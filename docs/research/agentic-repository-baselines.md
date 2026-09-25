@@ -5,6 +5,11 @@
 **Method:** first-party specifications, standards, regulator guidance, official product documentation, and first-party engineering reports. Recommendations that are not direct source claims are labelled **[Inference]** or **[Template decision]**.
 
 > **Important boundary:** this is a technical starter baseline, not legal advice, a certification, or a claim that a generated project is GDPR-, WCAG-, SSDF-, SLSA-, or OWASP-compliant. Agent instructions and skill metadata are context, not a security boundary. File, network, identity, secret, and tool permissions must be enforced by the host or CI platform.
+>
+> **Link-check boundary:** the cited OpenAI Harness Engineering page and the three
+> ISO catalogue pages return `403` to automated clients. They were manually
+> reviewed on the access date above. CI excludes only those exact paths, not
+> either domain, so unrelated links remain fail-closed.
 
 ## Executive baseline
 

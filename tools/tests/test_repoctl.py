@@ -692,7 +692,10 @@ quality_oracle = "human review"
         self.assertIn("permissions: {}", ci_workflow)
         scans = (root / ".github/workflows/specialist-scans.yml").read_text(encoding="utf-8")
         self.assertIn("pull_request:", scans)
-        self.assertNotIn("403", scans.split("args:", 1)[1].split("fail:", 1)[0])
+        scan_args = scans.split("args:", 1)[1].split("fail:", 1)[0]
+        self.assertNotIn("403", scan_args)
+        self.assertIn("openai\\.com/index/harness-engineering", scan_args)
+        self.assertIn("iso\\.org/standard/(74393|78176|81291)", scan_args)
 
     def test_public_launch_fails_without_typed_evidence(self) -> None:
         self.write("project.toml", """schema = 1
