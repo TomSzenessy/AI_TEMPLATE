@@ -732,6 +732,11 @@ verification = [["python3", "-c", "print('ok')"]]
         self.assertIn("private_reporting", result.stderr)
         self.assertIn("legal document", result.stderr)
         self.assertIn("security_reviewer", result.stderr)
+    def test_readiness_output_does_not_claim_full_production_acceptance(self) -> None:
+        source = (Path(__file__).resolve().parents[1] / "repoctl.py").read_text(encoding="utf-8")
+        self.assertIn("not a full production-readiness", source)
+        self.assertIn("docs/production.md", source)
+
     def test_owner_sentinels_cannot_satisfy_doctor(self) -> None:
         self.write("README.md", "# Demo\n<!-- repoctl:project-readme -->\n> Project initialized: **Demo** (`web`).\n")
         self.write("project.toml", """schema = 1
@@ -836,6 +841,41 @@ rollback = "remove the project-local skill and restore the previous lockfile"
         result = self.cli("incident", "--title", "Rollback failure", "--summary", summary, "--public-safe", "--review-evidence", "incident-review.md")
         self.assertEqual(result.returncode, 1)
         self.assertEqual(list((self.root / "docs" / "incidents").glob("*.md")), [])
+
+    def test_resource_registry_validates_and_routes_without_network(self) -> None:
+        self.write("project.toml", """schema = 1
+name = "Demo"
+kind = "web"
+phase = "development"
+[resources]
+registry = "resources.toml"
+""")
+        self.write("resources.toml", """schema = 1
+[[resources]]
+id = "react-docs"
+kind = "library-docs"
+source = "https://react.dev/"
+trust = "official"
+access = "read-only"
+mcp = "context7"
+scope = "web"
+summary = "Official React documentation."
+""")
+        result = self.cli("resources")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("react-docs", result.stdout)
+        self.write("resources.toml", """schema = 1
+[[resources]]
+id = "bad"
+kind = "unknown"
+source = "http://example.com/docs"
+trust = "unknown"
+scope = "web"
+summary = "pending"
+""")
+        invalid = self.cli("resources")
+        self.assertEqual(invalid.returncode, 1)
+        self.assertIn("resource registry check failed", invalid.stderr)
 
     def test_skill_directory_without_manifest_is_rejected(self) -> None:
         (self.root / ".agents" / "skills" / "attacker").mkdir(parents=True)

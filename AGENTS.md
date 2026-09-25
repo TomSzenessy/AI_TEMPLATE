@@ -76,8 +76,9 @@ completion. Keep active security vulnerabilities private under `SECURITY.md`.
   read [`docs/operations.md`](./docs/operations.md); reproduce first and use
   `make incident` when a private regression draft is useful; promote it with
   `PUBLIC_SAFE=1` only after redaction and review.
-- **Completion, a broad change, or a quality claim:** read
-  [`docs/verification.md`](./docs/verification.md).
+- **Completion, a broad change, a quality claim, or production/release work:**
+  read [`docs/verification.md`](./docs/verification.md) and
+  [`docs/production.md`](./docs/production.md).
 - **Authentication, authorization, secrets, dependencies, CI, deployment, or
   untrusted input:** read [`docs/security.md`](./docs/security.md) and
   [`SECURITY.md`](./SECURITY.md).
@@ -85,7 +86,7 @@ completion. Keep active security vulnerabilities private under `SECURITY.md`.
   legal text:** read [`docs/privacy.md`](./docs/privacy.md) and
   [`docs/legal/README.md`](./docs/legal/README.md).
 - **Missing specialist capability, code style, example, or platform/legal gate:**
-  read [`docs/resources.md`](./docs/resources.md) and
+  run `make resources`, then read [`docs/resources.md`](./docs/resources.md) and
   [`docs/skills.md`](./docs/skills.md). Discover, inspect, pin, and record
   before using a third-party skill; prefer reviewed capabilities already
   available locally.

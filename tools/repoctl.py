@@ -31,6 +31,8 @@ PROJECT_KIND_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 CONTAINER_DIRECTORIES = {"apps", "frontends", "packages", "services", "workers"}
 FILE_SURFACE_KINDS = {"file", "script", "document", "asset"}
 BUNDLED_SKILLS = {"agent-handover", "quality-loop", "repository-audit"}
+RESOURCE_KINDS = {"library-docs", "platform-policy", "accessibility", "security", "media", "skills"}
+RESOURCE_TRUSTS = {"official", "first-party", "reviewed", "discovery"}
 # Ambiguous names such as tests/, config/, and fixtures/ are intentionally not
 # implicit infrastructure: a project must declare them or opt in explicitly.
 REPOSITORY_INFRASTRUCTURE_DIRECTORIES = {
@@ -137,6 +139,67 @@ def load_project(root: Path) -> dict[str, object]:
     if not isinstance(project.get("name"), str) or not isinstance(project.get("kind"), str):
         raise RepoctlError("project.toml requires string name and kind fields")
     return project
+
+
+def load_resource_registry(root: Path, project: dict[str, object] | None = None) -> list[dict[str, object]]:
+    project = project or load_project(root)
+    resources = project.get("resources", {})
+    if not isinstance(resources, dict):
+        raise RepoctlError("resources must be a table")
+    registry_value = resources.get("registry", "resources.toml")
+    if not isinstance(registry_value, str) or not registry_value.strip():
+        raise RepoctlError("resources.registry must be a repository-relative path")
+    registry_path = ensure_inside_root(root, root / registry_value, "resource registry")
+    try:
+        with registry_path.open("rb") as registry_file:
+            registry = tomllib.load(registry_file)
+    except FileNotFoundError as error:
+        raise RepoctlError(f"resource registry is missing: {registry_value}") from error
+    except tomllib.TOMLDecodeError as error:
+        raise RepoctlError(f"resource registry is invalid: {error}") from error
+    if registry.get("schema") != 1:
+        raise RepoctlError("resource registry schema must be 1")
+    entries = registry.get("resources", [])
+    if not isinstance(entries, list) or not entries or not all(isinstance(entry, dict) for entry in entries):
+        raise RepoctlError("resource registry must contain a non-empty resources array")
+    errors: list[str] = []
+    identifiers: set[str] = set()
+    for position, entry in enumerate(entries, start=1):
+        identifier = entry.get("id")
+        kind = entry.get("kind")
+        source = entry.get("source")
+        trust = entry.get("trust")
+        access = entry.get("access")
+        scope = entry.get("scope")
+        summary = entry.get("summary")
+        mcp = entry.get("mcp", "")
+        if not isinstance(identifier, str) or not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", identifier):
+            errors.append(f"resource #{position} id must be kebab-case")
+        elif identifier in identifiers:
+            errors.append(f"duplicate resource id: {identifier}")
+        else:
+            identifiers.add(identifier)
+        if kind not in RESOURCE_KINDS:
+            errors.append(f"resource #{position} kind is invalid")
+        if trust not in RESOURCE_TRUSTS:
+            errors.append(f"resource #{position} trust is invalid")
+        if access != "read-only":
+            errors.append(f"resource #{position} access must be read-only")
+        if not isinstance(source, str) or not source.startswith("https://"):
+            errors.append(f"resource #{position} source must be an HTTPS URL")
+        else:
+            parsed = urlsplit(source)
+            if not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment:
+                errors.append(f"resource #{position} source must be a clean HTTPS URL")
+        if not isinstance(scope, str) or not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", scope):
+            errors.append(f"resource #{position} scope must be kebab-case")
+        if not isinstance(summary, str) or is_placeholder(summary):
+            errors.append(f"resource #{position} summary is required")
+        if mcp and (not isinstance(mcp, str) or not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", mcp)):
+            errors.append(f"resource #{position} mcp must be a kebab-case adapter name")
+    if errors:
+        raise RepoctlError("resource registry check failed:\n- " + "\n- ".join(errors))
+    return entries
 
 
 def governance_profile(project: dict[str, object]) -> str:
@@ -523,6 +586,11 @@ def check_structure(root: Path, project: dict[str, object]) -> None:
             configured_path = ensure_inside_root(root, root / value, f"governance.{field}")
             if not configured_path.is_file():
                 raise RepoctlError(f"governance.{field} does not exist: {value}")
+    except RepoctlError as error:
+        errors.append(str(error))
+    try:
+        if "resources" in project:
+            load_resource_registry(root, project)
     except RepoctlError as error:
         errors.append(str(error))
     try:
@@ -2114,10 +2182,13 @@ def check_readiness(root: Path) -> None:
     if errors:
         raise RepoctlError("readiness check failed:\n- " + "\n- ".join(errors))
     if project.get("phase") == "public-launch":
-        print("Repository is ready for public launch.")
+        print(
+            "Configured public-launch gates passed; this is not a full production-readiness "
+            "certification. Follow docs/production.md for the complete evidence matrix."
+        )
     else:
         print(
-            f"Repository is ready for its declared phase ({project.get('phase')}); "
+            f"Repository is structurally ready for its declared phase ({project.get('phase')}); "
             "public-launch security, legal, and production evidence gates remain inactive."
         )
 
@@ -2162,6 +2233,15 @@ def print_inventory(root: Path) -> None:
             )
     else:
         print("Declared surfaces: none")
+
+
+def print_resources(root: Path) -> None:
+    project = load_project(root)
+    resources = load_resource_registry(root, project)
+    print(f"Resource registry: {project.get('resources', {}).get('registry', 'resources.toml')}")
+    for resource in resources:
+        mcp = resource.get("mcp") or "none"
+        print(f"- {resource['id']} [{resource['kind']}; trust={resource['trust']}; scope={resource['scope']}; mcp={mcp}]: {resource['source']}")
 
 
 def update_readme_identity(root: Path, name: str, kind: str) -> None:
@@ -2321,6 +2401,7 @@ def build_parser() -> argparse.ArgumentParser:
     init_parser.add_argument("--kind", required=True, help="lowercase kebab-case project kind")
 
     subparsers.add_parser("inventory", help="show detected and declared product surfaces")
+    subparsers.add_parser("resources", help="show the validated read-only resource router")
     skill_digest_parser = subparsers.add_parser("skill-digest", help="hash a reviewed skill directory for provenance")
     skill_digest_parser.add_argument("path", type=Path)
     subparsers.add_parser("check", help="check manifests, structure, docs, and hygiene")
@@ -2381,6 +2462,8 @@ def main(argv: list[str] | None = None) -> int:
             initialize_project(arguments.root.resolve(), arguments.name, arguments.kind)
         elif arguments.command == "inventory":
             print_inventory(arguments.root.resolve())
+        elif arguments.command == "resources":
+            print_resources(arguments.root.resolve())
         elif arguments.command == "skill-digest":
             repository_root = arguments.root.resolve()
             skill_path = ensure_inside_root(repository_root, repository_root / arguments.path, "skill directory")

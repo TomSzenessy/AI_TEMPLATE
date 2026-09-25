@@ -5,6 +5,32 @@ smallest set of primary documentation, examples, and specialist capabilities
 that materially improve the current surface. Do not download a framework,
 component catalog, snippet collection, or skill merely because it appears here.
 
+The machine-readable source of truth is [`../resources.toml`](../resources.toml).
+Run `make resources` to validate and display it. The registry contains
+read-only starting points only; it does not install packages, configure MCP
+credentials, or authorize external actions. The protocol and Context7 boundary
+sources are recorded in [`research/mcp-production-boundaries-2026-09-25.md`](./research/mcp-production-boundaries-2026-09-25.md).
+
+## Optional MCP policy
+
+An MCP/documentation adapter such as Context7 can be useful for current library
+and API documentation, but it remains host-owned:
+
+- use it for read-only documentation retrieval, not production credentials or
+  architecture/legal decisions;
+- pin or review the server/source configuration outside this public template;
+- use least-privilege filesystem/network permissions and no secrets by default;
+- record the consulted source and the version actually adopted in the issue or
+  ADR;
+- fall back to the linked official source when the adapter is unavailable.
+
+A resource entry's `mcp` value is a route hint, not an instruction to invoke or
+install that server. Context7 and similar retrieval tools can improve
+version-specific discovery, but they do not guarantee completeness, accuracy,
+security, or fitness for a project. The agent should use the smallest matching
+capability, cross-check the official source, and retain it only while its trust
+and usefulness remain current.
+
 ## Use resources deliberately
 
 For a new task:

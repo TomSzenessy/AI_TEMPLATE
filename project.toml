@@ -28,6 +28,10 @@ profile = "agent-first"
 issue_template = "docs/ISSUE_TEMPLATE.md"
 label_registry = ".github/issue-labels.json"
 
+[resources]
+# Read-only resource/MCP starting points; never an automatic install manifest.
+registry = "resources.toml"
+
 [security]
 contact = ""
 private_reporting = ""

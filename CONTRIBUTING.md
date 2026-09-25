@@ -23,6 +23,10 @@
   work. Address blockers; record residual uncertainty honestly.
 - Link the issue (`Fixes #N` or `Refs #N`) and include commands, observed
   results, and remaining external gates in the PR.
+- Use `make resources` when a task needs current library, platform, security,
+  legal, media, or skill guidance; record the selected source and version.
+- For a real release, follow [`docs/production.md`](./docs/production.md) and
+  attach the evidence rows; do not substitute a green local check.
 
 ## Commits and issues
 

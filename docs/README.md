@@ -21,6 +21,7 @@ backlog.
 | [`operations.md`](./operations.md) | Error ledger and incident loop | A bug, outage, flaky test, or operational failure occurs. |
 | [`ERROR_LOG.md`](./ERROR_LOG.md) | Solved failure signatures and permanent fixes | A recurring operational failure needs a durable regression/fix record. |
 | [`verification.md`](./verification.md) | Definition of done and independent quality loop | A change is ready for review or a quality claim is made. |
+| [`production.md`](./production.md) | Production evidence and release boundary | A real project is being prepared for deployment or release. |
 | [`handoffs/README.md`](./handoffs/README.md) | Cross-session continuity | Work must be transferred or resumed. |
 | [`handoffs/TEMPLATE.md`](./handoffs/TEMPLATE.md) | Handoff record scaffold | A fresh actor needs a focused continuation record. |
 | [`incidents/README.md`](./incidents/README.md) | Reviewed public incident record boundary | A public incident is promoted or a regression artifact is reviewed. |
@@ -53,12 +54,14 @@ backlog.
 
 | Read | Owns | Reach for it when |
 |---|---|---|
+| [`../resources.toml`](../resources.toml) | Machine-readable read-only resource/MCP routes | An agent needs validated current source or documentation starting points. |
 | [`resources.md`](./resources.md) | Primary docs, examples, licenses, and platform/legal-risk routing | A task needs a capability, code style, example, or external gate not owned by the kernel. |
 | [`skills.md`](./skills.md) | Safe skill discovery and provenance | A task needs a capability that the repository does not provide. |
 | [`adr/README.md`](./adr/README.md) | Architecture decision records | A hard-to-reverse, surprising trade-off is made. |
 | [`adr/0001-issue-backed-write-ahead.md`](./adr/0001-issue-backed-write-ahead.md) | Accepted WAL and documentation-boundary decision | The agent needs the rationale for issue-backed continuity. |
 | [`research/agentic-repository-baselines.md`](./research/agentic-repository-baselines.md) | Primary-source research behind the template | Guidance, legal boundaries, or external references need provenance. |
 | [`research/primary-source-hardening-2026-09-25.md`](./research/primary-source-hardening-2026-09-25.md) | Fresh hardening and adversarial pass | Reviewing new agent, CI, skill, privacy, or legal-risk controls. |
+| [`research/mcp-production-boundaries-2026-09-25.md`](./research/mcp-production-boundaries-2026-09-25.md) | MCP/resource and generic production-evidence boundaries | Adding an optional documentation/resource provider or preparing a real release. |
 
 ## Durable knowledge versus live work
 
@@ -82,8 +85,9 @@ move the status to an issue and reduce the document to its durable owner.
   update or file an issue using [`ISSUE_TEMPLATE.md`](./ISSUE_TEMPLATE.md).
 - **“Can this be removed?”** Prove callers/owners are gone, run the affected
   checks, and file an independent residual instead of deleting a live contract.
-- **“Is it ready to ship?”** Read [`verification.md`](./verification.md), run
-  `make verify`, obtain a fresh-agent critique, and inspect the real artifact.
+- **“Is it ready to ship?”** Read [`verification.md`](./verification.md) and
+  [`production.md`](./production.md), run `make verify`, obtain a fresh-agent
+  critique, and inspect the real artifact.
 
 ## Incident index
 

@@ -1,0 +1,117 @@
+# Machine-readable resource router. This is an allowlist of read-only starting
+# points, not an instruction to install packages or MCP servers automatically.
+schema = 1
+
+[[resources]]
+id = "react-docs"
+kind = "library-docs"
+source = "https://react.dev/"
+trust = "official"
+access = "read-only"
+mcp = "context7"
+scope = "web"
+summary = "Official React documentation and versioned API guidance."
+
+[[resources]]
+id = "react-native-docs"
+kind = "library-docs"
+source = "https://reactnative.dev/docs/getting-started"
+trust = "official"
+access = "read-only"
+mcp = "context7"
+scope = "mobile"
+summary = "Official React Native guides, architecture, testing, and native integration."
+
+[[resources]]
+id = "expo-docs"
+kind = "library-docs"
+source = "https://docs.expo.dev/"
+trust = "official"
+access = "read-only"
+mcp = "context7"
+scope = "mobile"
+summary = "Official Expo tooling, EAS, runtime, and store-submission documentation."
+
+[[resources]]
+id = "tailwind-docs"
+kind = "library-docs"
+source = "https://tailwindcss.com/docs"
+trust = "official"
+access = "read-only"
+mcp = "context7"
+scope = "web"
+summary = "Official Tailwind CSS installation, compatibility, and styling documentation."
+
+[[resources]]
+id = "shadcn-docs"
+kind = "library-docs"
+source = "https://ui.shadcn.com/docs"
+trust = "official"
+access = "read-only"
+mcp = "context7"
+scope = "web"
+summary = "Official shadcn/ui component, theming, registry, and installation documentation."
+
+[[resources]]
+id = "apple-platform"
+kind = "platform-policy"
+source = "https://developer.apple.com/"
+trust = "official"
+access = "read-only"
+scope = "apple"
+summary = "Apple developer, design, platform, and App Store submission guidance."
+
+[[resources]]
+id = "android-platform"
+kind = "platform-policy"
+source = "https://developer.android.com/"
+trust = "official"
+access = "read-only"
+scope = "android"
+summary = "Android development, design, testing, and distribution guidance."
+
+[[resources]]
+id = "wcag"
+kind = "accessibility"
+source = "https://www.w3.org/WAI/standards-guidelines/wcag/"
+trust = "official"
+access = "read-only"
+scope = "accessibility"
+summary = "W3C Web Content Accessibility Guidelines and supporting evaluation guidance."
+
+[[resources]]
+id = "owasp"
+kind = "security"
+source = "https://cheatsheetseries.owasp.org/"
+trust = "official"
+access = "read-only"
+scope = "security"
+summary = "OWASP primary cheat sheets for application, API, CI/CD, and security review."
+
+[[resources]]
+id = "ffmpeg"
+kind = "media"
+source = "https://ffmpeg.org/documentation.html"
+trust = "official"
+access = "read-only"
+scope = "media"
+summary = "Official FFmpeg codec, filter, format, and pipeline documentation."
+
+[[resources]]
+id = "blender"
+kind = "media"
+source = "https://docs.blender.org/manual/en/latest/"
+trust = "official"
+access = "read-only"
+scope = "3d"
+summary = "Official Blender manual for modeling, rendering, animation, and pipelines."
+
+[[resources]]
+id = "skills-directory"
+kind = "skills"
+source = "https://skills.sh/"
+trust = "discovery"
+access = "read-only"
+mcp = "find-skills"
+scope = "agent"
+summary = "Skill discovery directory; inspect source, license, permissions, and revision before use."

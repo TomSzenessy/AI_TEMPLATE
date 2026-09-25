@@ -78,4 +78,5 @@ Use the same loop with a domain-specific oracle:
   and a human-readable rendered review.
 
 A command that exits zero is not a quality oracle until it proves the intended
-artifact or behavior.
+artifact or behavior. For a real deployment or release, follow
+[`production.md`](./production.md) and attach its evidence rows.

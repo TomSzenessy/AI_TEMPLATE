@@ -24,6 +24,8 @@ a project small:
 | `docs/ERROR_LOG.md` | Keep as an append-only solved-failure ledger. | Do not use it for open work; link open work to Issues. |
 | `.agents/skills/` | Keep the small first-party workflows and verified reusable capabilities. | Retain a reviewed skill while it remains trusted and useful; remove it only with a documented trust, permission, maintenance, or owner decision. |
 | `.security/` | Keep and refresh the threat model/config as security surfaces change. | Do not delete security evidence merely to make a check quiet. |
+| `resources.toml` | Keep as the small read-only route registry. | Add or retire a route only with an owner, source/trust review, and current-use rationale. |
+| `docs/production.md` | Keep as the generic release evidence boundary. | Replace its empty project-specific evidence with real records; do not turn it into a status board. |
 
 A project should be able to remove unused optional material without removing
 its operating contract, history, or evidence.

@@ -33,6 +33,7 @@ lychee for specialist CI, and pre-commit where the team wants local hooks.
 | Where is the durable documentation owner? | [`docs/README.md`](./docs/README.md) |
 | Where do I find official examples, licenses, and platform guidance? | [`docs/resources.md`](./docs/resources.md) |
 | How does the small kernel become a product? | [`docs/ADAPTATION.md`](./docs/ADAPTATION.md) |
+| Is a real project ready for production? | [`docs/production.md`](./docs/production.md) |
 | What is this project trying to become? | [`VISION.md`](./VISION.md) |
 | Why this stack/toolchain? | [`docs/STACK-DECISION.md`](./docs/STACK-DECISION.md) |
 | What work is active right now? | GitHub Issues, not a Markdown backlog |
@@ -95,9 +96,10 @@ to it; they do not become competing instruction sources.
 | `docs/audit.md` | Whole-repository audit and issue-filing protocol. |
 | `docs/operations.md` | Reproduce → diagnose → repair → verify loop and error ledger. |
 | `docs/verification.md` | Evidence ladder and independent quality loop. |
+| `docs/production.md` | Production evidence, release sequence, and external-gate boundary. |
 | `docs/security.md` / `SECURITY.md` | Engineering threat model and private vulnerability reporting. |
 | `docs/privacy.md` / `docs/legal/` | Data inventory, rights workflow, and jurisdiction/counsel gate. |
-| `docs/resources.md` | Primary docs, examples, licenses, and platform/legal-risk routing. |
+| `resources.toml` / `docs/resources.md` | Machine-readable and human-readable primary resource/MCP routes. |
 | `docs/skills.md` | Safe skill discovery, inspection, pinning, and provenance. |
 | `HANDOVER.template.md` | Concise local session-continuation record; copied to ignored `HANDOVER.md` when needed. |
 | `docs/handoffs/` | Deliberate committed cross-session continuation records. |
@@ -202,5 +204,6 @@ Select and add the project license, name accountable owners, configure GitHub
 branch protection/review/secret scanning/Dependabot, replace legal placeholders
 with verified facts, obtain counsel review where applicable, and attach runtime,
 provider, deployment, hardware, or counsel evidence to the launch issue. See
-[`docs/legal/README.md`](./docs/legal/README.md) and
+[`docs/production.md`](./docs/production.md),
+[`docs/legal/README.md`](./docs/legal/README.md), and
 [`docs/verification.md`](./docs/verification.md).
