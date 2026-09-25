@@ -37,6 +37,9 @@ check: python-check
 doctor: python-check
 	$(REPOCTL) doctor
 
+readiness: python-check
+	$(REPOCTL) readiness
+
 test: python-check
 	$(PYTHON) -m unittest discover -s tools/tests -p 'test_*.py'
 

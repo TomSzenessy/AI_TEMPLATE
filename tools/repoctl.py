@@ -2096,12 +2096,17 @@ def reset_vision_for_project(root: Path, manifest: str, project_name: str) -> st
     except FileNotFoundError:
         content = "# Project vision\n\nStatus: pending\n"
     content = re.sub(r"(?m)^Status:\s*.*$", "Status: pending", content, count=1)
+    content = re.sub(r"(?m)^Project:\s*.*$", f"Project: {project_name}", content, count=1)
+    content = re.sub(r"(?m)^Owner:\s*.*$", "Owner: project-owner", content, count=1)
+    content = re.sub(r"(?m)^Date:\s*.*$", "Date: [YYYY-MM-DD]", content, count=1)
     vision_path.write_text(content, encoding="utf-8")
     stack_path = ensure_inside_root(root, root / "docs" / "STACK-DECISION.md", "stack decision record")
     try:
         stack_content = stack_path.read_text(encoding="utf-8")
         stack_content = re.sub(r"(?m)^Status:\s*.*$", "Status: pending", stack_content, count=1)
         stack_content = re.sub(r"(?m)^Project:\s*.*$", f"Project: {project_name}", stack_content, count=1)
+        stack_content = re.sub(r"(?m)^Owner:\s*.*$", "Owner: project-owner", stack_content, count=1)
+        stack_content = re.sub(r"(?m)^Date:\s*.*$", "Date: [YYYY-MM-DD]", stack_content, count=1)
         stack_path.write_text(stack_content, encoding="utf-8")
     except FileNotFoundError:
         pass
@@ -2132,6 +2137,8 @@ def initialize_project(root: Path, name: str, kind: str) -> None:
     manifest = replace_manifest_field(manifest, "kind", kind)
     manifest = replace_manifest_field(manifest, "phase", "development")
     manifest = re.sub(r'(?m)^github\s*=\s*"[^"]*"$', 'github = ""', manifest, count=1)
+    manifest = re.sub(r'(?m)^owners\s*=\s*\[[^\]]*\]', 'owners = ["project-owner"]', manifest, count=1)
+    manifest = manifest.replace('owner = "TomSzenessy"', 'owner = "project-owner"')
     manifest = reset_vision_for_project(root, manifest, name)
     manifest_path.write_text(manifest, encoding="utf-8")
     update_readme_identity(root, name, kind)
@@ -2220,6 +2227,8 @@ def main(argv: list[str] | None = None) -> int:
             check_docs_index(repository_root)
             check_markdown_links(repository_root)
             check_file_hygiene(repository_root)
+            if isinstance(project.get("vision"), dict) and project["vision"].get("status") != "accepted":
+                print("Vision intake is pending; complete VISION.md and docs/STACK-DECISION.md before declaring readiness.")
             print("Repository structure is coherent.")
         elif arguments.command == "doctor":
             check_readiness(arguments.root.resolve())

@@ -50,7 +50,8 @@ bundled specialist workflow runs Gitleaks on trusted pushes/manual runs (its
 organization license is not exposed to fork PRs) and Lychee for Markdown links;
 organization-owned repositories must provide the trusted `GITLEAKS_LICENSE`
 secret for the pinned action. Enable the provider's fork-PR secret scanning as
-well.
+well. The link job excludes the known slow German legal site and records it for
+manual review rather than turning a transient timeout into a false pass/fail.
 
 ## Supply chain and CI
 

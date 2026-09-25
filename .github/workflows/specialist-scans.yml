@@ -42,6 +42,7 @@ jobs:
           args: >-
             --no-progress
             --max-retries 2
-            --accept 200,206,301,302,307,308,403,429
+            --accept 200,202,206,301,302,307,308,403,429
+            --exclude 'https://www\.gesetze-im-internet\.de/.*'
             './**/*.md'
           fail: true
