@@ -1,0 +1,94 @@
+name: Issue tracker
+description: File a compact, public-safe issue for the agent-first profile.
+title: "[type/priority] concise outcome"
+body:
+  - type: markdown
+    attributes:
+      value: "Search existing issues and the error ledger first. Use SECURITY.md for active vulnerabilities, secrets, or personal data."
+  - type: input
+    id: type
+    attributes:
+      label: Type
+      placeholder: bug, privacy, audit, task, operations, documentation, enhancement
+    validations:
+      required: true
+  - type: input
+    id: priority
+    attributes:
+      label: Priority
+      placeholder: P0, P1, P2, or P3
+    validations:
+      required: true
+  - type: input
+    id: area
+    attributes:
+      label: Area
+      placeholder: repo, web, game, media, data, security, privacy, legal, operations
+    validations:
+      required: true
+  - type: input
+    id: topic
+    attributes:
+      label: Topic
+      description: One stable lowercase kebab-case topic.
+    validations:
+      required: true
+  - type: dropdown
+    id: status
+    attributes:
+      label: Status
+      options: [triage, ready, in-progress, blocked, fixed, wont-fix]
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Concrete outcome, scope, and non-goals.
+    validations:
+      required: true
+  - type: textarea
+    id: duplicate
+    attributes:
+      label: Duplicate check
+      description: "Write: Duplicate check: searched title, symptom, and path for <terms>; no duplicate found (or reused #N)."
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Positive and negative/regression criteria with observable evidence.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Name evidence type and an Artifact/Commit/Diff reference.
+    validations:
+      required: true
+  - type: textarea
+    id: disclosure
+    attributes:
+      label: Disclosure classification
+      description: "Include public-safe: yes; Security/privacy review: <review>; Reviewer/date: <name and YYYY-MM-DD>."
+    validations:
+      required: true
+  - type: input
+    id: dependencies
+    attributes:
+      label: Dependencies and handoff
+      description: Owner / next action and affected path.
+    validations:
+      required: true
+  - type: checkboxes
+    attributes:
+      label: Safety checks
+      options:
+        - label: I searched open and closed issues and the error ledger.
+          required: true
+        - label: I reviewed public disclosure; sensitive findings use the private route.
+          required: true
+        - label: Evidence is redacted and acceptance criteria are objective.
+          required: true

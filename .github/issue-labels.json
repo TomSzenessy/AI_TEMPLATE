@@ -1,0 +1,8 @@
+{
+  "type": ["bug", "security", "privacy", "compliance", "audit", "task", "operations", "documentation", "enhancement"],
+  "priority": ["P0", "P1", "P2", "P3"],
+  "area": ["security", "privacy", "legal", "operations", "platform", "documentation", "web", "game", "media", "data", "repo"],
+  "status": ["triage", "ready", "in-progress", "blocked", "fixed", "wont-fix"],
+  "gate": ["operator-action", "counsel-review", "provider-evidence", "deployment-evidence", "hardware-validation"],
+  "surface": ["repo", "web", "game", "media", "backend", "data", "docs", "provider", "deployment"]
+}

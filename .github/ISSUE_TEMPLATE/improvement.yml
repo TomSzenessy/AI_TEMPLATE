@@ -1,0 +1,84 @@
+name: Improvement
+description: Propose a bounded maintainability or product improvement.
+title: "[enhancement/P3] bounded improvement"
+body:
+  - type: markdown
+    attributes:
+      value: "Use for public-safe improvements. Do not file speculative cleanup without an owner and evidence."
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Concrete cleanup or improvement outcome and why it matters.
+    validations:
+      required: true
+  - type: textarea
+    id: duplicate
+    attributes:
+      label: Duplicate check
+      description: "Write: Duplicate check: searched title, symptom, and path for <terms>; no duplicate found (or reused #N)."
+    validations:
+      required: true
+  - type: input
+    id: type
+    attributes:
+      label: Type
+      description: Use `enhancement`.
+    validations:
+      required: true
+  - type: input
+    id: priority
+    attributes:
+      label: Priority
+      placeholder: P0, P1, P2, or P3
+    validations:
+      required: true
+  - type: input
+    id: area
+    attributes:
+      label: Area
+      placeholder: repo, web, game, media, data, security, privacy, legal, operations
+    validations:
+      required: true
+  - type: input
+    id: topic
+    attributes:
+      label: Topic
+      description: One stable lowercase kebab-case topic.
+    validations:
+      required: true
+  - type: dropdown
+    id: status
+    attributes:
+      label: Status
+      options: [triage, ready, in-progress, blocked]
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: "Include a positive criterion and a negative/regression criterion with observable evidence."
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: "Name evidence type, positive/negative acceptance criteria, and an Artifact/Commit/Diff reference."
+    validations:
+      required: true
+  - type: textarea
+    id: disclosure
+    attributes:
+      label: Disclosure classification
+      description: "Include Public-safe: yes; Security/privacy review: <not applicable or review>; Reviewer/date: <name and YYYY-MM-DD>."
+    validations:
+      required: true
+  - type: input
+    id: dependencies
+    attributes:
+      label: Dependencies and handoff
+      description: Owner / next action and affected path.
+    validations:
+      required: true

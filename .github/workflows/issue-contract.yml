@@ -1,0 +1,149 @@
+name: Issue contract
+
+on:
+  issues:
+    types: [opened, edited, reopened, labeled, unlabeled, transferred]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  canonical-contract:
+    name: canonical issue contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository contract
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Validate classification and disclosure fields
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPOSITORY: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import re
+          import subprocess
+          import sys
+          from datetime import date, timedelta
+          from pathlib import Path
+
+          body = Path(os.environ["GITHUB_EVENT_PATH"]).read_text()
+          import json
+          event = json.loads(body)
+          text = event.get("issue", {}).get("body") or ""
+          structural_text = re.sub(r"```.*?```", "", text, flags=re.DOTALL)
+          import tomllib
+          manifest = tomllib.loads(Path("project.toml").read_text())
+          governance = manifest.get("governance", {})
+          if not isinstance(governance, dict):
+              raise SystemExit("governance must be a table")
+          profile = governance.get("profile", "agent-first")
+          if profile not in {"agent-first", "regulated", "minimal"}:
+              raise SystemExit("invalid governance.profile")
+          if profile == "regulated":
+              raise SystemExit("Regulated projects must use repoctl issue/private security route for reviewed evidence")
+          if profile == "minimal":
+              print("Minimal profile delegates issue intake to the host organization")
+              raise SystemExit(0)
+          event_labels = {label.get("name", "") for label in event.get("issue", {}).get("labels", [])}
+          status_values = [label.split(":", 1)[1] for label in event_labels if label.startswith("status:")]
+          issue_status = status_values[0] if len(status_values) == 1 else "triage"
+          Path("issue-event.md").write_text(text, encoding="utf-8")
+          subprocess.run(
+              [sys.executable, "tools/repoctl.py", "--root", ".", "validate-issue", "--body-file", "issue-event.md", "--status", issue_status],
+              check=True,
+          )
+          required = [
+              "Summary",
+              "What happens",
+              "Where",
+              "When",
+              "Why",
+              "How to reproduce",
+              "Impact and scope",
+              "Acceptance criteria",
+              "Evidence",
+              "Disclosure classification",
+              "Dependencies and handoff",
+          ] if profile == "regulated" else [
+              "Summary",
+              "Acceptance criteria",
+              "Evidence",
+              "Disclosure classification",
+              "Dependencies and handoff",
+          ]
+          missing = [heading for heading in required if not re.search(rf"^### {re.escape(heading)}$", structural_text, re.MULTILINE)]
+          public_safe = bool(re.search(r"(?im)^\s*(?:-\s*)?(?:\*\*)?Public-safe:(?:\*\*)?\s*yes\s*$" if profile == "regulated" else r"(?im)^\s*(?:-\s*)?(?:\*\*)?Public-safe:(?:\*\*)?\s*yes\b", structural_text))
+          duplicate_recorded = bool(re.search(r"(?im)^Duplicate check:\s*searched\s+title,\s*symptom,\s*and\s+path\s+for\s+.+;\s*(?:reused\s+#[0-9]+|no duplicate found)\s*$", structural_text))
+          reviewer = re.search(
+              r"(?im)^\s*(?:-\s*)?(?:\*\*)?Reviewer/date:(?:\*\*)?\s*(.+?)\s*$",
+              structural_text,
+          ) if profile != "regulated" else re.search(r"(?im)^\s*(?:-\s*)?(?:\*\*)?Reviewer/date:(?:\*\*)?\s*(.+?)\s*$", structural_text)
+          labels = {label.get("name", "") for label in event.get("issue", {}).get("labels", [])}
+          invalid = missing or not public_safe or not duplicate_recorded or "type:security" in labels
+          registry = json.loads(Path(".github/issue-labels.json").read_text())
+          field_values = {}
+          for field in ("Type", "Priority", "Area", "Topic", "Status"):
+              match = re.search(rf"(?im)^### {field}\s*$\n\s*([^\n]+)", structural_text)
+              if match:
+                  field_values[field.lower()] = match.group(1).strip().strip("`")
+          if field_values:
+              if set(field_values) != {"type", "priority", "area", "topic", "status"}:
+                  invalid = True
+              for family, value in field_values.items():
+                  if family == "topic":
+                      if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", value):
+                          invalid = True
+                  elif family not in registry or value not in registry[family]:
+                      invalid = True
+              if field_values.get("type") == "security":
+                  invalid = True
+          elif not labels:
+              invalid = True
+          labels_to_add = [f"{family}:{value}" for family, value in field_values.items()]
+          for desired in labels_to_add:
+              family_name = desired.split(":", 1)[0] + ":"
+              conflicting = {label for label in labels if label.startswith(family_name) and label != desired}
+              if conflicting:
+                  invalid = True
+          if labels:
+              labels_to_add = [label for label in labels_to_add if label not in labels]
+          sensitive = bool(re.search(r"(?i)\b(?:unpatched|vulnerability|exploit|credential|secret|personal data|privacy incident)\b", structural_text))
+          if sensitive:
+              invalid = True
+          if reviewer is None or re.search(r"\[|required|tbd|never|pending", reviewer.group(1), re.I):
+              invalid = True
+          else:
+              reviewer_name = re.split(r"\s+\d{4}-\d{2}-\d{2}\b", reviewer.group(1).strip(), maxsplit=1)[0].strip(" *_`")
+              if len(reviewer_name) < 3 or reviewer_name.lower() in {"x", "none", "n/a", "pending", "tbd"}:
+                  invalid = True
+              reviewer_date = re.search(r"\b(\d{4}-\d{2}-\d{2})\b", reviewer.group(1))
+              if not reviewer_date:
+                  invalid = True
+              else:
+                  try:
+                      reviewed = date.fromisoformat(reviewer_date.group(1))
+                      if reviewed > date.today() or reviewed < date.today() - timedelta(days=365):
+                          invalid = True
+                  except ValueError:
+                      invalid = True
+          if invalid:
+              message = "Issue contract incomplete. Use docs/ISSUE_TEMPLATE.md, include every canonical heading, and complete the public disclosure review. Active vulnerabilities, secrets, and personal data belong in the private security route."
+              subprocess.run([
+                  "gh", "issue", "comment", os.environ["ISSUE_NUMBER"],
+                  "--repo", os.environ["GH_REPOSITORY"], "--body", message,
+              ], check=True)
+              raise SystemExit("Issue contract validation failed")
+          if labels_to_add:
+              subprocess.run([
+                  "gh", "issue", "edit", os.environ["ISSUE_NUMBER"],
+                  "--repo", os.environ["GH_REPOSITORY"],
+                  *sum((["--add-label", label] for label in labels_to_add), []),
+              ], check=True)
+          print("Canonical issue contract passed")
+          PY

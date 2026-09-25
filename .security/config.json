@@ -1,0 +1,25 @@
+{
+  "threat_model_version": "1.1.0",
+  "last_updated": "2026-09-25T11:56:06Z",
+  "security_reviewed_on": "",
+  "security_reviewer": "",
+  "security_team_contacts": [],
+  "compliance_requirements": [],
+  "scan_frequency": "on_commit",
+  "severity_thresholds": {
+    "block_merge": ["CRITICAL"],
+    "require_review": ["HIGH", "CRITICAL"],
+    "notify_security_team": ["CRITICAL"]
+  },
+  "vulnerability_patterns": {
+    "enabled": [
+      "command_injection",
+      "path_traversal",
+      "secret_exposure",
+      "prompt_injection",
+      "supply_chain",
+      "ci_privilege"
+    ],
+    "custom_patterns_path": null
+  }
+}

@@ -1,0 +1,76 @@
+# The manifest is the machine-readable source of truth for repository shape,
+# verification commands, launch state, and reviewed skill provenance.
+# Keep product meaning in code/specs; keep live work in GitHub Issues.
+schema = 1
+name = "AI_TEMPLATE"
+kind = "template"
+phase = "development"
+license = "MIT"
+owners = ["TomSzenessy"]
+
+[repository]
+default_branch = "main"
+# Set github = "owner/name" when the checkout has no trusted GitHub remote.
+github = "TomSzenessy/AI_TEMPLATE"
+# Add project-specific generated/infrastructure paths here when the defaults
+# are not enough. Product surfaces still belong in [[surfaces]].
+infrastructure_paths = []
+
+[vision]
+status = "accepted"
+record = "VISION.md"
+stack_decision = "docs/STACK-DECISION.md"
+
+[governance]
+profile = "agent-first"
+issue_template = "docs/ISSUE_TEMPLATE.md"
+label_registry = ".github/issue-labels.json"
+
+[security]
+contact = ""
+private_reporting = ""
+
+[launch]
+legal_review = "pending"
+# Public launch: local review record with Counsel review, Reviewer, Date.
+legal_review_ref = ""
+production_evidence = "unverified"
+# Public launch: local artifacts with Evidence type: deployed, Observed,
+# Reviewer, and Date. External provider/counsel gates stay linked issues.
+production_evidence_refs = []
+# Public launch must list final, placeholder-free documents under docs/legal/.
+legal_document_paths = []
+
+# Add one entry per independently verifiable product or creative surface.
+# Example:
+# [[surfaces]]
+# id = "app"
+# path = "apps/app"
+# kind = "code"
+# status = "active"
+# owner = "team-or-person"
+# quality_oracle = "Playwright smoke test plus a fresh visual review"
+# critic_evidence = ["artifacts/reviews/app-123.md"]
+# verification = [["npm", "ci"], ["npm", "test"]]
+#
+# Reviewed third-party skills are recorded as provenance, not installed globally:
+# [[skills]]
+# package = "owner/repository@skill"
+# source = "https://github.com/owner/repository"
+# revision = "40-character-commit-sha-or-sha256:<64-hex-digest>"
+# purpose = "bounded capability"
+# reviewed_on = "YYYY-MM-DD"
+# permissions = "read-only / project-local"
+# rollback = "remove the project-local skill and restore the previous lockfile"
+#
+# A surface is not a folder to fill mechanically. Add it when the requirement
+# exists, then give it an owner, a quality oracle, and evidence-producing checks.
+
+[[surfaces]]
+id = "template"
+path = "."
+kind = "template"
+owner = "TomSzenessy"
+status = "active"
+quality_oracle = "Fresh-agent navigation, contract checks, and bounded review packet inspection"
+verification = [["python3", "tools/repoctl.py", "check"]]
