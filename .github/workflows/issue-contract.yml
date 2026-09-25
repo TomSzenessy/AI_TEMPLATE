@@ -31,6 +31,8 @@ jobs:
           import sys
           from datetime import date, timedelta
           from pathlib import Path
+          sys.path.insert(0, ".")
+          from tools.issue_contract import disclosure_class, sensitive_issue_content
 
           body = Path(os.environ["GITHUB_EVENT_PATH"]).read_text()
           import json
@@ -45,11 +47,14 @@ jobs:
           profile = governance.get("profile", "agent-first")
           if profile not in {"agent-first", "regulated", "minimal"}:
               raise SystemExit("invalid governance.profile")
-          if profile == "regulated":
-              raise SystemExit("Regulated projects must use repoctl issue/private security route for reviewed evidence")
+          registry_value = governance.get("label_registry", ".github/issue-labels.json")
+          registry_path = Path(registry_value)
+          if registry_path.is_absolute() or ".." in registry_path.parts:
+              raise SystemExit("governance.label_registry must stay inside the repository")
           if profile == "minimal":
-              print("Minimal profile delegates issue intake to the host organization")
-              raise SystemExit(0)
+              raise SystemExit("Minimal profile delegates issue intake to the host organization; remove native forms")
+          if profile == "regulated":
+              raise SystemExit("Regulated profile uses the CLI/private issue route; remove native forms")
           event_labels = {label.get("name", "") for label in event.get("issue", {}).get("labels", [])}
           status_values = [label.split(":", 1)[1] for label in event_labels if label.startswith("status:")]
           issue_status = status_values[0] if len(status_values) == 1 else "triage"
@@ -78,6 +83,8 @@ jobs:
               "Dependencies and handoff",
           ]
           missing = [heading for heading in required if not re.search(rf"^### {re.escape(heading)}$", structural_text, re.MULTILINE)]
+          disclosure = disclosure_class(structural_text)
+          disclosure_valid = disclosure in {"ordinary", "public-reviewed"}
           public_safe = bool(re.search(r"(?im)^\s*(?:-\s*)?(?:\*\*)?Public-safe:(?:\*\*)?\s*yes\s*$" if profile == "regulated" else r"(?im)^\s*(?:-\s*)?(?:\*\*)?Public-safe:(?:\*\*)?\s*yes\b", structural_text))
           duplicate_recorded = bool(re.search(r"(?im)^Duplicate check:\s*searched\s+title,\s*symptom,\s*and\s+path\s+for\s+.+;\s*(?:reused\s+#[0-9]+|no duplicate found)\s*$", structural_text))
           reviewer = re.search(
@@ -85,35 +92,51 @@ jobs:
               structural_text,
           ) if profile != "regulated" else re.search(r"(?im)^\s*(?:-\s*)?(?:\*\*)?Reviewer/date:(?:\*\*)?\s*(.+?)\s*$", structural_text)
           labels = {label.get("name", "") for label in event.get("issue", {}).get("labels", [])}
-          invalid = missing or not public_safe or not duplicate_recorded or "type:security" in labels
-          registry = json.loads(Path(".github/issue-labels.json").read_text())
+          invalid = missing or not public_safe or not duplicate_recorded or not disclosure_valid
+          registry = json.loads(registry_path.read_text())
+          required_families = ("type", "priority", "area", "topic", "status")
+          label_values = {}
+          for label in labels:
+              if ":" not in label:
+                  continue
+              family, value = label.split(":", 1)
+              if family in required_families:
+                  if family in label_values:
+                      invalid = True
+                  label_values[family] = value
+              allowed = registry.get(family)
+              if family in required_families and (not isinstance(allowed, list) or value not in allowed):
+                  invalid = True
           field_values = {}
           for field in ("Type", "Priority", "Area", "Topic", "Status"):
               match = re.search(rf"(?im)^### {field}\s*$\n\s*([^\n]+)", structural_text)
               if match:
                   field_values[field.lower()] = match.group(1).strip().strip("`")
           if field_values:
-              if set(field_values) != {"type", "priority", "area", "topic", "status"}:
+              if set(field_values) != set(required_families):
                   invalid = True
               for family, value in field_values.items():
+                  allowed = registry.get(family)
                   if family == "topic":
                       if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", value):
                           invalid = True
-                  elif family not in registry or value not in registry[family]:
+                  elif not isinstance(allowed, list) or value not in allowed:
                       invalid = True
-              if field_values.get("type") == "security":
-                  invalid = True
-          elif not labels:
+                  if family in label_values and label_values[family] != value:
+                      invalid = True
+          elif set(label_values) != set(required_families):
+              invalid = True
+          if label_values.get("type") == "security" or field_values.get("type") == "security":
               invalid = True
           labels_to_add = [f"{family}:{value}" for family, value in field_values.items()]
           for desired in labels_to_add:
-              family_name = desired.split(":", 1)[0] + ":"
-              conflicting = {label for label in labels if label.startswith(family_name) and label != desired}
-              if conflicting:
+              family_name, desired_value = desired.split(":", 1)
+              conflicting = {label for label in labels if label.startswith(family_name + ":") and label != desired}
+              if conflicting or label_values.get(family_name, desired_value) != desired_value:
                   invalid = True
           if labels:
               labels_to_add = [label for label in labels_to_add if label not in labels]
-          sensitive = bool(re.search(r"(?i)\b(?:unpatched|vulnerability|exploit|credential|secret|personal data|privacy incident)\b", structural_text))
+          sensitive = sensitive_issue_content(structural_text)
           if sensitive:
               invalid = True
           if reviewer is None or re.search(r"\[|required|tbd|never|pending", reviewer.group(1), re.I):

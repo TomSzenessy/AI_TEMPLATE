@@ -36,7 +36,9 @@ Use exactly one label from each required family:
 | `gate:*` | optional: `operator-action`, `counsel-review`, `provider-evidence`, `deployment-evidence`, `hardware-validation` |
 | `surface:*` | optional: `repo`, `web`, `game`, `media`, `backend`, `data`, `docs`, `provider`, `deployment` |
 
-`ready` means a runnable reproduction or validation experiment exists. External
+`ready` means a runnable validation experiment exists. In `regulated`, the
+full numbered `How to reproduce` section is required; in `agent-first`, the
+compact contract may put the validation evidence in `Evidence`. External
 work remains `blocked` with its gate and named owner. The public `repoctl issue`
 adapter refuses `type: security`; use the private route in
 [`../SECURITY.md`](../SECURITY.md), then file a redacted follow-up only after
@@ -49,7 +51,10 @@ propagation, hardware behavior, or legal approval.
 default `agent-first` profile requires the compact contract: `Summary`,
 `Acceptance criteria`, `Evidence`, `Disclosure classification`, and
 `Dependencies and handoff`; add the diagnostic headings when they help a
-reviewer. `minimal` delegates the issue contract to the host organization.
+reviewer. `minimal` delegates the issue contract to the host organization. Native
+GitHub forms are for `agent-first` intake; `regulated` uses the CLI/private route
+and `minimal` uses the host's route, so a project using either profile must
+remove or disable `.github/ISSUE_TEMPLATE/` before `make check` is green.
 Replace placeholders; write `N/A — reason` when a section genuinely does not
 apply.
 
@@ -118,14 +123,18 @@ Mark every item as `source`, `test`, `deployed`, `provider`, `hardware`, or
 
 ### Disclosure classification
 
+- **Disclosure class:** `ordinary` or `public-reviewed`
 - **Public-safe:** yes
 - **Security/privacy review:** `not applicable` or link the private review record
 - **Reviewer/date:** `[REQUIRED for public filing]`
 
-This is an explicit publication gate, not a legal conclusion. A body containing
-an unpatched vulnerability, exposed secret, raw personal data, or sensitive
-provider detail belongs in the private route in [`../SECURITY.md`](../SECURITY.md),
-not in a public Issue.
+`ordinary` means the issue contains no security/privacy, personal-data, secret,
+or sensitive-provider subject; `public-reviewed` means a reviewer explicitly
+approved a redacted public form. This is an explicit publication gate, not a
+legal conclusion or a perfect classifier. A body containing an unpatched
+vulnerability, exposed secret, raw personal data, or sensitive provider detail
+belongs in the private route in [`../SECURITY.md`](../SECURITY.md), not in a
+public Issue.
 
 ### Dependencies and handoff
 

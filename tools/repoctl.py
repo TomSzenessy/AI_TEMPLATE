@@ -20,22 +20,22 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path, PureWindowsPath
 from urllib.parse import unquote, urlsplit
 
+try:
+    from issue_contract import disclosure_class, sensitive_issue_content
+except ImportError:  # pragma: no cover - module import from a package context
+    from tools.issue_contract import disclosure_class, sensitive_issue_content
+
 
 PROJECT_NAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 PROJECT_KIND_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 CONTAINER_DIRECTORIES = {"apps", "frontends", "packages", "services", "workers"}
 FILE_SURFACE_KINDS = {"file", "script", "document", "asset"}
 BUNDLED_SKILLS = {"agent-handover", "quality-loop", "repository-audit"}
+# Ambiguous names such as tests/, config/, and fixtures/ are intentionally not
+# implicit infrastructure: a project must declare them or opt in explicitly.
 REPOSITORY_INFRASTRUCTURE_DIRECTORIES = {
     "docs",
     "tools",
-    "tests",
-    "test",
-    "scripts",
-    "script",
-    "config",
-    "configs",
-    "fixtures",
     "incidents",
     "cache",
     "coverage",
@@ -308,6 +308,11 @@ def check_skill_provenance(project: dict[str, object]) -> None:
             errors.append(f"skill #{position} revision must be a full commit SHA or sha256 digest")
         elif set(revision.replace("sha256:", "")) == {"0"}:
             errors.append(f"skill #{position} revision must not be an all-zero digest")
+        content_digest = skill.get("content_digest")
+        if not isinstance(content_digest, str) or not re.fullmatch(r"sha256:[0-9a-f]{64}", content_digest):
+            errors.append(f"skill #{position} content_digest must be sha256:<64-hex-digest>")
+        elif set(content_digest.removeprefix("sha256:")) == {"0"}:
+            errors.append(f"skill #{position} content_digest must not be an all-zero digest")
         for field in ("purpose", "reviewed_on", "permissions", "rollback"):
             if is_placeholder(skill.get(field)):
                 errors.append(f"skill #{position} {field} is required and concrete")
@@ -336,28 +341,69 @@ def check_skill_provenance(project: dict[str, object]) -> None:
         raise RepoctlError("skill provenance check failed:\n- " + "\n- ".join(errors))
 
 
+def directory_digest(directory: Path) -> str:
+    digest = hashlib.sha256()
+    for path in sorted(directory.rglob("*")):
+        if is_link_like(path):
+            raise RepoctlError(f"skill contains an unsupported file type: {path}")
+        if path.is_dir():
+            continue
+        if not path.is_file():
+            raise RepoctlError(f"skill contains an unsupported file type: {path}")
+        relative = path.relative_to(directory).as_posix().encode("utf-8")
+        digest.update(len(relative).to_bytes(8, "big"))
+        digest.update(relative)
+        digest.update(b"X" if path.stat().st_mode & 0o111 else b"F")
+        data = path.read_bytes()
+        digest.update(len(data).to_bytes(8, "big"))
+        digest.update(data)
+    return f"sha256:{digest.hexdigest()}"
+
+
 def check_skill_admission(root: Path, project: dict[str, object]) -> None:
     entries = project.get("skills", [])
-    provenance_names = {
-        str(entry.get("package", "")).split("@", 1)[1]
-        for entry in entries if isinstance(entry, dict) and "@" in str(entry.get("package", ""))
+    if not isinstance(entries, list):
+        raise RepoctlError("skills must be an array of tables")
+    provenance = {
+        str(entry.get("package", "")).split("@", 1)[1]: entry
+        for entry in entries
+        if isinstance(entry, dict) and "@" in str(entry.get("package", ""))
     }
     skill_root = root / ".agents" / "skills"
     if not skill_root.exists():
         return
-    for skill_file in sorted(skill_root.glob("*/SKILL.md")):
+    for skill_directory in sorted(skill_root.iterdir()):
+        if not skill_directory.is_dir() or skill_directory.name.startswith("."):
+            continue
+        skill_file = skill_directory / "SKILL.md"
         try:
+            skill_directory = ensure_inside_root(root, skill_directory, "skill directory")
             skill_file = ensure_inside_root(root, skill_file, "bundled skill")
         except RepoctlError as error:
             raise RepoctlError(str(error)) from error
-        name = skill_file.parent.name
-        if name not in BUNDLED_SKILLS and name not in provenance_names:
+        if not skill_file.is_file():
+            raise RepoctlError(f"skill directory is missing SKILL.md: {skill_directory.relative_to(root).as_posix()}")
+        name = skill_directory.name
+        if name in BUNDLED_SKILLS:
+            for child in skill_file.parent.iterdir():
+                if child.name == "SKILL.md" or child.name.startswith("."):
+                    continue
+                raise RepoctlError(
+                    f"first-party skill contains an unregistered file: {child.relative_to(root).as_posix()}"
+                )
+            continue
+        entry = provenance.get(name)
+        if entry is None:
             raise RepoctlError(f"skill directory is not allowlisted or recorded in project provenance: {name}")
-        for child in skill_file.parent.iterdir():
-            if child.name == "SKILL.md" or child.name.startswith("."):
-                continue
-            if name in BUNDLED_SKILLS:
-                raise RepoctlError(f"first-party skill contains an unregistered file: {child.relative_to(root).as_posix()}")
+        expected = entry.get("content_digest")
+        try:
+            actual = directory_digest(skill_file.parent)
+        except (OSError, RepoctlError) as error:
+            raise RepoctlError(f"cannot digest third-party skill {name}: {error}") from error
+        if actual != expected:
+            raise RepoctlError(
+                f"third-party skill {name} content_digest does not match project provenance"
+            )
 
 
 def validation_commands(surface: dict[str, object]) -> list[list[str]]:
@@ -465,10 +511,30 @@ def check_structure(root: Path, project: dict[str, object]) -> None:
         errors.append(str(error))
     surfaces = declared_surfaces(project)
     try:
+        governance = project.get("governance", {})
+        if not isinstance(governance, dict):
+            raise RepoctlError("governance must be a table")
+        for field in ("issue_template", "label_registry"):
+            if field not in governance:
+                continue
+            value = governance[field]
+            if not isinstance(value, str) or not value.strip():
+                raise RepoctlError(f"governance.{field} must be a repository-relative path")
+            configured_path = ensure_inside_root(root, root / value, f"governance.{field}")
+            if not configured_path.is_file():
+                raise RepoctlError(f"governance.{field} does not exist: {value}")
+    except RepoctlError as error:
+        errors.append(str(error))
+    try:
         check_vision(root, project, enforce=False)
         check_skill_admission(root, project)
     except RepoctlError as error:
         errors.append(str(error))
+    if profile in {"minimal", "regulated"}:
+        issue_templates = root / ".github" / "ISSUE_TEMPLATE"
+        if issue_templates.exists() and any(issue_templates.glob("*.yml")):
+            route = "host" if profile == "minimal" else "CLI/private"
+            errors.append(f"{profile} profile must remove or disable native issue forms; use the {route} route")
     surface_ids: set[str] = set()
     surface_paths_seen: set[str] = set()
     declared_paths: set[str] = set()
@@ -696,7 +762,7 @@ def check_readme_identity(root: Path, project: dict[str, object]) -> None:
         raise RepoctlError("initialized project README.md needs a project identity marker value")
     if identity.group("name") != project.get("name") or identity.group("kind") != project.get("kind"):
         raise RepoctlError("README project identity does not match project.toml")
-    if re.search(r"(?m)^# Agent Template$|cp -R AGENT_TEMPLATE my-project", content):
+    if project.get("name") != "AI_TEMPLATE" and re.search(r"(?m)^# Agent Template$|cp -R AGENT_TEMPLATE my-project|make init NAME=my-project", content):
         raise RepoctlError("initialized project README.md still contains template bootstrap text")
 
 
@@ -814,7 +880,17 @@ def date_is_stale(value: datetime.date) -> bool:
 
 
 def is_placeholder(value: object) -> bool:
-    return not isinstance(value, str) or not value.strip() or bool(re.fullmatch(r"\[.*\]|\s*(?:tbd|pending|required|unknown|none|placeholder)\s*", value.strip(), re.I))
+    if not isinstance(value, str) or not value.strip():
+        return True
+    normalized = value.strip()
+    return bool(
+        re.fullmatch(
+            r"\[.*\]|\s*(?:tbd|pending|required|unknown|none|placeholder|project-owner|todo)\s*"
+            r"|todo(?:\s*:\s*assign)?|replace[_-]?with[_-]?project[_-]?owner",
+            normalized,
+            re.I,
+        )
+    )
 
 
 def secret_matches(content: str) -> list[str]:
@@ -931,6 +1007,27 @@ def check_file_hygiene(root: Path) -> None:
         raise RepoctlError("file hygiene check failed:\n- " + "\n- ".join(errors))
 
 
+def verification_environment() -> dict[str, str]:
+    environment = os.environ.copy()
+    for variable in (
+        "GH_TOKEN",
+        "GITHUB_TOKEN",
+        "GITHUB_ENTERPRISE_TOKEN",
+        "GH_ENTERPRISE_TOKEN",
+        "ACTIONS_RUNTIME_TOKEN",
+        "ACTIONS_ID_TOKEN_REQUEST_TOKEN",
+        "AWS_ACCESS_KEY_ID",
+        "AWS_SECRET_ACCESS_KEY",
+        "AWS_SESSION_TOKEN",
+        "GOOGLE_APPLICATION_CREDENTIALS",
+        "AZURE_CLIENT_SECRET",
+        "VERCEL_TOKEN",
+        "NETLIFY_AUTH_TOKEN",
+    ):
+        environment.pop(variable, None)
+    return environment
+
+
 def run_verification(root: Path) -> None:
     try:
         depth = int(os.environ.get("REPOCTL_VERIFY_DEPTH", "0"))
@@ -966,14 +1063,14 @@ def run_verification(root: Path) -> None:
         for command in commands:
             print(f"{identifier}: running {' '.join(command)}")
             try:
-                verification_environment = os.environ.copy()
-                verification_environment["REPOCTL_VERIFY_DEPTH"] = str(depth + 1)
+                command_environment = verification_environment()
+                command_environment["REPOCTL_VERIFY_DEPTH"] = str(depth + 1)
                 result = subprocess.run(
                     command,
                     cwd=surface_root,
                     check=False,
                     timeout=1800,
-                    env=verification_environment,
+                    env=command_environment,
                 )
             except (FileNotFoundError, subprocess.TimeoutExpired) as error:
                 raise RepoctlError(f"{identifier}: verification command failed to run: {error}") from error
@@ -999,16 +1096,19 @@ ISSUE_REQUIRED_HEADINGS = (
 )
 
 
-def load_label_registry(root: Path) -> dict[str, list[str]]:
-    registry_path = ensure_inside_root(
-        root, root / ".github" / "issue-labels.json", "label registry"
-    )
+def load_label_registry(root: Path, project: dict[str, object] | None = None) -> dict[str, list[str]]:
+    project = project or load_project(root)
+    governance = project.get("governance", {})
+    configured = governance.get("label_registry", ".github/issue-labels.json") if isinstance(governance, dict) else ".github/issue-labels.json"
+    if not isinstance(configured, str) or not configured.strip():
+        raise RepoctlError("governance.label_registry must be a repository-relative path")
+    registry_path = ensure_inside_root(root, root / configured, "label registry")
     try:
         registry = json.loads(registry_path.read_text(encoding="utf-8"))
     except FileNotFoundError as error:
-        raise RepoctlError(".github/issue-labels.json is missing") from error
+        raise RepoctlError(f"configured label registry is missing: {configured}") from error
     except json.JSONDecodeError as error:
-        raise RepoctlError(f".github/issue-labels.json is invalid: {error}") from error
+        raise RepoctlError(f"configured label registry is invalid: {error}") from error
     if not isinstance(registry, dict):
         raise RepoctlError("issue label registry must be a JSON object")
     return registry
@@ -1024,7 +1124,7 @@ def issue_labels(
     surface: str | None,
     gate: str | None,
 ) -> list[str]:
-    registry = load_label_registry(root)
+    registry = load_label_registry(root, load_project(root))
     for family, value in (
         ("type", issue_type),
         ("priority", priority),
@@ -1098,18 +1198,17 @@ def validate_issue_body(body: str, profile: str = "regulated") -> None:
         raise RepoctlError("issue reviewer/date is invalid") from error
     if date_is_stale(parsed_reviewer_date):
         raise RepoctlError("issue reviewer/date is stale or in the future")
+    classification = disclosure_class(disclosure)
+    if classification not in {"ordinary", "public-reviewed"}:
+        raise RepoctlError(
+            "issue Disclosure classification must be ordinary or public-reviewed; use private-route for sensitive findings"
+        )
     privacy_review = re.search(
         r"(?im)^\s*(?:-\s*)?(?:\*\*)?Security/privacy review:(?:\*\*)?\s*(.+?)\s*$", disclosure
     )
     if not privacy_review or is_placeholder(privacy_review.group(1)):
         raise RepoctlError("issue Disclosure classification must include a security/privacy review value")
-    high_risk = bool(
-        re.search(
-            r"(?i)\b(?:unpatched|vulnerability|exploit|credential|secret|personal data|privacy incident)\b",
-            structural_body,
-        )
-    )
-    if high_risk:
+    if sensitive_issue_content(structural_body):
         raise RepoctlError(
             "sensitive issue bodies cannot use the public adapter; redact them or use the private security route"
         )
@@ -1173,7 +1272,7 @@ def validate_issue_content(body: str, status: str, profile: str = "regulated") -
 
 
 def validate_issue_state(body: str, status: str, profile: str = "regulated") -> None:
-    if status == "ready" and profile != "minimal" and not re.search(
+    if status == "ready" and profile == "regulated" and not re.search(
         r"(?im)^\s*\d+\.\s+", issue_section(body, "How to reproduce")
     ):
         raise RepoctlError("status=ready requires numbered deterministic reproduction steps")
@@ -1235,7 +1334,7 @@ def sync_issue_labels(root: Path) -> None:
         raise RepoctlError("minimal profile delegates issue labels to the host organization")
     repository = resolve_github_repo(root)
     print(f"Synchronizing issue labels in {repository}.")
-    registry = load_label_registry(root)
+    registry = load_label_registry(root, project)
     for family, values in registry.items():
         if not isinstance(values, list) or not all(isinstance(value, str) for value in values):
             raise RepoctlError(f"label family {family} must be an array of strings")
@@ -1537,25 +1636,37 @@ def slugify(value: str) -> str:
     return slug[:80].rstrip("-")
 
 
-def add_docs_index_link(root: Path, marker: str, link: str) -> None:
+def docs_index_link_content(root: Path, marker: str, link: str) -> str:
     index = ensure_inside_root(root, root / "docs" / "README.md", "documentation index")
     content = index.read_text(encoding="utf-8")
     start_marker = f"<!-- repoctl:{marker} -->"
     end_marker = f"<!-- /repoctl:{marker} -->"
     block = f"{start_marker}\n{link}\n{end_marker}"
+    if (start_marker in content) != (end_marker in content):
+        raise RepoctlError(f"documentation marker is malformed: {marker}")
     if start_marker in content and end_marker in content:
-        updated = re.sub(
+        match = re.search(
             rf"{re.escape(start_marker)}.*?{re.escape(end_marker)}",
-            block,
             content,
-            count=1,
             flags=re.DOTALL,
         )
+        if not match:
+            raise RepoctlError(f"documentation marker is malformed: {marker}")
+        body = match.group(0)[len(start_marker) : -len(end_marker)].strip()
+        if link in body.splitlines():
+            raise RepoctlError(f"documentation marker already contains link: {marker}")
+        new_body = f"\n{body}\n{link}\n" if body else f"\n{link}\n"
+        updated = content[: match.start()] + start_marker + new_body + end_marker + content[match.end() :]
     else:
         updated = content.rstrip() + "\n\n" + block + "\n"
     if start_marker in content and updated == content:
         raise RepoctlError(f"documentation marker did not update: {marker}")
-    index.write_text(updated, encoding="utf-8")
+    return updated
+
+
+def add_docs_index_link(root: Path, marker: str, link: str) -> None:
+    index = ensure_inside_root(root, root / "docs" / "README.md", "documentation index")
+    index.write_text(docs_index_link_content(root, marker, link), encoding="utf-8")
 
 
 def create_incident(root: Path, title: str, summary: str, public_safe: bool = False, review_evidence: str | None = None) -> None:
@@ -1619,13 +1730,21 @@ def create_incident(root: Path, title: str, summary: str, public_safe: bool = Fa
 - **Permanent error-ledger entry:**
 - **Linked issue/PR:**
 """
-    incident_path.write_text(incident, encoding="utf-8")
     if public_safe:
         relative = f"incidents/{filename}"
-        add_docs_index_link(root, "incidents", f"- [{safe_markdown_text(title)}]({relative})")
+        link = f"- [{safe_markdown_text(title)}]({relative})"
+        updated_index = docs_index_link_content(root, "incidents", link)
+        incident_path.write_text(incident, encoding="utf-8")
+        index_path = ensure_inside_root(root, root / "docs" / "README.md", "documentation index")
+        try:
+            index_path.write_text(updated_index, encoding="utf-8")
+        except OSError:
+            incident_path.unlink(missing_ok=True)
+            raise
         print(f"Created {relative}. Reproduce before changing code.")
     else:
         relative = f".agent/incidents/{filename}"
+        incident_path.write_text(incident, encoding="utf-8")
         print(f"Created private draft {relative}. Review/redact before promoting it to docs/incidents/.")
 
 
@@ -1668,26 +1787,10 @@ def github_target_configured(root: Path, project: dict[str, object]) -> bool:
     if configured and remote_target and configured != remote_target:
         return False
     target = configured or remote_target
-    if not isinstance(target, str):
-        return False
-    try:
-        result = subprocess.run(
-            ["gh", "repo", "view", target, "--json", "nameWithOwner"],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=20,
-            cwd=root,
-            env=github_environment(),
-        )
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        return False
-    if result.returncode != 0:
-        return False
-    try:
-        return json.loads(result.stdout).get("nameWithOwner") == target
-    except (json.JSONDecodeError, AttributeError):
-        return False
+    # Readiness is a local evidence gate. Live GitHub API confirmation belongs
+    # to a separate privileged job/evidence record and must not receive a token
+    # in general repository verification.
+    return isinstance(target, str) and bool(target)
 
 
 def valid_private_route(value: str) -> bool:
@@ -1724,7 +1827,11 @@ def read_evidence_file(
         return None, str(error)
     if secret_matches(content):
         return None, f"{label} contains possible secret material"
-    if re.search(r"\[(?:REQUIRED|pending|TBD)|DRAFT TEMPLATE|REPLACE_WITH|UNSELECTED|^\s*(?:Status|Counsel review|Evidence type|Legal owner|Reviewer|Observed|Date):\s*(?:pending|tbd|required|unknown|none|placeholder)\b", content, re.I | re.M):
+    for field in ("Status", "Counsel review", "Evidence type", "Legal owner", "Reviewer", "Observed", "Date"):
+        for value in re.findall(rf"(?im)^{re.escape(field)}:\s*(.+?)\s*$", content):
+            if is_placeholder(value) or re.search(r"[\[\]]", value):
+                return None, f"{label} contains placeholders"
+    if re.search(r"\[(?:REQUIRED|pending|TBD|name/team|YYYY-MM-DD)|DRAFT TEMPLATE|REPLACE_WITH|UNSELECTED|^\s*(?:Status|Counsel review|Evidence type|Legal owner|Reviewer|Observed|Date):\s*(?:pending|tbd|required|unknown|none|placeholder)\b", content, re.I | re.M):
         return None, f"{label} contains placeholders"
     for marker in markers:
         if not re.search(marker, content, re.I | re.MULTILINE):
@@ -1838,7 +1945,7 @@ def check_public_launch_evidence(root: Path, project: dict[str, object]) -> list
                             errors.append("security review date is stale or in the future")
                     except ValueError:
                         errors.append("security_reviewed_on is invalid")
-                if not isinstance(reviewer, str) or len(reviewer.strip()) < 3 or reviewer.strip().lower() in {"x", "n/a", "none"}:
+                if not isinstance(reviewer, str) or is_placeholder(reviewer) or re.search(r"[\[\]]", reviewer) or len(reviewer.strip()) < 3:
                     errors.append("public security configuration needs a named security_reviewer")
         except (OSError, json.JSONDecodeError):
             errors.append("public security configuration is unreadable")
@@ -1974,7 +2081,7 @@ def check_readiness(root: Path) -> None:
     if (
         not isinstance(owners, list)
         or not owners
-        or not all(isinstance(owner, str) and owner.strip() for owner in owners)
+        or not all(isinstance(owner, str) and owner.strip() and not is_placeholder(owner) for owner in owners)
     ):
         errors.append("at least one accountable owner is required")
 
@@ -1985,6 +2092,8 @@ def check_readiness(root: Path) -> None:
         errors.append("public launch requires at least one active product surface")
     if planned_surfaces and project.get("phase") == "public-launch":
         errors.append("public launch has unresolved planned surfaces")
+    if any(surface.get("id") == "template-bootstrap" for surface in planned_surfaces):
+        errors.append("template-bootstrap surface must be replaced with the first real product surface")
     if not active_surfaces and not planned_surfaces:
         errors.append("declare at least one active or planned product surface")
     for surface in surfaces:
@@ -2004,7 +2113,13 @@ def check_readiness(root: Path) -> None:
 
     if errors:
         raise RepoctlError("readiness check failed:\n- " + "\n- ".join(errors))
-    print("Repository is ready for its declared phase.")
+    if project.get("phase") == "public-launch":
+        print("Repository is ready for public launch.")
+    else:
+        print(
+            f"Repository is ready for its declared phase ({project.get('phase')}); "
+            "public-launch security, legal, and production evidence gates remain inactive."
+        )
 
 
 def check_readiness_gate(root: Path) -> None:
@@ -2073,6 +2188,27 @@ def update_readme_identity(root: Path, name: str, kind: str) -> None:
         f"> Project initialized: **{name}** (`{kind}`).",
         content,
     )
+    initialized_quickstart = '''<!-- repoctl:quickstart -->
+```bash
+# This project is initialized. Complete the intake and replace the
+# template-bootstrap surface before treating checks as product evidence.
+make inventory
+make check
+```
+<!-- /repoctl:quickstart -->'''
+    content = re.sub(
+        r"(?ms)^<!-- repoctl:quickstart -->\s*.*?^<!-- /repoctl:quickstart -->$",
+        initialized_quickstart,
+        content,
+        count=1,
+    )
+    if "<!-- repoctl:quickstart -->" not in content:
+        content = re.sub(
+            r"(?ms)(^## Start in five minutes\s*\n\s*```bash\s*\n).*?(\n\s*```)",
+            r"\1# This project is initialized. Complete the intake and replace the template-bootstrap surface before treating checks as product evidence.\nmake inventory\nmake check\2",
+            content,
+            count=1,
+        )
     content = re.sub(
         r"```bash\s*\n\s*cp -R AGENT_TEMPLATE my-project\s*\n.*?```",
         "```bash\nmake inventory\nmake check\n```",
@@ -2080,7 +2216,31 @@ def update_readme_identity(root: Path, name: str, kind: str) -> None:
         count=1,
         flags=re.DOTALL,
     )
+    content = re.sub(
+        r"(?ms)^`make init` sets identity and phase only;.*?then rerun the doctor\.",
+        "This project is initialized. Complete `VISION.md`, `docs/STACK-DECISION.md`, the accountable owner, and the first real surface in `project.toml`; rerun `make doctor` when those gates are resolved.",
+        content,
+        count=1,
+    )
     readme.write_text(content, encoding="utf-8")
+
+
+def reset_template_surface(manifest: str) -> str:
+    pattern = re.compile(
+        r'(?ms)^\[\[surfaces\]\]\s*\nid = "template"\s*\npath = "\.".*?(?=^\[\[?[^\]]+\]\]?\s*$|^\Z)'
+    )
+    replacement = '''[[surfaces]]
+id = "template-bootstrap"
+path = "."
+kind = "template"
+status = "planned"
+# Replace this bootstrap declaration with the first real product surface.
+verification = []
+'''
+    updated, count = pattern.subn(replacement, manifest, count=1)
+    if count == 0:
+        return manifest
+    return updated
 
 
 def reset_vision_for_project(root: Path, manifest: str, project_name: str) -> str:
@@ -2139,6 +2299,7 @@ def initialize_project(root: Path, name: str, kind: str) -> None:
     manifest = re.sub(r'(?m)^github\s*=\s*"[^"]*"$', 'github = ""', manifest, count=1)
     manifest = re.sub(r'(?m)^owners\s*=\s*\[[^\]]*\]', 'owners = ["project-owner"]', manifest, count=1)
     manifest = manifest.replace('owner = "TomSzenessy"', 'owner = "project-owner"')
+    manifest = reset_template_surface(manifest)
     manifest = reset_vision_for_project(root, manifest, name)
     manifest_path.write_text(manifest, encoding="utf-8")
     update_readme_identity(root, name, kind)
@@ -2160,6 +2321,8 @@ def build_parser() -> argparse.ArgumentParser:
     init_parser.add_argument("--kind", required=True, help="lowercase kebab-case project kind")
 
     subparsers.add_parser("inventory", help="show detected and declared product surfaces")
+    skill_digest_parser = subparsers.add_parser("skill-digest", help="hash a reviewed skill directory for provenance")
+    skill_digest_parser.add_argument("path", type=Path)
     subparsers.add_parser("check", help="check manifests, structure, docs, and hygiene")
     subparsers.add_parser("doctor", help="check initialization and launch readiness")
     subparsers.add_parser("readiness", help="enforce public-launch evidence gates")
@@ -2218,6 +2381,12 @@ def main(argv: list[str] | None = None) -> int:
             initialize_project(arguments.root.resolve(), arguments.name, arguments.kind)
         elif arguments.command == "inventory":
             print_inventory(arguments.root.resolve())
+        elif arguments.command == "skill-digest":
+            repository_root = arguments.root.resolve()
+            skill_path = ensure_inside_root(repository_root, repository_root / arguments.path, "skill directory")
+            if not skill_path.is_dir():
+                raise RepoctlError("skill-digest path must be a directory")
+            print(directory_digest(skill_path))
         elif arguments.command == "check":
             repository_root = arguments.root.resolve()
             project = load_project(repository_root)

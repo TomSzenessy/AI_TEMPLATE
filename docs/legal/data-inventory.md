@@ -26,6 +26,22 @@ secure delivery, correction/restriction path, deletion target, retries/alerts,
 and evidence. A row deletion, HTTP success, queue status, or counsel opinion is
 not proof that replicas, backups, logs, and providers are deleted.
 
+## Agent and review data stores
+
+Treat the following as possible data-processing stores even when they are not
+part of the product database:
+
+| Store | Possible contents | Owner / access | Retention and deletion evidence |
+|---|---|---|---|
+| Agent prompts, transcripts, and memory | User text, secrets accidentally included, project decisions | Host/provider; project owner | Host policy, redaction, deletion/export evidence |
+| Issues, pull requests, and review packets | Intent, diffs, artifacts, vulnerability reports | Repository permissions | Issue retention, private advisory route, deletion evidence |
+| CI logs and artifacts | Test output, build metadata, provider/deployment data | CI/provider | Log/artifact expiry and access review |
+| Installed skills and provenance | Third-party instructions, scripts, source/revision, permissions | Project owner/host | Trust review, digest, update/rollback record |
+| Support exports and analytics | User content, identifiers, usage events | Support/provider | Export minimization, retention, deletion path |
+
+Record the factual role, provider, region, access boundary, and retention path;
+do not infer a legal basis or compliance status from this table.
+
 ## Review triggers
 
 Review this record when code/schema/config changes a data flow, a provider or

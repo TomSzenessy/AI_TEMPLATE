@@ -31,6 +31,8 @@ lychee for specialist CI, and pre-commit where the team wants local hooks.
 | What should an agent do in its first session? | [`docs/START-HERE.md`](./docs/START-HERE.md) |
 | What rules always apply to agents? | [`AGENTS.md`](./AGENTS.md) |
 | Where is the durable documentation owner? | [`docs/README.md`](./docs/README.md) |
+| Where do I find official examples, licenses, and platform guidance? | [`docs/resources.md`](./docs/resources.md) |
+| How does the small kernel become a product? | [`docs/ADAPTATION.md`](./docs/ADAPTATION.md) |
 | What is this project trying to become? | [`VISION.md`](./VISION.md) |
 | Why this stack/toolchain? | [`docs/STACK-DECISION.md`](./docs/STACK-DECISION.md) |
 | What work is active right now? | GitHub Issues, not a Markdown backlog |
@@ -41,6 +43,7 @@ is the public landing page, START-HERE is a short first-session checklist, and
 
 ## Start in five minutes
 
+<!-- repoctl:quickstart -->
 ```bash
 # In a copy of this repository:
 git init
@@ -50,14 +53,17 @@ make init NAME=my-project KIND=web
 make inventory
 make check
 ```
+<!-- /repoctl:quickstart -->
 
-`make init` sets identity and phase only; it does not invent application folders
-or choose a framework. The published `AI_TEMPLATE` can be reinitialized in a
-copy; other already-initialized projects require an explicit manifest edit.
-`make doctor` intentionally reports the license, owner, surface, and launch
-gates that a real project must decide. Replace those gates in `project.toml`,
-complete `VISION.md` and `docs/STACK-DECISION.md`, declare each real surface and
-its verification, then rerun the doctor.
+`make init` sets identity and phase, clears the configured GitHub target,
+replaces template-owned owner/surface state, marks the vision and stack records
+pending, and rewrites the README quick start. It does not invent application
+folders or choose a framework. The published `AI_TEMPLATE` can be reinitialized
+in a copy; other already-initialized projects require an explicit manifest
+edit. `make doctor` intentionally reports the license, owner, surface, and
+launch gates that a real project must decide. Replace those gates in
+`project.toml`, complete `VISION.md` and `docs/STACK-DECISION.md`, declare each
+real surface and its verification, then rerun the doctor.
 
 <!-- repoctl:project-readme -->
 > Project initialized: **AI_TEMPLATE** (`template`). Keep this identity,
@@ -91,6 +97,7 @@ to it; they do not become competing instruction sources.
 | `docs/verification.md` | Evidence ladder and independent quality loop. |
 | `docs/security.md` / `SECURITY.md` | Engineering threat model and private vulnerability reporting. |
 | `docs/privacy.md` / `docs/legal/` | Data inventory, rights workflow, and jurisdiction/counsel gate. |
+| `docs/resources.md` | Primary docs, examples, licenses, and platform/legal-risk routing. |
 | `docs/skills.md` | Safe skill discovery, inspection, pinning, and provenance. |
 | `HANDOVER.template.md` | Concise local session-continuation record; copied to ignored `HANDOVER.md` when needed. |
 | `docs/handoffs/` | Deliberate committed cross-session continuation records. |
@@ -164,8 +171,10 @@ make issue BODY=.agent/issue.md TITLE="..." TYPE=bug PRIORITY=P1 \
   PUBLIC_REVIEWED=1 REVIEW_EVIDENCE=.agent/review.md
 ```
 
-It is a guardrail, not a replacement for human judgment; the adapter refuses
-active security findings and active vulnerabilities stay private.
+It is a guardrail, not a replacement for human judgment. The disclosure class is
+an explicit owner/reviewer decision, and the keyword blocklist is only a
+conservative secondary signal; uncertain security/privacy content belongs in
+the private route.
 
 ## Non-code projects
 
@@ -179,7 +188,9 @@ must inspect and pin the source before use.
 ## Research and provenance
 
 Primary-source findings and their boundaries are recorded in
-[`docs/research/agentic-repository-baselines.md`](./docs/research/agentic-repository-baselines.md).
+[`docs/research/agentic-repository-baselines.md`](./docs/research/agentic-repository-baselines.md)
+and the fresh
+[`docs/research/primary-source-hardening-2026-09-25.md`](./docs/research/primary-source-hardening-2026-09-25.md).
 The template incorporates current guidance from OpenAI, Anthropic, GitHub,
 NIST, SLSA, OpenSSF, OWASP, W3C, OpenTelemetry, the European Commission/EDPB,
 EUR-Lex, and ICO where applicable. Those sources inform defaults; they do not

@@ -3,7 +3,7 @@ REPOCTL := $(PYTHON) tools/repoctl.py
 
 .DEFAULT_GOAL := help
 
-.PHONY: help python-check init inventory check doctor readiness test verify validate incident issue labels review-packet
+.PHONY: help python-check init inventory skill-digest check doctor readiness test verify validate incident issue labels review-packet
 
 # Export user-supplied values so recipes pass them as data, not as shell source.
 export NAME KIND TITLE SUMMARY BODY TYPE PRIORITY AREA TOPIC STATUS SURFACE GATE PUBLIC_REVIEWED REVIEW_EVIDENCE ISSUE_FILE PUBLIC_SAFE
@@ -11,6 +11,7 @@ export NAME KIND TITLE SUMMARY BODY TYPE PRIORITY AREA TOPIC STATUS SURFACE GATE
 help:
 	@printf '%s\n' \
 	  'make inventory                            Show detected and declared surfaces' \
+	  'make skill-digest SKILL_PATH=.agents/skills/name  Hash a reviewed skill tree' \
 	  'make init NAME=my-project KIND=web       Set identity, reset vision intake, and update README' \
 	  'make check                                Validate structure, docs, links, and hygiene' \
 	  'make doctor                               Check initialization and launch readiness' \
@@ -30,6 +31,9 @@ init: python-check
 
 inventory:
 	$(REPOCTL) inventory
+
+skill-digest:
+	$(REPOCTL) skill-digest "$${SKILL_PATH}"
 
 check: python-check
 	$(REPOCTL) check

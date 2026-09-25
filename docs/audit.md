@@ -6,6 +6,10 @@ evidence-backed report**; file/update GitHub Issues only when the user
 explicitly authorizes that mutation. Do not turn a read-only audit into a
 large unrequested refactor.
 
+This file owns the canonical audit procedure. The
+[`repository-audit` skill](../.agents/skills/repository-audit/SKILL.md) is a
+host invocation adapter, not a second copy of the protocol.
+
 ## Disclosure gate before filing
 
 Before copying any finding into a public issue, classify it. An active

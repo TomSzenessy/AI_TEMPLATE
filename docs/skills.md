@@ -2,6 +2,8 @@
 
 Skills are reviewed instruction packages, not magic prompt dumps. Use the
 smallest capability that closes the current gap and keep the repository lean.
+For official documentation, examples, licenses, and platform/legal-risk
+routing, start with [`resources.md`](./resources.md).
 
 ## Discovery loop
 
@@ -19,8 +21,14 @@ smallest capability that closes the current gap and keep the repository lean.
    prompt-injection risks, and the exact files it would change.
 5. Use a project-local install, pin the source/revision where the tool permits,
    run it in a disposable environment first, and record it under `[[skills]]` in
-   `project.toml` with purpose, source, revision, review date, and rollback.
-6. Re-check after updates. Remove unused skills and their generated state.
+   `project.toml` with purpose, source, revision, `content_digest`, review
+   date, permissions, and rollback. Compute the tree digest locally with
+   `python3 tools/repoctl.py skill-digest .agents/skills/<name>`; the digest
+   covers every file path, executable mode, and byte so an added, removed, or
+   changed file is visible.
+6. Re-check after updates. Retain a verified capability for future reuse while
+   it remains trusted, scoped, and useful; remove it only when its source,
+   permissions, maintenance state, or project owner justify retirement.
 
 ## Dynamic capability selection
 
@@ -63,10 +71,10 @@ large prompt collection:
 They are first-party bundled skills: they are source-controlled with the
 repository and do not belong in the third-party `[[skills]]` provenance ledger.
 Third-party skills added later must include exact package/source match, an
-immutable revision or digest, a real review date, least-privilege permissions,
-and a rollback action. Add a new skill only when repeated work has a distinct
-trigger, interface, and quality oracle; otherwise keep the procedure in the
-owning document.
+immutable revision, a matching whole-tree `content_digest`, a real review date,
+least-privilege permissions, and a rollback action. Add a new skill only when
+repeated work has a distinct trigger, interface, and quality oracle; otherwise
+keep the procedure in the owning document.
 
 ## Useful capability branches
 

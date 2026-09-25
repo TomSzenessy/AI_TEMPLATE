@@ -10,10 +10,11 @@ quality oracle changes.
    working tree. **Done when** the current goal, branch, and next action are
    known without relying on chat history.
 2. Read [`../AGENTS.md`](../AGENTS.md), [`../project.toml`](../project.toml), and
-   [`README.md`](./README.md). For a new project, read
-   [`../VISION.md`](../VISION.md) and [`STACK-DECISION.md`](./STACK-DECISION.md).
-   **Done when** you can name the project purpose, active surfaces, owners, and
-   verification commands without guessing.
+   this [documentation index](./README.md). For a new project, read
+   [`../VISION.md`](../VISION.md), [`STACK-DECISION.md`](./STACK-DECISION.md),
+   and [`ADAPTATION.md`](./ADAPTATION.md). **Done when** you can name the
+   project purpose, active surfaces, owners, and verification commands without
+   guessing.
 3. Run `make inventory` and `make check`. **Done when** every product directory
    is either declared in `project.toml` or consciously left as infrastructure.
 4. Run the smallest declared check for the surface you will touch. **Done when**
@@ -21,6 +22,9 @@ quality oracle changes.
 5. If the project is not initialized, run `make init NAME=my-project KIND=...`
    and then replace the license/owner/launch placeholders deliberately. **Done
    when** `make doctor` reports only intentional gates.
+6. Replace the `template-bootstrap` surface declared by `make init` with the
+   first real product surface, following [`ADAPTATION.md`](./ADAPTATION.md).
+   **Done when** the manifest names a real owner, oracle, and verification path.
 
 ## Profiles and issue route
 
@@ -38,9 +42,10 @@ Read `[governance].profile` in `project.toml` before filing work:
   it. It still keeps manifest/path/verification checks here.
 
 If the task needs a missing specialist capability, read
-[`skills.md`](./skills.md), discover only the capability that matches the
-trigger, and record its reviewed provenance before using it. Do not load or
-install every available skill.
+[`resources.md`](./resources.md) and [`skills.md`](./skills.md), discover only
+the capability that matches the trigger, and record its reviewed provenance
+before using it. Retain verified capabilities while they remain trusted and
+useful. Do not load or install every available skill.
 
 Do not switch profiles to bypass a blocker. Record the decision and its reason
 in the issue.

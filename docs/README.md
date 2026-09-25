@@ -23,6 +23,7 @@ backlog.
 | [`verification.md`](./verification.md) | Definition of done and independent quality loop | A change is ready for review or a quality claim is made. |
 | [`handoffs/README.md`](./handoffs/README.md) | Cross-session continuity | Work must be transferred or resumed. |
 | [`handoffs/TEMPLATE.md`](./handoffs/TEMPLATE.md) | Handoff record scaffold | A fresh actor needs a focused continuation record. |
+| [`incidents/README.md`](./incidents/README.md) | Reviewed public incident record boundary | A public incident is promoted or a regression artifact is reviewed. |
 
 ## Design and engineering
 
@@ -52,10 +53,12 @@ backlog.
 
 | Read | Owns | Reach for it when |
 |---|---|---|
+| [`resources.md`](./resources.md) | Primary docs, examples, licenses, and platform/legal-risk routing | A task needs a capability, code style, example, or external gate not owned by the kernel. |
 | [`skills.md`](./skills.md) | Safe skill discovery and provenance | A task needs a capability that the repository does not provide. |
 | [`adr/README.md`](./adr/README.md) | Architecture decision records | A hard-to-reverse, surprising trade-off is made. |
 | [`adr/0001-issue-backed-write-ahead.md`](./adr/0001-issue-backed-write-ahead.md) | Accepted WAL and documentation-boundary decision | The agent needs the rationale for issue-backed continuity. |
 | [`research/agentic-repository-baselines.md`](./research/agentic-repository-baselines.md) | Primary-source research behind the template | Guidance, legal boundaries, or external references need provenance. |
+| [`research/primary-source-hardening-2026-09-25.md`](./research/primary-source-hardening-2026-09-25.md) | Fresh hardening and adversarial pass | Reviewing new agent, CI, skill, privacy, or legal-risk controls. |
 
 ## Durable knowledge versus live work
 

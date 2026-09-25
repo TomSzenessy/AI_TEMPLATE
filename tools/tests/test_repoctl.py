@@ -97,6 +97,7 @@ profile = "regulated"
             Test evidence: integration result and API response.
             Artifact: review.md
             ### Disclosure classification
+            - **Disclosure class:** ordinary
             - **Public-safe:** yes
             - **Security/privacy review:** {review}
             - **Reviewer/date:** 2026-08-25 test reviewer
@@ -164,6 +165,49 @@ cp -R AGENT_TEMPLATE my-project
         self.assertIn("Project initialized", readme)
         self.assertNotIn("cp -R AGENT_TEMPLATE my-project", readme)
         self.assertEqual(self.cli("check").returncode, 0)
+
+    def test_init_replaces_shipped_surface_and_preserves_trailing_tables(self) -> None:
+        shipped = (Path(__file__).resolve().parents[2] / "README.md").read_text(encoding="utf-8")
+        self.write("README.md", shipped)
+        self.write("project.toml", """schema = 1
+name = "AI_TEMPLATE"
+kind = "template"
+phase = "development"
+license = "MIT"
+owners = ["TomSzenessy"]
+[repository]
+github = "example/project"
+[governance]
+profile = "agent-first"
+[vision]
+status = "accepted"
+record = "VISION.md"
+stack_decision = "docs/STACK-DECISION.md"
+[[surfaces]]
+id = "template"
+path = "."
+kind = "template"
+owner = "TomSzenessy"
+status = "active"
+quality_oracle = "template governance"
+verification = [["python3", "tools/repoctl.py", "check"]]
+[[skills]]
+package = "example/tool@demo"
+source = "https://github.com/example/tool"
+revision = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+content_digest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+purpose = "bounded test capability"
+reviewed_on = "2026-08-25"
+permissions = "read-only / project-local"
+rollback = "remove the project-local skill and restore the previous lockfile"
+""")
+        result = self.cli("init", "--name", "Demo", "--kind", "game")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        manifest = (self.root / "project.toml").read_text(encoding="utf-8")
+        self.assertIn('id = "template-bootstrap"', manifest)
+        self.assertIn("[[skills]]", manifest)
+        self.assertIn("content_digest", manifest)
+        self.assertNotIn("make init NAME=my-project", (self.root / "README.md").read_text(encoding="utf-8"))
 
     def test_infrastructure_defaults_and_root_surface_rogue_detection(self) -> None:
         (self.root / "tests").mkdir()
@@ -447,6 +491,7 @@ Duplicate check: searched title, symptom, and path for login/session-refresh; no
 ### Evidence
 Test evidence: integration output; Artifact: review.md
 ### Disclosure classification
+- **Disclosure class:** ordinary
 - **Public-safe:** yes
 - **Security/privacy review:** not applicable
 - **Reviewer/date:** tester 2026-08-25
@@ -455,6 +500,42 @@ Test evidence: integration output; Artifact: review.md
 """)
         result = self.cli("validate-issue", "--body-file", "form-body.md")
         self.assertEqual(result.returncode, 0, result.stderr)
+        ready = self.cli("validate-issue", "--body-file", "form-body.md", "--status", "ready")
+        self.assertEqual(ready.returncode, 0, ready.stderr)
+
+    def test_disclosure_class_and_security_terms_fail_closed(self) -> None:
+        self.write("project.toml", """schema = 1
+name = "Demo"
+kind = "web"
+phase = "development"
+[governance]
+profile = "agent-first"
+""")
+        body = """Duplicate check: searched title, symptom, and path for tenant isolation; no duplicate found
+### Summary
+A remote code execution flaw lets one tenant read another tenant's private data.
+### Acceptance criteria
+- A positive test records the intended safe behavior.
+- A negative test rejects cross-tenant access.
+### Evidence
+Test evidence: the regression is reproducible.
+### Disclosure classification
+- **Disclosure class:** ordinary
+- **Public-safe:** yes
+- **Security/privacy review:** not applicable
+- **Reviewer/date:** tester 2026-08-25
+### Dependencies and handoff
+- **Owner / next action:** security owner; use the private route
+"""
+        self.write("sensitive.md", body)
+        result = self.cli("validate-issue", "--body-file", "sensitive.md")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("sensitive issue bodies", result.stderr)
+        ssrf_body = body.replace("remote code execution flaw", "SSRF flaw")
+        self.write("ssrf.md", ssrf_body)
+        result = self.cli("validate-issue", "--body-file", "ssrf.md")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("sensitive issue bodies", result.stderr)
 
     def test_markdown_escape_and_unc_are_rejected(self) -> None:
         self.write("docs/guide.md", "# Guide\n\n[x](../../outside.md)\n")
@@ -544,6 +625,28 @@ verification = [["python3", "main.py"]]
         self.write("README.md", "# Demo\n<!-- repoctl:project-readme -->\n> Project initialized: **Demo** (`script`).\n")
         self.assertEqual(self.cli("check").returncode, 0)
 
+    def test_verification_scrubs_github_tokens_and_increments_depth(self) -> None:
+        self.write("README.md", "# Demo\n<!-- repoctl:project-readme -->\n> Project initialized: **Demo** (`script`).\n")
+        self.write("project.toml", """schema = 1
+name = "Demo"
+kind = "script"
+phase = "development"
+license = "MIT"
+owners = ["team"]
+[[surfaces]]
+id = "entry"
+path = "main.py"
+kind = "file"
+owner = "team"
+status = "active"
+quality_oracle = "run the entry file and inspect output"
+verification = [["python3", "-c", "import os; open('env.txt', 'w').write(os.environ.get('GH_TOKEN', '') + '|' + os.environ.get('GITHUB_TOKEN', '') + '|' + os.environ.get('REPOCTL_VERIFY_DEPTH', ''))"]]
+""")
+        self.write("main.py", "print('ok')\n")
+        result = self.cli("verify", env={"GH_TOKEN": "gh-secret", "GITHUB_TOKEN": "github-secret"})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.root / "env.txt").read_text(encoding="utf-8"), "||1")
+
     def test_minimal_profile_skips_commandless_critic_gate(self) -> None:
         self.write("README.md", "# Demo\n<!-- repoctl:project-readme -->\n> Project initialized: **Demo** (`design`).\n")
         self.write("project.toml", """schema = 1
@@ -571,9 +674,25 @@ quality_oracle = "human review"
         self.assertIn("actions/checkout@", issue_workflow)
         self.assertIn("topic", issue_workflow)
         self.assertIn("labeled", issue_workflow)
+        self.assertIn("registry_path", issue_workflow)
+        self.assertIn("Disclosure class", issue_workflow)
         reference_workflow = (root / ".github/workflows/require-issue-reference.yml").read_text(encoding="utf-8")
-        self.assertIn("security-events: read", reference_workflow)
-        self.assertIn("Security-Owner", reference_workflow)
+        self.assertNotIn("security-events: read", reference_workflow)
+        self.assertNotIn("security-advisories/", reference_workflow)
+        self.assertIn("maintainer-attested", reference_workflow)
+        self.assertIn("security-reviewed", reference_workflow)
+        self.assertIn("unlabeled", reference_workflow)
+        self.assertIn("closing_references", reference_workflow)
+        self.assertIn("must be an open issue", reference_workflow)
+        self.assertIn("canonical issue contract", reference_workflow)
+        self.assertIn("PR_AUTHOR_ASSOCIATION", reference_workflow)
+        self.assertIn("private security prs require", reference_workflow.casefold())
+        ci_workflow = (root / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+        self.assertNotIn("GH_TOKEN", ci_workflow)
+        self.assertIn("permissions: {}", ci_workflow)
+        scans = (root / ".github/workflows/specialist-scans.yml").read_text(encoding="utf-8")
+        self.assertIn("pull_request:", scans)
+        self.assertNotIn("403", scans.split("args:", 1)[1].split("fail:", 1)[0])
 
     def test_public_launch_fails_without_typed_evidence(self) -> None:
         self.write("project.toml", """schema = 1
@@ -604,23 +723,50 @@ verification = [["python3", "-c", "print('ok')"]]
 """)
         self.write("LICENSE", "MIT")
         self.write("README.md", "# Demo\n<!-- repoctl:project-readme -->\n> Project initialized: **Demo** (`web`).\n")
-        self.write("docs/legal/privacy-notice.template.md", "# [REQUIRED] draft\n")
+        self.write("docs/legal/privacy-notice.template.md", "# Draft\nProject: Demo\nLegal owner: [name/team]\nReviewer: Alice [to be confirmed]\nDate: 2026-08-25\n")
         self.write("docs/legal/data-inventory.md", "# Inventory\n")
+        self.write(".security/config.json", '{"security_team_contacts": [], "security_reviewed_on": "2026-08-25", "security_reviewer": "Alice [pending]"}')
         result = self.cli("readiness")
         self.assertEqual(result.returncode, 1)
         self.assertIn("security.contact", result.stderr)
         self.assertIn("private_reporting", result.stderr)
         self.assertIn("legal document", result.stderr)
+        self.assertIn("security_reviewer", result.stderr)
+    def test_owner_sentinels_cannot_satisfy_doctor(self) -> None:
+        self.write("README.md", "# Demo\n<!-- repoctl:project-readme -->\n> Project initialized: **Demo** (`web`).\n")
+        self.write("project.toml", """schema = 1
+name = "Demo"
+kind = "web"
+phase = "development"
+license = "MIT"
+owners = ["project-owner"]
+[[surfaces]]
+id = "app"
+path = "."
+kind = "code"
+owner = "team"
+status = "active"
+quality_oracle = "run the app and inspect the result"
+verification = [["python3", "-c", "print('ok')"]]
+""")
+        result = self.cli("doctor")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("accountable owner", result.stderr)
+
     def test_forms_and_pr_workflow_keep_public_contracts(self) -> None:
         root = Path(__file__).resolve().parents[2]
         for name in ("config.yml", "bug.yml", "improvement.yml", "feature.yml"):
             content = (root / ".github" / "ISSUE_TEMPLATE" / name).read_text(encoding="utf-8")
             self.assertIn("Disclosure classification", content)
+            self.assertIn("Disclosure class", content)
             self.assertIn("public-safe", content)
         self.assertIn("[enhancement/P2]", (root / ".github/ISSUE_TEMPLATE/feature.yml").read_text(encoding="utf-8"))
+        issue_workflow = (root / ".github/workflows/issue-contract.yml").read_text(encoding="utf-8")
+        self.assertIn("Regulated profile uses the CLI/private issue route", issue_workflow)
+        self.assertIn("Minimal profile delegates issue intake", issue_workflow)
         workflow = (root / ".github/workflows/require-issue-reference.yml").read_text(encoding="utf-8")
         self.assertIn("Fixes", workflow)
-        self.assertIn("Security-Reference", workflow)
+        self.assertIn("private security prs require", workflow.casefold())
     def test_incident_updates_empty_docs_marker_and_passes_check(self) -> None:
         result = self.cli("incident", "--title", "Probe failure", "--summary", "A reproducible probe")
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -635,6 +781,68 @@ verification = [["python3", "-c", "print('ok')"]]
         sensitive = self.cli("incident", "--title", "Exploit", "--summary", "unpatched vulnerability", "--public-safe")
         self.assertEqual(sensitive.returncode, 1)
         self.assertIn("private incident draft", sensitive.stderr)
+
+    def test_multiple_public_incidents_remain_indexed(self) -> None:
+        for index, title in enumerate(("First failure", "Second failure"), start=1):
+            summary = f"A redacted failure {index}"
+            body_hash = hashlib.sha256(summary.encode()).hexdigest()
+            evidence = f"incident-review-{index}.md"
+            self.write(evidence, "Issue: #42\nCommit: " + "a" * 40 + "\nArtifact: " + evidence + "\nReviewer: reviewer\nDate: 2026-08-25\nResult: public-safe\n" + f"Body-SHA256: {body_hash}\n")
+            result = self.cli("incident", "--title", title, "--summary", summary, "--public-safe", "--review-evidence", evidence)
+            self.assertEqual(result.returncode, 0, result.stderr)
+        index = (self.root / "docs" / "README.md").read_text(encoding="utf-8")
+        self.assertIn("First failure", index)
+        self.assertIn("Second failure", index)
+        self.assertEqual(self.cli("check").returncode, 0)
+
+    def test_third_party_skill_digest_binds_tree_and_mode(self) -> None:
+        self.write(".agents/skills/example/SKILL.md", "# Reviewed skill\n")
+        self.write(".agents/skills/example/reference.md", "bounded reference\n")
+        digest_result = self.cli("skill-digest", ".agents/skills/example")
+        self.assertEqual(digest_result.returncode, 0, digest_result.stderr)
+        digest = digest_result.stdout.strip()
+        self.write("project.toml", """schema = 1
+name = "Demo"
+kind = "web"
+phase = "development"
+license = "MIT"
+owners = ["team"]
+[[skills]]
+package = "example/tool@example"
+source = "https://github.com/example/tool"
+revision = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+content_digest = "DIGEST"
+purpose = "bounded test capability"
+reviewed_on = "2026-08-25"
+permissions = "read-only / project-local"
+rollback = "remove the project-local skill and restore the previous lockfile"
+""".replace("DIGEST", digest))
+        self.write("README.md", "# Demo\n<!-- repoctl:project-readme -->\n> Project initialized: **Demo** (`web`).\n")
+        self.assertEqual(self.cli("check").returncode, 0)
+        skill_path = self.root / ".agents" / "skills" / "example" / "SKILL.md"
+        skill_path.chmod(0o755)
+        self.assertIn("content_digest", self.cli("check").stderr)
+        skill_path.chmod(0o644)
+        (self.root / ".agents" / "skills" / "example" / "extra.txt").write_text("extra\n")
+        self.assertIn("content_digest", self.cli("check").stderr)
+
+    def test_public_incident_index_failure_leaves_no_orphan(self) -> None:
+        summary = "A redacted failure"
+        body_hash = hashlib.sha256(summary.encode()).hexdigest()
+        self.write("incident-review.md", "Issue: #42\nCommit: " + "a" * 40 + "\nArtifact: incident-review.md\nReviewer: reviewer\nDate: 2026-08-25\nResult: public-safe\n" + f"Body-SHA256: {body_hash}\n")
+        index = self.root / "docs" / "README.md"
+        index.unlink()
+        index.mkdir()
+        result = self.cli("incident", "--title", "Rollback failure", "--summary", summary, "--public-safe", "--review-evidence", "incident-review.md")
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(list((self.root / "docs" / "incidents").glob("*.md")), [])
+
+    def test_skill_directory_without_manifest_is_rejected(self) -> None:
+        (self.root / ".agents" / "skills" / "attacker").mkdir(parents=True)
+        (self.root / ".agents" / "skills" / "attacker" / "run.py").write_text("print('unexpected')\n")
+        result = self.cli("check")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("missing SKILL.md", result.stderr)
 
     def test_first_party_skill_extra_file_is_rejected(self) -> None:
         self.write(".agents/skills/quality-loop/SKILL.md", "# Quality\n")

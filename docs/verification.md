@@ -3,6 +3,10 @@
 “Done” means the issue's acceptance criteria have observable evidence. A build,
 lint run, or green return code is necessary but not sufficient.
 
+This file owns the canonical quality-loop procedure and domain oracles. The
+[quality-loop skill](../.agents/skills/quality-loop/SKILL.md) is a small
+host invocation adapter, not a second copy of the rules.
+
 ## Profile-aware evidence
 
 `agent-first` requires a critic for commandless/creative surfaces but lets the
@@ -24,7 +28,18 @@ Use the smallest sufficient evidence, then escalate:
 5. **Independent review:** a fresh agent or reviewer checks the issue, diff,
    standards, security/privacy impact, and artifact without editing first.
 6. **Deployment/provider/hardware/counsel evidence:** attach separately; local
-   evidence never silently substitutes for it.
+   evidence never silently substitutes for it. A configured GitHub target is a
+   local binding check; live API/advisory verification belongs to a separately
+   authorized evidence record, not general repository verification.
+
+The pull-request issue-reference workflow requires a closing keyword, an open
+issue rather than a pull request, and the profile's canonical issue headings and
+duplicate-search record. GitHub issues are editable, so this is not by itself
+proof that the acceptance contract predated implementation or remained
+immutable. Projects that need a stronger receipt should commit a redacted
+pre-change record (issue URL/creation time, contract hash, scope/risk, and
+verification plan) before implementation and bind review evidence to the exact
+head SHA. Never call the mutable issue itself an immutable audit log.
 
 ## The quality loop
 

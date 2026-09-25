@@ -64,4 +64,9 @@ route in both `project.toml`, `.security/config.json`, and `SECURITY.md`.
 These are evidence gates, not legal claims.
 
 Research citations and boundaries live in
-[`../research/agentic-repository-baselines.md`](../research/agentic-repository-baselines.md).
+[`../research/agentic-repository-baselines.md`](../research/agentic-repository-baselines.md)
+and the fresh
+[`../research/primary-source-hardening-2026-09-25.md`](../research/primary-source-hardening-2026-09-25.md).
+For official platform/resource links and a qualified legal-risk prompt, use
+[`../resources.md`](../resources.md); neither catalog is legal advice or a
+compliance determination.

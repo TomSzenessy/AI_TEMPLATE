@@ -27,6 +27,12 @@ notification decisions. This file does not promise a response time or certify
 compliance. Record verified remediation in the issue and regression suite; keep
 the public issue free of exploit detail until disclosure is safe.
 
+For a private fix's public pull request, use only the non-sensitive maintainer
+attestation described in the PR template (`Security-Review:
+maintainer-attested`, a named `Security-Owner`, and a maintainer-applied
+`security-reviewed` label). The untrusted workflow does not query or prove
+private advisory contents; keep the advisory and exploit details out of band.
+
 ## Agent and CI boundaries
 
 Agents use least privilege and must not deploy, rotate production credentials,

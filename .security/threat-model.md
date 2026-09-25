@@ -1,7 +1,7 @@
 # Threat Model — Agent Template
 
 **Last Updated:** 2026-09-25
-**Version:** 1.1.0
+**Version:** 1.2.0
 **Methodology:** STRIDE + natural-language analysis
 
 ## 1. System overview
@@ -214,7 +214,7 @@ skill or command, and ask for human authorization for high-impact effects.
 
 | Check | Frequency | Evidence |
 |---|---|---|
-| `python3 -m unittest discover -s tools/tests -p 'test_*.py'` | Every change | 28 CLI/profile/form/security behavior tests |
+| `python3 -m unittest discover -s tools/tests -p 'test_*.py'` | Every change | 36 CLI/profile/form/security behavior tests |
 | `make check` | Every change/CI | Manifest, index, links, skill provenance, hygiene |
 | `make verify` | Before completion/CI | Declared surface commands and real checks |
 | YAML/JSON parsing | Configuration change | Parser output and CI review |
@@ -237,6 +237,14 @@ skill or command, and ask for human authorization for high-impact effects.
 6. Legal/privacy templates are drafting aids and never establish compliance.
 
 ## 8. Changelog
+
+### 1.2.0 — 2026-09-25
+
+- Added credential-free verification, skill tree/mode binding, structured
+  disclosure classification, profile-specific intake gates, resource/legal-risk
+  routing, and fail-closed public-link/private-review boundaries.
+- Documented mutable issue-reference limits and retained the trusted-maintainer
+  attestation path for private security pull requests.
 
 ### 1.1.0 — 2026-08-25
 

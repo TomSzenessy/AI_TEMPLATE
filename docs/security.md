@@ -47,11 +47,13 @@ organization-approved equivalent) for external Markdown links. Use a pinned
 these tools additive: their output and failures are evidence, while
 `repoctl` remains the zero-dependency contract and path-safety check. The
 bundled specialist workflow runs Gitleaks on trusted pushes/manual runs (its
-organization license is not exposed to fork PRs) and Lychee for Markdown links;
+organization license is not exposed to fork PRs) and credential-free Lychee for
+Markdown links on pull requests, trusted pushes, and manual runs;
 organization-owned repositories must provide the trusted `GITLEAKS_LICENSE`
 secret for the pinned action. Enable the provider's fork-PR secret scanning as
-well. The link job excludes the known slow German legal site and records it for
-manual review rather than turning a transient timeout into a false pass/fail.
+well. The link job accepts only successful response classes and excludes the
+known slow German legal site with a documented manual-review exception; a 403,
+429, or 404 is not silently treated as a passing link.
 
 ## Supply chain and CI
 
@@ -63,6 +65,10 @@ manual review rather than turning a transient timeout into a false pass/fail.
   as security-sensitive changes.
 - Keep `repoctl check` in CI and make the aggregate verification command cover
   every active surface. A green job for one language is not repository proof.
+- Keep general verification credential-free: the verification runner scrubs
+  common GitHub/cloud credential variables from repository-owned commands. Put
+  live provider, advisory, release, or deployment checks in separately
+  authorized jobs with explicit evidence.
 - Keep `.security/config.json` review fields and the threat model dated within
   the freshness window; security-sensitive changes reopen the security gate.
 

@@ -5,6 +5,8 @@ schema = 1
 name = "AI_TEMPLATE"
 kind = "template"
 phase = "development"
+# The root LICENSE file is authoritative; this SPDX label is metadata, not proof
+# that the text matches it. Replace both deliberately.
 license = "MIT"
 owners = ["TomSzenessy"]
 
@@ -53,11 +55,14 @@ legal_document_paths = []
 # critic_evidence = ["artifacts/reviews/app-123.md"]
 # verification = [["npm", "ci"], ["npm", "test"]]
 #
-# Reviewed third-party skills are recorded as provenance, not installed globally:
+# Reviewed third-party skills are recorded as provenance, not installed globally.
+# Retain a verified capability while it remains trusted and useful; update the
+# digest/review whenever its vendored tree or source changes.
 # [[skills]]
 # package = "owner/repository@skill"
 # source = "https://github.com/owner/repository"
 # revision = "40-character-commit-sha-or-sha256:<64-hex-digest>"
+# content_digest = "sha256:<64-hex-digest>"
 # purpose = "bounded capability"
 # reviewed_on = "YYYY-MM-DD"
 # permissions = "read-only / project-local"

@@ -25,6 +25,12 @@ read, or generate it. When a fact must be duplicated for a human, link to the
 owner and explain why the copy is not executable. Update all consumers and
 migrations in the same change as the owner.
 
+The root [`LICENSE`](../LICENSE) file is the authoritative license text.
+`project.toml.license` is a human/tooling label for the selected SPDX-style
+identifier; `repoctl` checks that both exist but does not infer that arbitrary
+license text matches the label. Replace and review both files together; do not
+claim a verified license from the manifest alone.
+
 ## Change discipline
 
 - Make the smallest change that satisfies the issue; avoid opportunistic

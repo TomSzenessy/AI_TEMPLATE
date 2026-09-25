@@ -2,10 +2,10 @@ name: specialist scans
 
 on:
   push:
+  pull_request:
   workflow_dispatch:
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
   group: specialist-scans-${{ github.workflow }}-${{ github.ref }}
@@ -13,8 +13,11 @@ concurrency:
 
 jobs:
   secrets:
+    if: github.event_name != 'pull_request'
     name: maintained secret scan
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     timeout-minutes: 10
     steps:
       - name: Checkout
@@ -30,6 +33,8 @@ jobs:
   links:
     name: maintained Markdown link scan
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     timeout-minutes: 10
     steps:
       - name: Checkout
@@ -42,7 +47,7 @@ jobs:
           args: >-
             --no-progress
             --max-retries 2
-            --accept 200,202,206,301,302,307,308,403,429
+            --accept 200,202,206
             --exclude 'https://www\.gesetze-im-internet\.de/.*'
             './**/*.md'
           fail: true

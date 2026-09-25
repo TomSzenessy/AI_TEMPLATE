@@ -2,12 +2,11 @@ name: Require issue reference
 
 on:
   pull_request:
-    types: [opened, edited, reopened, synchronize]
+    types: [opened, edited, reopened, synchronize, labeled, unlabeled]
 
 permissions:
   issues: read
   pull-requests: read
-  security-events: read
 
 jobs:
   issue-reference:
@@ -21,6 +20,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_API_URL: ${{ github.api_url }}
+          PR_AUTHOR_ASSOCIATION: ${{ github.event.pull_request.author_association }}
         run: |
           python3 - <<'PY'
           import json
@@ -30,21 +30,47 @@ jobs:
           from pathlib import Path
 
           event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text())
+          import tomllib
+          manifest = tomllib.loads(Path("project.toml").read_text())
+          governance = manifest.get("governance", {})
+          if not isinstance(governance, dict):
+              raise SystemExit("governance must be a table")
+          profile = governance.get("profile", "agent-first")
+          if profile == "minimal":
+              print("Minimal profile delegates issue/reference validation to the host organization")
+              raise SystemExit(0)
+          if profile not in {"agent-first", "regulated"}:
+              raise SystemExit("invalid governance.profile")
+
           body = event.get("pull_request", {}).get("body") or ""
           references = sorted(set(re.findall(r"\b(?:Closes|Fixes|Refs)\s+#([1-9][0-9]*)\b", body, re.I)))
+          closing_references = sorted(set(re.findall(r"\b(?:Closes|Fixes)\s+#([1-9][0-9]*)\b", body, re.I)))
           private_reference = re.search(
               r"(?im)^\s*Security-Reference:\s*(?:GHSA-[0-9a-z-]{4,}|https://github\.com/[^\s]+/security/advisories/[^\s]+)\s*$",
               body,
           )
+          trusted_attestation = bool(re.search(r"(?im)^\s*Security-Review:\s*maintainer-attested\s*$", body))
           security_owner = re.search(r"(?im)^\s*Security-Owner:\s*@?[A-Za-z0-9][A-Za-z0-9-]{1,39}\s*$", body)
-          if private_reference and not security_owner:
-              raise SystemExit("Private security references require a named Security-Owner")
-          if not references and not private_reference:
-              raise SystemExit("PR body must include Closes/Fixes/Refs #<number> or a private Security-Reference")
+          labels = {label.get("name", "") for label in event.get("pull_request", {}).get("labels", [])}
+          trusted_association = os.environ.get("PR_AUTHOR_ASSOCIATION") in {"OWNER", "MEMBER", "COLLABORATOR"}
+          private_gate = trusted_attestation and security_owner and "security-reviewed" in labels and trusted_association
+          if private_reference and not private_gate:
+              raise SystemExit(
+                  "Private security PRs require a maintainer-applied security-reviewed label, Security-Owner, and trusted author association"
+              )
+          if "security-reviewed" in labels and not private_gate:
+              raise SystemExit("The security-reviewed label requires the trusted private-review attestation")
+          if not private_gate and not closing_references:
+              raise SystemExit("PR body must include Closes/Fixes #<number> or the trusted private-review attestation")
 
           repository = os.environ["GITHUB_REPOSITORY"]
           api_root = os.environ["GITHUB_API_URL"].rstrip("/")
-          for number in references:
+          required_headings = (
+              ["Summary", "What happens", "Where", "When", "Why", "How to reproduce", "Impact and scope", "Acceptance criteria", "Evidence", "Disclosure classification", "Dependencies and handoff"]
+              if profile == "regulated"
+              else ["Summary", "Acceptance criteria", "Evidence", "Disclosure classification", "Dependencies and handoff"]
+          )
+          for number in closing_references:
               request = urllib.request.Request(
                   f"{api_root}/repos/{repository}/issues/{number}",
                   headers={
@@ -56,30 +82,12 @@ jobs:
                   issue = json.load(response)
               if "pull_request" in issue:
                   raise SystemExit(f"#{number} is a pull request, not an issue")
-          if private_reference:
-              advisory_value = private_reference.group(1)
-              advisory_match = re.search(r"GHSA-[0-9a-z-]{4,}", advisory_value, re.I)
-              if not advisory_match:
-                  raise SystemExit("Private security reference must contain a GHSA identifier")
-              advisory_id = advisory_match.group(0).upper()
-              request = urllib.request.Request(
-                  f"{api_root}/repos/{repository}/security-advisories/{advisory_id}",
-                  headers={
-                      "Authorization": f"Bearer {os.environ['GH_TOKEN']}",
-                      "Accept": "application/vnd.github+json",
-                  },
-              )
-              try:
-                  with urllib.request.urlopen(request, timeout=15) as response:
-                      advisory = json.load(response)
-              except Exception as error:
-                  raise SystemExit(f"Private security advisory could not be verified: {advisory_id}") from error
-              owner = security_owner.group(1).lstrip("@").casefold()
-              repository_owner = repository.split("/", 1)[0].casefold()
-              advisory_owner = str((advisory.get("user") or {}).get("login", "")).casefold()
-              if owner not in {repository_owner, advisory_owner}:
-                  raise SystemExit("Security-Owner is not trusted by the advisory metadata")
-              print(f"Private security advisory verified: {advisory_id}")
-          else:
-              print(f"Validated issue references: {', '.join('#' + n for n in references)}")
+              if issue.get("state") != "open":
+                  raise SystemExit(f"#{number} must be an open issue")
+              issue_body = issue.get("body") or ""
+              if not all(re.search(rf"(?m)^### {re.escape(heading)}\s*$", issue_body) for heading in required_headings):
+                  raise SystemExit(f"#{number} does not contain the expected canonical issue contract")
+              if not re.search(r"(?im)^Duplicate check:\s*searched\s+title,\s*symptom,\s+and\s+path\s+for\s+.+;", issue_body):
+                  raise SystemExit(f"#{number} is missing the duplicate-search record")
+          print(f"Validated open issue contracts: {', '.join('#' + n for n in closing_references)}")
           PY

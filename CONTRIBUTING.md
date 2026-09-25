@@ -6,8 +6,10 @@
    nearest scoped instructions.
 2. Search GitHub Issues and [`docs/ERROR_LOG.md`](./docs/ERROR_LOG.md); create or
    update the issue-backed write-ahead record using
-   [`docs/ISSUE_TEMPLATE.md`](./docs/ISSUE_TEMPLATE.md). Public filing requires
-   `PUBLIC_REVIEWED=1` and `REVIEW_EVIDENCE=<repo-relative record>`.
+   [`docs/ISSUE_TEMPLATE.md`](./docs/ISSUE_TEMPLATE.md). In the `regulated`
+   profile, public filing requires `PUBLIC_REVIEWED=1` and
+   `REVIEW_EVIDENCE=<repo-relative record>`; `agent-first` and `minimal`
+   follow their profile-specific rules in `AGENTS.md`.
 3. Run the relevant existing check before editing so a new failure is not
    mistaken for a pre-existing one.
 

@@ -4,11 +4,13 @@
 
 Fixes/Refs/Closes #<number>
 
-For a private security fix, replace the public reference with a non-sensitive
-`Security-Reference: GHSA-...` (or a GitHub advisory URL containing that GHSA
-identifier) plus `Security-Owner: @team-or-owner`. The workflow verifies the
-advisory through GitHub and checks the owner against its metadata. Do not paste
-exploit details, secrets, or personal data here.
+For a private security fix, do not put a GHSA, private-advisory URL, exploit,
+secret, or personal data in this public PR. Use the private reporting process
+in [`SECURITY.md`](../SECURITY.md). A maintainer may add the non-sensitive
+`security-reviewed` label and attest out of band with:
+`Security-Review: maintainer-attested` and `Security-Owner: @team-or-owner`.
+The workflow accepts that trusted label/association without querying private
+advisory data; it does not verify exploit details.
 
 ## Evidence
 

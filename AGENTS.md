@@ -44,11 +44,14 @@ Before a behavior, schema, contract, security, privacy, or operational change:
 2. Update the matching issue when the root cause and acceptance boundary match.
    Otherwise create one issue from `docs/ISSUE_TEMPLATE.md`; `make issue` checks
    required sections, labels, duplicate-search terms, and disclosure evidence
-   before filing. In `regulated` profile, public filing requires
-   `PUBLIC_REVIEWED=1` plus a repository-relative `REVIEW_EVIDENCE` record; in
-   `agent-first`, ordinary public-safe work may use the compact contract and
-   attach that record when available. Use the private security route instead
-   for active vulnerabilities or sensitive personal data.
+   before filing. A `Local-WAL` packet may stage this record for review, but it
+   does not authorize implementation before the issue exists. In `regulated`
+   profile, public filing requires `PUBLIC_REVIEWED=1` plus a repository-relative
+   `REVIEW_EVIDENCE` record; in `agent-first`, ordinary public-safe work may use
+   the compact contract and attach that record when available. Use the private
+   security route instead for active vulnerabilities or sensitive personal data.
+   Treat the disclosure class as an owner/reviewer decision, not an automated
+   proof; uncertain security/privacy content stays private.
 3. State the intended behavior, scope, risks, and evidence-producing acceptance
    criteria **before** implementation. This issue is the write-ahead record.
 4. Implement the smallest coherent change. Update the issue and every affected
@@ -81,9 +84,11 @@ completion. Keep active security vulnerabilities private under `SECURITY.md`.
 - **Personal data, analytics, cookies, retention, user rights, public launch, or
   legal text:** read [`docs/privacy.md`](./docs/privacy.md) and
   [`docs/legal/README.md`](./docs/legal/README.md).
-- **Missing specialist capability or a new tool/framework:** read
-  [`docs/skills.md`](./docs/skills.md). Discover, inspect, pin, and record before
-  using a third-party skill; never install from popularity alone.
+- **Missing specialist capability, code style, example, or platform/legal gate:**
+  read [`docs/resources.md`](./docs/resources.md) and
+  [`docs/skills.md`](./docs/skills.md). Discover, inspect, pin, and record
+  before using a third-party skill; prefer reviewed capabilities already
+  available locally.
 - **Audit, cleanup, dead code, scalability, or repository-wide review:** follow
   the audit protocol in [`docs/audit.md`](./docs/audit.md). Its default is
   report-only; file/update Issues only with explicit authorization. Do not mix
@@ -96,7 +101,9 @@ completion. Keep active security vulnerabilities private under `SECURITY.md`.
 ## Build and repair loop
 
 1. **Frame:** identify the user-visible outcome, acceptance evidence, affected
-   surface, and non-goals. Ask only for a decision that changes the product.
+   surface, and non-goals. Check the trigger map and use a reviewed skill or
+   primary resource when it materially improves the result; record the choice.
+   Ask only for a decision that changes the product.
 2. **Reproduce:** for a bug, capture the failing behavior in a regression test
    or minimal deterministic experiment before patching.
 3. **Design:** place behavior behind the smallest deep module interface. Keep
