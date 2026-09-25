@@ -26,3 +26,6 @@
 
 Small, reviewable commits with a clear intent are preferred. GitHub Issues are
 the live task/status register; do not recreate that register in Markdown.
+
+Dependabot's automated PRs are reviewed as dependency changes and skip the
+human issue-reference gate; the maintainer still reviews the diff and CI.
