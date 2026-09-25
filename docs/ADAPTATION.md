@@ -6,6 +6,27 @@ manifest, issue-backed intent, path safety, declared verification, and bounded
 review. Project-specific policy and code are added only after the vision intake
 identifies a real need.
 
+## Artifact lifecycle
+
+The template contains deliberate scaffolds. Their lifecycle is part of keeping
+a project small:
+
+| Artifact | Keep/update | Replace or remove when |
+|---|---|---|
+| `VISION.md` | Keep as the current product-direction record. | Never remove; revise it when the product direction changes. |
+| `docs/STACK-DECISION.md` | Keep the accepted decision and its rationale. | Replace a superseded decision with a new record or explicit revision. |
+| `project.toml` example comments | Useful while adapting. | Remove unused examples/comments once the real manifest is understood. |
+| `HANDOVER.template.md` | Keep the reusable local/committed templates. | Delete ignored `HANDOVER.md` after a session; keep a committed handoff only while another actor needs it. |
+| `docs/ISSUE_TEMPLATE.md` and `.github/ISSUE_TEMPLATE/` | Keep as intake schemas. | Do not turn them into a status board; live work belongs in Issues. |
+| `docs/legal/*.template.md` | Keep while a document may apply. | Replace with a reviewed final document and update `legal_document_paths`; unused templates may be removed from a project copy. |
+| `docs/research/` | Keep as provenance while its guidance matters. | Archive/remove after the knowledge has been internalized and no decision cites it. |
+| `docs/ERROR_LOG.md` | Keep as an append-only solved-failure ledger. | Do not use it for open work; link open work to Issues. |
+| `.agents/skills/` | Keep the small first-party workflows. | Add third-party skills only for a current trigger; remove unused ones and their provenance/state. |
+| `.security/` | Keep and refresh the threat model/config as security surfaces change. | Do not delete security evidence merely to make a check quiet. |
+
+A project should be able to remove unused optional material without removing
+its operating contract, history, or evidence.
+
 ## Adaptation loop
 
 1. Read `VISION.md`, `docs/STACK-DECISION.md`, and the active surfaces.

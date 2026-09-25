@@ -10,8 +10,10 @@ quality oracle changes.
    working tree. **Done when** the current goal, branch, and next action are
    known without relying on chat history.
 2. Read [`../AGENTS.md`](../AGENTS.md), [`../project.toml`](../project.toml), and
-   this index. **Done when** you can name the project purpose, active surfaces,
-   owners, and verification commands without guessing.
+   [`README.md`](./README.md). For a new project, read
+   [`../VISION.md`](../VISION.md) and [`STACK-DECISION.md`](./STACK-DECISION.md).
+   **Done when** you can name the project purpose, active surfaces, owners, and
+   verification commands without guessing.
 3. Run `make inventory` and `make check`. **Done when** every product directory
    is either declared in `project.toml` or consciously left as infrastructure.
 4. Run the smallest declared check for the surface you will touch. **Done when**
@@ -34,6 +36,11 @@ Read `[governance].profile` in `project.toml` before filing work:
 - `minimal` delegates issue/review tooling to the host organization; the local
   `repoctl issue`/`labels` commands intentionally decline to file or synchronize
   it. It still keeps manifest/path/verification checks here.
+
+If the task needs a missing specialist capability, read
+[`skills.md`](./skills.md), discover only the capability that matches the
+trigger, and record its reviewed provenance before using it. Do not load or
+install every available skill.
 
 Do not switch profiles to bypass a blocker. Record the decision and its reason
 in the issue.

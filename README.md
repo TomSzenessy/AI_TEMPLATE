@@ -23,6 +23,22 @@ review packet. Public-launch and regulated projects can set
 record. Use native GitHub forms for human intake, Gitleaks/TruffleHog and
 lychee for specialist CI, and pre-commit where the team wants local hooks.
 
+## Which document answers which question?
+
+| Question | Read |
+|---|---|
+| Why does this repository exist and how do I start? | This `README.md` |
+| What should an agent do in its first session? | [`docs/START-HERE.md`](./docs/START-HERE.md) |
+| What rules always apply to agents? | [`AGENTS.md`](./AGENTS.md) |
+| Where is the durable documentation owner? | [`docs/README.md`](./docs/README.md) |
+| What is this project trying to become? | [`VISION.md`](./VISION.md) |
+| Why this stack/toolchain? | [`docs/STACK-DECISION.md`](./docs/STACK-DECISION.md) |
+| What work is active right now? | GitHub Issues, not a Markdown backlog |
+
+These documents intentionally overlap only at their entry points. The README
+is the public landing page, START-HERE is a short first-session checklist, and
+`AGENTS.md` is the always-loaded trigger router.
+
 ## Start in five minutes
 
 ```bash
@@ -64,6 +80,7 @@ to it; they do not become competing instruction sources.
 | Path | Owns |
 |---|---|
 | `AGENTS.md` | The short operating contract and trigger router. |
+| `docs/START-HERE.md` | The shortest first-session checklist for a new agent or maintainer. |
 | `project.toml` | Machine-readable surfaces, quality oracles, checks, launch state, and reviewed skills. |
 | `VISION.md` | Accepted product direction, constraints, success evidence, and intake questions. |
 | `docs/STACK-DECISION.md` | Framework/toolchain decision and confirmation boundary. |
