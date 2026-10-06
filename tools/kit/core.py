@@ -295,3 +295,23 @@ def slugify(value: str) -> str:
     if not slug:
         raise RepoctlError("title must contain at least one letter or number")
     return slug[:80].rstrip("-")
+
+
+def repository_files(root: Path) -> list[str]:
+    """Tracked and untracked-but-not-ignored regular files, repository-relative and sorted."""
+    return sorted(
+        path.relative_to(root).as_posix()
+        for path in worktree_files(root)
+        if path.is_file() and not is_link_like(path)
+    )
+
+
+def read_text_file(root: Path, relative: str, limit: int = 1_000_000) -> str | None:
+    """Return UTF-8 text for a small regular file, or None for binary/large/unreadable files."""
+    path = root / relative
+    try:
+        if path.stat().st_size > limit:
+            return None
+        return path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None

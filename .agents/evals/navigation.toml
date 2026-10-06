@@ -1,0 +1,30 @@
+# Fresh-agent navigation benchmark (docs/self-healing.md#measuring-the-kit-fresh-agent-evals).
+# Each task runs in a new read-only headless session; `expect` is a
+# case-insensitive regex the answer must contain. Keep tasks about finding
+# and understanding, so the suite measures navigation, not general knowledge.
+schema = 1
+
+[[tasks]]
+id = "completion-command"
+prompt = "Which single make command must pass before any change in this repository counts as complete? Reply with the command only."
+expect = "make verify"
+
+[[tasks]]
+id = "delegation-contract"
+prompt = "Which repository file defines the brief and report contract for subagents? Reply with its repository-relative path only."
+expect = "docs/delegation\\.md"
+
+[[tasks]]
+id = "doc-owner-lookup"
+prompt = "Which command tells you which document covers a given source file? Reply with the command only."
+expect = "make where"
+
+[[tasks]]
+id = "canonical-skills"
+prompt = "Where do the canonical (non-generated) skill definitions live? Reply with the directory path only."
+expect = "\\.agents/skills"
+
+[[tasks]]
+id = "stale-doc-escape"
+prompt = "A commit changes code covered by a document but genuinely does not affect it. What must the commit contain so the stale-document check accepts it? Reply in one line."
+expect = "Docs-Unaffected"

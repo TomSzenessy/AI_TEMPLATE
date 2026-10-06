@@ -1,0 +1,128 @@
+"""Cheap navigation: a one-screen repository map, `where` lookups, and skill overlap.
+
+These answer "what is here", "where does X live / who owns it / did it break
+before", and "does a capability already exist" in one call, so agents spend
+context on the task instead of on repeated searches.
+"""
+
+from __future__ import annotations
+
+import re
+from pathlib import Path
+
+from .adapters import canonical_roles, canonical_skills
+from .core import declared_surfaces, governance_profile, load_project, read_text_file, repository_files
+from .docsync import bindings, owners
+
+SYMBOL = re.compile(
+    r"^\s*(?:export\s+)?(?:default\s+)?(?:async\s+)?(?:pub(?:\([^)]*\))?\s+)?"
+    r"(?:def|class|function|interface|type|struct|enum|trait|impl|fn|func|const|let|var|module)\s+"
+    r"([A-Za-z_][A-Za-z0-9_]*)"
+)
+HEADING = re.compile(r"^#{1,4}\s+(.+)$")
+MEMORY_FILES = ("docs/ERROR_LOG.md",)
+SKIP_PREFIXES = (".claude/",)
+WORD = re.compile(r"[a-z0-9]+")
+
+
+def _short(text: str, limit: int = 90) -> str:
+    text = " ".join(text.split())
+    return text if len(text) <= limit else text[: limit - 1] + "…"
+
+
+def print_map(root: Path, limit: int | None = None) -> None:
+    """Print the map; limit caps long sections (the session brief stays small at any scale)."""
+    project = load_project(root)
+    files = repository_files(root)
+    print(f"# Map: {project.get('name')} ({project.get('kind')}, phase={project.get('phase')}, profile={governance_profile(project)})")
+    print("\n## Surfaces (project.toml)")
+    surfaces = declared_surfaces(project)
+    for surface in surfaces[:limit]:
+        commands = [" ".join(command) for command in surface.get("verification", [])]
+        print(f"- {surface.get('id')} [{surface.get('status', 'active')}] {surface.get('path')} — verify: {_short('; '.join(commands) or 'critic evidence', 90)}")
+    if limit is not None and len(surfaces) > limit:
+        print(f"- … {len(surfaces) - limit} more (make map)")
+    doc_bindings = bindings(root, files)
+    if doc_bindings:
+        print("\n## Doc ownership (<!-- covers: --> bindings)")
+        items = sorted(doc_bindings.items())
+        for doc, patterns in items[:limit]:
+            print(f"- {doc} ← {_short(' '.join(patterns), 110)}")
+        if limit is not None and len(items) > limit:
+            print(f"- … {len(items) - limit} more (make map)")
+    roles = canonical_roles(root)
+    if roles:
+        print("\n## Delegation roles (.agents/agents/, contract: docs/delegation.md)")
+        for role in roles:
+            print(f"- {role['name']} [{role['access']}, {role['tier']}]: {_short(role['description'], 80)}")
+    skills = canonical_skills(root)
+    if skills:
+        print("\n## Skills (.agents/skills/)")
+        print("- " + ", ".join(skill["name"] for skill in skills))
+    print("\n## Commands")
+    print("- make where Q=\"...\" · make finish · make verify · make garden · make risk · make capabilities")
+
+
+def _score(terms: list[str], text: str) -> int:
+    lowered = text.lower()
+    return sum(1 for term in terms if term in lowered)
+
+
+def where(root: Path, query: str, limit: int = 20) -> list[str]:
+    """Rank paths, symbols, headings, and failure-memory lines matching the query."""
+    terms = [term for term in WORD.findall(query.lower()) if len(term) > 1]
+    if not terms:
+        return []
+    files = [path for path in repository_files(root) if not path.startswith(SKIP_PREFIXES)]
+    doc_bindings = bindings(root, files)
+    hits: list[tuple[int, str]] = []
+    for relative in files:
+        path_score = _score(terms, relative)
+        if path_score:
+            owned = owners(doc_bindings, relative)
+            suffix = f"  (documented in {', '.join(owned)})" if owned else ""
+            hits.append((path_score * 3, f"{relative}  [path]{suffix}"))
+        text = read_text_file(root, relative, limit=400_000)
+        if not text:
+            continue
+        is_memory = relative in MEMORY_FILES or relative.startswith("docs/incidents/")
+        for number, line in enumerate(text.splitlines(), start=1):
+            kind = None
+            match = SYMBOL.match(line)
+            if match:
+                kind, label = "symbol", match.group(1)
+            else:
+                heading = HEADING.match(line) if relative.endswith(".md") else None
+                if heading:
+                    kind, label = "heading", heading.group(1)
+                elif is_memory and line.strip():
+                    kind, label = "seen-before", line
+            if not kind:
+                continue
+            score = _score(terms, label)
+            if score:
+                weight = {"symbol": 3, "heading": 2, "seen-before": 3}[kind]
+                hits.append((score * weight, f"{relative}:{number}  [{kind}] {_short(label)}"))
+    hits.sort(key=lambda hit: (-hit[0], hit[1]))
+    return [line for _, line in hits[:limit]]
+
+
+def _tokens(text: str) -> set[str]:
+    stop = {"the", "and", "for", "use", "with", "that", "this", "into", "from", "when", "your", "are", "or", "a", "to", "of", "in", "an", "it", "on", "is", "be", "by"}
+    return {word for word in WORD.findall(text.lower()) if word not in stop and len(word) > 2}
+
+
+def skill_overlap(root: Path, description: str, limit: int = 5) -> list[tuple[float, str, str]]:
+    """Jaccard overlap between a proposed capability and existing skills/roles."""
+    proposed = _tokens(description)
+    if not proposed:
+        return []
+    candidates = [("skill", item["name"], item["description"]) for item in canonical_skills(root)]
+    candidates += [("role", item["name"], item["description"]) for item in canonical_roles(root)]
+    scored = []
+    for kind, name, text in candidates:
+        existing = _tokens(text)
+        if existing:
+            scored.append((len(proposed & existing) / len(proposed | existing), f"{kind}:{name}", _short(text, 100)))
+    scored.sort(key=lambda item: -item[0])
+    return scored[:limit]

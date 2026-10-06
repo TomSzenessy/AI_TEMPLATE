@@ -10,6 +10,8 @@ backlog.
 | Read | Owns | Reach for it when |
 |---|---|---|
 | [`START-HERE.md`](./START-HERE.md) | First-run and session orientation | A new agent or maintainer needs the shortest safe route through the project. |
+| [`delegation.md`](./delegation.md) | Orchestrator/subagent roles, brief and report contract | Work is bounded enough to hand to a scout, implementer, critic, researcher, doc-gardener, or skill-scout. |
+| [`self-healing.md`](./self-healing.md) | Hooks, doc-code bindings, deprecation expiry, budgets, adapters, gardener, evals | A check fails, docs drift, a host is added, or the kit itself changes. |
 | [`../AGENTS.md`](../AGENTS.md) | Agent operating contract | Any change is requested. |
 | [`../project.toml`](../project.toml) | Machine-readable structure, checks, launch state, skill provenance | Adding a surface, changing verification, or checking readiness. |
 | [`../VISION.md`](../VISION.md) | Accepted product direction, constraints, and success evidence | Starting a new project or making a high-impact scope decision. |
@@ -79,8 +81,9 @@ move the status to an issue and reduce the document to its durable owner.
 
 ## Navigation recipes
 
-- **“Where does this belong?”** Start at [`../project.toml`](../project.toml),
-  then use this index and the nearest scoped `AGENTS.md`.
+- **“Where does this belong?”** Run `make where Q="<term or path>"`; it names
+  paths, symbols, owning documents, and past failures. Then use
+  [`../project.toml`](../project.toml), this index, and the nearest scoped `AGENTS.md`.
 - **“What is broken?”** Read [`operations.md`](./operations.md), reproduce, and
   update or file an issue using [`ISSUE_TEMPLATE.md`](./ISSUE_TEMPLATE.md).
 - **“Can this be removed?”** Prove callers/owners are gone, run the affected

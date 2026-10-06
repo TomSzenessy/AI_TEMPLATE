@@ -16,9 +16,13 @@ try:
 except ModuleNotFoundError as error:  # pragma: no cover - exercised on Python 3.10
     raise SystemExit("repoctl requires Python 3.11 or newer") from error
 
+from kit import adapters, session
 from kit.bootstrap import initialize_project
+from kit.capabilities import print_capabilities
 from kit.core import RepoctlError, ensure_inside_root, load_project
 from kit.docs import check_docs_index, check_file_hygiene, check_markdown_links
+from kit.evals import run_evals
+from kit.garden import garden_report, self_heal_errors
 from kit.github import sync_issue_labels
 from kit.issues import (
     check_issue_for_duplicates,
@@ -27,6 +31,8 @@ from kit.issues import (
     validate_issue_file,
 )
 from kit.launch import check_readiness, check_readiness_gate
+from kit.navigate import print_map, skill_overlap, where
+from kit.risk import print_risk
 from kit.skills import check_skill_provenance, directory_digest, print_resources
 from kit.structure import check_readme_identity, check_structure, print_inventory, run_verification
 
@@ -96,7 +102,35 @@ def build_parser() -> argparse.ArgumentParser:
     labels_parser = subparsers.add_parser("labels", help="manage the canonical GitHub issue taxonomy")
     labels_parser.add_argument("--sync", action="store_true", help="create/update registry labels")
 
+    # Self-healing and navigation commands (docs/self-healing.md, docs/delegation.md).
+    adapters_parser = subparsers.add_parser("adapters", help="generate host adapter files from .agents/ and resources.toml")
+    adapters_parser.add_argument("--check", action="store_true", help="report drift without writing")
+    hook_parser = subparsers.add_parser("hook", help="run a host lifecycle hook (reads optional host JSON on stdin)")
+    hook_parser.add_argument("event", choices=["session-start", "pre-compact", "after-edit", "stop"])
+    subparsers.add_parser("start", help="print the session brief (for hosts without hooks)")
+    subparsers.add_parser("finish", help="completion gate for this branch's change set")
+    subparsers.add_parser("map", help="print the one-screen repository map")
+    where_parser = subparsers.add_parser("where", help="find paths, symbols, headings, owners, and past failures")
+    where_parser.add_argument("query", nargs="+")
+    risk_parser = subparsers.add_parser("risk", help="classify this branch's changes into a ceremony tier")
+    risk_parser.add_argument("--base")
+    subparsers.add_parser("capabilities", help="report tools, agent hosts, and MCP routes available here")
+    garden_parser = subparsers.add_parser("garden", help="aggregate rot report (docs, deprecations, budgets, surfaces)")
+    garden_parser.add_argument("--output", type=Path, help="also write the Markdown report to this path")
+    overlap_parser = subparsers.add_parser("skill-overlap", help="compare a proposed capability with existing skills/roles")
+    overlap_parser.add_argument("description", nargs="+")
+    eval_parser = subparsers.add_parser("eval", help="run the fresh-agent navigation benchmark")
+    eval_parser.add_argument("--host", default="claude")
+    eval_parser.add_argument("--tasks", help="comma-separated task ids")
+    eval_parser.add_argument("--timeout", type=int, default=300)
+
     return parser
+
+
+def require_self_heal(root: Path) -> None:
+    errors = self_heal_errors(root)
+    if errors:
+        raise RepoctlError("self-healing check failed:\n- " + "\n- ".join(errors))
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -124,6 +158,7 @@ def main(argv: list[str] | None = None) -> int:
             check_docs_index(repository_root)
             check_markdown_links(repository_root)
             check_file_hygiene(repository_root)
+            require_self_heal(repository_root)
             if isinstance(project.get("vision"), dict) and project["vision"].get("status") != "accepted":
                 print("Vision intake is pending; complete VISION.md and docs/STACK-DECISION.md before declaring readiness.")
             print("Repository structure is coherent.")
@@ -132,6 +167,7 @@ def main(argv: list[str] | None = None) -> int:
         elif arguments.command == "readiness":
             check_readiness_gate(arguments.root.resolve())
         elif arguments.command == "verify":
+            require_self_heal(arguments.root.resolve())
             run_verification(arguments.root.resolve())
         elif arguments.command == "incident":
             create_incident(arguments.root.resolve(), arguments.title, arguments.summary, arguments.public_safe, arguments.review_evidence)
@@ -159,6 +195,45 @@ def main(argv: list[str] | None = None) -> int:
             if not arguments.sync:
                 raise RepoctlError("labels currently requires --sync")
             sync_issue_labels(arguments.root.resolve())
+        elif arguments.command == "adapters":
+            repository_root = arguments.root.resolve()
+            if arguments.check:
+                drift = adapters.drift(repository_root)
+                if drift:
+                    raise RepoctlError("adapter drift:\n- " + "\n- ".join(drift))
+                print("Host adapters match their canonical sources.")
+            else:
+                changed = adapters.sync(repository_root)
+                print("\n".join(changed) if changed else "Host adapters already up to date.")
+        elif arguments.command == "hook":
+            return session.run_hook(arguments.root.resolve(), arguments.event)
+        elif arguments.command == "start":
+            session.session_start(arguments.root.resolve())
+        elif arguments.command == "finish":
+            return session.finish(arguments.root.resolve())
+        elif arguments.command == "map":
+            print_map(arguments.root.resolve())
+        elif arguments.command == "where":
+            hits = where(arguments.root.resolve(), " ".join(arguments.query))
+            print("\n".join(hits) if hits else "No match. Try fewer or different terms, or ask the scout role.")
+        elif arguments.command == "risk":
+            print_risk(arguments.root.resolve(), arguments.base)
+        elif arguments.command == "capabilities":
+            print_capabilities(arguments.root.resolve())
+        elif arguments.command == "garden":
+            report, status = garden_report(arguments.root.resolve())
+            print(report, end="")
+            if arguments.output:
+                arguments.output.write_text(report, encoding="utf-8")
+            return status
+        elif arguments.command == "skill-overlap":
+            matches = skill_overlap(arguments.root.resolve(), " ".join(arguments.description))
+            for score, name, text in matches:
+                print(f"{score:.2f}  {name}: {text}")
+            if matches and matches[0][0] >= 0.3:
+                print("High overlap: extend or reuse the existing capability instead of adding a new one.")
+        elif arguments.command == "eval":
+            return run_evals(arguments.root.resolve(), arguments.host, arguments.tasks, arguments.timeout)
     except (OSError, RepoctlError) as error:
         print(f"repoctl: {error}", file=sys.stderr)
         return 1
