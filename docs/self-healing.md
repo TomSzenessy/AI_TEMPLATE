@@ -73,6 +73,12 @@ adding a renderer in `tools/kit/adapters.py` and listing it in
 `project.toml [adapters].hosts`. Codex, Copilot, and Cursor already read
 `AGENTS.md` and `.agents/skills/` directly.
 
+Entry files must *load* the router, not just point at it. `CLAUDE.md` imports
+it with `@AGENTS.md`. A pointer-only version failed the fresh-agent benchmark
+(4/5): a one-turn answer skipped the read and invented a commit trailer. With
+the import, Claude scored 5/5, at about 35% more cost per cold single-shot
+task, which the `AGENTS.md` budget keeps bounded.
+
 ## Ceremony by risk
 
 `make risk` classifies this branch's changed paths with `project.toml [risk]`
