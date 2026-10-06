@@ -337,7 +337,10 @@ def live_metadata(repository: str) -> dict[str, object] | None:
         return None
     if result.returncode != 0:
         return None
-    data = json.loads(result.stdout or "{}")
+    try:
+        data = json.loads(result.stdout or "{}")
+    except json.JSONDecodeError as error:
+        raise RepoctlError("gh returned invalid repository JSON") from error
     topics = [item.get("name") for item in (data.get("repositoryTopics") or []) if isinstance(item, dict)]
     return {"description": (data.get("description") or "").strip(), "topics": sorted(topics), "is_template": bool(data.get("isTemplate"))}
 
@@ -351,7 +354,7 @@ def metadata_drift(root: Path) -> list[str]:
         return []
     declared = declared_metadata(project)
     if not declared["description"] and not declared["topics"]:
-        return []
+        return []  # nothing declared yet (fresh project): never report or clear
     live = live_metadata(str(target))
     if live is None:
         return []
@@ -371,7 +374,7 @@ def sync_repository_metadata(root: Path) -> list[str]:
     if live is None:
         raise RepoctlError(f"cannot read {repository} with gh; authenticate the GitHub CLI first")
     command = ["gh", "repo", "edit", repository]
-    if live["description"] != declared["description"]:
+    if declared["description"] and live["description"] != declared["description"]:
         command += ["--description", str(declared["description"])]
     for topic in sorted(set(declared["topics"]) - set(live["topics"])):
         command += ["--add-topic", topic]

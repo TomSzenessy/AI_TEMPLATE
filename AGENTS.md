@@ -65,10 +65,11 @@ issues). Never change it silently; record the reason in the issue.
 
 ## Navigate by trigger
 
-Every document is listed with "read it when" in [`docs/README.md`](./docs/README.md). The ones you must not skip:
+[`docs/README.md`](./docs/README.md) lists every document and when to read it. Never skip:
 
 - **New project or reshaping:** [`VISION.md`](./VISION.md), [`docs/ADAPTATION.md`](./docs/ADAPTATION.md); ask only high-impact product, data, deployment, and stack questions.
-- **Bug or incident:** [`docs/operations.md`](./docs/operations.md); reproduce first.
+- **Vocabulary, architecture, seams:** [`CONTEXT.md`](./CONTEXT.md), [`docs/architecture/README.md`](./docs/architecture/README.md).
+- **Bug or incident:** [`docs/operations.md`](./docs/operations.md); reproduce first. **Release or quality claim:** [`docs/verification.md`](./docs/verification.md), [`docs/production.md`](./docs/production.md).
 - **Auth, secrets, dependencies, CI, untrusted input:** [`docs/security.md`](./docs/security.md).
 - **Personal data, legal text, launch:** [`docs/privacy.md`](./docs/privacy.md), [`docs/legal/README.md`](./docs/legal/README.md).
 - **Skills, MCP, pasted resources:** [`docs/resources.md`](./docs/resources.md), [`docs/skills.md`](./docs/skills.md); discover, inspect, pin, record.

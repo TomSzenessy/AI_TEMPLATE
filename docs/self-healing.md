@@ -17,7 +17,12 @@ standard-library command in `tools/kit/`, so it works with any agent host.
 | Before context compaction | `repoctl hook pre-compact` | — | Writes `.agent/checkpoint.md` (uncommitted paths, docs still owed). |
 | After a file edit | `repoctl hook after-edit` | — | Names the docs covering the edited path (once per session); regenerates derived files when a source changed; warns on edits to generated files. |
 | Before declaring done | `repoctl hook stop` | `make done` | Gate over this branch's change set: owed docs, derived-file drift, dead bindings, expired, undated, or unfinished markers. The hook blocks once; `make done` also runs every test. |
-| Every commit | `.githooks/commit-msg` (any agent or human) | same | Refuses a commit whose staged covered code skips its doc (unless the message carries a `Docs-Unaffected:` trailer), plus drift and marker checks. Exit 3 means blocked; a crashed kit never blocks a commit. Bypass deliberately with `--no-verify`. |
+| Every commit | `.githooks/commit-msg` (any agent or human) | same | Refuses a commit whose staged covered code skips its doc (unless the message carries a `Docs-Unaffected:` trailer), plus marker checks, and derived-file drift when the commit touches a source. Exit 3 means blocked; a crashed kit never blocks a commit. Bypass deliberately with `--no-verify`. |
+
+The commit gate is installed (`core.hooksPath=.githooks`) only when the
+repository has no hooks path and no active hooks in `.git/hooks`; otherwise
+the brief says so and you call `.githooks/commit-msg "$1"` from your existing
+commit-msg hook or hook manager, so nothing already in use is switched off.
 
 Claude Code receives the hooks through the generated `.claude/settings.json`.
 Other hosts read [`AGENTS.md`](../AGENTS.md), which tells them to run the make
@@ -37,7 +42,9 @@ A document declares what it describes with one comment near its top, such as
 - **Stale document**: a commit newer than the document's last commit touched
   covered paths. `make check` fails. If a change truly does not affect the doc,
   record that in the commit with a trailer, `Docs-Unaffected: docs/x.md <reason>`
-  (no path = all documents).
+  (a reason with no path exempts all documents). Git's own trailer parsing is
+  used everywhere: trailers belong in the message's last paragraph, and a
+  trailer without a reason exempts nothing.
 - **Owed document**: covered paths changed on this branch while the doc did not;
   the stop gate and `make done` report it before history even exists.
 - **Command references**: every backticked `make <target>` or `repoctl <command>`
@@ -89,9 +96,11 @@ listing it in `project.toml [adapters].hosts`. Codex, Copilot, and Cursor read
 
 ## Extending: skills, roles, docs
 
-`make new KIND=skill|agent|doc NAME=<kebab> DESC="<what>; <when>"` is the one
-way to add a capability. It refuses a near-duplicate (overlap at or above
-`[kit].overlap_limit`; `FORCE=1` overrides), writes valid frontmatter or
+`make similar Q="<need>"` answers first: reuse (score at or above
+`[kit].overlap_limit`), read the closest match first (at or above half of it),
+or create. `make new KIND=skill|agent|doc NAME=<kebab> DESC="<what>; <when>"` is
+the one way to add a capability. It refuses a near-duplicate by description
+and name (`FORCE=1` overrides), writes valid frontmatter or
 index metadata, registers a first-party skill in `[capabilities].local_skills`,
 regenerates every derived file, and leaves `FILL-IN:` lines for the content.
 Refining an existing capability is an ordinary edit of its canonical file;

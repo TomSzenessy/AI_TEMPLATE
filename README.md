@@ -100,5 +100,6 @@ secret scanning, replace legal placeholders with verified facts, and attach
 runtime, provider, and counsel evidence to the launch issue. Start at
 [`docs/production.md`](./docs/production.md).
 
-The research behind these defaults lives in the template repository's
-`docs/research/` and is removed from new projects by `make init`.
+The research behind these defaults is in the template repository
+([baselines](./docs/research/agentic-repository-baselines.md)); `make init`
+removes it from new projects and points this link at the template.

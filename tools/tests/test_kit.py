@@ -348,6 +348,57 @@ class CommitGateTests(KitRepository):
         self.assertNotIn("No such file", self.self_heal())
 
 
+class CriticRegressionTests(KitRepository):
+    """Round-two critic findings: hook safety and one trailer parser everywhere."""
+
+    def gate(self, message: str) -> int:
+        path = self.root / ".git" / "COMMIT_EDITMSG"
+        path.write_text(message, encoding="utf-8")
+        return self.cli("hook", "commit-msg", str(path)).returncode
+
+    def stage_billing_change(self) -> None:
+        self.write("src/billing/invoice.py", "def render_invoice():\n    return 11\n")
+        self.git("add", "src/billing/invoice.py")
+
+    def test_existing_git_hooks_are_never_disabled(self) -> None:
+        (self.root / ".githooks").mkdir()
+        (self.root / ".githooks" / "commit-msg").write_text("#!/bin/sh\nexit 0\n")
+        hook = self.root / ".git" / "hooks" / "pre-commit"
+        hook.write_text("#!/bin/sh\nexit 0\n")
+        hook.chmod(0o755)
+        brief = self.cli("hook", "session-start", stdin="{}").stdout
+        self.assertIn("git commit gate NOT installed", brief)
+        result = subprocess.run(["git", "-C", str(self.root), "config", "--get", "core.hooksPath"], capture_output=True, text=True)
+        self.assertEqual(result.stdout.strip(), "")
+
+    def test_bare_or_misplaced_trailer_exempts_nothing_in_gate_or_history(self) -> None:
+        self.stage_billing_change()
+        self.assertEqual(self.gate("change\n\nDocs-Unaffected:\n"), 3)
+        self.assertEqual(self.gate("change\n\nDocs-Unaffected: docs/billing.md\n"), 3, "a reason is required")
+        self.assertEqual(self.gate("change\n\nDocs-Unaffected: docs/billing.md cosmetic\n\nMore text.\n"), 3)
+        self.git("commit", "-q", "-m", "change\n\nDocs-Unaffected:")
+        self.assertIn("docs/billing.md: stale since", self.self_heal())
+
+    def test_trailer_with_trailing_period_names_only_that_doc(self) -> None:
+        self.stage_billing_change()
+        self.assertEqual(self.gate("change\n\nDocs-Unaffected: docs/billing.md. cosmetic rename\n"), 0)
+        self.git("commit", "-q", "-m", "change\n\nDocs-Unaffected: docs/billing.md. cosmetic rename")
+        self.assertEqual(self.self_heal(), "")
+
+    def test_unstaged_derived_drift_does_not_block_unrelated_commit(self) -> None:
+        self.write(".agents/agents/scout.md", "---\nname: scout\ndescription: Changed locator text.\naccess: read-only\ntier: fast\n---\n")
+        self.write("notes.txt", "notes\n")
+        self.git("add", "notes.txt")
+        self.assertEqual(self.gate("notes\n"), 0)
+
+    def test_similar_names_are_refused(self) -> None:
+        self.write("project.toml", (self.root / "project.toml").read_text() + "[capabilities]\nlocal_skills = []\n")
+        result = self.cli("new", "--kind", "skill", "--name", "demo-renderer",
+                          "--description", "Produce billing documents for invoice workflows quickly.")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("too similar to skill:demo-skill", result.stderr)
+
+
 class DerivedContentTests(KitRepository):
     def test_index_is_generated_from_declarations(self) -> None:
         self.write("docs/README.md", "# Index\n\n<!-- repoctl:index -->\n<!-- /repoctl:index -->\n")

@@ -201,7 +201,6 @@ def finish_findings(root: Path) -> list[str]:
 
 
 GATE_BLOCKED = 3  # distinct from crashes, which .githooks/commit-msg lets through
-TRAILER = re.compile(r"(?mi)^Docs-Unaffected:\s*(.*)$")
 
 
 def commit_gate(root: Path, message_file: str | None) -> int:
@@ -214,10 +213,7 @@ def commit_gate(root: Path, message_file: str | None) -> int:
     except OSError:
         message = ""
     message = "\n".join(line for line in message.splitlines() if not line.startswith("#"))
-    exempt: set[str] = set()
-    for value in TRAILER.findall(message):
-        named = {token.strip(",;") for token in value.split() if token.strip(",;").endswith(".md")}
-        exempt |= named or {"*"}
+    exempt = docsync.exemption_scope(docsync.message_trailers(root, message)) or set()
     files = repository_files(root)
     doc_bindings = docsync.bindings(root, files)
     findings = [
@@ -225,26 +221,39 @@ def commit_gate(root: Path, message_file: str | None) -> int:
         for doc, paths in docsync.pending_documents(doc_bindings, staged).items()
         if "*" not in exempt and doc not in exempt
     ]
-    findings += derive.drift(root)
+    # Derived drift only matters when this commit touches a source of derived files.
+    if any(path.startswith(CANONICAL_INPUTS) or path.endswith(".md") for path in staged):
+        findings += derive.drift(root)
     findings += hygiene.scan_markers(root, [path for path in staged if path in set(files)]).errors
     if not findings:
         return 0
     print("Commit blocked by the self-healing gate (docs/self-healing.md):", file=sys.stderr)
     print("\n".join(f"- {item}" for item in findings[:15]), file=sys.stderr)
     print(
-        "Fix and re-stage (make sync regenerates derived files), or add a trailer\n"
-        "'Docs-Unaffected: <doc> <reason>' when a covered change truly leaves the doc correct.",
+        "Owed doc: update and stage it, or add the trailer 'Docs-Unaffected: <doc> <reason>'\n"
+        "  in the message's LAST paragraph (with any Co-Authored-By lines), as git requires.\n"
+        "Derived file: run make sync and stage the result. Marker: fix the named line.",
         file=sys.stderr,
     )
     return GATE_BLOCKED
 
 
 def install_git_hooks(root: Path) -> str | None:
-    """Point git at .githooks unless the repository already chose a hooks path."""
+    """Point git at .githooks only when that cannot disable hooks already in use."""
     if not (root / ".githooks" / "commit-msg").is_file() or git(root, "rev-parse", "--git-dir") is None:
         return None
     if (git(root, "config", "--get", "core.hooksPath") or "").strip():
         return None
+    hooks_dir = (git(root, "rev-parse", "--git-path", "hooks") or "").strip()
+    existing = sorted(
+        path.name for path in (root / hooks_dir).glob("*")
+        if hooks_dir and path.is_file() and not path.name.endswith(".sample")
+    )
+    if existing:
+        return (
+            f"git commit gate NOT installed: .git/hooks already has {', '.join(existing)}; call "
+            "`.githooks/commit-msg \"$1\"` from your commit-msg hook (or hook manager) to add it"
+        )
     if git(root, "config", "core.hooksPath", ".githooks") is None:
         return None
     return "installed git hooks (core.hooksPath=.githooks): commits now run the self-healing gate"

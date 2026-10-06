@@ -47,7 +47,6 @@
     "allow": [
       "Bash(make start)",
       "Bash(make done)",
-      "Bash(make finish)",
       "Bash(make check)",
       "Bash(make test)",
       "Bash(make verify)",

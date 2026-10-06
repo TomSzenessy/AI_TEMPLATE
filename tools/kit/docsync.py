@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import subprocess
 from pathlib import Path
 
 from .core import markdown_without_fenced_code, read_text_file
@@ -133,6 +134,40 @@ def dead_bindings(doc_bindings: dict[str, list[str]], files: list[str]) -> list[
     return errors
 
 
+def exemption_scope(values: list[str]) -> set[str] | None:
+    """Docs exempted by Docs-Unaffected trailer values; None when nothing valid.
+
+    Each value is `<doc.md ...> <reason>` (named docs only) or `<reason>` (all
+    docs). A value without a reason exempts nothing, so an empty or bare trailer
+    cannot silence the gate. The commit gate and the history check share this.
+    """
+    scope: set[str] = set()
+    for value in values:
+        tokens = value.split()
+        docs = {token.rstrip(".,;:") for token in tokens if token.rstrip(".,;:").endswith(".md")}
+        reason = [token for token in tokens if token.rstrip(".,;:") not in docs]
+        if reason:
+            scope |= docs or {"*"}
+    return scope or None
+
+
+def message_trailers(root: Path, message: str) -> list[str]:
+    """Docs-Unaffected values exactly as git parses commit trailers."""
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(root), "interpret-trailers", "--parse"],
+            input=message, capture_output=True, text=True, timeout=30, check=False,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return []
+    values = []
+    for line in result.stdout.splitlines():
+        key, _, value = line.partition(":")
+        if key.strip().lower() == UNAFFECTED_TRAILER.lower():
+            values.append(value.strip())
+    return values
+
+
 def _history(root: Path, revisions: str | None = None) -> list[tuple[str, set[str] | None, set[str]]]:
     """Newest-first (commit, Docs-Unaffected scope, paths); scope None = no trailer."""
     output = git(
@@ -142,7 +177,7 @@ def _history(root: Path, revisions: str | None = None) -> list[tuple[str, set[st
         f"-n{HISTORY_LIMIT}",
         "--no-merges",
         "--name-only",
-        f"--format=%x1e%h%x1f%(trailers:key={UNAFFECTED_TRAILER},valueonly,separator=%x20)%x1f",
+        f"--format=%x1e%h%x1f%(trailers:key={UNAFFECTED_TRAILER},valueonly,separator=%x1d)%x1f",
         timeout=60,
     )
     commits = []
@@ -150,12 +185,7 @@ def _history(root: Path, revisions: str | None = None) -> list[tuple[str, set[st
         if not record.strip():
             continue
         commit, trailer, names = (record.split("\x1f") + ["", ""])[:3]
-        scope: set[str] | None = None
-        if trailer.strip():
-            # A trailer naming specific .md files scopes the exemption to them;
-            # any other value exempts the commit for every document.
-            named = {token.strip(",;") for token in trailer.split() if token.strip(",;").endswith(".md")}
-            scope = named or {"*"}
+        scope = exemption_scope([value for value in trailer.split("\x1d") if value.strip()])
         commits.append((commit.strip(), scope, {line for line in names.splitlines() if line}))
     return commits
 

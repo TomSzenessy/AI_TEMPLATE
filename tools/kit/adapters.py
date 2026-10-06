@@ -156,7 +156,7 @@ CLAUDE_TOOLS = {
 }
 HOOK = 'python3 "$CLAUDE_PROJECT_DIR/tools/repoctl.py" hook {event}'
 CLAUDE_ALLOWED_COMMANDS = [
-    "make start", "make done", "make finish", "make check", "make test", "make verify", "make map",
+    "make start", "make done", "make check", "make test", "make verify", "make map",
     "make where:*", "make garden", "make risk", "make capabilities", "make sync", "make handover",
     "make inventory", "make resources", "make similar:*", "make new:*",
 ]

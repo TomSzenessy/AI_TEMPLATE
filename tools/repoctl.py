@@ -23,6 +23,7 @@ from kit.core import RepoctlError, ensure_inside_root, load_project
 from kit.docs import check_docs_index, check_file_hygiene, check_markdown_links
 from kit.evals import run_evals
 from kit.garden import garden_report, self_heal_errors
+from kit.config import setting
 from kit.github import sync_issue_labels, sync_repository_metadata
 from kit.issues import (
     check_issue_for_duplicates,
@@ -251,11 +252,17 @@ def main(argv: list[str] | None = None) -> int:
                 arguments.output.write_text(report, encoding="utf-8")
             return status
         elif arguments.command == "similar":
-            matches = skill_overlap(arguments.root.resolve(), " ".join(arguments.description))
+            repository_root = arguments.root.resolve()
+            matches = skill_overlap(repository_root, " ".join(arguments.description))
+            limit = float(setting(repository_root, "overlap_limit"))
             for score, name, text in matches:
                 print(f"{score:.2f}  {name}: {text}")
-            if matches and matches[0][0] >= 0.3:
-                print("High overlap: extend or reuse the existing capability instead of adding a new one.")
+            if matches and matches[0][0] >= limit:
+                print(f"Verdict: reuse or extend {matches[0][1]} (edit its canonical file in .agents/).")
+            elif matches and matches[0][0] >= limit / 2:
+                print(f"Verdict: read {matches[0][1]} first; extend it if it covers the need, otherwise create a new one with make new.")
+            else:
+                print('Verdict: nothing similar. Create it: make new KIND=skill|agent|doc NAME=... DESC="...; ..."')
         elif arguments.command == "eval":
             return run_evals(arguments.root.resolve(), arguments.host, arguments.tasks, arguments.timeout)
     except (OSError, RepoctlError) as error:

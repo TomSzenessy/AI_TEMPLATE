@@ -62,7 +62,7 @@ def create(
         )
     messages: list[str] = []
     if kind in {"skill", "agent"}:
-        overlap = skill_overlap(root, description)
+        overlap = skill_overlap(root, description, name)
         if overlap:
             messages += [f"overlap {score:.2f} with {label}" for score, label, _ in overlap[:3]]
         if overlap and overlap[0][0] >= float(setting(root, "overlap_limit")) and not force:

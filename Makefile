@@ -5,7 +5,7 @@ SKILL_TEST_SUITES := $(wildcard .agents/skills/*/tests)
 .DEFAULT_GOAL := help
 
 .PHONY: help python-check init inventory resources skill-digest check doctor readiness test verify validate incident issue labels review-packet \
-	start done new finish handover map where risk garden capabilities sync github-sync similar eval
+	start done new handover map where risk garden capabilities sync github-sync similar eval
 
 # Export user-supplied values so recipes pass them as data, not as shell source.
 export Q AGENT TASKS DESC GROUP COVERS ACCESS TIER FORCE NAME KIND TITLE SUMMARY BODY TYPE PRIORITY AREA TOPIC STATUS SURFACE GATE PUBLIC_REVIEWED REVIEW_EVIDENCE ISSUE_FILE PUBLIC_SAFE
@@ -105,9 +105,6 @@ review-packet:
 start: python-check
 	@$(REPOCTL) start
 
-finish: python-check
-	$(REPOCTL) finish
-
 # The one completion command: heal derived files, run the change gate, then
 # everything CI runs. Prints the risk tier so the right review follows.
 done: python-check
@@ -117,8 +114,11 @@ done: python-check
 	@echo "All gates passed. Get the review your risk tier requires, then hand over or open the PR."
 
 new: python-check
-	@$(REPOCTL) new --kind "$${KIND:?set KIND=skill|agent|doc}" --name "$${NAME:?set NAME=kebab-case-name}" \
-	  --description "$${DESC:?set DESC=\"what it does; when to use it\"}" \
+	$(if $(KIND),,$(error Choose what to create: make new KIND=skill|agent|doc NAME=my-name DESC="what it does; when to use it"))
+	$(if $(NAME),,$(error Name it: NAME=kebab-case-name))
+	$(if $(DESC),,$(error Describe it: DESC="what it does; when to use it"))
+	@$(REPOCTL) new --kind "$${KIND}" --name "$${NAME}" \
+	  --description "$${DESC}" \
 	  --group "$${GROUP:-operate}" --covers "$${COVERS:-}" --access "$${ACCESS:-read-only}" \
 	  --tier "$${TIER:-balanced}" $(if $(filter 1 yes true,$(FORCE)),--force,)
 
@@ -129,7 +129,8 @@ map: python-check
 	@$(REPOCTL) map
 
 where: python-check
-	@$(REPOCTL) where "$${Q:?set Q=\"search terms\"}"
+	$(if $(Q),,$(error Add what to look for: make where Q="login form"))
+	@$(REPOCTL) where "$${Q}"
 
 risk: python-check
 	@$(REPOCTL) risk
@@ -147,7 +148,8 @@ github-sync: python-check
 	$(REPOCTL) github-sync
 
 similar: python-check
-	@$(REPOCTL) similar "$${Q:?set Q=\"what the capability should do\"}"
+	$(if $(Q),,$(error Describe the capability: make similar Q="draft release notes"))
+	@$(REPOCTL) similar "$${Q}"
 
 eval: python-check
 	$(REPOCTL) eval --host "$${AGENT:-claude}" $(if $(TASKS),--tasks "$${TASKS}",)

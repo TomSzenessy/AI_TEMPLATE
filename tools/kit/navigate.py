@@ -139,22 +139,38 @@ def where(root: Path, query: str, limit: int = 20) -> list[str]:
     return [line for _, line in hits[:limit]]
 
 
+def _stem(word: str) -> str:
+    for suffix in ("ing", "ers", "er", "s"):
+        if word.endswith(suffix) and len(word) - len(suffix) >= 4:
+            return word[: -len(suffix)]
+    return word
+
+
 def _tokens(text: str) -> set[str]:
     stop = {"the", "and", "for", "use", "with", "that", "this", "into", "from", "when", "your", "are", "or", "a", "to", "of", "in", "an", "it", "on", "is", "be", "by"}
-    return {word for word in WORD.findall(text.lower()) if word not in stop and len(word) > 2}
+    return {_stem(word) for word in WORD.findall(text.lower()) if word not in stop and len(word) > 2}
 
 
-def skill_overlap(root: Path, description: str, limit: int = 5) -> list[tuple[float, str, str]]:
-    """Jaccard overlap between a proposed capability and existing skills/roles."""
+def _jaccard(left: set[str], right: set[str]) -> float:
+    return len(left & right) / len(left | right) if left and right else 0.0
+
+
+def skill_overlap(root: Path, description: str, name: str = "", limit: int = 5) -> list[tuple[float, str, str]]:
+    """Similarity of a proposed capability to existing skills/roles (0..1).
+
+    Description word overlap, plus half the overlap of the names when a name is
+    proposed, so `handover-writer` is caught next to `agent-handover`.
+    """
     proposed = _tokens(description)
+    proposed_name = _tokens(name.replace("-", " "))
     if not proposed:
         return []
     candidates = [("skill", item["name"], item["description"]) for item in canonical_skills(root)]
     candidates += [("role", item["name"], item["description"]) for item in canonical_roles(root)]
     scored = []
-    for kind, name, text in candidates:
-        existing = _tokens(text)
-        if existing:
-            scored.append((len(proposed & existing) / len(proposed | existing), f"{kind}:{name}", _short(text, 100)))
+    for kind, existing_name, text in candidates:
+        score = _jaccard(proposed, _tokens(text)) + 0.5 * _jaccard(proposed_name, _tokens(existing_name.replace("-", " ")))
+        if score > 0:
+            scored.append((min(score, 1.0), f"{kind}:{existing_name}", _short(text, 100)))
     scored.sort(key=lambda item: -item[0])
     return scored[:limit]
