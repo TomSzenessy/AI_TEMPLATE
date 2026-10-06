@@ -13,6 +13,7 @@ from pathlib import Path
 from .adapters import canonical_roles, canonical_skills
 from .core import declared_surfaces, governance_profile, load_project, read_text_file, repository_files
 from .docsync import bindings, owners
+from .gitinfo import git, is_repository
 
 SYMBOL = re.compile(
     r"^\s*(?:export\s+)?(?:default\s+)?(?:async\s+)?(?:pub(?:\([^)]*\))?\s+)?"
@@ -68,6 +69,40 @@ def _score(terms: list[str], text: str) -> int:
     return sum(1 for term in terms if term in lowered)
 
 
+def _candidate_lines(root: Path, files: list[str], terms: list[str]):
+    """Yield (path, line number, text) for lines containing any term.
+
+    Uses `git grep` (fast at very large scale) and falls back to a Python scan
+    outside git. Files over 400 KB and binaries are skipped either way.
+    """
+    if is_repository(root):
+        arguments = ["grep", "-n", "-I", "-i", "-z", "--untracked"]
+        for term in terms:
+            arguments += ["-e", term]
+        output = git(root, *arguments, "--", ".", *(f":!{prefix}" for prefix in SKIP_PREFIXES), timeout=120)
+        if output is not None or git(root, "rev-parse", "--git-dir") is not None:
+            sizes: dict[str, bool] = {}
+            for record in (output or "").splitlines():
+                parts = record.split("\0", 2)
+                if len(parts) != 3 or not parts[1].isdigit():
+                    continue
+                path = parts[0]
+                if path not in sizes:
+                    try:
+                        sizes[path] = (root / path).stat().st_size <= 400_000
+                    except OSError:
+                        sizes[path] = False
+                if sizes[path]:
+                    yield path, int(parts[1]), parts[2]
+            return
+    for relative in files:
+        text = read_text_file(root, relative, limit=400_000)
+        for number, line in enumerate((text or "").splitlines(), start=1):
+            lowered = line.lower()
+            if any(term in lowered for term in terms):
+                yield relative, number, line
+
+
 def where(root: Path, query: str, limit: int = 20) -> list[str]:
     """Rank paths, symbols, headings, and failure-memory lines matching the query."""
     terms = [term for term in WORD.findall(query.lower()) if len(term) > 1]
@@ -82,27 +117,24 @@ def where(root: Path, query: str, limit: int = 20) -> list[str]:
             owned = owners(doc_bindings, relative)
             suffix = f"  (documented in {', '.join(owned)})" if owned else ""
             hits.append((path_score * 3, f"{relative}  [path]{suffix}"))
-        text = read_text_file(root, relative, limit=400_000)
-        if not text:
-            continue
+    for relative, number, line in _candidate_lines(root, files, terms):
         is_memory = relative in MEMORY_FILES or relative.startswith("docs/incidents/")
-        for number, line in enumerate(text.splitlines(), start=1):
-            kind = None
-            match = SYMBOL.match(line)
-            if match:
-                kind, label = "symbol", match.group(1)
-            else:
-                heading = HEADING.match(line) if relative.endswith(".md") else None
-                if heading:
-                    kind, label = "heading", heading.group(1)
-                elif is_memory and line.strip():
-                    kind, label = "seen-before", line
-            if not kind:
-                continue
-            score = _score(terms, label)
-            if score:
-                weight = {"symbol": 3, "heading": 2, "seen-before": 3}[kind]
-                hits.append((score * weight, f"{relative}:{number}  [{kind}] {_short(label)}"))
+        kind = None
+        match = SYMBOL.match(line)
+        if match:
+            kind, label = "symbol", match.group(1)
+        else:
+            heading = HEADING.match(line) if relative.endswith(".md") else None
+            if heading:
+                kind, label = "heading", heading.group(1)
+            elif is_memory and line.strip():
+                kind, label = "seen-before", line
+        if not kind:
+            continue
+        score = _score(terms, label)
+        if score:
+            weight = {"symbol": 3, "heading": 2, "seen-before": 3}[kind]
+            hits.append((score * weight, f"{relative}:{number}  [{kind}] {_short(label)}"))
     hits.sort(key=lambda hit: (-hit[0], hit[1]))
     return [line for _, line in hits[:limit]]
 

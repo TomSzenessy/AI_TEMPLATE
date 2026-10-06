@@ -96,6 +96,18 @@ The weekly report-only workflow (`.github/workflows/garden.yml`) publishes the
 report as a job summary. A `doc-gardener` or `implementer` subagent fixes
 findings, one root cause per change (see [`delegation.md`](./delegation.md)).
 
+## Scale and limits
+
+- `make where` searches with `git grep` (falls back to a Python scan outside
+  git) and skips files over 400 KB. Doc bindings are cached by size and mtime
+  in ignored `.agent/cache/`, so the per-edit hook does not re-read every doc.
+- Staleness inspects the newest 2000 non-merge commits; a document last
+  committed before that window is not judged.
+- The stop gate judges the whole branch, so an unresolved finding is raised
+  once per turn until it is fixed or exempted by a trailer.
+- Generated hooks call `python3` via `$CLAUDE_PROJECT_DIR`, so Windows hosts
+  need Python 3.11+ on `PATH` under that name (Git Bash or WSL).
+
 ## Measuring the kit: fresh-agent evals
 
 `.agents/evals/*.toml` holds navigation tasks with an expected-answer regex.

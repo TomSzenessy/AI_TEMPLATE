@@ -12,6 +12,7 @@ and pending documents (uncommitted covered changes without a doc change).
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -22,24 +23,51 @@ COVERS_PATTERN = re.compile(r"<!--\s*covers:\s*(.*?)\s*-->", re.DOTALL)
 INLINE_CODE = re.compile(r"`[^`\n]*`")  # examples in code spans are not bindings
 UNAFFECTED_TRAILER = "Docs-Unaffected"
 HISTORY_LIMIT = 2000
+BINDINGS_CACHE = ".agent/cache/bindings.json"
 
 
 def bindings(root: Path, files: list[str]) -> dict[str, list[str]]:
-    """Map each Markdown document to the path globs it declares it covers."""
+    """Map each Markdown document to the path globs it declares it covers.
+
+    Parsed declarations are cached in ignored `.agent/cache/` by size and
+    mtime, so per-edit hooks stay cheap in repositories with many documents.
+    """
+    cache_path = root / BINDINGS_CACHE
+    try:
+        cache = json.loads(cache_path.read_text(encoding="utf-8"))
+        cache = cache if isinstance(cache, dict) and cache.get("version") == 1 else {}
+    except (OSError, ValueError):
+        cache = {}
+    entries = cache.get("entries", {}) if isinstance(cache.get("entries"), dict) else {}
+    fresh: dict[str, list] = {}
     result: dict[str, list[str]] = {}
     for relative in files:
         if not relative.endswith(".md"):
             continue
-        text = read_text_file(root, relative)
-        if not text:
+        try:
+            status = (root / relative).stat()
+        except OSError:
             continue
-        patterns = [
-            pattern
-            for match in COVERS_PATTERN.finditer(INLINE_CODE.sub("", markdown_without_fenced_code(text)))
-            for pattern in match.group(1).split()
-        ]
+        stamp = [status.st_mtime_ns, status.st_size]
+        cached = entries.get(relative)
+        if isinstance(cached, list) and len(cached) == 2 and cached[0] == stamp:
+            patterns = cached[1]
+        else:
+            text = read_text_file(root, relative) or ""
+            patterns = [
+                pattern
+                for match in COVERS_PATTERN.finditer(INLINE_CODE.sub("", markdown_without_fenced_code(text)))
+                for pattern in match.group(1).split()
+            ]
+        fresh[relative] = [stamp, patterns]
         if patterns:
             result[relative] = patterns
+    if fresh != entries:
+        try:
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            cache_path.write_text(json.dumps({"version": 1, "entries": fresh}), encoding="utf-8")
+        except OSError:
+            pass  # the cache is an optimization only
     return result
 
 
