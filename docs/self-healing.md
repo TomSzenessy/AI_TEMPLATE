@@ -117,4 +117,6 @@ deterministic) and records pass rate, turns, time, and cost under
 `.agent/evals/`. Re-run it after changing `AGENTS.md`, the map, or the docs.
 A change to the kit that lowers the pass rate or raises cost is a regression.
 A host-side failure, such as an expired login, is recorded as an error rather
-than as a wrong answer.
+than as a wrong answer. Runs drop the launching session's host variables, so a
+benchmark started from inside an agent session uses the CLI's own login, as a
+truly fresh agent would.

@@ -9,6 +9,7 @@ ignored `.agent/evals/`. Compare runs before and after changing the kit.
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -33,6 +34,9 @@ HOST_COMMANDS = {
     "codex": lambda prompt: ["codex", "exec", "--sandbox", "read-only", prompt],
     "gemini": lambda prompt: ["gemini", "-p", prompt],
 }
+# A fresh agent must not inherit the launching session: host session variables
+# would route a nested CLI through the parent's (short-lived) session auth.
+INHERITED_SESSION = ("CLAUDECODE", "CLAUDE_CODE_", "CLAUDE_PID", "CLAUDE_AGENT_SDK", "CLAUDE_EFFORT", "CLAUDE_PREVIEW", "ANTHROPIC_BASE_URL")
 PREFIX = "You are a fresh agent in this repository. Do not edit files. Answer briefly. Task: "
 
 
@@ -54,7 +58,8 @@ def run_task(root: Path, host: str, task: dict[str, str], timeout: int) -> dict[
     command = HOST_COMMANDS[host](PREFIX + task["prompt"])
     started = time.monotonic()
     try:
-        result = subprocess.run(command, cwd=root, capture_output=True, text=True, timeout=timeout, check=False)
+        environment = {key: value for key, value in os.environ.items() if not key.startswith(INHERITED_SESSION)}
+        result = subprocess.run(command, cwd=root, env=environment, capture_output=True, text=True, timeout=timeout, check=False)
         output = result.stdout
     except subprocess.TimeoutExpired:
         return {"id": task["id"], "passed": False, "error": f"timeout after {timeout}s"}
