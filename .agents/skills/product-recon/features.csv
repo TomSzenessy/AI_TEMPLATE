@@ -3,3 +3,4 @@ feature,area,priority,original,clone,notes
 {{feature}},{{area}},should,yes,no,
 {{feature the reference product lacks}},{{area}},could,no,no,{{an improvement this build adds}}
 {{out-of-reach feature}},{{area}},could,yes,skip,{{why: licensed content, partner network, ...}}
+,,,,"","Adapted from https://github.com/Jakeschincariol/replica-skill (MIT, © 2026 Jake Schincariol), replica-recon/features.csv @ 77c9436fb3d18c3d58169efb8caf4fe906b0dc51"

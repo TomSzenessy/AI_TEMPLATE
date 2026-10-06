@@ -16,10 +16,10 @@ reason: what the reference product's users hate, in their own words, and what
 your build does instead. Reads the scope in `reference/recon.md`
 (product-recon), so the mining stays inside the slice being built.
 
-Tool in this folder:
+Tool in this folder (command runs from the project root):
 
 ```bash
-python3 reviews.py reference/reviews.csv --out reference/feedback.md
+python3 .agents/skills/review-mining/reviews.py reference/reviews.csv --out reference/feedback.md
 ```
 
 ## The rules, which are not negotiable
@@ -62,7 +62,7 @@ the best fixes hide.
 ## Step 2: rank
 
 ```bash
-python3 reviews.py reference/reviews.csv --out reference/feedback.md
+python3 .agents/skills/review-mining/reviews.py reference/reviews.csv --out reference/feedback.md
 ```
 
 It sorts reviews into themes (`themes.json` in this folder, edit it for the

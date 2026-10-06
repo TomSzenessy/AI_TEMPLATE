@@ -15,11 +15,11 @@ Nothing launches under the reference product's identity. This skill is the
 line between a copy and your own product.
 
 Reads the angle from `reference/fixes.md` (review-mining) and the token roles
-in `reference/design/tokens.json` (design-tokens). Tool in this folder:
+in `reference/design/tokens.json` (design-tokens). Tool in this folder (commands run from the project root):
 
 ```bash
-python3 sweep.py . --avoid "Original Name,Its Company" --domains original.com --colors "#006bff"
-python3 sweep.py . --config reference/brand.json        # same, from the brand file
+python3 .agents/skills/brand-sweep/sweep.py . --avoid "Original Name,Its Company" --domains original.com --colors "#006bff"
+python3 .agents/skills/brand-sweep/sweep.py . --config reference/brand.json        # same, from the brand file
 ```
 
 Writes `reference/brand.md` and `reference/brand.json` (`avoid`, `domains`,
@@ -64,7 +64,7 @@ primary brand hue from a different family than the reference product's (if
 theirs is blue, yours is not a nearby blue). Then:
 
 ```bash
-python3 ../design-tokens/contrast.py reference/design/tokens.json
+python3 .agents/skills/design-tokens/contrast.py reference/design/tokens.json
 ```
 
 Zero AA failures. Add the reference product's brand colours to
@@ -96,7 +96,7 @@ phrasing.
 Replace every placeholder name, colour and string. Then:
 
 ```bash
-python3 sweep.py . --config reference/brand.json
+python3 .agents/skills/brand-sweep/sweep.py . --config reference/brand.json
 ```
 
 It searches file contents and file names for the reference product's name

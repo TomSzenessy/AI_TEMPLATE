@@ -17,7 +17,7 @@ tokens.json in this folder), `reference/design/tokens.css`, the theme
 mapping, and `reference/design/components.md`.
 
 ```bash
-python3 contrast.py reference/design/tokens.json     # every text pair, WCAG ratio
+python3 .agents/skills/design-tokens/contrast.py reference/design/tokens.json     # every text pair, WCAG ratio
 ```
 
 ## The rules
@@ -63,7 +63,7 @@ Add a `pairs` list for every text and background combination the app uses,
 then:
 
 ```bash
-python3 contrast.py reference/design/tokens.json
+python3 .agents/skills/design-tokens/contrast.py reference/design/tokens.json
 ```
 
 AA is the floor: 4.5:1 for body text, 3:1 for large text and for input

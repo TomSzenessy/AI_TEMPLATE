@@ -80,6 +80,10 @@ owner per fact.
    or its source is unmaintained or untrusted: drop it with one line of reason
    in the issue or conversation. Exclusions leave no files behind.
 
+A pasted MCP server is linked, never installed here: record it as a route's
+`mcp` hint (or as its own route when it brings documentation) and leave
+pinning, credentials, and permissions to the host under the MCP policy above.
+
 Decide in this order: does a real task's trigger match it? Is it the primary
 source or the closest one? Is it already covered? Can it be pinned, reviewed,
 and rolled back? Keep the registry lean: one route per topic, and popularity is

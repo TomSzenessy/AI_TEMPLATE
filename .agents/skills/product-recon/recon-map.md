@@ -1,5 +1,7 @@
 # Recon map: {{product}} ({{platform}})
 
+_Adapted from `replica-recon/recon-map.md` in [Jakeschincariol/replica-skill](https://github.com/Jakeschincariol/replica-skill) (MIT, © 2026 Jake Schincariol), revision 77c9436fb3d18c3d58169efb8caf4fe906b0dc51._
+
 Scope: {{the slice being studied}}
 For: {{who it is for, or what decision it feeds}}
 Date: {{YYYY-MM-DD}}

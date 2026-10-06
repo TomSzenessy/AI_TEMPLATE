@@ -11,16 +11,18 @@ skills, v1.0"). Reviewed and adapted 2026-10-06 under issue #3.
 | Upstream | Local | Adaptation |
 | --- | --- | --- |
 | `replica-recon/` (SKILL.md, `recon-map.md`, `features.csv`) | [`product-recon`](./.agents/skills/product-recon/) | Generalized from app cloning to studying any reference product; artifact root `replica/` → `reference/`; pack-chain references retargeted. |
-| `replica-diff/` (SKILL.md, `parity.py`, `imgdiff.py`) | [`parity-check`](./.agents/skills/parity-check/) | Same generalization; two crash-on-malformed-input defects hardened (short IHDR chunk, zero-width PNG); `parity.py`/`imgdiff.py` keep their CLI contracts. |
+| `replica-diff/` (SKILL.md, `parity.py`, `imgdiff.py`) | [`parity-check`](./.agents/skills/parity-check/) | Same generalization; three malformed-input defects hardened (short IHDR chunk and zero-width PNG in `imgdiff.py`, ragged CSV rows in `parity.py`); the tools' CLI contracts keep their documented exit codes. |
 | `replica-design/` (SKILL.md, `contrast.py`, `tokens.json`) | [`design-tokens`](./.agents/skills/design-tokens/) | Same generalization; `contrast.py` unchanged apart from attribution and path examples. |
 | `replica-entrepreneur/` (SKILL.md, `reviews.py`, `themes.json`) | [`review-mining`](./.agents/skills/review-mining/) | Same generalization; ragged-CSV row handling hardened in `reviews.py`. |
 | `replica-brand/` (SKILL.md, `sweep.py`) | [`brand-sweep`](./.agents/skills/brand-sweep/) | Naming/checklist and sweep parts kept; logo/voice/palette brief trimmed to what the template needs; `sweep.py`'s `--include-replica` flag generalized to `--include-reference`. |
 
 Upstream material not adopted here, reviewed and declined for this template:
 `replica-architect`, `replica-build`, `replica-backend`, `replica-test`,
-`replica-launch`, `replica-deploy`, and `listing.py` (store-listing linter,
-coupled to App Store/Google Play metadata). Reasons are recorded in
-[`docs/skills.md`](./docs/skills.md).
+`replica-launch`, `replica-deploy`, and `listing.py` with `listing.example.json`
+(store-listing linter, coupled to App Store/Google Play metadata). Reasons are
+recorded in [`docs/skills.md`](./docs/skills.md). Upstream `tests/test_repo.py`
+(pack-shape checks) and the listing half of `tests/test_contrast_listing.py`
+were dropped with the tools they cover.
 
 Test suites in `.agents/skills/*/tests/` are adapted from upstream `tests/`
 with regression tests added for the hardened defects. Files adapted for this

@@ -1,5 +1,6 @@
 {
   "_about": "Themes reviews.py sorts feedback into. Patterns are Python regular expressions, matched case-insensitively against the review text. kind is complaint (something users hate) or request (something users want that is missing). Edit freely: add the app category's own words (for a booking app: double booking, time zone, no-show).",
+  "_source": "Adapted from https://github.com/Jakeschincariol/replica-skill (MIT, © 2026 Jake Schincariol), replica-entrepreneur/themes.json @ 77c9436fb3d18c3d58169efb8caf4fe906b0dc51",
   "request_patterns": [
     "\\bi wish\\b",
     "\\bplease add\\b",

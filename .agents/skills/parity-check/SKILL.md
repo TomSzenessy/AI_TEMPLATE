@@ -14,13 +14,14 @@ description: >-
 Reads `reference/features.csv`, which product-recon starts and the build
 fills in, plus the two screenshot sets. Writes `reference/parity.md`.
 
-Two tools in this folder, both standard-library Python, no installs:
+Two tools in this folder, both standard-library Python, no installs
+(commands run from the project root):
 
 ```bash
-python3 parity.py reference/features.csv                         # feature parity + missing list
-python3 imgdiff.py reference/screens/S07.png reference/build-screens/S07.png --out reference/diffs/S07.png
-python3 imgdiff.py a.png b.png --json > reference/diffs/S07.json # for parity.py --visual
-python3 parity.py reference/features.csv --visual reference/diffs/*.json --markdown > reference/parity.md
+python3 .agents/skills/parity-check/parity.py reference/features.csv                         # feature parity + missing list
+python3 .agents/skills/parity-check/imgdiff.py reference/screens/S07.png reference/build-screens/S07.png --out reference/diffs/S07.png
+python3 .agents/skills/parity-check/imgdiff.py a.png b.png --json > reference/diffs/S07.json # for parity.py --visual
+python3 .agents/skills/parity-check/parity.py reference/features.csv --visual reference/diffs/*.json --markdown > reference/parity.md
 ```
 
 ## What parity means here
@@ -42,7 +43,7 @@ is does the reference product have it; `clone` is does this build have it.
 Then:
 
 ```bash
-python3 parity.py reference/features.csv
+python3 .agents/skills/parity-check/parity.py reference/features.csv
 ```
 
 It weights must 3, should 2, could 1, counts partial as half, leaves out
@@ -60,7 +61,7 @@ or the user's own account, saved in `reference/screens/`. This build's go in
 `reference/build-screens/`.
 
 ```bash
-python3 imgdiff.py reference/screens/S07.png reference/build-screens/S07.png --out reference/diffs/S07.png
+python3 .agents/skills/parity-check/imgdiff.py reference/screens/S07.png reference/build-screens/S07.png --out reference/diffs/S07.png
 ```
 
 Layout mode (default) turns both into edge maps, cuts them into a grid, and
