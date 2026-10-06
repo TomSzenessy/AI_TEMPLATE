@@ -137,7 +137,7 @@ if args[:2] == ['repo', 'view']:
 elif args[:2] == ['issue', 'list']:
     print({results_literal!r})
 elif args[:2] == ['issue', 'create']:
-    Path(os.environ['GH_LOG']).write_text(json.dumps({{'args': args, 'stdin': sys.stdin.read()}}), encoding='utf-8')
+    Path(os.environ['GH_LOG']).open('a', encoding='utf-8').write(json.dumps({{'args': args, 'stdin': sys.stdin.read()}}) + '\\n')
     print('https://github.com/example/project/issues/17')
 elif args[:2] == ['label', 'create']:
     Path(os.environ['GH_LOG']).open('a', encoding='utf-8').write('\\n'.join(args) + '\\n')
@@ -327,6 +327,27 @@ critic_evidence = ["review.md"]
         self.assertEqual(created.returncode, 0, created.stderr)
         self.assertIn("https://github.com/example/project/issues/17", created.stdout)
         self.assertIn("--repo", log.read_text(encoding="utf-8"))
+
+    def test_label_sync_passes_label_name_positionally(self) -> None:
+        github, log = self.github()
+        self.write(".github/issue-labels.json", '{"type":["bug"],"priority":["P1"],"area":["repo"],"status":["triage"],"surface":["repo"]}')
+        result = self.cli("labels", "--sync", env={"PATH": f"{github}:{os.environ['PATH']}", "GH_LOG": str(log)})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        logged = log.read_text(encoding="utf-8").splitlines()
+        self.assertIn("label", logged)
+        self.assertIn("type:bug", logged)
+        self.assertNotIn("--name", logged)
+
+    def test_issue_creation_creates_missing_labels(self) -> None:
+        github, log = self.github()
+        self.write("issue.md", self.issue_body())
+        self.write(".github/issue-labels.json", '{"type":["bug"],"priority":["P1"],"area":["repo"],"status":["triage"],"surface":["repo"]}')
+        args = self.issue_args()
+        result = self.cli(*args, env={"PATH": f"{github}:{os.environ['PATH']}", "GH_LOG": str(log)})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        logged = log.read_text(encoding="utf-8").splitlines()
+        self.assertIn("topic:session-refresh", logged)
+        self.assertIn("type:bug", logged)
 
     def test_duplicate_search_ignores_unrelated_hit_but_matches_same_path(self) -> None:
         self.write("issue.md", "Issue #42\n" + self.issue_body())
@@ -833,6 +854,20 @@ rollback = "remove the project-local skill and restore the previous lockfile"
         skill_path.chmod(0o644)
         (self.root / ".agents" / "skills" / "example" / "extra.txt").write_text("extra\n")
         self.assertIn("content_digest", self.cli("check").stderr)
+
+    def test_third_party_skill_digest_ignores_generated_bytecode(self) -> None:
+        self.write(".agents/skills/example/SKILL.md", "# Reviewed skill\n")
+        self.write(".agents/skills/example/tool.py", "print('ok')\n")
+        digest_result = self.cli("skill-digest", ".agents/skills/example")
+        self.assertEqual(digest_result.returncode, 0, digest_result.stderr)
+        before = digest_result.stdout.strip()
+        cache = self.root / ".agents" / "skills" / "example" / "__pycache__"
+        cache.mkdir()
+        (cache / "tool.cpython-314.pyc").write_bytes(b"\x00\x01bytecode")
+        (self.root / ".agents" / "skills" / "example" / "orphan.pyc").write_bytes(b"\x00\x01")
+        after = self.cli("skill-digest", ".agents/skills/example")
+        self.assertEqual(after.returncode, 0, after.stderr)
+        self.assertEqual(before, after.stdout.strip())
 
     def test_public_incident_index_failure_leaves_no_orphan(self) -> None:
         summary = "A redacted failure"
