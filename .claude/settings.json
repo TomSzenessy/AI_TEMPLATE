@@ -60,10 +60,5 @@
       "Bash(make resources)",
       "Bash(make skill-overlap:*)"
     ]
-  },
-  "enabledMcpjsonServers": [
-    "context7",
-    "exa",
-    "playwright"
-  ]
+  }
 }

@@ -20,8 +20,8 @@ servers. The template enables three reviewed defaults so any agent can read
 current docs, search the web, and drive a browser: **Context7** (remote, library
 docs), **Exa** (remote, search and fetch), and **Playwright** (local, pinned
 `@playwright/mcp`). `make adapters` renders enabled routes into host
-configuration (`.mcp.json` for Claude Code, which still asks the user before a
-server's first use). `make capabilities` shows which routes can actually run here.
+configuration (`.mcp.json` for Claude Code). The generated settings do not
+pre-approve servers, so each person approves each project server once. `make capabilities` shows which routes can actually run here.
 
 - Credentials never live in the repository: `env_headers` maps an HTTP header to
   an environment variable (`EXA_API_KEY`, `CONTEXT7_API_KEY`). Unset variables

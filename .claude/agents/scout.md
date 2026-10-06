@@ -1,6 +1,6 @@
 ---
 name: scout
-description: Read-only locator. Use before reading many files yourself - finds where something lives, who owns it, how it is wired, and what broke there before, then returns a short map with file:line evidence.
+description: "Read-only locator. Use before reading many files yourself - finds where something lives, who owns it, how it is wired, and what broke there before, then returns a short map with file:line evidence."
 tools: Read, Grep, Glob, Bash
 model: haiku
 ---

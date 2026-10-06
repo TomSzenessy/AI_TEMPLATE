@@ -14,7 +14,7 @@ from .gitinfo import branch_paths, path_matches
 
 CEREMONY = {
     "low": "make check; no issue needed unless behavior or a contract changes.",
-    "normal": "issue-backed write-ahead record, focused test, make verify, observed artifact.",
+    "normal": "issue-backed write-ahead record, focused test, make verify, observed artifact; critic for subjective or commandless work.",
     "high": "normal ceremony + independent critic (critic role / make review-packet) + security/privacy doc review.",
 }
 ORDER = ("low", "normal", "high")

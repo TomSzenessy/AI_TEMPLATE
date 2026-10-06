@@ -93,6 +93,7 @@ and privacy templates are starting points, not certification.
 ## Completion gate
 
 Done means: acceptance criteria have evidence, affected checks pass, the
-critic required by the risk tier found no blocker, the real artifact was
+independent critic found no blocker (required at `high` risk and for subjective or
+commandless work), the real artifact was
 observed, covering docs are current, and residual risks are linked issues.
 State any external gate (provider, deployment, hardware, counsel) that stays open.

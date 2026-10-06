@@ -61,11 +61,12 @@ def dead_bindings(doc_bindings: dict[str, list[str]], files: list[str]) -> list[
     return errors
 
 
-def _history(root: Path) -> list[tuple[str, set[str] | None, set[str]]]:
+def _history(root: Path, revisions: str | None = None) -> list[tuple[str, set[str] | None, set[str]]]:
     """Newest-first (commit, Docs-Unaffected scope, paths); scope None = no trailer."""
     output = git(
         root,
         "log",
+        *([revisions] if revisions else []),
         f"-n{HISTORY_LIMIT}",
         "--no-merges",
         "--name-only",
@@ -107,7 +108,7 @@ def stale_documents(
         for commit, scope, paths in history:
             if doc in paths:
                 break
-            if scope is not None and ("*" in scope or doc in scope):
+            if _exempt(scope, doc):
                 continue
             touched = sorted(path for path in paths if any(path_matches(path, p) for p in patterns))
             if touched:
@@ -118,6 +119,34 @@ def stale_documents(
                 )
                 break
     return findings
+
+
+def _exempt(scope: set[str] | None, doc: str) -> bool:
+    return scope is not None and ("*" in scope or doc in scope)
+
+
+def owed_documents(
+    root: Path, doc_bindings: dict[str, list[str]], base: str, uncommitted: list[str]
+) -> dict[str, list[str]]:
+    """Covered paths changed on this branch (since base) or uncommitted, per untouched doc.
+
+    Branch commits carrying a matching Docs-Unaffected trailer do not create debt.
+    """
+    merge_base = (git(root, "merge-base", "HEAD", base) or "").strip()
+    branch_commits = _history(root, f"{merge_base}..HEAD") if merge_base else []
+    touched_docs = set(uncommitted) | {path for _, _, paths in branch_commits for path in paths}
+    owed: dict[str, list[str]] = {}
+    for doc, patterns in sorted(doc_bindings.items()):
+        if doc in touched_docs:
+            continue
+        candidates = set(uncommitted)
+        for _, scope, paths in branch_commits:
+            if not _exempt(scope, doc):
+                candidates |= paths
+        covered = sorted(path for path in candidates if path != doc and any(path_matches(path, p) for p in patterns))
+        if covered:
+            owed[doc] = covered
+    return owed
 
 
 def pending_documents(doc_bindings: dict[str, list[str]], changed: list[str]) -> dict[str, list[str]]:

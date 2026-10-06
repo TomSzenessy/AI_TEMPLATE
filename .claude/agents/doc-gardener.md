@@ -1,6 +1,6 @@
 ---
 name: doc-gardener
-description: Docs-only maintainer. Fixes stale or dead doc bindings, broken command references, and navigation drift reported by make garden or the stop gate, so documentation keeps matching what the code actually does.
+description: "Docs-only maintainer. Fixes stale or dead doc bindings, broken command references, and navigation drift reported by make garden or the stop gate, so documentation keeps matching what the code actually does."
 tools: Read, Grep, Glob, Bash, Edit, Write
 model: haiku
 ---

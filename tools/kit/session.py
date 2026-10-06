@@ -77,7 +77,7 @@ def session_start(root: Path) -> None:
     print_map(root, limit=MAP_LIMIT)
     try:
         findings = self_heal_errors(root, project)
-    except (RepoctlError, OSError) as error:
+    except Exception as error:  # noqa: BLE001 - the brief must survive a broken manifest
         findings = [str(error)]
     if healed:
         findings.insert(0, "regenerated host adapters: " + ", ".join(healed))
@@ -155,10 +155,11 @@ def finish_findings(root: Path) -> list[str]:
         return []
     files = repository_files(root)
     doc_bindings = docsync.bindings(root, files)
+    owed = docsync.owed_documents(root, doc_bindings, base, changed_paths(root))
     findings = [
         f"{doc} covers changed {', '.join(paths[:4])}{' …' if len(paths) > 4 else ''} but was not updated"
         " (update it, or record why in the commit with a 'Docs-Unaffected: <doc> <reason>' trailer)"
-        for doc, paths in docsync.pending_documents(doc_bindings, changed).items()
+        for doc, paths in owed.items()
     ]
     findings += adapters.drift(root)
     findings += docsync.dead_bindings(doc_bindings, files)
@@ -198,7 +199,6 @@ def run_hook(root: Path, event_name: str) -> int:
     }
     try:
         handlers[event_name]()
-    except (RepoctlError, OSError) as error:
-        # A hook must never wedge the host session; report and continue.
-        print(f"repoctl hook {event_name}: {error}", file=sys.stderr)
+    except Exception as error:  # noqa: BLE001 - a hook must never fail the host session
+        print(f"repoctl hook {event_name}: {type(error).__name__}: {error}", file=sys.stderr)
     return 0

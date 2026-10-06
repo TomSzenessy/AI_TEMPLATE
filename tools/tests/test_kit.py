@@ -178,7 +178,7 @@ class HygieneTests(KitRepository):
 class AdapterTests(KitRepository):
     def test_generated_stubs_redirect_without_content(self) -> None:
         skill = (self.root / ".claude/skills/demo-skill/SKILL.md").read_text()
-        self.assertIn("description: Render invoices for billing customers.", skill)
+        self.assertIn("description: \"Render invoices for billing customers.\"", skill)
         self.assertIn(".agents/skills/demo-skill/SKILL.md", skill)
         self.assertNotIn("# Demo", skill)
         role = (self.root / ".claude/agents/scout.md").read_text()
@@ -188,7 +188,19 @@ class AdapterTests(KitRepository):
         self.assertEqual(mcp["mcpServers"]["browser"], {"command": "npx", "args": ["-y", "@example/mcp@1.2.3"]})
         settings = json.loads((self.root / ".claude/settings.json").read_text())
         self.assertIn("Stop", settings["hooks"])
-        self.assertEqual(settings["enabledMcpjsonServers"], ["browser"])
+        self.assertNotIn("enabledMcpjsonServers", settings, "servers must stay approved per person")
+
+    def test_folded_description_survives_into_stub(self) -> None:
+        self.write(".agents/skills/demo-skill/SKILL.md", "---\nname: demo-skill\ndescription: >-\n  Render invoices: for billing\n  customers \"fast\".\n---\n")
+        adapters.sync(self.root)
+        stub = (self.root / ".claude/skills/demo-skill/SKILL.md").read_text()
+        self.assertIn('description: "Render invoices: for billing customers \\"fast\\"."', stub)
+        self.assertEqual(navigate.skill_overlap(self.root, "render invoices billing")[0][1], "skill:demo-skill")
+
+    def test_disabling_every_route_clears_host_mcp_config(self) -> None:
+        self.write("resources.toml", (self.root / "resources.toml").read_text().replace("enabled = true", "enabled = false"))
+        adapters.sync(self.root)
+        self.assertEqual(json.loads((self.root / ".mcp.json").read_text()), {"mcpServers": {}})
 
     def test_drift_and_stray_files_fail_check(self) -> None:
         self.write(".agents/skills/demo-skill/SKILL.md", "---\nname: demo-skill\ndescription: Changed purpose.\n---\n")
@@ -239,6 +251,22 @@ class HookTests(KitRepository):
         self.commit("feature change")
         decision = json.loads(self.cli("hook", "stop", stdin="{}").stdout)
         self.assertIn("docs/billing.md", decision["reason"])
+
+    def test_docs_unaffected_trailer_satisfies_stop_gate(self) -> None:
+        self.git("checkout", "-q", "-b", "feature")
+        self.write("src/billing/invoice.py", "def render_invoice():\n    return 1  # comment only\n")
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", "tidy\n\nDocs-Unaffected: docs/billing.md comment only")
+        self.assertEqual(self.cli("hook", "stop", stdin="{}").stdout, "")
+        self.assertEqual(self.cli("finish").returncode, 0)
+        self.assertEqual(self.self_heal(), "")
+
+    def test_hooks_survive_a_broken_manifest(self) -> None:
+        self.write("resources.toml", "schema = [broken\n")
+        for event in ("session-start", "stop", "after-edit", "pre-compact"):
+            result = self.cli("hook", event, stdin="{}")
+            self.assertEqual(result.returncode, 0, (event, result.stderr))
+            self.assertNotIn("Traceback", result.stderr)
 
     def test_after_edit_names_owner_once_and_heals_adapters(self) -> None:
         event = {"session_id": "s1", "tool_input": {"file_path": str(self.root / "src/billing/invoice.py")}}

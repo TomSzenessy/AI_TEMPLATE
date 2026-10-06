@@ -66,7 +66,7 @@ into a linked owner document instead of growing the router.
 Canonical agent content lives in `.agents/` (skills, roles, evals) and
 `resources.toml` (`[[mcp]]` routes). `make adapters` renders host files from it.
 For Claude Code that means skill and role redirect stubs in `.claude/`,
-`.claude/settings.json` (hooks, allowlisted kit commands, approved MCP servers),
+`.claude/settings.json` (hooks and allowlisted kit commands; MCP servers stay approved per person),
 and `.mcp.json`. Generated files hold no content of their own. `make check`
 fails on drift or on any hand-written file in a host directory. Add a host by
 adding a renderer in `tools/kit/adapters.py` and listing it in
@@ -77,7 +77,7 @@ adding a renderer in `tools/kit/adapters.py` and listing it in
 
 `make risk` classifies this branch's changed paths with `project.toml [risk]`
 globs: `low` needs `make check` only, `normal` follows the full build and repair
-loop, and `high` (CI, tooling, agent instructions, security, auth, and migrations by default) adds an
+loop (with a critic for subjective or commandless work), and `high` (CI, tooling, agent instructions, security, auth, and migrations by default) adds an
 independent critic. Tune the globs per project. Never widen `low` to dodge a gate.
 
 ## The gardener
