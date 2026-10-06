@@ -1,5 +1,7 @@
 # Error ledger
 
+<!-- index: operate | Solved failure signatures and permanent fixes | A recurring failure needs a durable regression/fix record. -->
+
 This is a compact record of solved or recurring operational failure signatures.
 It is not a backlog. Unresolved work and priorities live in GitHub Issues.
 

@@ -1,5 +1,6 @@
 # Architecture and decisions
 
+<!-- index: design | Current structure, seams, kit module map, and design rules | Adding a surface, changing dependencies, or locating ownership. -->
 <!-- covers: tools/repoctl.py tools/kit/__init__.py tools/kit/core.py tools/kit/structure.py Makefile -->
 
 This directory owns the current structural truth. Keep it short and factual;
@@ -30,7 +31,7 @@ whose imports point toward `core`:
 | Skills provenance, resource registry | `skills` | [`../skills.md`](../skills.md) |
 | Links, index, file hygiene | `docs` | [`../security.md`](../security.md) |
 | Launch evidence | `launch` | [`../production.md`](../production.md) |
-| Self-healing: bindings, markers, adapters, hooks, garden, map, risk, evals | `docsync`, `hygiene`, `adapters`, `session`, `garden`, `navigate`, `risk`, `capabilities`, `evals` | [`../self-healing.md`](../self-healing.md) |
+| Self-healing: bindings, markers, derived files, scaffolding, hooks, garden, map, risk, config, evals | `docsync`, `hygiene`, `adapters`, `derive`, `scaffold`, `session`, `garden`, `navigate`, `risk`, `config`, `capabilities`, `evals` | [`../self-healing.md`](../self-healing.md) |
 
 For a copied project, replace the template row above with the real surfaces
 and keep this section only while the kit is part of the repository.

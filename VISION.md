@@ -1,5 +1,7 @@
 # Project vision
 
+<!-- index: operate | Accepted product direction, constraints, and success evidence | Starting a project or making a high-impact scope decision. -->
+
 Status: accepted
 Project: AI_TEMPLATE
 Owner: TomSzenessy

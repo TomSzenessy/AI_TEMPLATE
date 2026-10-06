@@ -1,5 +1,6 @@
 # Security engineering baseline
 
+<!-- index: design | Secure implementation baseline | Auth, secrets, CI, dependencies, deployment, or untrusted input changes. -->
 <!-- covers: .github/workflows/ci.yml .github/workflows/specialist-scans.yml .github/dependabot.yml .security/config.json tools/kit/docs.py -->
 
 Security is a property of the whole path, not a dependency scan. Start with a

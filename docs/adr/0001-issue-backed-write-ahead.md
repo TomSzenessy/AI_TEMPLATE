@@ -4,6 +4,8 @@ status: accepted
 
 # Issue-backed write-ahead record
 
+<!-- index: extend | Accepted write-ahead and documentation-boundary decision | You need the rationale for issue-backed continuity. -->
+
 The repository uses a duplicate-checked GitHub Issue as the durable
 write-ahead record for behavior, schema, security, privacy, and operational
 changes: intent, scope, risks, and acceptance evidence exist before mutation and

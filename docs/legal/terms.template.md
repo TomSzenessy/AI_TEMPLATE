@@ -1,5 +1,7 @@
 # Terms of service — DRAFT TEMPLATE
 
+<!-- index: launch | Draft terms scaffold | Public terms are prepared for factual completion and review. -->
+
 > **Do not publish this file unchanged.** This is a neutral drafting scaffold,
 > not ready-to-publish contract language. Replace placeholders from verified
 > product, operator, jurisdiction, and counsel decisions.

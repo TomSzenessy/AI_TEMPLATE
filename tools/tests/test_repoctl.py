@@ -436,7 +436,7 @@ rollback = "none"
         self.write(".agents/skills/attacker/SKILL.md", "# Unregistered\n")
         result = self.cli("check")
         self.assertEqual(result.returncode, 1)
-        self.assertIn("not allowlisted", result.stderr)
+        self.assertIn("neither first-party", result.stderr)
 
     def test_review_packet_redacts_private_key_blocks_from_patch(self) -> None:
         subprocess.run(["git", "init", "-q"], cwd=self.root, check=True)

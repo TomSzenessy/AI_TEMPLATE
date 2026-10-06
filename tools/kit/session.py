@@ -3,18 +3,19 @@ edit, and before an agent declares it is done.
 
 Hosts with hooks call `repoctl hook <event>` (Claude Code via the generated
 `.claude/settings.json`); hosts without hooks run `make start` and
-`make finish`. Every event reads optional host JSON on stdin and never needs it.
+`make done`. Every event reads optional host JSON on stdin and never needs it.
 Output is evidence about the repository, not new authority: AGENTS.md rules.
 """
 
 from __future__ import annotations
 
 import json
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import adapters, docsync, hygiene
+from . import derive, docsync, hygiene
 from .core import RepoctlError, governance_profile, load_project, read_text_file, repository_files
 from .garden import self_heal_errors
 from .gitinfo import branch, branch_paths, changed_paths, git, head
@@ -48,9 +49,9 @@ def _relative(root: Path, value: object) -> str | None:
         return None
 
 
-def _heal_adapters(root: Path) -> list[str]:
+def _heal_derived(root: Path) -> list[str]:
     try:
-        return adapters.sync(root)
+        return derive.sync(root)
     except (RepoctlError, OSError) as error:
         return [f"adapter regeneration failed: {error}"]
 
@@ -72,7 +73,8 @@ def session_start(root: Path) -> None:
         print("\n## HANDOVER.md (read first; verify against the working tree)\n" + clipped)
     if (root / CHECKPOINT).is_file():
         print(f"\nPre-compaction checkpoint available: {CHECKPOINT}")
-    healed = _heal_adapters(root)
+    healed = _heal_derived(root)
+    hooks_note = install_git_hooks(root)
     print()
     print_map(root, limit=MAP_LIMIT)
     try:
@@ -80,7 +82,9 @@ def session_start(root: Path) -> None:
     except Exception as error:  # noqa: BLE001 - the brief must survive a broken manifest
         findings = [str(error)]
     if healed:
-        findings.insert(0, "regenerated host adapters: " + ", ".join(healed))
+        findings.insert(0, "regenerated derived files: " + ", ".join(healed))
+    if hooks_note:
+        findings.insert(0, hooks_note)
     print("\n## Needs attention")
     print("\n".join(f"- {item}" for item in findings[:15]) or "- nothing: the self-healing checks are green")
     print(
@@ -88,7 +92,8 @@ def session_start(root: Path) -> None:
         "- You orchestrate and keep the goal; delegate bounded searches, builds, reviews, and doc fixes to the roles\n"
         "  in .agents/agents/ using the brief in docs/delegation.md. Subagent reports must stay short and cite file:line.\n"
         "- Navigate with `make where Q=\"...\"` before broad searching; `make risk` sets the ceremony for your change.\n"
-        "- Before declaring done: update the docs that cover what you changed, then `make finish` and `make verify`."
+        "- Before declaring done: update the docs that cover what you changed, then `make done`."
+        "\n- Missing a capability? `make similar Q=\"...\"`, then `make new` (skill, agent role, or doc) wires it in."
     )
 
 
@@ -114,6 +119,33 @@ def pre_compact(root: Path) -> None:
     print(f"checkpoint written to {CHECKPOINT}")
 
 
+HANDOVER_TEMPLATE = "docs/handoffs/TEMPLATE.md"
+
+
+def write_handover(root: Path) -> str:
+    """Create root HANDOVER.md from the one template with git facts pre-filled."""
+    target = root / "HANDOVER.md"
+    if target.exists():
+        return "HANDOVER.md already exists; update it in place (it is never overwritten)."
+    template = read_text_file(root, HANDOVER_TEMPLATE)
+    if template is None:
+        raise RepoctlError(f"{HANDOVER_TEMPLATE} is missing")
+    changed = changed_paths(root)
+    owed = docsync.pending_documents(docsync.bindings(root, repository_files(root)), changed)
+    facts = {
+        "`<timestamp>`": datetime.now(timezone.utc).isoformat(timespec="minutes"),
+        "`<branch/commit or issue links>`": f"`{branch(root)}` @ `{head(root)}`",
+        "`<clean or exact uncommitted paths>`": ", ".join(f"`{path}`" for path in changed[:20]) or "clean",
+    }
+    text = re.sub(r"(?m)^<!-- index:.*-->\n\n?", "", template)
+    for placeholder, value in facts.items():
+        text = text.replace(placeholder, value, 1)
+    if owed:
+        text += "\n## Documents still owed\n\n" + "\n".join(f"- {doc} (covers {', '.join(paths[:4])})" for doc, paths in owed.items()) + "\n"
+    target.write_text(text, encoding="utf-8")
+    return "Wrote HANDOVER.md (ignored). Fill in objective, decisions, blockers, and the exact next action."
+
+
 def _load_state(root: Path, session: str) -> dict[str, list[str]]:
     try:
         state = json.loads((root / STATE).read_text(encoding="utf-8"))
@@ -129,11 +161,11 @@ def after_edit(root: Path, event: dict[str, object]) -> None:
         return
     notes = []
     if relative.startswith(".claude/") or relative == ".mcp.json":
-        notes.append(f"{relative} is generated. Put the change in .agents/ or resources.toml; `make adapters` regenerates it.")
-    elif relative.startswith(CANONICAL_INPUTS):
-        healed = _heal_adapters(root)
+        notes.append(f"{relative} is generated. Put the change in .agents/ or resources.toml; `make sync` regenerates it.")
+    elif relative.startswith(CANONICAL_INPUTS) or relative.endswith(".md"):
+        healed = _heal_derived(root)
         if healed:
-            notes.append("Host adapters regenerated from the canonical source: " + ", ".join(healed))
+            notes.append("Derived files regenerated from their sources: " + ", ".join(healed))
     session = str(event.get("session_id", "local"))
     state = _load_state(root, session)
     owned = [doc for doc in docsync.owners(docsync.bindings(root, repository_files(root)), relative) if doc not in state["noted"]]
@@ -161,11 +193,61 @@ def finish_findings(root: Path) -> list[str]:
         " (update it, or record why in the commit with a 'Docs-Unaffected: <doc> <reason>' trailer)"
         for doc, paths in owed.items()
     ]
-    findings += adapters.drift(root)
+    findings += derive.drift(root)
     findings += docsync.dead_bindings(doc_bindings, files)
     present = [path for path in changed if path in set(files)]
     findings += hygiene.scan_markers(root, present).errors
     return findings
+
+
+GATE_BLOCKED = 3  # distinct from crashes, which .githooks/commit-msg lets through
+TRAILER = re.compile(r"(?mi)^Docs-Unaffected:\s*(.*)$")
+
+
+def commit_gate(root: Path, message_file: str | None) -> int:
+    """git commit-msg gate over the staged change set; returns the exit code."""
+    staged = [path for path in (git(root, "diff", "--cached", "--name-only") or "").splitlines() if path]
+    if not staged:
+        return 0
+    try:
+        message = Path(message_file).read_text(encoding="utf-8") if message_file else ""
+    except OSError:
+        message = ""
+    message = "\n".join(line for line in message.splitlines() if not line.startswith("#"))
+    exempt: set[str] = set()
+    for value in TRAILER.findall(message):
+        named = {token.strip(",;") for token in value.split() if token.strip(",;").endswith(".md")}
+        exempt |= named or {"*"}
+    files = repository_files(root)
+    doc_bindings = docsync.bindings(root, files)
+    findings = [
+        f"{doc} covers staged {', '.join(paths[:4])} but is not staged"
+        for doc, paths in docsync.pending_documents(doc_bindings, staged).items()
+        if "*" not in exempt and doc not in exempt
+    ]
+    findings += derive.drift(root)
+    findings += hygiene.scan_markers(root, [path for path in staged if path in set(files)]).errors
+    if not findings:
+        return 0
+    print("Commit blocked by the self-healing gate (docs/self-healing.md):", file=sys.stderr)
+    print("\n".join(f"- {item}" for item in findings[:15]), file=sys.stderr)
+    print(
+        "Fix and re-stage (make sync regenerates derived files), or add a trailer\n"
+        "'Docs-Unaffected: <doc> <reason>' when a covered change truly leaves the doc correct.",
+        file=sys.stderr,
+    )
+    return GATE_BLOCKED
+
+
+def install_git_hooks(root: Path) -> str | None:
+    """Point git at .githooks unless the repository already chose a hooks path."""
+    if not (root / ".githooks" / "commit-msg").is_file() or git(root, "rev-parse", "--git-dir") is None:
+        return None
+    if (git(root, "config", "--get", "core.hooksPath") or "").strip():
+        return None
+    if git(root, "config", "core.hooksPath", ".githooks") is None:
+        return None
+    return "installed git hooks (core.hooksPath=.githooks): commits now run the self-healing gate"
 
 
 def stop(root: Path, event: dict[str, object]) -> None:
@@ -185,11 +267,17 @@ def finish(root: Path) -> int:
     if findings:
         print("Not finished:\n" + "\n".join(f"- {item}" for item in findings))
         return 1
-    print("Self-healing gate passed for this branch's change set. Next: make verify, critic review per tier, handover if work continues.")
+    print("Self-healing gate passed for this branch's change set.")
     return 0
 
 
-def run_hook(root: Path, event_name: str) -> int:
+def run_hook(root: Path, event_name: str, message_file: str | None = None) -> int:
+    if event_name == "commit-msg":
+        try:
+            return commit_gate(root, message_file)
+        except Exception as error:  # noqa: BLE001 - a broken kit must not wedge git
+            print(f"repoctl hook commit-msg skipped: {type(error).__name__}: {error}", file=sys.stderr)
+            return 0
     event = read_event()
     handlers = {
         "session-start": lambda: session_start(root),

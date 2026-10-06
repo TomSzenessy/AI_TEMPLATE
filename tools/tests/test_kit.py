@@ -15,7 +15,7 @@ TOOLS = Path(__file__).resolve().parents[1]
 REPOCTL = TOOLS / "repoctl.py"
 sys.path.insert(0, str(TOOLS))
 
-from kit import adapters, docsync, garden, hygiene, navigate, risk  # noqa: E402
+from kit import adapters, derive, docsync, garden, hygiene, navigate, risk  # noqa: E402
 from kit.gitinfo import path_matches  # noqa: E402
 
 # Built by concatenation so this test file never trips the marker scanner itself.
@@ -70,7 +70,7 @@ class KitRepository(unittest.TestCase):
         self.git("init", "-q", "-b", "main")
         self.git("config", "user.email", "test@example.com")
         self.git("config", "user.name", "Test")
-        adapters.sync(self.root)
+        derive.sync(self.root)
         self.commit("initial")
 
     def tearDown(self) -> None:
@@ -169,6 +169,14 @@ class HygieneTests(KitRepository):
         self.write("docs/notes.md", f"# Notes\n\nA {TASK} in prose belongs in an issue, but prose is not scanned.\n")
         self.assertEqual(hygiene.scan_markers(self.root, ["docs/notes.md"]).errors, [])
 
+    def test_repeated_paragraph_is_reported(self) -> None:
+        paragraph = " ".join(f"word{index}" for index in range(60))
+        self.write("docs/a.md", f"# A\n\n{paragraph}\n")
+        self.write("docs/b.md", f"# B\n\nIntro.\n\n{paragraph}\n")
+        findings = hygiene.duplicate_paragraphs(self.root, ["docs/a.md", "docs/b.md", "docs/billing.md"])
+        self.assertEqual(len(findings), 1)
+        self.assertIn("docs/a.md and docs/b.md repeat a paragraph", findings[0])
+
     def test_budget_is_a_finding(self) -> None:
         self.write("AGENTS.md", "# Agents\n" + "x" * 400)
         self.commit("grow router")
@@ -192,27 +200,27 @@ class AdapterTests(KitRepository):
 
     def test_folded_description_survives_into_stub(self) -> None:
         self.write(".agents/skills/demo-skill/SKILL.md", "---\nname: demo-skill\ndescription: >-\n  Render invoices: for billing\n  customers \"fast\".\n---\n")
-        adapters.sync(self.root)
+        derive.sync(self.root)
         stub = (self.root / ".claude/skills/demo-skill/SKILL.md").read_text()
         self.assertIn('description: "Render invoices: for billing customers \\"fast\\"."', stub)
         self.assertEqual(navigate.skill_overlap(self.root, "render invoices billing")[0][1], "skill:demo-skill")
 
     def test_disabling_every_route_clears_host_mcp_config(self) -> None:
         self.write("resources.toml", (self.root / "resources.toml").read_text().replace("enabled = true", "enabled = false"))
-        adapters.sync(self.root)
+        derive.sync(self.root)
         self.assertEqual(json.loads((self.root / ".mcp.json").read_text()), {"mcpServers": {}})
 
     def test_drift_and_stray_files_fail_check(self) -> None:
         self.write(".agents/skills/demo-skill/SKILL.md", "---\nname: demo-skill\ndescription: Changed purpose.\n---\n")
         self.write(".claude/commands/handwritten.md", "# my own command\n")
-        result = self.cli("adapters", "--check")
+        result = self.cli("sync", "--check")
         self.assertEqual(result.returncode, 1)
-        self.assertIn("adapter out of date: .claude/skills/demo-skill/SKILL.md", result.stderr)
+        self.assertIn("derived file out of date: .claude/skills/demo-skill/SKILL.md", result.stderr)
         self.assertIn("hand-authored file in a generated host directory: .claude/commands/handwritten.md", result.stderr)
 
     def test_sync_removes_only_generated_orphans(self) -> None:
         (self.root / ".agents/skills/demo-skill/SKILL.md").unlink()
-        changed = adapters.sync(self.root)
+        changed = derive.sync(self.root)
         self.assertIn("removed .claude/skills/demo-skill/SKILL.md", changed)
         self.assertFalse((self.root / ".claude/skills/demo-skill").exists())
 
@@ -277,7 +285,7 @@ class HookTests(KitRepository):
         event = {"session_id": "s1", "tool_input": {"file_path": str(self.root / ".agents/skills/demo-skill/SKILL.md")}}
         healed = json.loads(self.cli("hook", "after-edit", stdin=json.dumps(event)).stdout)
         self.assertIn("regenerated", healed["hookSpecificOutput"]["additionalContext"])
-        self.assertEqual(self.cli("adapters", "--check").returncode, 0)
+        self.assertEqual(self.cli("sync", "--check").returncode, 0)
 
     def test_session_start_and_pre_compact(self) -> None:
         self.write("HANDOVER.md", "# Handover\nNext action: ship billing.\n")
@@ -292,6 +300,124 @@ class HookTests(KitRepository):
     def test_hook_never_crashes_on_garbage_input(self) -> None:
         result = self.cli("hook", "after-edit", stdin="not json")
         self.assertEqual(result.returncode, 0)
+
+
+class CommitGateTests(KitRepository):
+    def message(self, text: str) -> str:
+        path = self.root / ".git" / "COMMIT_EDITMSG"
+        path.write_text(text, encoding="utf-8")
+        return str(path)
+
+    def test_blocks_staged_covered_change_without_doc(self) -> None:
+        self.write("src/billing/invoice.py", "def render_invoice():\n    return 9\n")
+        self.git("add", "src/billing/invoice.py")
+        result = self.cli("hook", "commit-msg", self.message("change billing\n"))
+        self.assertEqual(result.returncode, 3)
+        self.assertIn("docs/billing.md covers staged src/billing/invoice.py", result.stderr)
+
+    def test_trailer_or_staged_doc_passes(self) -> None:
+        self.write("src/billing/invoice.py", "def render_invoice():\n    return 9\n")
+        self.git("add", "src/billing/invoice.py")
+        trailer = self.message("tidy\n\nDocs-Unaffected: docs/billing.md rename only\n")
+        self.assertEqual(self.cli("hook", "commit-msg", trailer).returncode, 0)
+        self.write("docs/billing.md", "# Billing\n\n<!-- covers: src/billing/** -->\n\nReturns 9. `make check`.\n")
+        self.git("add", "docs/billing.md")
+        self.assertEqual(self.cli("hook", "commit-msg", self.message("change billing\n")).returncode, 0)
+
+    def test_commented_trailer_does_not_count(self) -> None:
+        self.write("src/billing/invoice.py", "def render_invoice():\n    return 9\n")
+        self.git("add", "src/billing/invoice.py")
+        commented = self.message("change\n# Docs-Unaffected: docs/billing.md\n")
+        self.assertEqual(self.cli("hook", "commit-msg", commented).returncode, 3)
+
+    def test_installed_git_hook_blocks_commit(self) -> None:
+        hooks = self.root / ".githooks"
+        hooks.mkdir()
+        (hooks / "commit-msg").write_text((TOOLS.parent / ".githooks" / "commit-msg").read_text())
+        (hooks / "commit-msg").chmod(0o755)
+        (self.root / "tools").symlink_to(TOOLS, target_is_directory=True)
+        self.assertIn("installed git hooks", self.cli("hook", "session-start", stdin="{}").stdout)
+        self.write("src/billing/invoice.py", "def render_invoice():\n    return 9\n")
+        self.git("add", "src/billing/invoice.py")
+        blocked = subprocess.run(["git", "-C", str(self.root), "commit", "-q", "-m", "x"], capture_output=True, text=True)
+        self.assertNotEqual(blocked.returncode, 0)
+        self.assertIn("Commit blocked", blocked.stderr)
+
+    def test_deleted_tracked_file_does_not_break_checks(self) -> None:
+        (self.root / "src/auth/login.py").unlink()
+        self.assertNotIn("No such file", self.self_heal())
+
+
+class DerivedContentTests(KitRepository):
+    def test_index_is_generated_from_declarations(self) -> None:
+        self.write("docs/README.md", "# Index\n\n<!-- repoctl:index -->\n<!-- /repoctl:index -->\n")
+        self.write("docs/billing.md", "# Billing\n\n<!-- index: design | Invoice rules | Billing changes. -->\n<!-- covers: src/billing/** -->\n\n`make check`.\n")
+        self.assertIn("derived file out of date: docs/README.md", self.self_heal())
+        derive.sync(self.root)
+        index = (self.root / "docs/README.md").read_text()
+        self.assertIn("| [`billing.md`](./billing.md) | Invoice rules | Billing changes. |", index)
+        self.assertNotIn("docs/README.md", self.self_heal())
+
+    def test_bad_index_group_is_reported(self) -> None:
+        self.write("docs/billing.md", "# Billing\n\n<!-- index: misc | x | y -->\n<!-- covers: src/billing/** -->\n")
+        self.assertIn("index declaration must be", self.self_heal())
+
+    def test_readme_description_comes_from_manifest(self) -> None:
+        self.write("README.md", "# Demo\n\n<!-- repoctl:description -->\nold\n<!-- /repoctl:description -->\n")
+        text = (self.root / "project.toml").read_text().replace("[adapters]", '[repository]\ndescription = "Invoices for everyone."\n\n[adapters]')
+        self.write("project.toml", text)
+        derive.sync(self.root)
+        self.assertIn("\nInvoices for everyone.\n", (self.root / "README.md").read_text())
+
+    def test_handover_prefills_git_facts_and_never_overwrites(self) -> None:
+        self.write("docs/handoffs/TEMPLATE.md", "# Handoff\n\n- **Created (UTC):** `<timestamp>`\n- **Working tree:** `<clean or exact uncommitted paths>`\n")
+        self.write("src/billing/invoice.py", "def render_invoice():\n    return 7\n")
+        self.assertIn("Wrote HANDOVER.md", self.cli("handover").stdout)
+        text = (self.root / "HANDOVER.md").read_text()
+        self.assertIn("`src/billing/invoice.py`", text)
+        self.assertIn("docs/billing.md (covers src/billing/invoice.py)", text)
+        self.assertIn("already exists", self.cli("handover").stdout)
+
+
+class ScaffoldTests(KitRepository):
+    def setUp(self) -> None:
+        super().setUp()
+        self.write("project.toml", (self.root / "project.toml").read_text() + "[capabilities]\nlocal_skills = []\n")
+        self.write("docs/README.md", "# Index\n\n<!-- repoctl:index -->\n<!-- /repoctl:index -->\n")
+        self.write("docs/delegation.md", "# Delegation\n\n<!-- repoctl:roles -->\n<!-- /repoctl:roles -->\n")
+
+    def test_new_skill_is_registered_wired_and_unfinished_until_filled(self) -> None:
+        result = self.cli("new", "--kind", "skill", "--name", "release-notes",
+                          "--description", "Drafts release notes from merged pull requests before tagging a release.")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('local_skills = ["release-notes"]', (self.root / "project.toml").read_text())
+        self.assertTrue((self.root / ".claude/skills/release-notes/SKILL.md").is_file())
+        self.assertIn("unfinished scaffold", self.self_heal())
+
+    def test_new_agent_appears_in_generated_role_table(self) -> None:
+        result = self.cli("new", "--kind", "agent", "--name", "test-writer", "--access", "full",
+                          "--description", "Writes missing regression tests for one module when seam coverage is thin.")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("[`test-writer`]", (self.root / "docs/delegation.md").read_text())
+        self.assertTrue((self.root / ".claude/agents/test-writer.md").is_file())
+
+    def test_near_duplicate_is_refused_unless_forced(self) -> None:
+        arguments = ["new", "--kind", "skill", "--name", "invoice-renderer", "--description", "Render invoices for billing customers."]
+        refused = self.cli(*arguments)
+        self.assertEqual(refused.returncode, 1)
+        self.assertIn("too similar to skill:demo-skill", refused.stderr)
+        self.assertEqual(self.cli(*arguments, "--force").returncode, 0)
+
+    def test_new_doc_indexes_itself_with_configurable_groups(self) -> None:
+        bad = self.cli("new", "--kind", "doc", "--name", "pricing", "--group", "misc", "--description", "Pricing rules; when prices change")
+        self.assertIn("GROUP must be one of", bad.stderr)
+        self.write("project.toml", (self.root / "project.toml").read_text() + '[kit]\ndoc_groups = { misc = "Miscellany" }\n')
+        ok = self.cli("new", "--kind", "doc", "--name", "pricing", "--group", "misc", "--covers", "src/billing/**",
+                      "--description", "Pricing rules; when prices change")
+        self.assertEqual(ok.returncode, 0, ok.stderr)
+        index = (self.root / "docs/README.md").read_text()
+        self.assertIn("### Miscellany", index)
+        self.assertIn("| [`pricing.md`](./pricing.md) | Pricing rules | when prices change |", index)
 
 
 class NavigationTests(KitRepository):

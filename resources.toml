@@ -116,7 +116,7 @@ mcp = "find-skills"
 scope = "agent"
 summary = "Skill discovery directory; inspect source, license, permissions, and revision before use."
 
-# MCP routes: the single source for agent tool servers. `make adapters` renders
+# MCP routes: the single source for agent tool servers. `make sync` renders
 # enabled routes into host configs (for Claude Code: .mcp.json plus an explicit
 # approval list). Keys never live here: `env_headers` maps an HTTP header to the
 # environment variable that supplies it; unset variables send an empty value,

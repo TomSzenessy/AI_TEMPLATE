@@ -17,6 +17,17 @@ github = "TomSzenessy/AI_TEMPLATE"
 # Add project-specific generated/infrastructure paths here when the defaults
 # are not enough. Product surfaces still belong in [[surfaces]].
 infrastructure_paths = []
+# Single source for the README description block and the GitHub repository
+# metadata (`make sync` renders the README; `make github-sync` applies GitHub).
+description = "Self-healing starting point for AI-agent-built projects of any size: docs bound to code, generated host adapters, delegation roles, and deterministic gates for any agent or model."
+topics = ["ai-agents", "agents-md", "claude-code", "codex", "mcp", "template", "self-healing", "developer-tools"]
+is_template = true
+
+[template]
+# Template-only material that `make init` removes from new projects; relative
+# links to removed files are rewritten to `source` so nothing breaks.
+source = "https://github.com/TomSzenessy/AI_TEMPLATE"
+prune = ["docs/research/**"]
 
 [vision]
 status = "accepted"
@@ -37,11 +48,30 @@ registry = "resources.toml"
 # Codex, Copilot, and Cursor read AGENTS.md and .agents/ without adapters.
 hosts = ["claude"]
 
+# Optional per-host overrides; omitted keys keep the kit defaults.
+# [adapters.claude]
+# models = { fast = "haiku", balanced = "sonnet", deep = "opus" }   # role tier -> model
+# tools = { "read-only" = "Read, Grep, Glob, Bash" }               # role access -> tools
+# allow = ["make start", "make done", "make where:*"]               # pre-approved commands
+
+[kit]
+# Optional tunables (docs/self-healing.md); omitted keys keep the defaults.
+# doc_groups = { operate = "Start and operate", design = "Design and engineering", launch = "Product, privacy, and launch", extend = "Extensibility and evidence" }
+# unbound_docs_ok = ["docs/legal/**", "docs/research/**"]
+# overlap_limit = 0.30
+# deprecation_warning_days = 30
+# skill_review_days = 365
+
+[capabilities]
+# First-party skills written in this repository (`make new KIND=skill` adds
+# them here). Third-party skills instead need [[skills]] provenance below.
+local_skills = []
+
 [budgets]
 # Byte limits (~4 bytes/token) for files agents load often; make check enforces.
 "AGENTS.md" = 7000
 "docs/README.md" = 9500
-"docs/START-HERE.md" = 4000
+"tools/kit/*.py" = 32000  # keep kit modules agent-sized; add budgets for product code too
 ".agents/agents/*.md" = 3000
 ".agents/skills/*/SKILL.md" = 8000
 
@@ -54,6 +84,7 @@ high = [
   "**/auth/**", "**/migrations/**", "**/*.sql", "**/secrets/**", "**/infra/**",
 ]
 low = ["docs/**", "**/*.md"]
+# ceremony = { normal = "issue, focused test, make done, observed artifact" }   # optional per-tier text
 
 [security]
 contact = ""

@@ -1,7 +1,8 @@
 """Ceremony scales with blast radius: classify changed paths into risk tiers.
 
 `project.toml [risk]` lists `high` and `low` globs (first match wins, high
-first); everything else is `normal`. The tier tells an agent how much process
+first; everything else is `normal`) and may override the `ceremony` text per
+tier. The tier tells an agent how much process
 the change needs, so small edits stay cheap and dangerous ones never skip review.
 """
 
@@ -14,7 +15,7 @@ from .gitinfo import branch_paths, path_matches
 
 CEREMONY = {
     "low": "make check; no issue needed unless behavior or a contract changes.",
-    "normal": "issue-backed write-ahead record, focused test, make verify, observed artifact; critic for subjective or commandless work.",
+    "normal": "issue-backed write-ahead record, focused test, make done, observed artifact; critic for subjective or commandless work.",
     "high": "normal ceremony + independent critic (critic role / make review-packet) + security/privacy doc review.",
 }
 ORDER = ("low", "normal", "high")
@@ -51,9 +52,15 @@ def assess(root: Path, base: str | None = None) -> tuple[str, dict[str, list[str
     return overall, grouped
 
 
+def ceremony(root: Path) -> dict[str, str]:
+    rules = load_project(root).get("risk", {})
+    custom = rules.get("ceremony", {}) if isinstance(rules, dict) else {}
+    return {**CEREMONY, **(custom if isinstance(custom, dict) else {})}
+
+
 def print_risk(root: Path, base: str | None = None) -> None:
     overall, grouped = assess(root, base)
-    print(f"Risk tier: {overall} — {CEREMONY[overall]}")
+    print(f"Risk tier: {overall} — {ceremony(root)[overall]}")
     for tier in reversed(ORDER):
         if grouped[tier]:
             shown = grouped[tier][:12]

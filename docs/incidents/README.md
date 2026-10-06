@@ -1,5 +1,7 @@
 # Incident records
 
+<!-- index: operate | Reviewed public incident record boundary | A public incident is promoted or a regression artifact is reviewed. -->
+
 Reviewed public incident records are linked from the main
 [`docs/README.md`](../README.md) incident index. Private drafts remain under
 ignored `.agent/incidents/` until redaction and review are complete.

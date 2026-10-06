@@ -1,5 +1,7 @@
 # Engineering standard
 
+<!-- index: design | Modular design, single source of truth, dependency, and cleanup rules | Code is being changed, refactored, or reviewed. -->
+
 The goal is compact, legible software with high leverage: a small interface
 over a meaningful implementation, one owner for each changing fact, and tests
 that cross the same seams as callers.

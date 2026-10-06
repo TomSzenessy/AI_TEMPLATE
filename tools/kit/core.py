@@ -217,7 +217,12 @@ def worktree_files(root: Path) -> list[Path]:
                 capture_output=True,
                 text=True,
             )
-            return [root / relative for relative in listed.stdout.split("\0") if relative]
+            # Tracked files deleted in the working tree are gone, not hygiene subjects.
+            return [
+                root / relative
+                for relative in listed.stdout.split("\0")
+                if relative and os.path.lexists(root / relative)
+            ]
 
     files: list[Path] = []
     for current, directory_names, file_names in os.walk(

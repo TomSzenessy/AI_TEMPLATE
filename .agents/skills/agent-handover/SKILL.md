@@ -26,8 +26,9 @@ Reference issues, commits, specs, and ADRs instead of copying them.
 
 ## Conclude or pause
 
-1. Copy [`../../../HANDOVER.template.md`](../../../HANDOVER.template.md) to root
-   `HANDOVER.md` when a local continuation record is useful.
+1. Run `make handover` to create root `HANDOVER.md` from
+   [`../../../docs/handoffs/TEMPLATE.md`](../../../docs/handoffs/TEMPLATE.md)
+   with the git facts pre-filled (it never overwrites an existing one).
 2. Update every section concisely and remove stale claims.
 3. Use [`../../../docs/handoffs/TEMPLATE.md`](../../../docs/handoffs/TEMPLATE.md)
    for a committed cross-machine handoff, then add it to the docs index.

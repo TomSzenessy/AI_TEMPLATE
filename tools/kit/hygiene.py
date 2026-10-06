@@ -7,6 +7,7 @@ Markers are language-neutral comments, so they work in any stack:
   on the same line or within the next three lines.
 - A task marker (to-do, fix-me, hack, triple-x) must reference an issue
   (`#123`, a URL, or `Local-WAL`) so open work lives in the issue register.
+- A scaffold placeholder left by `make new` is unfinished work and fails.
 
 Budgets bound files that agents load often, in bytes (~4 bytes per token).
 """
@@ -25,9 +26,10 @@ from .gitinfo import path_matches
 DEPRECATION = re.compile(r"DEPRECATED\(remove-by=(\d{4}-\d{2}-\d{2})([^)]*)\)")
 ANNOTATION = re.compile(r"@[Dd]eprecated\b")
 TASK = re.compile(r"\b(T[O]DO|F[I]XME|H[A]CK|X[X]X)\b")
+SCAFFOLD = re.compile(r"\bF[I]LL-IN:")
+INLINE_CODE = re.compile(r"`[^`\n]*`")  # documentation may name the marker in code spans
 TASK_REFERENCE = re.compile(r"#\d+|https?://|Local-WAL")
 PROSE_SUFFIXES = {".md", ".markdown", ".txt", ".csv", ".tsv", ".json", ".lock", ".svg"}
-UPCOMING_DAYS = 30
 
 
 @dataclass
@@ -36,6 +38,7 @@ class MarkerReport:
     upcoming: list[str] = field(default_factory=list)
     undated: list[str] = field(default_factory=list)
     orphan_tasks: list[str] = field(default_factory=list)
+    unfinished: list[str] = field(default_factory=list)
 
     @property
     def errors(self) -> list[str]:
@@ -43,10 +46,11 @@ class MarkerReport:
             [f"expired deprecation: {item}" for item in self.expired]
             + [f"deprecation annotation without remove-by date: {item}" for item in self.undated]
             + [f"task marker without issue reference: {item}" for item in self.orphan_tasks]
+            + [f"unfinished scaffold (replace the FILL-IN text): {item}" for item in self.unfinished]
         )
 
 
-def scan_markers(root: Path, files: list[str], today: date | None = None) -> MarkerReport:
+def scan_markers(root: Path, files: list[str], today: date | None = None, warning_days: int = 30) -> MarkerReport:
     today = today or date.today()
     report = MarkerReport()
     for relative in files:
@@ -57,6 +61,8 @@ def scan_markers(root: Path, files: list[str], today: date | None = None) -> Mar
         lines = text.splitlines()
         for number, line in enumerate(lines, start=1):
             location = f"{relative}:{number}"
+            if SCAFFOLD.search(INLINE_CODE.sub("", line)):
+                report.unfinished.append(location)
             for match in DEPRECATION.finditer(line):
                 try:
                     deadline = date.fromisoformat(match.group(1))
@@ -65,7 +71,7 @@ def scan_markers(root: Path, files: list[str], today: date | None = None) -> Mar
                     continue
                 if deadline < today:
                     report.expired.append(f"{location} (remove-by {deadline})")
-                elif deadline <= today + timedelta(days=UPCOMING_DAYS):
+                elif deadline <= today + timedelta(days=warning_days):
                     report.upcoming.append(f"{location} (remove-by {deadline})")
             if suffix in PROSE_SUFFIXES:
                 continue
@@ -97,3 +103,27 @@ def budget_errors(root: Path, project: dict[str, object], files: list[str]) -> l
                     " move detail to a linked owner document"
                 )
     return errors
+
+
+FENCE = re.compile(r"```.*?```", re.DOTALL)
+WORDS = re.compile(r"[a-z0-9]+")
+
+
+def duplicate_paragraphs(root: Path, files: list[str], min_words: int = 40, threshold: float = 0.8) -> list[str]:
+    """Paragraphs that substantially repeat one in another document (one owner per fact)."""
+    shingles: list[tuple[str, str, set[tuple[str, ...]]]] = []
+    for relative in files:
+        if not relative.endswith(".md") or relative.startswith((".claude/", ".agents/")):
+            continue
+        text = read_text_file(root, relative)
+        for paragraph in re.split(r"\n\s*\n", FENCE.sub("", text or "")):
+            words = WORDS.findall(paragraph.lower())
+            if len(words) >= min_words:
+                grams = {tuple(words[index : index + 6]) for index in range(len(words) - 5)}
+                shingles.append((relative, " ".join(paragraph.split())[:60], grams))
+    findings = []
+    for position, (path_a, head_a, grams_a) in enumerate(shingles):
+        for path_b, head_b, grams_b in shingles[position + 1 :]:
+            if path_a != path_b and len(grams_a & grams_b) / min(len(grams_a), len(grams_b)) >= threshold:
+                findings.append(f"{path_a} and {path_b} repeat a paragraph (\"{head_a}…\"); keep it in one owner and link")
+    return findings

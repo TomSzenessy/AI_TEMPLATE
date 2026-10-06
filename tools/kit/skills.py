@@ -182,6 +182,8 @@ def check_skill_admission(root: Path, project: dict[str, object]) -> None:
         for entry in entries
         if isinstance(entry, dict) and "@" in str(entry.get("package", ""))
     }
+    capabilities = project.get("capabilities", {})
+    local_skills = set(capabilities.get("local_skills", [])) if isinstance(capabilities, dict) else set()
     skill_root = root / ".agents" / "skills"
     if not skill_root.exists():
         return
@@ -205,9 +207,14 @@ def check_skill_admission(root: Path, project: dict[str, object]) -> None:
                     f"first-party skill contains an unregistered file: {child.relative_to(root).as_posix()}"
                 )
             continue
+        if name in local_skills:
+            continue  # authored here (make new); reviewed like any other code in this repository
         entry = provenance.get(name)
         if entry is None:
-            raise RepoctlError(f"skill directory is not allowlisted or recorded in project provenance: {name}")
+            raise RepoctlError(
+                f"skill {name} is neither first-party ([capabilities].local_skills, see `make new`) "
+                "nor recorded in [[skills]] provenance (third-party, see docs/skills.md)"
+            )
         expected = entry.get("content_digest")
         try:
             actual = directory_digest(skill_file.parent)

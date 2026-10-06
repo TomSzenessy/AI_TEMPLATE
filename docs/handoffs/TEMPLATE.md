@@ -1,5 +1,7 @@
 # Handoff — <short outcome>
 
+<!-- index: operate | Handover record scaffold (local HANDOVER.md or committed handoff) | A fresh actor needs a focused continuation record. -->
+
 - **Created (UTC):** `<timestamp>`
 - **Next actor/session focus:** `<one sentence>`
 - **Sharing boundary:** `<private team / public repository / other>`

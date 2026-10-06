@@ -13,6 +13,7 @@ and pending documents (uncommitted covered changes without a doc change).
 from __future__ import annotations
 
 import json
+import os
 import re
 from pathlib import Path
 
@@ -20,27 +21,28 @@ from .core import markdown_without_fenced_code, read_text_file
 from .gitinfo import git, has_history, path_matches
 
 COVERS_PATTERN = re.compile(r"<!--\s*covers:\s*(.*?)\s*-->", re.DOTALL)
+INDEX_PATTERN = re.compile(r"<!--\s*index:\s*(.*?)\s*-->", re.DOTALL)
 INLINE_CODE = re.compile(r"`[^`\n]*`")  # examples in code spans are not bindings
 UNAFFECTED_TRAILER = "Docs-Unaffected"
 HISTORY_LIMIT = 2000
-BINDINGS_CACHE = ".agent/cache/bindings.json"
+META_CACHE = ".agent/cache/doc-meta.json"
 
 
-def bindings(root: Path, files: list[str]) -> dict[str, list[str]]:
-    """Map each Markdown document to the path globs it declares it covers.
+def doc_meta(root: Path, files: list[str]) -> dict[str, dict[str, object]]:
+    """Per-document declarations: `covers` globs and the `index` entry, cached.
 
     Parsed declarations are cached in ignored `.agent/cache/` by size and
     mtime, so per-edit hooks stay cheap in repositories with many documents.
     """
-    cache_path = root / BINDINGS_CACHE
+    cache_path = root / META_CACHE
     try:
         cache = json.loads(cache_path.read_text(encoding="utf-8"))
-        cache = cache if isinstance(cache, dict) and cache.get("version") == 1 else {}
+        cache = cache if isinstance(cache, dict) and cache.get("version") == 2 else {}
     except (OSError, ValueError):
         cache = {}
     entries = cache.get("entries", {}) if isinstance(cache.get("entries"), dict) else {}
     fresh: dict[str, list] = {}
-    result: dict[str, list[str]] = {}
+    result: dict[str, dict[str, object]] = {}
     for relative in files:
         if not relative.endswith(".md"):
             continue
@@ -51,24 +53,66 @@ def bindings(root: Path, files: list[str]) -> dict[str, list[str]]:
         stamp = [status.st_mtime_ns, status.st_size]
         cached = entries.get(relative)
         if isinstance(cached, list) and len(cached) == 2 and cached[0] == stamp:
-            patterns = cached[1]
+            meta = cached[1]
         else:
-            text = read_text_file(root, relative) or ""
-            patterns = [
-                pattern
-                for match in COVERS_PATTERN.finditer(INLINE_CODE.sub("", markdown_without_fenced_code(text)))
-                for pattern in match.group(1).split()
-            ]
-        fresh[relative] = [stamp, patterns]
-        if patterns:
-            result[relative] = patterns
+            text = INLINE_CODE.sub("", markdown_without_fenced_code(read_text_file(root, relative) or ""))
+            index = INDEX_PATTERN.search(text)
+            title = re.search(r"(?m)^# (.+)$", text)
+            meta = {
+                "covers": [p for match in COVERS_PATTERN.finditer(text) for p in match.group(1).split()],
+                "index": [part.strip() for part in index.group(1).split("|")] if index else None,
+                "title": title.group(1).strip() if title else relative,
+            }
+        fresh[relative] = [stamp, meta]
+        result[relative] = meta
     if fresh != entries:
         try:
             cache_path.parent.mkdir(parents=True, exist_ok=True)
-            cache_path.write_text(json.dumps({"version": 1, "entries": fresh}), encoding="utf-8")
+            cache_path.write_text(json.dumps({"version": 2, "entries": fresh}), encoding="utf-8")
         except OSError:
             pass  # the cache is an optimization only
     return result
+
+
+def bindings(root: Path, files: list[str]) -> dict[str, list[str]]:
+    """Map each Markdown document to the path globs it declares it covers."""
+    return {path: list(meta["covers"]) for path, meta in doc_meta(root, files).items() if meta["covers"]}
+
+
+def doc_groups(root: Path) -> dict[str, str]:
+    """Docs index sections from project.toml [kit].doc_groups (key = title)."""
+    from .config import setting  # local import keeps docsync importable without a manifest
+
+    return dict(setting(root, "doc_groups"))
+
+
+def index_errors(root: Path, files: list[str]) -> list[str]:
+    groups = doc_groups(root)
+    errors = []
+    for path, meta in sorted(doc_meta(root, files).items()):
+        entry = meta["index"]
+        if entry is not None and (len(entry) != 3 or entry[0] not in groups or not all(entry)):
+            errors.append(f"{path}: index declaration must be '<!-- index: {'|'.join(groups)} | owns | read when -->' (groups: project.toml [kit].doc_groups)")
+    return errors
+
+
+def render_index(root: Path, files: list[str], index_doc: str = "docs/README.md") -> str:
+    """Markdown tables for every document that declares `<!-- index: -->`."""
+    base = Path(index_doc).parent
+    titles = doc_groups(root)
+    groups: dict[str, list[str]] = {key: [] for key in titles}
+    for path, meta in sorted(doc_meta(root, files).items(), key=lambda item: (item[0].count("/"), item[0])):
+        entry = meta["index"]
+        if not entry or len(entry) != 3 or entry[0] not in titles or path == index_doc:
+            continue
+        link = Path(os.path.relpath(path, base)).as_posix()
+        link = link if link.startswith("../") else f"./{link}"
+        groups[entry[0]].append(f"| [`{link.removeprefix('./')}`]({link}) | {entry[1]} | {entry[2]} |")
+    blocks = []
+    for key, title in titles.items():
+        if groups[key]:
+            blocks.append(f"### {title}\n\n| Read | Owns | Reach for it when |\n|---|---|---|\n" + "\n".join(groups[key]))
+    return "\n\n".join(blocks)
 
 
 def owners(doc_bindings: dict[str, list[str]], path: str) -> list[str]:

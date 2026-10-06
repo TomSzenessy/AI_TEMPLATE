@@ -12,18 +12,19 @@ import subprocess
 from datetime import date
 from pathlib import Path
 
-from . import adapters, docsync, hygiene
+from . import derive, docsync, github, hygiene
 from .core import declared_surfaces, ensure_inside_root, load_project, repository_files
-from .gitinfo import changed_paths, has_history
+from .config import setting
+from .gitinfo import changed_paths, has_history, path_matches
 
-SKILL_REVIEW_DAYS = 365
 
 
 def self_heal_errors(root: Path, project: dict[str, object] | None = None) -> list[str]:
     project = project or load_project(root)
     files = repository_files(root)
     doc_bindings = docsync.bindings(root, files)
-    errors = adapters.drift(root)
+    errors = derive.drift(root)
+    errors += docsync.index_errors(root, files)
     errors += docsync.dead_bindings(doc_bindings, files)
     errors += docsync.stale_documents(root, doc_bindings, changed_paths(root))
     errors += docsync.command_reference_errors(root, files)
@@ -48,13 +49,14 @@ def garden_report(root: Path) -> tuple[str, int]:
     files = repository_files(root)
     doc_bindings = docsync.bindings(root, files)
     hard = self_heal_errors(root, project)
-    markers = hygiene.scan_markers(root, files)
+    markers = hygiene.scan_markers(root, files, warning_days=int(setting(root, "deprecation_warning_days")))
     advisory = [f"deprecation due soon: {item}" for item in markers.upcoming]
+    advisory += hygiene.duplicate_paragraphs(root, files)
     unbound = sorted(
         path
         for path in files
         if path.startswith("docs/") and path.endswith(".md") and path not in doc_bindings
-        and not path.startswith(("docs/legal/", "docs/research/", "docs/incidents/", "docs/handoffs/", "docs/adr/"))
+        and not any(path_matches(path, pattern) for pattern in setting(root, "unbound_docs_ok"))
     )
     if unbound:
         advisory.append("documents without a covers binding (fine for pure policy docs): " + ", ".join(unbound))
@@ -64,8 +66,12 @@ def garden_report(root: Path) -> tuple[str, int]:
             age = (date.today() - date.fromisoformat(reviewed)).days
         except ValueError:
             continue
-        if age > SKILL_REVIEW_DAYS:
+        if age > int(setting(root, "skill_review_days")):
             advisory.append(f"skill review older than a year: {entry.get('package')} (reviewed {reviewed})")
+    try:
+        advisory += github.metadata_drift(root)
+    except Exception as error:  # noqa: BLE001 - metadata drift is advisory only
+        advisory.append(f"GitHub metadata check skipped: {error}")
     if not has_history(root):
         advisory.append("git history unavailable or shallow: stale-document detection skipped (use fetch-depth: 0 in CI)")
 

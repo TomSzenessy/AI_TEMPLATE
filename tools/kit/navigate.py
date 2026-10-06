@@ -61,7 +61,7 @@ def print_map(root: Path, limit: int | None = None) -> None:
         print("\n## Skills (.agents/skills/)")
         print("- " + ", ".join(skill["name"] for skill in skills))
     print("\n## Commands")
-    print("- make where Q=\"...\" · make finish · make verify · make garden · make risk · make capabilities")
+    print("- make where Q=\"...\" · make done · make new · make similar Q=\"...\" · make risk · make garden · make help")
 
 
 def _score(terms: list[str], text: str) -> int:

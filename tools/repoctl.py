@@ -16,14 +16,14 @@ try:
 except ModuleNotFoundError as error:  # pragma: no cover - exercised on Python 3.10
     raise SystemExit("repoctl requires Python 3.11 or newer") from error
 
-from kit import adapters, session
+from kit import derive, scaffold, session
 from kit.bootstrap import initialize_project
 from kit.capabilities import print_capabilities
 from kit.core import RepoctlError, ensure_inside_root, load_project
 from kit.docs import check_docs_index, check_file_hygiene, check_markdown_links
 from kit.evals import run_evals
 from kit.garden import garden_report, self_heal_errors
-from kit.github import sync_issue_labels
+from kit.github import sync_issue_labels, sync_repository_metadata
 from kit.issues import (
     check_issue_for_duplicates,
     create_incident,
@@ -103,21 +103,33 @@ def build_parser() -> argparse.ArgumentParser:
     labels_parser.add_argument("--sync", action="store_true", help="create/update registry labels")
 
     # Self-healing and navigation commands (docs/self-healing.md, docs/delegation.md).
-    adapters_parser = subparsers.add_parser("adapters", help="generate host adapter files from .agents/ and resources.toml")
-    adapters_parser.add_argument("--check", action="store_true", help="report drift without writing")
+    sync_parser = subparsers.add_parser("sync", help="regenerate derived files: host adapters, docs index, README description")
+    sync_parser.add_argument("--check", action="store_true", help="report drift without writing")
     hook_parser = subparsers.add_parser("hook", help="run a host lifecycle hook (reads optional host JSON on stdin)")
-    hook_parser.add_argument("event", choices=["session-start", "pre-compact", "after-edit", "stop"])
+    hook_parser.add_argument("event", choices=["session-start", "pre-compact", "after-edit", "stop", "commit-msg"])
+    hook_parser.add_argument("message_file", nargs="?", help="commit message file (commit-msg only)")
     subparsers.add_parser("start", help="print the session brief (for hosts without hooks)")
     subparsers.add_parser("finish", help="completion gate for this branch's change set")
+    new_parser = subparsers.add_parser("new", help="scaffold a skill, agent role, or doc and wire it in")
+    new_parser.add_argument("--kind", required=True, choices=["skill", "agent", "doc"])
+    new_parser.add_argument("--name", required=True)
+    new_parser.add_argument("--description", required=True)
+    new_parser.add_argument("--group", default="operate")
+    new_parser.add_argument("--covers", default="")
+    new_parser.add_argument("--access", default="read-only")
+    new_parser.add_argument("--tier", default="balanced")
+    new_parser.add_argument("--force", action="store_true")
+    subparsers.add_parser("handover", help="create HANDOVER.md from the template with git facts filled in")
     subparsers.add_parser("map", help="print the one-screen repository map")
     where_parser = subparsers.add_parser("where", help="find paths, symbols, headings, owners, and past failures")
     where_parser.add_argument("query", nargs="+")
     risk_parser = subparsers.add_parser("risk", help="classify this branch's changes into a ceremony tier")
     risk_parser.add_argument("--base")
+    subparsers.add_parser("github-sync", help="apply project.toml description, topics, and template flag to GitHub")
     subparsers.add_parser("capabilities", help="report tools, agent hosts, and MCP routes available here")
     garden_parser = subparsers.add_parser("garden", help="aggregate rot report (docs, deprecations, budgets, surfaces)")
     garden_parser.add_argument("--output", type=Path, help="also write the Markdown report to this path")
-    overlap_parser = subparsers.add_parser("skill-overlap", help="compare a proposed capability with existing skills/roles")
+    overlap_parser = subparsers.add_parser("similar", help="find existing skills/roles similar to a proposed capability")
     overlap_parser.add_argument("description", nargs="+")
     eval_parser = subparsers.add_parser("eval", help="run the fresh-agent navigation benchmark")
     eval_parser.add_argument("--host", default="claude")
@@ -195,20 +207,29 @@ def main(argv: list[str] | None = None) -> int:
             if not arguments.sync:
                 raise RepoctlError("labels currently requires --sync")
             sync_issue_labels(arguments.root.resolve())
-        elif arguments.command == "adapters":
+        elif arguments.command == "sync":
             repository_root = arguments.root.resolve()
             if arguments.check:
-                drift = adapters.drift(repository_root)
+                drift = derive.drift(repository_root)
                 if drift:
-                    raise RepoctlError("adapter drift:\n- " + "\n- ".join(drift))
-                print("Host adapters match their canonical sources.")
+                    raise RepoctlError("derived content drift:\n- " + "\n- ".join(drift))
+                print("Derived files match their sources.")
             else:
-                changed = adapters.sync(repository_root)
-                print("\n".join(changed) if changed else "Host adapters already up to date.")
+                changed = derive.sync(repository_root)
+                print("\n".join(changed) if changed else "Derived files already up to date.")
         elif arguments.command == "hook":
-            return session.run_hook(arguments.root.resolve(), arguments.event)
+            return session.run_hook(arguments.root.resolve(), arguments.event, arguments.message_file)
         elif arguments.command == "start":
             session.session_start(arguments.root.resolve())
+        elif arguments.command == "new":
+            for line in scaffold.create(
+                arguments.root.resolve(), arguments.kind, arguments.name, arguments.description,
+                group=arguments.group, covers=arguments.covers, access=arguments.access,
+                tier=arguments.tier, force=arguments.force,
+            ):
+                print(line)
+        elif arguments.command == "handover":
+            print(session.write_handover(arguments.root.resolve()))
         elif arguments.command == "finish":
             return session.finish(arguments.root.resolve())
         elif arguments.command == "map":
@@ -218,6 +239,9 @@ def main(argv: list[str] | None = None) -> int:
             print("\n".join(hits) if hits else "No match. Try fewer or different terms, or ask the scout role.")
         elif arguments.command == "risk":
             print_risk(arguments.root.resolve(), arguments.base)
+        elif arguments.command == "github-sync":
+            applied = sync_repository_metadata(arguments.root.resolve())
+            print("Applied: " + " ".join(applied) if applied else "GitHub metadata already matches project.toml.")
         elif arguments.command == "capabilities":
             print_capabilities(arguments.root.resolve())
         elif arguments.command == "garden":
@@ -226,7 +250,7 @@ def main(argv: list[str] | None = None) -> int:
             if arguments.output:
                 arguments.output.write_text(report, encoding="utf-8")
             return status
-        elif arguments.command == "skill-overlap":
+        elif arguments.command == "similar":
             matches = skill_overlap(arguments.root.resolve(), " ".join(arguments.description))
             for score, name, text in matches:
                 print(f"{score:.2f}  {name}: {text}")

@@ -309,3 +309,79 @@ def github_target_configured(root: Path, project: dict[str, object]) -> bool:
     # to a separate privileged job/evidence record and must not receive a token
     # in general repository verification.
     return isinstance(target, str) and bool(target)
+
+
+TOPIC_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]{0,49}$")
+
+
+def declared_metadata(project: dict[str, object]) -> dict[str, object]:
+    """Repository metadata declared in project.toml [repository]."""
+    repository = project.get("repository", {})
+    repository = repository if isinstance(repository, dict) else {}
+    description = str(repository.get("description", "")).strip()
+    topics = repository.get("topics", [])
+    if not isinstance(topics, list) or not all(isinstance(t, str) and TOPIC_PATTERN.fullmatch(t) for t in topics):
+        raise RepoctlError("repository.topics must be lowercase kebab-case strings of at most 50 characters")
+    if len(description) > 350 or len(topics) > 20:
+        raise RepoctlError("repository.description is limited to 350 characters and topics to 20")
+    return {"description": description, "topics": sorted(topics), "is_template": bool(repository.get("is_template", False))}
+
+
+def live_metadata(repository: str) -> dict[str, object] | None:
+    try:
+        result = subprocess.run(
+            ["gh", "repo", "view", repository, "--json", "description,repositoryTopics,isTemplate"],
+            check=False, capture_output=True, text=True, timeout=30, env=github_environment(),
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return None
+    if result.returncode != 0:
+        return None
+    data = json.loads(result.stdout or "{}")
+    topics = [item.get("name") for item in (data.get("repositoryTopics") or []) if isinstance(item, dict)]
+    return {"description": (data.get("description") or "").strip(), "topics": sorted(topics), "is_template": bool(data.get("isTemplate"))}
+
+
+def metadata_drift(root: Path) -> list[str]:
+    """Read-only comparison of GitHub metadata with project.toml (empty when unknowable)."""
+    project = load_project(root)
+    repository = project.get("repository", {})
+    target = repository.get("github") if isinstance(repository, dict) else None
+    if not target:
+        return []
+    declared = declared_metadata(project)
+    if not declared["description"] and not declared["topics"]:
+        return []
+    live = live_metadata(str(target))
+    if live is None:
+        return []
+    return [
+        f"GitHub {field} differs from project.toml (run `make github-sync`)"
+        for field in ("description", "topics", "is_template")
+        if live[field] != declared[field]
+    ]
+
+
+def sync_repository_metadata(root: Path) -> list[str]:
+    """Apply project.toml [repository] description, topics, and template flag to GitHub."""
+    project = load_project(root)
+    declared = declared_metadata(project)
+    repository = resolve_github_repo(root)
+    live = live_metadata(repository)
+    if live is None:
+        raise RepoctlError(f"cannot read {repository} with gh; authenticate the GitHub CLI first")
+    command = ["gh", "repo", "edit", repository]
+    if live["description"] != declared["description"]:
+        command += ["--description", str(declared["description"])]
+    for topic in sorted(set(declared["topics"]) - set(live["topics"])):
+        command += ["--add-topic", topic]
+    for topic in sorted(set(live["topics"]) - set(declared["topics"])):
+        command += ["--remove-topic", topic]
+    if live["is_template"] != declared["is_template"]:
+        command += [f"--template={'true' if declared['is_template'] else 'false'}"]
+    if len(command) == 4:
+        return []
+    result = subprocess.run(command, check=False, capture_output=True, text=True, timeout=60, env=github_environment())
+    if result.returncode != 0:
+        raise RepoctlError(f"gh repo edit failed: {result.stderr.strip()[-300:]}")
+    return [part for part in command[4:] if part.startswith("--")]

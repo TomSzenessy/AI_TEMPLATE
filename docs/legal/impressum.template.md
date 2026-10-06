@@ -1,5 +1,7 @@
 # Provider information / Impressum — DRAFT TEMPLATE
 
+<!-- index: launch | Draft provider-information scaffold | A public operator notice is required. -->
+
 > **Do not publish this file unchanged.** Requirements and terminology vary by
 > jurisdiction. Confirm the applicable law and conditional fields with qualified
 > counsel; this is not a universal legal form.

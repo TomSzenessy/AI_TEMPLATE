@@ -1,6 +1,7 @@
 # Self-healing mechanics
 
-<!-- covers: tools/kit/docsync.py tools/kit/hygiene.py tools/kit/adapters.py tools/kit/session.py tools/kit/garden.py tools/kit/navigate.py tools/kit/risk.py tools/kit/capabilities.py tools/kit/evals.py tools/kit/gitinfo.py .github/workflows/garden.yml .agents/evals/** -->
+<!-- index: operate | Hooks, doc-code bindings, deprecation expiry, budgets, generated files, gardener, evals | A check fails, docs drift, a host is added, or the kit itself changes. -->
+<!-- covers: tools/kit/docsync.py tools/kit/hygiene.py tools/kit/adapters.py tools/kit/session.py tools/kit/garden.py tools/kit/navigate.py tools/kit/risk.py tools/kit/capabilities.py tools/kit/evals.py tools/kit/gitinfo.py tools/kit/derive.py tools/kit/scaffold.py tools/kit/config.py .githooks/** .github/workflows/garden.yml .agents/evals/** -->
 
 Agents follow written rules well at the start of a session and worst at the end,
 after compaction, which is when cleanup and documentation get skipped. So the
@@ -12,14 +13,17 @@ standard-library command in `tools/kit/`, so it works with any agent host.
 
 | Moment | Host with hooks | Host without hooks | What happens |
 |---|---|---|---|
-| Session start or resume | `repoctl hook session-start` | `make start` | Brief: branch, recent commits, `HANDOVER.md`, map, open self-healing findings. Drifted adapters are regenerated. |
+| Session start or resume | `repoctl hook session-start` | `make start` | Brief: branch, recent commits, `HANDOVER.md`, map, open self-healing findings. Derived files are regenerated and the git commit gate is installed. |
 | Before context compaction | `repoctl hook pre-compact` | — | Writes `.agent/checkpoint.md` (uncommitted paths, docs still owed). |
-| After a file edit | `repoctl hook after-edit` | — | Names the docs covering the edited path (once per session); regenerates adapters when a canonical source changed; warns on edits to generated files. |
-| Before declaring done | `repoctl hook stop` | `make finish` | Gate over this branch's change set: owed docs, adapter drift, dead bindings, expired or undated markers. Blocks once, then the agent fixes or explains. |
+| After a file edit | `repoctl hook after-edit` | — | Names the docs covering the edited path (once per session); regenerates derived files when a source changed; warns on edits to generated files. |
+| Before declaring done | `repoctl hook stop` | `make done` | Gate over this branch's change set: owed docs, derived-file drift, dead bindings, expired, undated, or unfinished markers. The hook blocks once; `make done` also runs every test. |
+| Every commit | `.githooks/commit-msg` (any agent or human) | same | Refuses a commit whose staged covered code skips its doc (unless the message carries a `Docs-Unaffected:` trailer), plus drift and marker checks. Exit 3 means blocked; a crashed kit never blocks a commit. Bypass deliberately with `--no-verify`. |
 
 Claude Code receives the hooks through the generated `.claude/settings.json`.
 Other hosts read [`AGENTS.md`](../AGENTS.md), which tells them to run the make
-targets.
+targets, and every host meets the git commit gate. `make handover` writes the
+ignored `HANDOVER.md` from [`handoffs/TEMPLATE.md`](./handoffs/TEMPLATE.md)
+with the time, branch, commit, uncommitted paths, and owed docs filled in.
 
 ## Documentation that tracks the code
 
@@ -35,7 +39,7 @@ A document declares what it describes with one comment near its top, such as
   record that in the commit with a trailer, `Docs-Unaffected: docs/x.md <reason>`
   (no path = all documents).
 - **Owed document**: covered paths changed on this branch while the doc did not;
-  the stop gate and `make finish` report it before history even exists.
+  the stop gate and `make done` report it before history even exists.
 - **Command references**: every backticked `make <target>` or `repoctl <command>`
   in Markdown, and every `make` line in a code fence, must exist.
 
@@ -54,6 +58,8 @@ Markers are plain comments and work in any language:
   `remove-by=` date on its line or within the next three lines.
 - Task markers in code must reference an issue (`#123`, a URL, or `Local-WAL`),
   because open work lives in the issue register, not in comments.
+- `FILL-IN:` placeholders left by `make new` fail until replaced, so a
+  half-written skill, role, or doc cannot rot unnoticed.
 
 ## Context budgets
 
@@ -61,17 +67,45 @@ Markers are plain comments and work in any language:
 (about 4 bytes per token). An over-budget file fails `make check`; move detail
 into a linked owner document instead of growing the router.
 
-## Host adapters
+## Derived files: one source each
 
-Canonical agent content lives in `.agents/` (skills, roles, evals) and
-`resources.toml` (`[[mcp]]` routes). `make adapters` renders host files from it.
-For Claude Code that means skill and role redirect stubs in `.claude/`,
-`.claude/settings.json` (hooks and allowlisted kit commands; MCP servers stay approved per person),
-and `.mcp.json`. Generated files hold no content of their own. `make check`
-fails on drift or on any hand-written file in a host directory. Add a host by
-adding a renderer in `tools/kit/adapters.py` and listing it in
-`project.toml [adapters].hosts`. Codex, Copilot, and Cursor already read
+Nothing that can be generated is maintained by hand. `make sync` (also run by
+`make done`, the session-start hook, and the after-edit hook) renders:
+
+| Derived | Single source |
+|---|---|
+| `.claude/skills/*`, `.claude/agents/*` (redirect stubs) | `.agents/skills/*/SKILL.md`, `.agents/agents/*.md` frontmatter |
+| `.claude/settings.json` (hooks, pre-approved kit commands) | the kit, plus optional `project.toml [adapters.claude]` |
+| `.mcp.json` | `resources.toml` `[[mcp]]` routes (servers are still approved per person) |
+| The tables in [`README.md`](./README.md) | each document's `<!-- index: group \| owns \| read when -->` line |
+| The role table in [`delegation.md`](./delegation.md) | role frontmatter (`description`, `access`, `tier`) |
+| The description block in the root `README.md` | `project.toml [repository].description` |
+| GitHub description, topics, template flag (`make github-sync`) | `project.toml [repository]`; `make garden` reports drift |
+
+`make check` fails on any drift and on hand-written files in a generated host
+directory. Add a host by adding a renderer in `tools/kit/adapters.py` and
+listing it in `project.toml [adapters].hosts`. Codex, Copilot, and Cursor read
 `AGENTS.md` and `.agents/skills/` directly.
+
+## Extending: skills, roles, docs
+
+`make new KIND=skill|agent|doc NAME=<kebab> DESC="<what>; <when>"` is the one
+way to add a capability. It refuses a near-duplicate (overlap at or above
+`[kit].overlap_limit`; `FORCE=1` overrides), writes valid frontmatter or
+index metadata, registers a first-party skill in `[capabilities].local_skills`,
+regenerates every derived file, and leaves `FILL-IN:` lines for the content.
+Refining an existing capability is an ordinary edit of its canonical file;
+the after-edit hook regenerates what depends on it. Agent-instruction paths are
+`high` risk, so changes to them get a critic.
+
+## Configuration
+
+Policy a project may change lives in `project.toml`, with built-in defaults
+when a key is absent: `[kit]` (docs index groups, unbound-doc exemptions,
+overlap limit, deprecation warning window, skill review age), `[adapters.claude]`
+(tier-to-model and access-to-tools maps, pre-approved commands), `[risk]`
+(tier globs and optional ceremony text), and `[budgets]` (byte limits for any
+glob, including product code).
 
 Entry files must *load* the router, not just point at it. `CLAUDE.md` imports
 it with `@AGENTS.md`. A pointer-only version failed the fresh-agent benchmark
@@ -89,7 +123,8 @@ independent critic. Tune the globs per project. Never widen `low` to dodge a gat
 ## The gardener
 
 `make garden` aggregates every finding above plus advisory items (upcoming
-deprecations, unbound docs, skill reviews older than a year) and runs each
+deprecations, paragraphs repeated across documents, unbound docs, skill
+reviews older than a year, GitHub metadata drift) and runs each
 surface's own `garden` commands, for example a dead-code finder:
 
 ```toml

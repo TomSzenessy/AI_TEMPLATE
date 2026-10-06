@@ -4,7 +4,7 @@ Canonical content lives in `.agents/skills/*/SKILL.md`, `.agents/agents/*.md`,
 and the `[[mcp]]` routes in `resources.toml`. A host directory such as
 `.claude/` receives only generated redirect stubs plus hook wiring, so there
 is one copy of every instruction and any agent can read the canonical tree.
-`make adapters` writes them; `make check` fails on drift or stray files.
+kit/derive.py writes them (`make sync`); `make check` fails on drift or stray files.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ try:
 except ModuleNotFoundError as error:  # pragma: no cover - exercised on Python 3.10
     raise SystemExit("repoctl requires Python 3.11 or newer") from error
 
-from .core import RepoctlError, ensure_inside_root, load_project, read_text_file
+from .core import RepoctlError, ensure_inside_root, load_project
 from .gitinfo import is_repository
 
 FRONTMATTER = re.compile(r"\A---\n(.*?)\n---\n", re.DOTALL)
@@ -156,14 +156,26 @@ CLAUDE_TOOLS = {
 }
 HOOK = 'python3 "$CLAUDE_PROJECT_DIR/tools/repoctl.py" hook {event}'
 CLAUDE_ALLOWED_COMMANDS = [
-    "make start", "make finish", "make check", "make test", "make verify", "make map",
-    "make where:*", "make garden", "make risk", "make capabilities", "make adapters",
-    "make inventory", "make resources", "make skill-overlap:*",
+    "make start", "make done", "make finish", "make check", "make test", "make verify", "make map",
+    "make where:*", "make garden", "make risk", "make capabilities", "make sync", "make handover",
+    "make inventory", "make resources", "make similar:*", "make new:*",
 ]
+
+
+def claude_settings(root: Path) -> tuple[dict[str, str], dict[str, str], list[str]]:
+    """Model map, tool map, and command allowlist; project.toml [adapters.claude] overrides."""
+    adapters_table = load_project(root).get("adapters", {})
+    claude = adapters_table.get("claude", {}) if isinstance(adapters_table, dict) else {}
+    claude = claude if isinstance(claude, dict) else {}
+    models = {**CLAUDE_MODELS, **claude.get("models", {})}
+    tools = {**CLAUDE_TOOLS, **claude.get("tools", {})}
+    allow = list(claude.get("allow", CLAUDE_ALLOWED_COMMANDS))
+    return models, tools, allow
 
 
 def render_claude(root: Path) -> dict[str, str]:
     files: dict[str, str] = {}
+    models, tools, allow = claude_settings(root)
     for skill in canonical_skills(root):
         source = f".agents/skills/{skill['name']}/SKILL.md"
         files[f".claude/skills/{skill['name']}/SKILL.md"] = (
@@ -175,9 +187,9 @@ def render_claude(root: Path) -> dict[str, str]:
     for role in canonical_roles(root):
         source = f".agents/agents/{role['name']}.md"
         header = [f"name: {role['name']}", f"description: {yaml_string(role['description'])}"]
-        if role["access"] in CLAUDE_TOOLS:
-            header.append(f"tools: {CLAUDE_TOOLS[role['access']]}")
-        header.append(f"model: {CLAUDE_MODELS[role['tier']]}")
+        if role["access"] in tools:
+            header.append(f"tools: {tools[role['access']]}")
+        header.append(f"model: {models[role['tier']]}")
         files[f".claude/agents/{role['name']}.md"] = (
             "---\n" + "\n".join(header) + "\n---\n"
             f"{GENERATED_NOTE.format(source=source)}\n\n"
@@ -199,7 +211,7 @@ def render_claude(root: Path) -> dict[str, str]:
             ],
             "Stop": [{"hooks": [{"type": "command", "command": HOOK.format(event="stop")}]}],
         },
-        "permissions": {"allow": [f"Bash({command})" for command in CLAUDE_ALLOWED_COMMANDS]},
+        "permissions": {"allow": [f"Bash({command})" for command in allow]},
     }
     # MCP servers are deliberately not pre-approved here: Claude Code asks the
     # user once per project server, which keeps consent with the person.
@@ -257,44 +269,3 @@ def host_files(root: Path, hosts: list[str]) -> list[str]:
         ).stdout.split()
         found = [path for path in found if path not in set(ignored)]
     return sorted(found)
-
-
-def drift(root: Path) -> list[str]:
-    """Differences between generated adapters and the working tree."""
-    expected = render(root)
-    hosts = configured_hosts(root)
-    errors = []
-    for relative, content in sorted(expected.items()):
-        if read_text_file(root, relative) != content:
-            errors.append(f"adapter out of date: {relative} (run `make adapters`)")
-    for relative in host_files(root, hosts):
-        if relative not in expected:
-            errors.append(
-                f"hand-authored file in a generated host directory: {relative} "
-                "(move its content to .agents/ and run `make adapters`)"
-            )
-    return errors
-
-
-def sync(root: Path) -> list[str]:
-    """Write generated adapters and remove stale ones; return the changed paths."""
-    expected = render(root)
-    hosts = configured_hosts(root)
-    changed = []
-    for relative, content in sorted(expected.items()):
-        target = ensure_inside_root(root, root / relative, "adapter path")
-        if read_text_file(root, relative) != content:
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(content, encoding="utf-8")
-            changed.append(relative)
-    for relative in host_files(root, hosts):
-        if relative not in expected:
-            # Only files this generator wrote are removed; hand-authored ones stay for drift().
-            if GENERATED_MARK in (read_text_file(root, relative) or ""):
-                stale = root / relative
-                stale.unlink()
-                if stale.parent != root and not any(stale.parent.iterdir()):
-                    stale.parent.rmdir()
-                changed.append(f"removed {relative}")
-    return changed
-

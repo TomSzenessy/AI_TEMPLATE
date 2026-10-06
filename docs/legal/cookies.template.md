@@ -1,5 +1,7 @@
 # Cookies and browser storage — DRAFT TEMPLATE
 
+<!-- index: launch | Browser-storage inventory scaffold | Cookies, local storage, pixels, or embeds are introduced. -->
+
 > **Do not publish this file unchanged.** A source scan does not prove runtime
 > cookies, pixels, SDKs, or third-party requests. Test an authenticated
 > production-like browser and have counsel review the applicable rules.

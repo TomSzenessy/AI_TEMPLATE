@@ -1,5 +1,7 @@
 # Security policy
 
+<!-- index: design | Vulnerability disclosure and security contact | A vulnerability or security-sensitive change is involved. -->
+
 This repository is a template, not a hosted service. **Initialization gate:**
 replace the contact and response expectations below before public launch.
 

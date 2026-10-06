@@ -1,5 +1,6 @@
 # Production readiness
 
+<!-- index: operate | Production evidence and release boundary | A real project is being prepared for deployment or release. -->
 <!-- covers: tools/kit/launch.py -->
 
 The template is a production **governance kernel**, not a production product.

@@ -19,7 +19,7 @@ You own exactly the deliverable in your brief and nothing else.
 4. Update every document whose `<!-- covers: -->` binding includes a path you
    touched (`make where Q="<path>"` shows owners). Mark replaced APIs with
    `DEPRECATED(remove-by=YYYY-MM-DD, use=...)` instead of leaving silent duplicates.
-5. Run the focused check, then `make finish` and `make verify`.
+5. Run the focused check, then `make done`.
 
 ## Boundaries
 

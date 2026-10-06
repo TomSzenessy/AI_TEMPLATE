@@ -1,5 +1,7 @@
 # Stack decision record
 
+<!-- index: operate | Framework/toolchain decision and rationale | Choosing a project stack or replacing an assumed tool. -->
+
 Status: accepted for AI_TEMPLATE (no product framework)
 Project: AI_TEMPLATE
 

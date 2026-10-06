@@ -7,7 +7,7 @@ schema = 1
 [[tasks]]
 id = "completion-command"
 prompt = "Which single make command must pass before any change in this repository counts as complete? Reply with the command only."
-expect = "make verify"
+expect = "make done"
 
 [[tasks]]
 id = "delegation-contract"
@@ -28,3 +28,13 @@ expect = "\\.agents/skills"
 id = "stale-doc-escape"
 prompt = "A commit changes code covered by a document but genuinely does not affect it. What must the commit contain so the stale-document check accepts it? Reply in one line."
 expect = "Docs-Unaffected"
+
+[[tasks]]
+id = "extend-capability"
+prompt = "You need a new reusable subagent role. Which make command creates it and wires it into every host? Reply with the command only."
+expect = "make new"
+
+[[tasks]]
+id = "generated-files"
+prompt = "A file under .claude/ looks wrong. Where do you make the fix so it sticks? Reply with the directory or file path only."
+expect = "\\.agents|resources\\.toml"

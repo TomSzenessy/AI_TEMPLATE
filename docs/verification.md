@@ -1,5 +1,7 @@
 # Verification and independent quality loop
 
+<!-- index: operate | Definition of done, evidence ladder, and quality loop | A change is ready for review or a quality claim is made. -->
+
 “Done” means the issue's acceptance criteria have observable evidence. A build,
 lint run, or green return code is necessary but not sufficient.
 
@@ -83,7 +85,7 @@ fresh `critic` role ([`delegation.md`](./delegation.md)) before completion.
 
 ## Before completion
 
-Run `make finish`, `make verify`, inspect the real artifact, generate a fresh review packet with
+Run `make done`, inspect the real artifact, generate a fresh review packet with
 `make review-packet ISSUE_FILE=...`, and resolve every blocker. Report skipped
 checks and external gates explicitly. “No issues found” means the declared scope
 was checked to the stated coverage—not that the entire universe is bug-free.

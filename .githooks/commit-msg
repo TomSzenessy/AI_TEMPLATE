@@ -1,0 +1,14 @@
+#!/bin/sh
+# Host-neutral commit gate (docs/self-healing.md): every agent and human gets the
+# same owed-docs, derived-file, and marker checks as hooked agent hosts.
+# Installed by `make start` / the session-start hook via core.hooksPath.
+# Bypass deliberately with `git commit --no-verify` and say why in the PR.
+command -v python3 >/dev/null 2>&1 || exit 0
+top=$(git rev-parse --show-toplevel)
+python3 "$top/tools/repoctl.py" --root "$top" hook commit-msg "$1"
+status=$?
+# 3 = blocked by the gate; anything else non-zero is a kit failure that must not
+# wedge commits (CI's make verify still catches a broken kit).
+[ "$status" -eq 3 ] && exit 1
+[ "$status" -ne 0 ] && echo "commit gate skipped: repoctl exited $status" >&2
+exit 0

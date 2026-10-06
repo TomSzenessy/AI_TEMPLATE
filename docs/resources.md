@@ -1,5 +1,6 @@
 # Resource routing for agents
 
+<!-- index: extend | Primary docs, MCP routes, licenses, and resource intake | A task needs a capability, example, current documentation, or external gate. -->
 <!-- covers: resources.toml -->
 
 This is a **routing catalog**, not a bundled code library. Use it to find the
@@ -19,7 +20,7 @@ sources are recorded in [`research/mcp-production-boundaries-2026-09-25.md`](./r
 servers. The template enables three reviewed defaults so any agent can read
 current docs, search the web, and drive a browser: **Context7** (remote, library
 docs), **Exa** (remote, search and fetch), and **Playwright** (local, pinned
-`@playwright/mcp`). `make adapters` renders enabled routes into host
+`@playwright/mcp`). `make sync` renders enabled routes into host
 configuration (`.mcp.json` for Claude Code). The generated settings do not
 pre-approve servers, so each person approves each project server once. `make capabilities` shows which routes can actually run here.
 

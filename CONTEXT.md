@@ -1,5 +1,7 @@
 # Project Context
 
+<!-- index: design | Project vocabulary | A term is ambiguous or a domain model changes. -->
+
 This glossary gives agents and designers shared language for an evolving
 product. It defines meaning, not implementation or task status.
 

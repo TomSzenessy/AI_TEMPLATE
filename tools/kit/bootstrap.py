@@ -1,17 +1,23 @@
-"""Project initialization: identity, README, vision reset."""
+"""Project initialization: identity, README, vision reset, template-only pruning."""
 
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 
+from . import derive
 from .core import (
     PROJECT_KIND_PATTERN,
     PROJECT_NAME_PATTERN,
     RepoctlError,
     ensure_inside_root,
+    load_project,
+    read_text_file,
     replace_manifest_field,
+    repository_files,
 )
+from .gitinfo import path_matches
 
 
 def update_readme_identity(root: Path, name: str, kind: str) -> None:
@@ -123,6 +129,56 @@ def reset_vision_for_project(root: Path, manifest: str, project_name: str) -> st
     return manifest
 
 
+def prune_template_material(root: Path, project: dict[str, object]) -> list[str]:
+    """Remove [template].prune files and point links to them at the template source."""
+    template = project.get("template", {})
+    if not isinstance(template, dict):
+        return []
+    patterns = template.get("prune", [])
+    source = str(template.get("source", "")).rstrip("/")
+    files = repository_files(root)
+    removed = [path for path in files if any(path_matches(path, pattern) for pattern in patterns)]
+    if not removed:
+        return []
+    removed_set = set(removed)
+    link = re.compile(r"(\]\()([^)\s]+)(\))")
+    for relative in files:
+        if not relative.endswith(".md") or relative in removed_set:
+            continue
+        text = read_text_file(root, relative)
+        if text is None:
+            continue
+
+        def absolute(match: re.Match[str]) -> str:
+            target = match.group(2)
+            if "://" in target or target.startswith("#"):
+                return match.group(0)
+            path, _, anchor = target.partition("#")
+            resolved = os.path.normpath(os.path.join(os.path.dirname(relative), path)).replace(os.sep, "/")
+            if resolved not in removed_set or not source:
+                return match.group(0)
+            return f"{match.group(1)}{source}/blob/main/{resolved}{'#' + anchor if anchor else ''}{match.group(3)}"
+
+        updated = link.sub(absolute, text)
+        if updated != text:
+            (root / relative).write_text(updated, encoding="utf-8")
+    for relative in removed:
+        (root / relative).unlink()
+    for directory in sorted({str(Path(path).parent) for path in removed}, key=len, reverse=True):
+        candidate = root / directory
+        while candidate != root and candidate.is_dir() and not any(candidate.iterdir()):
+            candidate.rmdir()
+            candidate = candidate.parent
+    return removed
+
+
+def reset_repository_metadata(manifest: str) -> str:
+    manifest = re.sub(r'(?m)^description\s*=\s*".*"$', 'description = ""', manifest, count=1)
+    manifest = re.sub(r"(?m)^topics\s*=\s*\[[^\]]*\]", "topics = []", manifest, count=1)
+    manifest = re.sub(r"(?m)^is_template\s*=\s*true$", "is_template = false", manifest, count=1)
+    return re.sub(r"(?m)^prune\s*=\s*\[[^\]]*\]", "prune = []", manifest, count=1)
+
+
 def initialize_project(root: Path, name: str, kind: str) -> None:
     if not PROJECT_NAME_PATTERN.fullmatch(name):
         raise RepoctlError(
@@ -151,6 +207,11 @@ def initialize_project(root: Path, name: str, kind: str) -> None:
     manifest = manifest.replace('owner = "TomSzenessy"', 'owner = "project-owner"')
     manifest = reset_template_surface(manifest)
     manifest = reset_vision_for_project(root, manifest, name)
+    removed = prune_template_material(root, load_project(root))
+    manifest = reset_repository_metadata(manifest)
     manifest_path.write_text(manifest, encoding="utf-8")
     update_readme_identity(root, name, kind)
+    derive.sync(root)
+    if removed:
+        print(f"Removed {len(removed)} template-only file(s); links now point to the template source.")
     print(f"Initialized {name} ({kind}). Declare real surfaces before implementation.")
