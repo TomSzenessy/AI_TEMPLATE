@@ -385,6 +385,24 @@ class CriticRegressionTests(KitRepository):
         self.git("commit", "-q", "-m", "change\n\nDocs-Unaffected: docs/billing.md. cosmetic rename")
         self.assertEqual(self.self_heal(), "")
 
+    def test_verbose_commit_diff_below_scissors_is_ignored(self) -> None:
+        self.stage_billing_change()
+        message = (
+            "change\n\nDocs-Unaffected: docs/billing.md comment only\n"
+            "# Please enter the commit message.\n"
+            "# ------------------------ >8 ------------------------\n"
+            "# Do not modify or remove the line above.\n"
+            "diff --git a/src/billing/invoice.py b/src/billing/invoice.py\n+    return 11\n"
+        )
+        self.assertEqual(self.gate(message), 0)
+        verbose = subprocess.run(
+            ["git", "-C", str(self.root), "-c", "core.hooksPath=/dev/null", "commit", "-q", "-v",
+             "-m", "change\n\nDocs-Unaffected: docs/billing.md comment only"],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(verbose.returncode, 0, verbose.stderr)
+        self.assertEqual(self.self_heal(), "")
+
     def test_unstaged_derived_drift_does_not_block_unrelated_commit(self) -> None:
         self.write(".agents/agents/scout.md", "---\nname: scout\ndescription: Changed locator text.\naccess: read-only\ntier: fast\n---\n")
         self.write("notes.txt", "notes\n")

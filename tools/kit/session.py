@@ -200,6 +200,7 @@ def finish_findings(root: Path) -> list[str]:
     return findings
 
 
+SCISSORS = re.compile(r"(?m)^# -+ >8 -+$")
 GATE_BLOCKED = 3  # distinct from crashes, which .githooks/commit-msg lets through
 
 
@@ -212,6 +213,8 @@ def commit_gate(root: Path, message_file: str | None) -> int:
         message = Path(message_file).read_text(encoding="utf-8") if message_file else ""
     except OSError:
         message = ""
+    # Like git's cleanup: drop everything below the `commit -v` scissors line, then comments.
+    message = SCISSORS.split(message, maxsplit=1)[0]
     message = "\n".join(line for line in message.splitlines() if not line.startswith("#"))
     exempt = docsync.exemption_scope(docsync.message_trailers(root, message)) or set()
     files = repository_files(root)
