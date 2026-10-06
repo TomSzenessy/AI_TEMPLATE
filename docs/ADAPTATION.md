@@ -63,6 +63,8 @@ These are discoverable patterns, not files copied into every project:
 - **Regulated/public launch:** counsel/provider evidence, privacy inventory,
   disclosure route, and runtime proof. Keep these gates external and explicit;
   no template text certifies compliance.
+- **Reference-product work:** the reviewed `.agents/skills/` recon/parity/
+  design-token/review-mining/brand-sweep pack owned by [`skills.md`](./skills.md).
 
 A pack is activated by adding its project-specific surface, commands, and
 records to `project.toml` and the documentation index. The kernel does not

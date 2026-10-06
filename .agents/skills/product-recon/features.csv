@@ -1,0 +1,5 @@
+feature,area,priority,original,clone,notes
+{{feature in plain words}},{{screen or flow it belongs to}},must,yes,no,
+{{feature}},{{area}},should,yes,no,
+{{feature the reference product lacks}},{{area}},could,no,no,{{an improvement this build adds}}
+{{out-of-reach feature}},{{area}},could,yes,skip,{{why: licensed content, partner network, ...}}

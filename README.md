@@ -103,7 +103,7 @@ to it; they do not become competing instruction sources.
 | `docs/skills.md` | Safe skill discovery, inspection, pinning, and provenance. |
 | `HANDOVER.template.md` | Concise local session-continuation record; copied to ignored `HANDOVER.md` when needed. |
 | `docs/handoffs/` | Deliberate committed cross-session continuation records. |
-| `.agents/skills/` | Small project-local handover, quality-loop, and audit workflows. |
+| `.agents/skills/` | Small project-local handover, quality-loop, and audit workflows, plus the reviewed reference-product capability pack (see `docs/skills.md` and `THIRD_PARTY_NOTICES.md`). |
 | `tools/repoctl.py` | Zero-dependency structure checks, issue guard, incident creation, and review packets. |
 | `.github/ISSUE_TEMPLATE/` | GitHub-native bug and improvement forms. |
 | `.github/workflows/` | Least-privilege CI that runs the same verification path. |

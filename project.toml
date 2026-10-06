@@ -83,3 +83,56 @@ owner = "TomSzenessy"
 status = "active"
 quality_oracle = "Fresh-agent navigation, contract checks, and bounded review packet inspection"
 verification = [["python3", "tools/repoctl.py", "check"]]
+
+# Reviewed capability pack adapted from Jakeschincariol/replica-skill (MIT).
+# `purpose` names the upstream skill each local skill adapts, because adapted
+# skills may be renamed; THIRD_PARTY_NOTICES.md holds the full mapping.
+[[skills]]
+package = "Jakeschincariol/replica-skill@product-recon"
+source = "https://github.com/Jakeschincariol/replica-skill"
+revision = "77c9436fb3d18c3d58169efb8caf4fe906b0dc51"
+content_digest = "sha256:8a44e6db602f1e56d241a8b65f36dd8a362f58a0d6a396d159dbcc5add666c4d"
+purpose = "Adapted from upstream replica-recon: map a reference product into an evidence-backed spec (sources, screens with states, flows, inferred data model, feature matrix) under clean-room rules"
+reviewed_on = "2026-10-06"
+permissions = "project-local"
+rollback = "remove the .agents/skills/product-recon directory and its [[skills]] entry"
+
+[[skills]]
+package = "Jakeschincariol/replica-skill@parity-check"
+source = "https://github.com/Jakeschincariol/replica-skill"
+revision = "77c9436fb3d18c3d58169efb8caf4fe906b0dc51"
+content_digest = "sha256:4848f038e5ec39ec9f5f1cdf3662f0ed7f58f3c381f32f732de8881124507253"
+purpose = "Adapted from upstream replica-diff: weighted feature-parity scoring against the feature matrix plus a dependency-free screenshot layout diff (parity.py, imgdiff.py)"
+reviewed_on = "2026-10-06"
+permissions = "project-local"
+rollback = "remove the .agents/skills/parity-check directory and its [[skills]] entry"
+
+[[skills]]
+package = "Jakeschincariol/replica-skill@design-tokens"
+source = "https://github.com/Jakeschincariol/replica-skill"
+revision = "77c9436fb3d18c3d58169efb8caf4fe906b0dc51"
+content_digest = "sha256:1db8b9665d0bbd3048f3d4725ba314717ed48d2e379a2169c59bfc788a229f35"
+purpose = "Adapted from upstream replica-design: measure a reference interface into design tokens and component specs, gated by the WCAG contrast checker (contrast.py, tokens.json)"
+reviewed_on = "2026-10-06"
+permissions = "project-local"
+rollback = "remove the .agents/skills/design-tokens directory and its [[skills]] entry"
+
+[[skills]]
+package = "Jakeschincariol/replica-skill@review-mining"
+source = "https://github.com/Jakeschincariol/replica-skill"
+revision = "77c9436fb3d18c3d58169efb8caf4fe906b0dc51"
+content_digest = "sha256:584ec5f22f4605413047fdc07d810b6ea06e7189174205eed1d757741b5a01d2"
+purpose = "Adapted from upstream replica-entrepreneur: rank real user complaints from linked verbatim quotes into a fix plan and positioning angle (reviews.py, themes.json)"
+reviewed_on = "2026-10-06"
+permissions = "project-local"
+rollback = "remove the .agents/skills/review-mining directory and its [[skills]] entry"
+
+[[skills]]
+package = "Jakeschincariol/replica-skill@brand-sweep"
+source = "https://github.com/Jakeschincariol/replica-skill"
+revision = "77c9436fb3d18c3d58169efb8caf4fe906b0dc51"
+content_digest = "sha256:c2f48885735c53b393d311bff8734ff581975747b7cb1959acbc036206b5de6d"
+purpose = "Adapted from upstream replica-brand: name and vet your own identity, then sweep the codebase for the reference product's names, domains, and colors before launch (sweep.py)"
+reviewed_on = "2026-10-06"
+permissions = "project-local"
+rollback = "remove the .agents/skills/brand-sweep directory and its [[skills]] entry"

@@ -1,5 +1,6 @@
 PYTHON ?= python3
 REPOCTL := $(PYTHON) tools/repoctl.py
+SKILL_TEST_SUITES := $(wildcard .agents/skills/*/tests)
 
 .DEFAULT_GOAL := help
 
@@ -50,6 +51,10 @@ readiness: python-check
 
 test: python-check
 	$(PYTHON) -m unittest discover -s tools/tests -p 'test_*.py'
+	@for suite in $(SKILL_TEST_SUITES); do \
+	  echo "-- $$suite"; \
+	  $(PYTHON) -m unittest discover -s "$$suite" -p 'test_*.py' || exit 1; \
+	done
 
 verify: python-check
 	$(MAKE) test
