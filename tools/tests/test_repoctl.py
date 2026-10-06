@@ -757,7 +757,7 @@ verification = [["python3", "-c", "print('ok')"]]
         self.assertIn("legal document", result.stderr)
         self.assertIn("security_reviewer", result.stderr)
     def test_readiness_output_does_not_claim_full_production_acceptance(self) -> None:
-        source = (Path(__file__).resolve().parents[1] / "repoctl.py").read_text(encoding="utf-8")
+        source = (Path(__file__).resolve().parents[1] / "kit" / "launch.py").read_text(encoding="utf-8")
         self.assertIn("not a full production-readiness", source)
         self.assertIn("docs/production.md", source)
 
