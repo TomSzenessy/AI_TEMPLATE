@@ -25,7 +25,11 @@ from .core import RepoctlError
 
 READ_ONLY_TOOLS = "Read Grep Glob Bash(make where:*) Bash(make map) Bash(git log:*) Bash(git status)"
 HOST_COMMANDS = {
-    "claude": lambda prompt: ["claude", "-p", prompt, "--output-format", "json", "--allowedTools", *READ_ONLY_TOOLS.split(" ")],
+    # Navigation needs no MCP servers; an empty strict config keeps runs fast and deterministic.
+    "claude": lambda prompt: [
+        "claude", "-p", prompt, "--output-format", "json", "--strict-mcp-config",
+        "--mcp-config", '{"mcpServers": {}}', "--allowedTools", *READ_ONLY_TOOLS.split(" "),
+    ],
     "codex": lambda prompt: ["codex", "exec", "--sandbox", "read-only", prompt],
     "gemini": lambda prompt: ["gemini", "-p", prompt],
 }
@@ -61,6 +65,8 @@ def run_task(root: Path, host: str, task: dict[str, str], timeout: int) -> dict[
             data = json.loads(output)
             answer = str(data.get("result", ""))
             record.update(turns=data.get("num_turns"), cost_usd=data.get("total_cost_usd"))
+            if data.get("is_error"):
+                return {**record, "passed": False, "error": answer[:300]}
         except json.JSONDecodeError:
             pass
     record["passed"] = bool(re.search(task["expect"], answer, re.IGNORECASE))
