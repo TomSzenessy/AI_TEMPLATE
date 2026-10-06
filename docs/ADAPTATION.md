@@ -41,7 +41,9 @@ its operating contract, history, or evidence.
 3. Run `make inventory` and classify each candidate as product, infrastructure,
    generated output, or unresolved.
 4. Ask the owner only for choices that change product direction, data/security
-   boundaries, deployment, cost, or an irreversible dependency.
+   boundaries, deployment, cost, or an irreversible dependency. The
+   `product-kickoff` skill bundles these into one round of questions with
+   recommendations and shows mockups before any code.
 5. Record the decision and acceptance evidence in the issue/WAL.
 6. Add only the smallest surface, toolchain, and verification needed for the
    first real artifact. A single-file product may declare `kind = "file"`,

@@ -16,7 +16,7 @@ from .core import RepoctlError, ensure_inside_root, is_link_like, is_placeholder
 
 
 BUNDLED_SKILLS = {"agent-handover", "quality-loop", "repository-audit"}
-RESOURCE_KINDS = {"library-docs", "platform-policy", "accessibility", "security", "media", "skills"}
+RESOURCE_KINDS = {"library-docs", "platform-policy", "accessibility", "security", "media", "skills", "design"}
 RESOURCE_TRUSTS = {"official", "first-party", "reviewed", "discovery"}
 
 

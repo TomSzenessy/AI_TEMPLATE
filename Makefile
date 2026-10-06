@@ -8,7 +8,7 @@ SKILL_TEST_SUITES := $(wildcard .agents/skills/*/tests)
 	start done new handover map where risk garden capabilities sync github-sync similar eval
 
 # Export user-supplied values so recipes pass them as data, not as shell source.
-export Q AGENT TASKS DESC GROUP COVERS ACCESS TIER FORCE NAME KIND TITLE SUMMARY BODY TYPE PRIORITY AREA TOPIC STATUS SURFACE GATE PUBLIC_REVIEWED REVIEW_EVIDENCE ISSUE_FILE PUBLIC_SAFE
+export Q AGENT MODEL TASKS DESC GROUP COVERS ACCESS TIER FORCE NAME KIND TITLE SUMMARY BODY TYPE PRIORITY AREA TOPIC STATUS SURFACE GATE PUBLIC_REVIEWED REVIEW_EVIDENCE ISSUE_FILE PUBLIC_SAFE
 
 help:
 	@printf '%s\n' \
@@ -37,7 +37,7 @@ help:
 	  'PROJECT SETUP AND MAINTENANCE' \
 	  '  make init NAME=my-project KIND=web   Turn the template into your project' \
 	  '  make check | verify | doctor | readiness | inventory | resources | labels | github-sync' \
-	  '  make eval AGENT=claude           Fresh-agent navigation benchmark' \
+	  '  make eval AGENT=claude [MODEL=haiku]   Fresh-agent navigation benchmark (cheap model by default)' \
 	  '  make validate BODY=path | skill-digest SKILL_PATH=.agents/skills/name'
 
 python-check:
@@ -152,4 +152,4 @@ similar: python-check
 	@$(REPOCTL) similar "$${Q}"
 
 eval: python-check
-	$(REPOCTL) eval --host "$${AGENT:-claude}" $(if $(TASKS),--tasks "$${TASKS}",)
+	$(REPOCTL) eval --host "$${AGENT:-claude}" $(if $(TASKS),--tasks "$${TASKS}",) $(if $(MODEL),--model "$${MODEL}",)

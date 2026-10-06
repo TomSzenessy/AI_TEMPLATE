@@ -72,6 +72,14 @@ another.
 The primary-source rationale for the MCP/resource and evidence boundary is in
 [`research/mcp-production-boundaries-2026-09-25.md`](./research/mcp-production-boundaries-2026-09-25.md).
 
+## Measure and learn
+
+After launch, check the success metric from `VISION.md` with the
+privacy-respecting measurement planned at kickoff, review error tracking and
+performance against budgets, and read real user feedback (run `review-mining`
+on your own product's reviews). Each confirmed problem or opportunity becomes an
+issue; the slice order changes on evidence, not on opinion.
+
 ## Optional MCP and resource use
 
 Context7-style documentation adapters, package registries, GitHub, official

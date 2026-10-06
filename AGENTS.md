@@ -3,24 +3,25 @@
 <!-- index: operate | Agent operating contract and trigger router | Any change is requested. -->
 
 The router for every coding agent. These rules always apply; detail lives in
-the linked owner documents. `make check` enforces the mechanical parts.
+the linked owner documents. **Golden path:** `make start`, then
+`make where Q="..."`, and `make done` before you call any work complete.
 
 ## Session protocol
 
-1. **Start.** A hooked host prints a session brief; otherwise run `make start`.
-   `make capabilities` shows which tools (browser, search, docs, `gh`) work here.
+1. **Start.** Hooked hosts print a session brief; otherwise `make start`.
+   `make capabilities` lists working tools (browser, search, docs, `gh`).
    Read root `HANDOVER.md` when present; the working tree wins over it.
 2. **Orient.** `project.toml` owns shape, surfaces, checks, and provenance;
    [`docs/README.md`](./docs/README.md) is the index; obey the nearest scoped
    `AGENTS.md`. Use `make where Q="..."` before broad searching.
-3. **Before editing:** `git status`, the current issue/PR, `make check`, and
-   `make risk` (ceremony for this change: low, normal, or high).
+3. **Before editing:** `git status`, the current issue/PR, and `make risk`
+   (ceremony for this change: low, normal, or high).
 4. **Finish:** update every doc covering what you changed, run `make done`,
    and observe the real artifact. When pausing, run `make handover` and update
    `HANDOVER.md` with the `agent-handover` skill.
 
-Code, configuration, tests, and runtime observations are evidence. A
-plausible explanation is not a diagnosis.
+Code, tests, and runtime observations are evidence; a plausible explanation
+is not a diagnosis.
 
 ## Orchestrate and delegate
 
@@ -67,7 +68,7 @@ issues). Never change it silently; record the reason in the issue.
 
 [`docs/README.md`](./docs/README.md) lists every document and when to read it. Never skip:
 
-- **New project or reshaping:** [`VISION.md`](./VISION.md), [`docs/ADAPTATION.md`](./docs/ADAPTATION.md); ask only high-impact product, data, deployment, and stack questions.
+- **New product:** `product-kickoff` (questions, mockups, decisions), then `stack-foundation`, before feature code. **Anything users see:** `ux-quality`.
 - **Vocabulary, architecture, seams:** [`CONTEXT.md`](./CONTEXT.md), [`docs/architecture/README.md`](./docs/architecture/README.md).
 - **Bug or incident:** [`docs/operations.md`](./docs/operations.md); reproduce first. **Release or quality claim:** [`docs/verification.md`](./docs/verification.md), [`docs/production.md`](./docs/production.md).
 - **Auth, secrets, dependencies, CI, untrusted input:** [`docs/security.md`](./docs/security.md).

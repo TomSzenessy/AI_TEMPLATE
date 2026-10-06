@@ -64,8 +64,9 @@ or other measurable oracle.
 
 ## Domain oracles
 
-- **Web/app:** functional browser path, responsive screenshots, accessibility,
-  performance budget, and no console/network errors on the critical path.
+- **Web/app:** functional browser path, responsive screenshots reviewed against
+  the `ux-quality` skill, accessibility, performance budget, and no
+  console/network errors on the critical path.
 - **Game:** deterministic gameplay scenario, input/frame/performance trace,
   save/load check, and rendered play session at target settings.
 - **3D/Blender:** deterministic scene/render command, geometry/material sanity,

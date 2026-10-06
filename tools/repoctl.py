@@ -136,6 +136,7 @@ def build_parser() -> argparse.ArgumentParser:
     eval_parser.add_argument("--host", default="claude")
     eval_parser.add_argument("--tasks", help="comma-separated task ids")
     eval_parser.add_argument("--timeout", type=int, default=300)
+    eval_parser.add_argument("--model", help="model for hosts that accept one (default: [kit].eval_model for claude)")
 
     return parser
 
@@ -264,7 +265,7 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 print('Verdict: nothing similar. Create it: make new KIND=skill|agent|doc NAME=... DESC="...; ..."')
         elif arguments.command == "eval":
-            return run_evals(arguments.root.resolve(), arguments.host, arguments.tasks, arguments.timeout)
+            return run_evals(arguments.root.resolve(), arguments.host, arguments.tasks, arguments.timeout, arguments.model)
     except (OSError, RepoctlError) as error:
         print(f"repoctl: {error}", file=sys.stderr)
         return 1

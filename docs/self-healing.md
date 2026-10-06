@@ -161,7 +161,8 @@ findings, one root cause per change (see [`delegation.md`](./delegation.md)).
 ## Measuring the kit: fresh-agent evals
 
 `.agents/evals/*.toml` holds navigation tasks with an expected-answer regex.
-`make eval AGENT=claude` (or `codex`, `gemini`) runs each task in a fresh,
+`make eval AGENT=claude` (or `codex`, `gemini`; `MODEL=` overrides, and Claude
+defaults to the cheap `[kit].eval_model`, Haiku) runs each task in a fresh,
 read-only headless session (without MCP servers, so runs stay fast and
 deterministic) and records pass rate, turns, time, and cost under
 `.agent/evals/`. Re-run it after changing `AGENTS.md`, the map, or the docs.

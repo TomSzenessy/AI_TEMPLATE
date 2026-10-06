@@ -14,7 +14,8 @@ You own exactly the deliverable in your brief and nothing else.
 1. Restate the acceptance check from the brief. If it is missing or
    ambiguous, stop and report instead of guessing.
 2. For a bug, reproduce it first as a failing test or deterministic script.
-3. Make the smallest change at the right seam. Reuse before adding; delete
+3. Make the smallest change at the right seam; for UI, follow the
+   `ux-quality` skill (all states, tokens, accessibility). Reuse before adding; delete
    what your change makes dead (prove no callers remain).
 4. Update every document whose `<!-- covers: -->` binding includes a path you
    touched (`make where Q="<path>"` shows owners). Mark replaced APIs with

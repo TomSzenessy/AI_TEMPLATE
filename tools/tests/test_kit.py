@@ -15,7 +15,7 @@ TOOLS = Path(__file__).resolve().parents[1]
 REPOCTL = TOOLS / "repoctl.py"
 sys.path.insert(0, str(TOOLS))
 
-from kit import adapters, derive, docsync, garden, hygiene, navigate, risk  # noqa: E402
+from kit import adapters, derive, docsync, evals, garden, hygiene, navigate, risk  # noqa: E402
 from kit.gitinfo import path_matches  # noqa: E402
 
 # Built by concatenation so this test file never trips the marker scanner itself.
@@ -487,6 +487,14 @@ class ScaffoldTests(KitRepository):
         index = (self.root / "docs/README.md").read_text()
         self.assertIn("### Miscellany", index)
         self.assertIn("| [`pricing.md`](./pricing.md) | Pricing rules | when prices change |", index)
+
+
+class EvalCommandTests(unittest.TestCase):
+    def test_model_flag_is_passed_only_when_set(self) -> None:
+        with_model = evals.HOST_COMMANDS["claude"]("task", "haiku")
+        self.assertEqual(with_model[with_model.index("--model") + 1], "haiku")
+        self.assertNotIn("--model", evals.HOST_COMMANDS["claude"]("task", ""))
+        self.assertIn("--sandbox", evals.HOST_COMMANDS["codex"]("task", ""))
 
 
 class NavigationTests(KitRepository):

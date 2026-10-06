@@ -34,9 +34,15 @@ make check                            # everything green before the first change
 ```
 <!-- /repoctl:quickstart -->
 
-Then complete `VISION.md` and `docs/STACK-DECISION.md`, declare your first real
-surface in `project.toml`, and let `make doctor` show the remaining gates.
-`make init` never invents folders or picks a framework for you.
+Then tell your agent what to build. It runs the `product-kickoff` skill first:
+one round of questions with recommendations (users, platforms, stack such as
+Next.js + Tailwind, Expo, Flutter, or SwiftUI, visual style), two or three
+mockup directions to choose from, and the decisions recorded in `VISION.md`,
+`docs/STACK-DECISION.md`, and `docs/design.md`, plus an epic of vertical-slice
+issues. The `stack-foundation` skill then builds a deployed walking skeleton with
+strict types, lint, tests, CI, previews, and error tracking; UI work follows the
+`ux-quality` skill and gets screenshot reviews. `make init` itself never invents
+folders or picks a framework for you.
 
 <!-- repoctl:project-readme -->
 > Project initialized: **AI_TEMPLATE** (`template`). Keep this identity,

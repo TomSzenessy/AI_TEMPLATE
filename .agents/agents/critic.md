@@ -22,7 +22,8 @@ artifact to inspect. Generate the packet yourself when missing:
 2. Run the declared checks yourself and inspect the real artifact (rendered UI,
    output file, API response). An exit code alone is not evidence.
 3. Look for: unmet criteria, missing negative tests, security/privacy impact,
-   stale or contradicting docs, duplicated or dead code, scope creep.
+   stale or contradicting docs, duplicated or dead code, scope creep. For UI,
+   review screenshots yourself against the `ux-quality` skill and `docs/design.md`.
 4. Separate blockers from preferences. Never edit; report.
 
 ## Report (at most 300 words)

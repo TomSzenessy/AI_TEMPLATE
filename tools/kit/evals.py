@@ -22,17 +22,19 @@ try:
 except ModuleNotFoundError as error:  # pragma: no cover - exercised on Python 3.10
     raise SystemExit("repoctl requires Python 3.11 or newer") from error
 
+from .config import setting
 from .core import RepoctlError
 
 READ_ONLY_TOOLS = "Read Grep Glob Bash(make where:*) Bash(make map) Bash(git log:*) Bash(git status)"
 HOST_COMMANDS = {
     # Navigation needs no MCP servers; an empty strict config keeps runs fast and deterministic.
-    "claude": lambda prompt: [
+    "claude": lambda prompt, model: [
         "claude", "-p", prompt, "--output-format", "json", "--strict-mcp-config",
-        "--mcp-config", '{"mcpServers": {}}', "--allowedTools", *READ_ONLY_TOOLS.split(" "),
+        "--mcp-config", '{"mcpServers": {}}', *(["--model", model] if model else []),
+        "--allowedTools", *READ_ONLY_TOOLS.split(" "),
     ],
-    "codex": lambda prompt: ["codex", "exec", "--sandbox", "read-only", prompt],
-    "gemini": lambda prompt: ["gemini", "-p", prompt],
+    "codex": lambda prompt, model: ["codex", "exec", "--sandbox", "read-only", *(["--model", model] if model else []), prompt],
+    "gemini": lambda prompt, model: ["gemini", *(["--model", model] if model else []), "-p", prompt],
 }
 # A fresh agent must not inherit the launching session: host session variables
 # would route a nested CLI through the parent's (short-lived) session auth.
@@ -54,8 +56,8 @@ def load_tasks(root: Path, only: str | None = None) -> list[dict[str, str]]:
     return tasks
 
 
-def run_task(root: Path, host: str, task: dict[str, str], timeout: int) -> dict[str, object]:
-    command = HOST_COMMANDS[host](PREFIX + task["prompt"])
+def run_task(root: Path, host: str, task: dict[str, str], timeout: int, model: str = "") -> dict[str, object]:
+    command = HOST_COMMANDS[host](PREFIX + task["prompt"], model)
     started = time.monotonic()
     try:
         environment = {key: value for key, value in os.environ.items() if not key.startswith(INHERITED_SESSION)}
@@ -81,27 +83,29 @@ def run_task(root: Path, host: str, task: dict[str, str], timeout: int) -> dict[
     return record
 
 
-def run_evals(root: Path, host: str, only: str | None = None, timeout: int = 300) -> int:
+def run_evals(root: Path, host: str, only: str | None = None, timeout: int = 300, model: str | None = None) -> int:
     if host not in HOST_COMMANDS:
         raise RepoctlError(f"unsupported eval host {host}; choose {', '.join(HOST_COMMANDS)}")
-    if shutil.which(HOST_COMMANDS[host]("x")[0]) is None:
+    if model is None:
+        model = str(setting(root, "eval_model")) if host == "claude" else ""
+    if shutil.which(HOST_COMMANDS[host]("x", "")[0]) is None:
         raise RepoctlError(f"{host} CLI is not installed")
     tasks = load_tasks(root, only)
     if not tasks:
         raise RepoctlError("no eval tasks selected")
     records = []
     for task in tasks:
-        record = run_task(root, host, task, timeout)
+        record = run_task(root, host, task, timeout, model)
         records.append(record)
         mark = "PASS" if record["passed"] else "FAIL"
         extras = " ".join(f"{key}={record[key]}" for key in ("seconds", "turns", "cost_usd") if record.get(key) is not None)
         print(f"{mark} {task['id']} {extras}\n     {record.get('answer') or record.get('error', '')}")
     passed = sum(1 for record in records if record["passed"])
     cost = sum(float(record.get("cost_usd") or 0) for record in records)
-    print(f"\n{passed}/{len(records)} passed" + (f", total cost ${cost:.4f}" if cost else ""))
+    print(f"\n{passed}/{len(records)} passed" + (f" with {model}" if model else "") + (f", total cost ${cost:.4f}" if cost else ""))
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     target = root / ".agent" / "evals" / f"{stamp}-{host}.json"
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(json.dumps({"host": host, "records": records}, indent=2) + "\n", encoding="utf-8")
+    target.write_text(json.dumps({"host": host, "model": model, "records": records}, indent=2) + "\n", encoding="utf-8")
     print(f"recorded {target.relative_to(root).as_posix()}")
     return 0 if passed == len(records) else 1

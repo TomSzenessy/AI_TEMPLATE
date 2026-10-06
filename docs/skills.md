@@ -63,7 +63,7 @@ does not duplicate or eagerly install its catalog.
 
 ## Bundled project-local workflows
 
-The template intentionally ships three small, composable first-party skills
+The template intentionally ships a few small, composable first-party skills
 rather than a large prompt collection:
 
 - [`../.agents/skills/agent-handover/SKILL.md`](../.agents/skills/agent-handover/SKILL.md)
@@ -71,7 +71,16 @@ rather than a large prompt collection:
 - [`../.agents/skills/quality-loop/SKILL.md`](../.agents/skills/quality-loop/SKILL.md)
   runs bounded builder/critic loops with real evidence;
 - [`../.agents/skills/repository-audit/SKILL.md`](../.agents/skills/repository-audit/SKILL.md)
-  turns broad reviews into evidence-backed issues.
+  turns broad reviews into evidence-backed issues;
+- [`../.agents/skills/product-kickoff/SKILL.md`](../.agents/skills/product-kickoff/SKILL.md)
+  turns "build me an app" into confirmed platform, stack, and visual-direction
+  decisions with mockups before code;
+- [`../.agents/skills/ux-quality/SKILL.md`](../.agents/skills/ux-quality/SKILL.md)
+  sets the UI/UX bar (platform conventions, states, accessibility, ethical
+  onboarding) and the screenshot review loop;
+- [`../.agents/skills/stack-foundation/SKILL.md`](../.agents/skills/stack-foundation/SKILL.md)
+  sets up a walking skeleton with strict types, lint, tests, CI, preview
+  deploys, configuration, and error tracking before feature work.
 
 They are first-party bundled skills: they are source-controlled with the
 repository and do not belong in the third-party `[[skills]]` provenance ledger.

@@ -61,11 +61,12 @@ hosts = ["claude"]
 # overlap_limit = 0.30
 # deprecation_warning_days = 30
 # skill_review_days = 365
+# eval_model = "haiku"   # model for `make eval` on Claude (cheap by default)
 
 [capabilities]
 # First-party skills written in this repository (`make new KIND=skill` adds
 # them here). Third-party skills instead need [[skills]] provenance below.
-local_skills = []
+local_skills = ["product-kickoff", "stack-foundation", "ux-quality"]
 
 [budgets]
 # Byte limits (~4 bytes/token) for files agents load often; make check enforces.

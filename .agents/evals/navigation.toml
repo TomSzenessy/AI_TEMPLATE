@@ -38,3 +38,13 @@ expect = "make new"
 id = "generated-files"
 prompt = "A file under .claude/ looks wrong. Where do you make the fix so it sticks? Reply with the directory or file path only."
 expect = "\\.agents|resources\\.toml"
+
+[[tasks]]
+id = "new-product-start"
+prompt = "The owner says: 'Build me a habit-tracking app.' Before writing any code, which skill do you run? Reply with the skill name only."
+expect = "product-kickoff"
+
+[[tasks]]
+id = "foundation-after-kickoff"
+prompt = "Kickoff is done and the owner confirmed the stack. Which skill sets up types, lint, tests, CI, and a deployed walking skeleton before feature work? Reply with the skill name only."
+expect = "stack-foundation"
