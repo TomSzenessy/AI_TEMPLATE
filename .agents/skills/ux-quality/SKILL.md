@@ -16,8 +16,9 @@ silently: record deliberate deviations there.
   macOS, Material 3 on Android, established web patterns on the web. Deviate
   deliberately and record why.
 - **Tokens are the single source:** colours, type, spacing, radius, and motion
-  come from design tokens, never ad-hoc values. Check contrast with
-  `python3 .agents/skills/design-tokens/contrast.py <tokens.json>`.
+  come from one tokens file (the `design-tokens` skill defines its format),
+  never ad-hoc values. Check contrast with
+  `python3 .agents/skills/design-tokens/contrast.py <tokens file>`.
 - **Hierarchy:** one primary action per screen, a consistent spacing scale,
   readable body text (16 px on the web, Dynamic Type on Apple platforms).
 
@@ -52,8 +53,11 @@ what to do next; no blame, no jargon.
 
 ## Review loop (vision-capable reviewer)
 
-1. Screenshot the real build at 375x812, 768x1024, and 1440x900, in light and
-   dark mode (browser tool or Playwright MCP; simulator or emulator for native).
+1. Run the real build and screenshot it at 375x812, 768x1024, and 1440x900,
+   in light and dark mode when both exist (browser tool or Playwright MCP;
+   simulator or emulator for native). If `make capabilities` shows no browser,
+   say so and ask the owner for screenshots; never claim a visual review you
+   did not do.
 2. The reviewer compares the screenshots with this list, `docs/design.md`, and
    the approved mockup, and reports each issue with the screenshot and region.
 3. Fix, re-screenshot, and use `parity-check`'s image diff to catch unintended
@@ -63,5 +67,6 @@ what to do next; no blame, no jargon.
 
 ## Done when
 
-Every state exists, contrast and accessibility checks pass, screenshots were
-reviewed with no blocker, and deviations are recorded in `docs/design.md`.
+You ran the real build and looked at it, every state exists, contrast and
+accessibility checks pass, screenshots were reviewed with no blocker, and
+deviations are recorded in `docs/design.md`.

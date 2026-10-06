@@ -8,6 +8,9 @@ description: "Sets up a new surface so it is clean, observable, and shippable fr
 Outcome: a walking skeleton (the thinnest end-to-end path, deployed to a
 preview) whose quality gates run in `make done` and CI before any feature work.
 Cleanliness is cheapest on day one; retrofitting it costs ten times more.
+Scale the setup to the kickoff tier: a `prototype` needs steps 1 to 4; a
+`product` needs all steps; a `platform` also applies "Built to scale" in
+`docs/engineering.md` from the start.
 
 ## Steps
 
@@ -30,7 +33,8 @@ Cleanliness is cheapest on day one; retrofitting it costs ten times more.
 6. **Observability:** structured logs with request IDs, error tracking (for
    example Sentry or the platform's crash reporting), and a health endpoint for
    services. Record any personal data they touch in `docs/legal/data-inventory.md`.
-7. **Delivery:** CI runs `make verify`; every pull request gets a preview
+7. **Delivery:** CI runs `make verify` (the test half of `make done`; agents
+   run `make done` locally); every pull request gets a preview
    deployment or build when the platform supports it; document rollback in
    `docs/production.md`.
 8. **Web reach, if web:** semantic HTML, metadata and social cards, sitemap,
@@ -44,5 +48,6 @@ above and passes, and a fresh agent can find the surface with `make where`.
 
 ## Never
 
-Hand-roll what the official generator provides, add a dependency without a
-reason in the issue, or commit secrets, generated build output, or caches.
+Hand-roll what the official generator provides, add a dependency beyond the
+generator's defaults without a reason in the issue, or commit secrets,
+generated build output, or caches.

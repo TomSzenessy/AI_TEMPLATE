@@ -48,3 +48,8 @@ expect = "product-kickoff"
 id = "foundation-after-kickoff"
 prompt = "Kickoff is done and the owner confirmed the stack. Which skill sets up types, lint, tests, CI, and a deployed walking skeleton before feature work? Reply with the skill name only."
 expect = "stack-foundation"
+
+[[tasks]]
+id = "kickoff-without-owner"
+prompt = "You are running product-kickoff headless and cannot ask the owner anything. What do you do? Reply in one sentence."
+expect = "(write|print|list|post).{0,40}question|stop"
