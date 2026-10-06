@@ -105,7 +105,12 @@ jobs:
                       invalid = True
                   label_values[family] = value
               allowed = registry.get(family)
-              if family in required_families and (not isinstance(allowed, list) or value not in allowed):
+              if family == "topic":
+                  # topic is open kebab-case vocabulary (docs/ISSUE_TEMPLATE.md),
+                  # exactly as the body-fields path below validates it.
+                  if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", value):
+                      invalid = True
+              elif family in required_families and (not isinstance(allowed, list) or value not in allowed):
                   invalid = True
           field_values = {}
           for field in ("Type", "Priority", "Area", "Topic", "Status"):
