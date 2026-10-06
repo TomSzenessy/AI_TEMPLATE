@@ -56,6 +56,38 @@ The useful question is not “Which popular library should I install?” It is
 “Which reviewed capability or primary source closes this named gap, under what
 license, with what rollback and quality evidence?”
 
+## Resource intake: triage what you are handed
+
+When a person hands you resources to adopt — a GitHub repository, a skill, an
+MCP server, a website, a docs URL — decide each item's outcome before anything
+lands. Search the existing routes, skills, and owning documents first; one
+owner per fact.
+
+1. **Link it** when future tasks should find it but the repo need not own it:
+   add a `[[resources]]` entry to `resources.toml` (id, kind, source, trust,
+   access, scope, summary; `mcp` is a route hint only) and a row in the
+   resource map below. A GitHub repo, site, or docs URL is a route, never a
+   dependency.
+2. **Vendor it** when it is a reusable capability with a trigger, interface,
+   and quality oracle: follow the admission loop in [`skills.md`](./skills.md)
+   — inspect, approve, pinned install, verify, `[[skills]]` provenance — and
+   satisfy the acceptance gate below. A pasted skill installs nothing by
+   itself.
+3. **Update the owner** when the material extends something already here: edit
+   the skill, route, or document that owns the fact instead of adding a
+   sibling.
+4. **Exclude it** when no trigger matches, a reviewed route already covers it,
+   or its source is unmaintained or untrusted: drop it with one line of reason
+   in the issue or conversation. Exclusions leave no files behind.
+
+Decide in this order: does a real task's trigger match it? Is it the primary
+source or the closest one? Is it already covered? Can it be pinned, reviewed,
+and rolled back? Keep the registry lean: one route per topic, and popularity is
+not trust. When torn between link and vendor, link — a route costs one entry
+and no provenance surface. The intake is done when `make resources` and
+`make check` pass and the issue records what was linked, vendored, updated, or
+excluded and why.
+
 ## First-party resource map
 
 Choose the row that matches the active surface. These links are starting points;

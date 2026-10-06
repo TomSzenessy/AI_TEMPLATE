@@ -85,8 +85,10 @@ completion. Keep active security vulnerabilities private under `SECURITY.md`.
 - **Personal data, analytics, cookies, retention, user rights, public launch, or
   legal text:** read [`docs/privacy.md`](./docs/privacy.md) and
   [`docs/legal/README.md`](./docs/legal/README.md).
-- **Missing specialist capability, code style, example, or platform/legal gate:**
-  run `make resources`, then read [`docs/resources.md`](./docs/resources.md) and
+- **Missing specialist capability, code style, example, or platform/legal gate,
+  or resources handed over to adopt (links, skills, MCPs, docs):**
+  run `make resources`, then read [`docs/resources.md`](./docs/resources.md)
+  (its intake section triages what to link, vendor, update, or exclude) and
   [`docs/skills.md`](./docs/skills.md). Discover, inspect, pin, and record
   before using a third-party skill; prefer reviewed capabilities already
   available locally.
