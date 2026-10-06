@@ -52,6 +52,18 @@ _Avoid_: TODO, best effort, or “ready”.
 provenance, and safe invocation contract.
 _Avoid_: prompt dump, untrusted script, or popular add-on.
 
+**Binding**: a document's `<!-- covers: -->` declaration of the paths whose
+behavior it explains; it makes the document checkable against the code.
+_Avoid_: "related docs" or a manual cross-reference list.
+
+**Adapter**: a generated, content-free host file (for example under `.claude/`)
+that redirects a specific agent host to the canonical `.agents/` source.
+_Avoid_: copying skill or role text into a host directory.
+
+**Role**: a host-neutral subagent definition with an access boundary, a model
+tier, and a fixed report format, used by the orchestrator for bounded work.
+_Avoid_: persona or ad-hoc prompt.
+
 ## Resolution rule
 
 When a term is ambiguous, choose one canonical word here and link the old term

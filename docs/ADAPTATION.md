@@ -1,5 +1,7 @@
 # Project adaptation
 
+<!-- covers: tools/kit/bootstrap.py -->
+
 The template is a small kernel plus capability packs, not a universal
 application scaffold. The kernel stays responsible for navigation, the project
 manifest, issue-backed intent, path safety, declared verification, and bounded

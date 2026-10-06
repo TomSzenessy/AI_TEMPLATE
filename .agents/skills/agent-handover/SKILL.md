@@ -10,7 +10,9 @@ For a short self-contained change, use the normal issue and verification loop.
 
 ## Start or resume
 
-1. Check directly for root `HANDOVER.md`; read it completely if present.
+1. Check directly for root `HANDOVER.md`; read it completely if present. A
+   hooked host already printed it in the session brief (`make start` otherwise),
+   and `.agent/checkpoint.md` holds the last pre-compaction snapshot.
 2. Compare it with the current branch, working tree, manifest, and linked issue.
    Treat the working tree and current repository state as authoritative when
    they disagree.

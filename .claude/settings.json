@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/tools/repoctl.py\" hook session-start"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/tools/repoctl.py\" hook pre-compact"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/tools/repoctl.py\" hook after-edit"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/tools/repoctl.py\" hook stop"
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(make start)",
+      "Bash(make finish)",
+      "Bash(make check)",
+      "Bash(make test)",
+      "Bash(make verify)",
+      "Bash(make map)",
+      "Bash(make where:*)",
+      "Bash(make garden)",
+      "Bash(make risk)",
+      "Bash(make capabilities)",
+      "Bash(make adapters)",
+      "Bash(make inventory)",
+      "Bash(make resources)",
+      "Bash(make skill-overlap:*)"
+    ]
+  },
+  "enabledMcpjsonServers": [
+    "context7",
+    "exa",
+    "playwright"
+  ]
+}

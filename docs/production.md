@@ -1,5 +1,7 @@
 # Production readiness
 
+<!-- covers: tools/kit/launch.py -->
+
 The template is a production **governance kernel**, not a production product.
 A copied project becomes production-ready only when its own facts and evidence
 fill the gates below. No document, scanner, MCP response, or green test proves

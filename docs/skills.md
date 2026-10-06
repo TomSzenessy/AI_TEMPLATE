@@ -1,5 +1,7 @@
 # Skill discovery and provenance
 
+<!-- covers: .agents/skills/** tools/kit/skills.py -->
+
 Skills are reviewed instruction packages, not magic prompt dumps. Use the
 smallest capability that closes the current gap and keep the repository lean.
 For official documentation, examples, licenses, and platform/legal-risk
@@ -77,6 +79,25 @@ immutable revision, a matching whole-tree `content_digest`, a real review date,
 least-privilege permissions, and a rollback action. Add a new skill only when
 repeated work has a distinct trigger, interface, and quality oracle; otherwise
 keep the procedure in the owning document.
+
+## One canonical copy, any host
+
+Skills live only in `.agents/skills/<name>/SKILL.md`. Codex, Copilot, and
+Cursor read that directory directly. Hosts that look elsewhere get generated
+redirect stubs (`make adapters`; for Claude Code, `.claude/skills/<name>/SKILL.md`
+carries the name, description, and a pointer back). The stubs hold no
+instructions, `make check` fails if they drift, and the after-edit hook
+regenerates them when a canonical skill changes. Subagent roles follow the same
+pattern from `.agents/agents/` (see [`delegation.md`](./delegation.md)).
+
+## Avoiding redundant capabilities
+
+Before adding a skill, role, or MCP route, run
+`make skill-overlap TEXT="<what it should do>"`. An overlap of 0.30 or more
+means you should extend or reuse the existing capability. The `skill-scout`
+role runs this check, searches catalogs, vets candidates under the discovery
+loop above, and returns a ready-to-review `[[skills]]` or `[[mcp]]` entry. It
+never installs anything itself.
 
 ## Reviewed capability pack: reference-product work
 

@@ -1,5 +1,7 @@
 # Architecture and decisions
 
+<!-- covers: tools/repoctl.py tools/kit/__init__.py tools/kit/core.py tools/kit/structure.py Makefile -->
+
 This directory owns the current structural truth. Keep it short and factual;
 put rationale for a hard-to-reverse trade-off in an ADR, not in every paragraph.
 
@@ -14,6 +16,25 @@ Maintain one table when the project has more than one surface:
 `project.toml` is the machine-readable source for paths and commands. This table
 is the human navigation view, not a second command catalog.
 
+## Repository kit
+
+`tools/repoctl.py` is only the command router; the `Makefile` exposes it as
+`make` targets. Behavior lives in standard-library modules under `tools/kit/`
+whose imports point toward `core`:
+
+| Concern | Modules | Owner doc |
+|---|---|---|
+| Manifest, paths, worktree, text primitives | `core`, `gitinfo` | this page |
+| Surfaces, vision, inventory, declared verification | `structure`, `bootstrap` | [`../ADAPTATION.md`](../ADAPTATION.md) |
+| Issues, review packets, incidents, GitHub CLI | `issues`, `github` | [`../ISSUE_TEMPLATE.md`](../ISSUE_TEMPLATE.md) |
+| Skills provenance, resource registry | `skills` | [`../skills.md`](../skills.md) |
+| Links, index, file hygiene | `docs` | [`../security.md`](../security.md) |
+| Launch evidence | `launch` | [`../production.md`](../production.md) |
+| Self-healing: bindings, markers, adapters, hooks, garden, map, risk, evals | `docsync`, `hygiene`, `adapters`, `session`, `garden`, `navigate`, `risk`, `capabilities`, `evals` | [`../self-healing.md`](../self-healing.md) |
+
+For a copied project, replace the template row above with the real surfaces
+and keep this section only while the kit is part of the repository.
+
 ## Design rules
 
 - A surface is independently owned, deployable or consumable, and verifiable.
@@ -24,6 +45,12 @@ is the human navigation view, not a second command catalog.
   hard to reverse, surprising without context, and based on a real trade-off.
 - Put live work and status in GitHub Issues. Do not add a roadmap matrix here.
 - Update the manifest, this map, and affected verification in the same change.
+- At scale, enforce boundaries mechanically: declare an import or dependency
+  rule checker (import-linter, dependency-cruiser, or a language equivalent)
+  as a surface verification command so layering cannot erode silently.
+- Give every non-trivial module a short card (purpose, public interface,
+  invariants, owner, performance budget) bound with `<!-- covers: -->`, so
+  agents load the card instead of the implementation.
 
 ## Architecture review prompts
 

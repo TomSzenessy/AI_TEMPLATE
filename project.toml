@@ -32,6 +32,29 @@ label_registry = ".github/issue-labels.json"
 # Read-only resource/MCP starting points; never an automatic install manifest.
 registry = "resources.toml"
 
+[adapters]
+# Hosts that get generated adapter files (docs/self-healing.md#host-adapters).
+# Codex, Copilot, and Cursor read AGENTS.md and .agents/ without adapters.
+hosts = ["claude"]
+
+[budgets]
+# Byte limits (~4 bytes/token) for files agents load often; make check enforces.
+"AGENTS.md" = 7000
+"docs/README.md" = 9500
+"docs/START-HERE.md" = 4000
+".agents/agents/*.md" = 3000
+".agents/skills/*/SKILL.md" = 8000
+
+[risk]
+# Ceremony tiers for `make risk` (first match wins, high before low; the rest
+# is normal). Tune per project; never widen low to dodge a gate.
+high = [
+  "tools/**", ".github/**", ".security/**", "project.toml", "resources.toml",
+  "AGENTS.md", "CLAUDE.md", "GEMINI.md", ".agents/**", ".claude/**", ".mcp.json",
+  "**/auth/**", "**/migrations/**", "**/*.sql", "**/secrets/**", "**/infra/**",
+]
+low = ["docs/**", "**/*.md"]
+
 [security]
 contact = ""
 private_reporting = ""
@@ -58,6 +81,7 @@ legal_document_paths = []
 # quality_oracle = "Playwright smoke test plus a fresh visual review"
 # critic_evidence = ["artifacts/reviews/app-123.md"]
 # verification = [["npm", "ci"], ["npm", "test"]]
+# garden = [["npx", "knip"]]   # optional rot finders run by `make garden`
 #
 # Reviewed third-party skills are recorded as provenance, not installed globally.
 # Retain a verified capability while it remains trusted and useful; update the

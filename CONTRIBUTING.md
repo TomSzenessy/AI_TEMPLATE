@@ -30,7 +30,10 @@
 
 ## Commits and issues
 
-Small, reviewable commits with a clear intent are preferred. GitHub Issues are
+Small, reviewable commits with a clear intent are preferred. Run `make finish`
+before committing. When a commit changes code that a document covers but
+genuinely does not affect it, add the trailer
+`Docs-Unaffected: docs/<file>.md <reason>` so the stale-document check accepts it. GitHub Issues are
 the live task/status register; do not recreate that register in Markdown.
 
 Dependabot's automated PRs are reviewed as dependency changes and skip the

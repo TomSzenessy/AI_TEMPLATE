@@ -75,9 +75,15 @@ or other measurable oracle.
 - **Legal/privacy:** factual source inventory, link/format validation, counsel
   gate where applicable, and a rendered human review.
 
+## Ceremony by risk
+
+`make risk` classifies the change set (see [`self-healing.md`](./self-healing.md#ceremony-by-risk)).
+`low` needs `make check`; `normal` needs the full loop above; `high` adds the
+fresh `critic` role ([`delegation.md`](./delegation.md)) before completion.
+
 ## Before completion
 
-Run `make verify`, inspect the real artifact, generate a fresh review packet with
+Run `make finish`, `make verify`, inspect the real artifact, generate a fresh review packet with
 `make review-packet ISSUE_FILE=...`, and resolve every blocker. Report skipped
 checks and external gates explicitly. “No issues found” means the declared scope
 was checked to the stated coverage—not that the entire universe is bug-free.

@@ -80,7 +80,10 @@ brief → issue-backed intent → inspect/reproduce → design seam
 
 `AGENTS.md` is the canonical agent contract. `CLAUDE.md`, `GEMINI.md`, and
 `.github/copilot-instructions.md` are deliberately tiny host adapters that point
-to it; they do not become competing instruction sources.
+to it; they do not become competing instruction sources. The same rule holds
+for skills, subagent roles, and MCP servers: their only copy lives in `.agents/`
+and `resources.toml`, and `make adapters` generates redirect-only host files
+such as `.claude/` and `.mcp.json`.
 
 ## Repository map
 
@@ -103,8 +106,12 @@ to it; they do not become competing instruction sources.
 | `docs/skills.md` | Safe skill discovery, inspection, pinning, and provenance. |
 | `HANDOVER.template.md` | Concise local session-continuation record; copied to ignored `HANDOVER.md` when needed. |
 | `docs/handoffs/` | Deliberate committed cross-session continuation records. |
+| `.agents/agents/` / `docs/delegation.md` | Subagent roles (scout, implementer, critic, researcher, doc-gardener, skill-scout) and their brief/report contract. |
+| `.agents/evals/` | Fresh-agent navigation benchmark run by `make eval`. |
+| `.claude/`, `.mcp.json` | Generated host adapters and hook wiring; never edited by hand. |
+| `docs/self-healing.md` | Hooks, doc-code bindings, deprecation expiry, budgets, risk tiers, gardener. |
 | `.agents/skills/` | Small project-local handover, quality-loop, and audit workflows, plus the reviewed reference-product capability pack (see `docs/skills.md` and `THIRD_PARTY_NOTICES.md`). |
-| `tools/repoctl.py` | Zero-dependency structure checks, issue guard, incident creation, and review packets. |
+| `tools/repoctl.py` / `tools/kit/` | Zero-dependency CLI router and its focused modules: structure checks, issue guard, incidents, review packets, and the self-healing kit. |
 | `.github/ISSUE_TEMPLATE/` | GitHub-native bug and improvement forms. |
 | `.github/workflows/` | Least-privilege CI that runs the same verification path. |
 
@@ -124,7 +131,18 @@ publish legal text. Those are decisions with evidence and owner boundaries.
 ## What “self-healing” means here
 
 The template cannot repair every unknown production problem autonomously. It
-makes the repair loop observable and repeatable:
+makes upkeep executable instead of relying on an agent's memory, and the repair
+loop observable and repeatable:
+
+- Session hooks (or `make start` / `make finish`) inject a brief at start,
+  checkpoint before compaction, name the owning doc after each edit, and block
+  "done" once while covered docs, adapters, or markers are out of date.
+- Docs bind to code with `<!-- covers: -->`; stale and dead bindings,
+  expired `DEPRECATED(remove-by=...)` markers, orphan task markers, broken
+  command references, and over-budget router files fail `make check`.
+- `make where`, `make map`, and `make risk` keep navigation and ceremony cheap;
+  `make garden` (also weekly in CI) aggregates every rot finding; `make eval`
+  measures whether a fresh agent can still find its way.
 
 - `make check` detects manifest drift, missing docs/index entries, broken local
   links, and obvious tracked-secret hygiene failures.

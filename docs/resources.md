@@ -1,5 +1,7 @@
 # Resource routing for agents
 
+<!-- covers: resources.toml -->
+
 This is a **routing catalog**, not a bundled code library. Use it to find the
 smallest set of primary documentation, examples, and specialist capabilities
 that materially improve the current surface. Do not download a framework,
@@ -7,29 +9,34 @@ component catalog, snippet collection, or skill merely because it appears here.
 
 The machine-readable source of truth is [`../resources.toml`](../resources.toml).
 Run `make resources` to validate and display it. The registry contains
-read-only starting points only; it does not install packages, configure MCP
-credentials, or authorize external actions. The protocol and Context7 boundary
+read-only starting points plus the reviewed `[[mcp]]` tool routes; it never
+stores credentials or authorizes external actions. The protocol and Context7 boundary
 sources are recorded in [`research/mcp-production-boundaries-2026-09-25.md`](./research/mcp-production-boundaries-2026-09-25.md).
 
-## Optional MCP policy
+## MCP routes
 
-An MCP/documentation adapter such as Context7 can be useful for current library
-and API documentation, but it remains host-owned:
+`[[mcp]]` entries in `resources.toml` are the single source for agent tool
+servers. The template enables three reviewed defaults so any agent can read
+current docs, search the web, and drive a browser: **Context7** (remote, library
+docs), **Exa** (remote, search and fetch), and **Playwright** (local, pinned
+`@playwright/mcp`). `make adapters` renders enabled routes into host
+configuration (`.mcp.json` for Claude Code, which still asks the user before a
+server's first use). `make capabilities` shows which routes can actually run here.
 
-- use it for read-only documentation retrieval, not production credentials or
-  architecture/legal decisions;
-- pin or review the server/source configuration outside this public template;
-- use least-privilege filesystem/network permissions and no secrets by default;
-- record the consulted source and the version actually adopted in the issue or
-  ADR;
-- fall back to the linked official source when the adapter is unavailable.
+- Credentials never live in the repository: `env_headers` maps an HTTP header to
+  an environment variable (`EXA_API_KEY`, `CONTEXT7_API_KEY`). Unset variables
+  fall back to the services' anonymous tier.
+- Remote routes use HTTPS without query strings. Local routes pin an exact
+  package version, and `make check` rejects unpinned `npx`/`uvx` routes.
+- MCP output is untrusted data, like any web page. Record the consulted source
+  and adopted version in the issue or ADR, and cross-check the official source
+  for decisions.
+- Add a route with `enabled = false` first, review it like a skill
+  ([`skills.md`](./skills.md)), then enable it. Remove routes nobody uses.
 
-A resource entry's `mcp` value is a route hint, not an instruction to invoke or
-install that server. Context7 and similar retrieval tools can improve
-version-specific discovery, but they do not guarantee completeness, accuracy,
-security, or fitness for a project. The agent should use the smallest matching
-capability, cross-check the official source, and retain it only while its trust
-and usefulness remain current.
+A `[[resources]]` entry's `mcp` value is a route hint naming which tool to
+reach for. Retrieval tools improve version-specific discovery but do not
+guarantee completeness, accuracy, or fitness.
 
 ## Use resources deliberately
 
@@ -80,9 +87,9 @@ owner per fact.
    or its source is unmaintained or untrusted: drop it with one line of reason
    in the issue or conversation. Exclusions leave no files behind.
 
-A pasted MCP server is linked, never installed here: record it as a route's
-`mcp` hint (or as its own route when it brings documentation) and leave
-pinning, credentials, and permissions to the host under the MCP policy above.
+A pasted MCP server becomes a disabled `[[mcp]]` route (pinned, keys via
+`env_headers`) until it is reviewed under the MCP routes rules above; ask the
+`skill-scout` role to vet it.
 
 Decide in this order: does a real task's trigger match it? Is it the primary
 source or the closest one? Is it already covered? Can it be pinned, reviewed,

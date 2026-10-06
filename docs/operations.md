@@ -8,7 +8,8 @@ to patch the first suspicious line.
 1. **Observe:** capture UTC time, environment/version, exact symptom, affected
    surface, user impact, and redacted logs or traces. Stop secret/personal-data
    spreading.
-2. **Search:** inspect [`ERROR_LOG.md`](./ERROR_LOG.md), open/closed issues, and
+2. **Search:** run `make where Q="<error signature>"` (it searches the error
+   ledger, incidents, symbols, and owning docs), then open/closed issues and
    recent changes for the same signature. Reuse the existing issue when the
    root cause and acceptance boundary match.
 3. **Reproduce:** create the smallest deterministic repro or failing regression
