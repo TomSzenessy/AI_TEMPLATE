@@ -524,6 +524,38 @@ Test evidence: integration output; Artifact: review.md
         ready = self.cli("validate-issue", "--body-file", "form-body.md", "--status", "ready")
         self.assertEqual(ready.returncode, 0, ready.stderr)
 
+    def test_checkbox_marker_is_not_a_placeholder(self) -> None:
+        self.write("project.toml", """schema = 1
+name = "Demo"
+kind = "web"
+phase = "development"
+[governance]
+profile = "agent-first"
+""")
+        body = """Duplicate check: searched title, symptom, and path for adapters; no duplicate found
+### Summary
+Add a manifest-driven adapter generator for one host.
+### Acceptance criteria
+- [ ] Adapters render from the canonical manifest without drift.
+- [ ] A drifted adapter does not pass silently; the gate rejects it.
+### Evidence
+Test evidence: unit test output.
+### Disclosure classification
+- **Disclosure class:** ordinary
+- **Public-safe:** yes
+- **Security/privacy review:** not applicable
+- **Reviewer/date:** tester 2026-08-25
+### Dependencies and handoff
+- **Owner / next action:** maintainer; review the branch
+"""
+        self.write("checkbox.md", body)
+        result = self.cli("validate-issue", "--body-file", "checkbox.md")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.write("placeholder.md", body.replace("Adapters render from the canonical manifest without drift.", "[criterion]"))
+        rejected = self.cli("validate-issue", "--body-file", "placeholder.md")
+        self.assertEqual(rejected.returncode, 1)
+        self.assertIn("evidence-bearing", rejected.stderr)
+
     def test_disclosure_class_and_security_terms_fail_closed(self) -> None:
         self.write("project.toml", """schema = 1
 name = "Demo"

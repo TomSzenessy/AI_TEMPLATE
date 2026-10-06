@@ -246,10 +246,12 @@ def validate_issue_content(body: str, status: str, profile: str = "regulated") -
     checkboxes = re.findall(r"(?im)^\s*-\s*\[[ xX]\].+$", acceptance)
     if profile != "regulated":
         checkboxes = checkboxes or re.findall(r"(?im)^\s*[-*]\s+\S.+$", acceptance)
-    if len(checkboxes) < 2 or any(
+    # Strip the checkbox marker so "- [ ]" itself never reads as a placeholder.
+    criteria = [re.sub(r"^\s*[-*]\s*(?:\[[ xX]\]\s*)?", "", item) for item in checkboxes]
+    if len(criteria) < 2 or any(
         re.search(r"(?i)\[|\b(?:criterion|evidence|negative/failure case)\b", item)
         and not re.search(r"(?i)\b(?:test|check|observe|verify|pass|fail|artifact|state|command)\b", item)
-        for item in checkboxes
+        for item in criteria
     ):
         raise RepoctlError("issue acceptance criteria must be concrete and evidence-bearing")
     if not any(
