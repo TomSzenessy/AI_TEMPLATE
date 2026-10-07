@@ -23,9 +23,9 @@ order:
 | design (UI) | `docs/design.md` records the chosen mockup direction |
 | stack | `docs/STACK-DECISION.md` says `Status: accepted` |
 | skeleton | a product surface is declared (`stack-foundation`) |
-| preview (UI) | the surface has a `[surfaces.preview]` table |
+| preview (web UI) | the surface has a `[surfaces.preview]` table (native apps use simulator screenshots) |
 | build | every must feature is `yes` with evidence |
-| review (UI) | the latest `make ui-review` matches the code and has a verdict |
+| review (UI) | the latest entry in `docs/product/ui-reviews.md` matches the code, every screenshot is ticked, and the verdict is `pass` |
 | polish | every should feature is done or skipped |
 | launch | release sequence in [`production.md`](./production.md) |
 
@@ -42,16 +42,19 @@ appends the applicable rows of
 [`production-features.csv`](../.agents/skills/product-kickoff/production-features.csv)
 (onboarding, every screen state, accessibility, identity, undo, backup, error
 handling, deployment, performance, and more), which is what turns a demo into a
-product. `make check` fails when a `yes` or `partial` row cites no existing
-evidence path (a test file, a `.agent/reviews/<run>` folder, a doc) or a must
-row has no acceptance criterion. `make done` prints the completeness score and
+product. `make check` fails when the list has no must row, a must row has no
+acceptance criterion, or a `yes`/`partial` row cites anything that is not an
+existing file; a must row marked `yes` also needs a test file or
+`docs/product/ui-reviews.md` among its evidence, so citing `README.md` cannot
+close a feature. `make done` prints the completeness score and
 the open must features.
 
 ## Research: `docs/product/research.md`
 
 Comparable products, real user complaints (`review-mining`), design references,
-and the product's angle, each with a URL. In a UI project with a product
-surface, `make check` requires at least three cited sources.
+and the product's angle, each with a URL, under an `<!-- index: -->` line.
+`make next` asks for it in every product; `make check` enforces at least three
+cited sources once a UI product has a surface.
 
 ## UI review
 
@@ -70,10 +73,14 @@ states = { "with-data" = "app/review-states/with-data.json" }
 
 `{port}` is replaced by a free port on every run, and the review refuses to
 start if something already answers at the URL: a first trial screenshotted a
-different project's dev server that held the port. It writes
-`.agent/reviews/<run>/REVIEW.md` with a checklist and a pending
-verdict. Someone who looked at the images (you or the `critic` role) records
-findings and `Verdict: pass` or `Verdict: fix`. The change gate (`make done`,
-the stop hook) reports a UI surface that has never been reviewed, changed
-since its last review, or has no verdict. Reviews are local evidence; cite the
-run folder in the feature list.
+different project's dev server that held the port.
+
+Screenshots stay local in `.agent/reviews/<run>/`; the review record is
+appended to the tracked `docs/product/ui-reviews.md`: the reviewed code digest
+per surface, one checkbox per screenshot, findings, and `Verdict: pending`.
+Whoever looked at the images (you or the `critic` role) ticks each screenshot,
+records findings, and sets `Verdict: pass` or `Verdict: fix`. The change gate
+(`make done`, the stop hook) reports a web UI surface that was never reviewed,
+changed since its latest review, has unticked screenshots, or is not `pass`;
+`fix` never clears it. Because the record is tracked, every clone and CI sees
+the same review state, and feature rows cite `docs/product/ui-reviews.md`.

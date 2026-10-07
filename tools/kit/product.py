@@ -77,12 +77,33 @@ def score(rows: list[dict[str, str]]) -> tuple[float, list[dict[str, str]]]:
     return (100.0 * earned / total if total else 0.0), open_must
 
 
-def _evidence_exists(root: Path, evidence: str) -> bool:
+REVIEW_LOG = "docs/product/ui-reviews.md"
+TEST_NAME = re.compile(r"(?i)(^|/)(tests?|__tests__|e2e|spec)/|[._-](test|spec)\.")
+
+
+def _evidence_paths(evidence: str) -> list[str]:
+    paths = []
     for token in re.split(r"[;\s,]+", evidence):
-        path = token.split("::", 1)[0].rstrip(":0123456789").strip("`")
-        if path and not path.startswith("http") and (root / path).exists():
-            return True
-    return False
+        path = token.strip("`").split("::", 1)[0].split("#", 1)[0]
+        path = re.sub(r":\d+$", "", path)
+        if path:
+            paths.append(path)
+    return paths
+
+
+def _evidence_problem(root: Path, row: dict[str, str]) -> str | None:
+    """None when the evidence is acceptable for this row."""
+    paths = _evidence_paths(row["evidence"])
+    if not paths:
+        return "cites no evidence"
+    missing = [path for path in paths if not (root / path).is_file()]
+    if missing:
+        return f"cites evidence that is not an existing file: {', '.join(missing)}"
+    if row["priority"] == "must" and row["status"] == "yes" and not any(
+        TEST_NAME.search(path) or path == REVIEW_LOG for path in paths
+    ):
+        return f"is a must feature marked yes without a test file or {REVIEW_LOG} among its evidence"
+    return None
 
 
 def feature_errors(root: Path) -> list[str]:
@@ -93,11 +114,14 @@ def feature_errors(root: Path) -> list[str]:
         rows = load_features(root)
     except RepoctlError as error:
         return [str(error)]
+    if rows and not any(row["priority"] == "must" for row in rows):
+        errors.append(f"{FEATURES}: needs at least one must row; a product without must features has no definition of done")
     for row in rows:
-        if row["status"] in {"yes", "partial"} and not _evidence_exists(root, row["evidence"]):
+        problem = _evidence_problem(root, row) if row["status"] in {"yes", "partial"} else None
+        if problem:
             errors.append(
-                f"{FEATURES}:{row['line']}: '{row['feature']}' is marked {row['status']} without existing evidence "
-                "(cite a test file, .agent/reviews/<run>, or a doc path in the evidence column)"
+                f"{FEATURES}:{row['line']}: '{row['feature']}' ({row['status']}) {problem} "
+                f"(cite test files and, for UI, {REVIEW_LOG})"
             )
         if row["priority"] == "must" and not row["acceptance"]:
             errors.append(f"{FEATURES}:{row['line']}: must feature '{row['feature']}' needs an acceptance criterion")
@@ -107,6 +131,7 @@ def feature_errors(root: Path) -> list[str]:
 def research_errors(root: Path, project: dict[str, object]) -> list[str]:
     vision = project.get("vision", {})
     accepted = isinstance(vision, dict) and vision.get("status") == "accepted"
+    # Enforced for UI products (references matter most there); make next recommends it for all.
     if not (accepted and is_product(project) and is_ui(root, project) and product_surfaces(project)):
         return []
     text = read_text_file(root, RESEARCH) or ""
@@ -121,7 +146,7 @@ def research_errors(root: Path, project: dict[str, object]) -> list[str]:
 
 def _stack_accepted(root: Path) -> bool:
     text = read_text_file(root, "docs/STACK-DECISION.md") or ""
-    return bool(re.search(r"(?im)^Status:\s*accepted", text))
+    return bool(re.search(r"(?im)^\W*status\W*:?\W*accepted\b", text))
 
 
 def next_step(root: Path) -> dict[str, str]:
@@ -141,12 +166,13 @@ def next_step(root: Path) -> dict[str, str]:
          "product-kickoff skill, steps 1-2", "VISION.md Status: accepted"),
         (len(set(URL.findall(read_text_file(root, RESEARCH) or ""))) < 3, "research",
          f"Research comparable products, real user complaints, and design references; write {RESEARCH} with cited URLs.",
-         "researcher role; product-recon and review-mining skills; browse the web", "make check (research has 3+ sources)"),
-        (not load_features(root), "features",
+         "researcher role; product-recon and review-mining skills; browse the web",
+         f"{RESEARCH} cites at least three sources"),
+        (not any(row["priority"] == "must" for row in load_features(root)), "features",
          f"Write {FEATURES} from the research and owner answers, then append the relevant production rows "
          "(.agents/skills/product-kickoff/production-features.csv). Every must row gets an acceptance criterion.",
          "product-kickoff skill, step 4", "make next shows the build phase"),
-        (ui and "docs/design.md" not in files, "design",
+        (ui and len(read_text_file(root, "docs/design.md") or "") < 300, "design",
          "Render two or three mockup directions, choose with the owner, and record docs/design.md (direction, tokens, references).",
          "product-kickoff step 3; ux-quality skill", "docs/design.md exists"),
         (not _stack_accepted(root), "stack",
@@ -159,7 +185,7 @@ def next_step(root: Path) -> dict[str, str]:
     for pending, phase, action, guide, verify in steps:
         if pending:
             return {"phase": phase, "action": action, "guide": guide, "verify": verify}
-    if ui:
+    if project.get("kind") in setting(root, "preview_kinds"):
         missing = [str(s.get("id")) for s in product_surfaces(project) if not isinstance(s.get("preview"), dict)]
         if missing:
             return {"phase": "preview", "action": f"Declare a [surfaces.preview] table (command, url, routes) for: {', '.join(missing)}.",
@@ -178,7 +204,7 @@ def next_step(root: Path) -> dict[str, str]:
         if stale:
             return {"phase": "review", "action": "Run the UI review and fix what it shows: " + "; ".join(stale),
                     "guide": "make ui-review, then the critic role on the screenshots (ux-quality skill)",
-                    "verify": "review verdict recorded in .agent/reviews/<run>/REVIEW.md"}
+                    "verify": f"latest entry in {REVIEW_LOG} matches the code, every screenshot ticked, Verdict: pass"}
     open_should = [row for row in rows if row["priority"] == "should" and row["status"] not in {"yes", "skip"}]
     if open_should:
         row = open_should[0]

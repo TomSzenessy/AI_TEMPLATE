@@ -76,8 +76,9 @@ what to do next; no blame, no jargon.
    screenshots; never claim a visual review you did not do.
 2. Open every screenshot (you or the `critic` role, vision-capable) and compare
    it with this list, `docs/design.md`, the approved mockup, and the design
-   references. Write findings and the `Verdict:` line in the run's `REVIEW.md`;
-   the change gate stays red until a verdict exists for the current code.
+   references. In the run's entry in `docs/product/ui-reviews.md`, tick each
+   screenshot you looked at, write findings, and set `Verdict: pass` only when
+   nothing blocks; the change gate stays red until the current code has a pass.
 3. Fix, re-screenshot, and use `parity-check`'s image diff to catch unintended
    layout changes.
 4. For key flows, walk through as a first-time user: count steps and time to

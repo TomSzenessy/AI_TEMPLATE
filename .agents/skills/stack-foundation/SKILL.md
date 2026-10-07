@@ -8,7 +8,7 @@ description: "Sets up a new surface so it is clean, observable, and shippable fr
 Outcome: a walking skeleton (the thinnest end-to-end path, deployed to a
 preview) whose quality gates run in `make done` and CI before any feature work.
 Cleanliness is cheapest on day one; retrofitting it costs ten times more.
-Scale the setup to the kickoff tier: a `prototype` needs steps 1 to 4; a
+Scale the setup to the kickoff tier: a `prototype` needs steps 1 to 5; a
 `product` needs all steps; a `platform` also applies "Built to scale" in
 `docs/engineering.md` from the start.
 
@@ -27,19 +27,21 @@ Scale the setup to the kickoff tier: a `prototype` needs steps 1 to 4; a
 4. **Declare the surface** in `project.toml`: `verification` runs typecheck,
    lint, and tests; `garden` runs a dead-code finder (knip for JS/TS, vulture for
    Python, or the stack's analyzer); add a `[budgets]` glob so files stay agent-sized.
-   Bind the surface's architecture doc with `<!-- covers: -->`. For a UI,
-   add a `[surfaces.preview]` table (`command`, `url`, `routes`, optional
-   seeded `states`) so `make ui-review` can screenshot it.
-5. **Configuration and secrets:** commit `.env.example` with every variable and
+   Bind the surface's architecture doc with `<!-- covers: -->`.
+5. **Preview for review (web UIs):** add a `[surfaces.preview]` table with the
+   dev command and URL using a `{port}` placeholder, every route, and seeded
+   storage `states` for filled screens, then run `make ui-review`. Native apps
+   use simulator or emulator screenshots instead.
+6. **Configuration and secrets:** commit `.env.example` with every variable and
    a comment, never real values; validate configuration at startup and fail fast.
-6. **Observability:** structured logs with request IDs, error tracking (for
+7. **Observability:** structured logs with request IDs, error tracking (for
    example Sentry or the platform's crash reporting), and a health endpoint for
    services. Record any personal data they touch in `docs/legal/data-inventory.md`.
-7. **Delivery:** CI runs `make verify` (the test half of `make done`; agents
+8. **Delivery:** CI runs `make verify` (the test half of `make done`; agents
    run `make done` locally); every pull request gets a preview
    deployment or build when the platform supports it; document rollback in
    `docs/production.md`.
-8. **Web reach, if web:** semantic HTML, metadata and social cards, sitemap,
+9. **Web reach, if web:** semantic HTML, metadata and social cards, sitemap,
    performance budget (Core Web Vitals), and i18n-ready strings when more than
    one language is plausible.
 

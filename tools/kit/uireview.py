@@ -3,43 +3,60 @@
 For every active product surface with a `preview` table in project.toml:
 
     [surfaces.preview]
-    command = ["npm", "run", "dev", "--", "--port", "{port}"]
+    command = ["npm", "run", "dev", "--", "--port", "{port}", "--strictPort"]
     url = "http://localhost:{port}"
     routes = ["/", "/settings"]
     states = { "with-data" = "app/review-states/with-data.json" }   # optional
 
 it starts the preview on a free port (the `{port}` placeholder), refuses to
-review a server it did not start, captures each route (and each storage state) at phone
-and desktop sizes in light and dark mode with a pinned Playwright, stops the
-server, and writes `.agent/reviews/<run>/REVIEW.md`. The run counts only after
-its Verdict line is filled; a later change to the surface makes it stale, and
-the change gate reports stale or unreviewed UI.
+review a server it did not start, captures each route and storage state at
+phone and desktop sizes in light and dark mode with a pinned Playwright, and
+stops the server. Screenshots stay local in `.agent/reviews/<run>/`; the review
+record is appended to the tracked `docs/product/ui-reviews.md` (surface
+digests, one checkbox per screenshot, findings, verdict), so every clone sees
+the same review history. A surface counts as reviewed only when its latest
+record matches the current code, every screenshot is ticked, and the verdict
+is `pass`.
 """
 
 from __future__ import annotations
 
 import hashlib
-import json
 import os
+import re
 import shutil
 import signal
 import socket
 import subprocess
 import time
+import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from .config import setting
 from .core import RepoctlError, ensure_inside_root, load_project, read_text_file, repository_files
 from .product import is_product, is_ui, product_surfaces
 
-REVIEWS = ".agent/reviews"
-LATEST = f"{REVIEWS}/latest.json"
+SHOTS = ".agent/reviews"
+LOG = "docs/product/ui-reviews.md"
+LOG_HEADER = (
+    "# UI reviews\n\n"
+    "<!-- index: launch | Screenshot review history: verdicts, findings, reviewed code digests | "
+    "judging UI quality or citing review evidence -->\n\n"
+    "Appended by `make ui-review` (docs/building.md). Screenshots are local in `.agent/reviews/<run>/`; "
+    "tick each one after looking at it, record findings, then set the verdict to pass or fix.\n"
+)
 VIEWPORTS = {"phone": "390,844", "desktop": "1440,900"}
 SCHEMES = ("light", "dark")
-CHROME_PATHS = ("/Applications/Google Chrome.app", "/usr/bin/google-chrome", "/usr/bin/google-chrome-stable")
-VERDICT_PENDING = "Verdict: pending"
+CHROME_PATHS = (
+    "/Applications/Google Chrome.app", "/usr/bin/google-chrome", "/usr/bin/google-chrome-stable",
+    "/opt/google/chrome/chrome", "C:/Program Files/Google/Chrome/Application/chrome.exe",
+)
+ENTRY = re.compile(r"(?ms)^## Review (?P<run>\S+)\n(?P<body>.*?)(?=^## Review |\Z)")
+MARKER = re.compile(r"<!-- review: (?P<surfaces>[^>]*?) -->")
+SAFE = re.compile(r"[^A-Za-z0-9-]+")
 
 
 def surface_digest(root: Path, path: str) -> str:
@@ -53,51 +70,61 @@ def surface_digest(root: Path, path: str) -> str:
                 digest.update((root / relative).read_bytes())
             except OSError:
                 continue
-    return digest.hexdigest()
+    return digest.hexdigest()[:16]
 
 
-def _latest(root: Path) -> dict:
-    try:
-        data = json.loads((root / LATEST).read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {}
-    return data if isinstance(data, dict) else {}
+def preview_surfaces(project: dict[str, object]) -> list[dict[str, object]]:
+    return [surface for surface in product_surfaces(project) if isinstance(surface.get("preview"), dict)]
+
+
+def latest_records(root: Path) -> dict[str, tuple[str, str, str]]:
+    """surface id -> (run, digest, entry body) for the newest review of each surface."""
+    records: dict[str, tuple[str, str, str]] = {}
+    for match in ENTRY.finditer(read_text_file(root, LOG) or ""):
+        marker = MARKER.search(match.group("body"))
+        if not marker:
+            continue
+        for pair in marker.group("surfaces").split():
+            identifier, _, digest = pair.partition("=")
+            records[identifier] = (match.group("run"), digest, match.group("body"))
+    return records
 
 
 def review_status(root: Path) -> list[str]:
-    """Findings for UI surfaces without a fresh, judged review (empty when fine)."""
+    """Findings for previewable UI surfaces without a fresh, fully judged, passing review."""
     project = load_project(root)
     if not (is_product(project) and is_ui(root, project)):
         return []
-    latest = _latest(root)
+    records = latest_records(root)
     findings = []
-    for surface in product_surfaces(project):
-        identifier, path = str(surface.get("id")), str(surface.get("path", "."))
-        if not isinstance(surface.get("preview"), dict):
-            continue
-        record = latest.get(identifier)
-        if not record:
+    for surface in preview_surfaces(project):
+        identifier = str(surface.get("id"))
+        if identifier not in records:
             findings.append(f"surface {identifier} has never had a UI review (make ui-review)")
             continue
-        if record.get("digest") != surface_digest(root, path):
-            findings.append(f"surface {identifier} changed since its last UI review (make ui-review)")
-            continue
-        review = read_text_file(root, f"{record.get('run')}/REVIEW.md") or ""
-        if VERDICT_PENDING in review or "Verdict:" not in review:
-            findings.append(f"{record.get('run')}/REVIEW.md has no verdict yet: look at every screenshot and record it")
+        run, digest, body = records[identifier]
+        if digest != surface_digest(root, str(surface.get("path", "."))):
+            findings.append(f"surface {identifier} changed since UI review {run} (make ui-review)")
+        elif re.search(r"(?m)^- \[ \]", body):
+            findings.append(f"UI review {run} in {LOG}: tick every screenshot after looking at it")
+        elif not re.search(r"(?m)^Verdict:\s*pass\b", body):
+            findings.append(f"UI review {run} in {LOG} is not `Verdict: pass`: fix the findings and run make ui-review again")
     return findings
 
 
 def _browser_arguments() -> list[str]:
-    if any(Path(path).exists() for path in CHROME_PATHS) or shutil.which("google-chrome"):
+    if any(Path(path).exists() for path in CHROME_PATHS) or shutil.which("google-chrome") or shutil.which("google-chrome-stable"):
         return ["--channel", "chrome"]  # the installed Chrome: nothing to download
     return ["-b", "chromium"]
 
 
 def _answers(url: str) -> bool:
+    """True when anything HTTP answers, including error statuses."""
     try:
         with urllib.request.urlopen(url, timeout=2):
             return True
+    except urllib.error.HTTPError:
+        return True
     except OSError:
         return False
 
@@ -106,6 +133,20 @@ def _free_port() -> int:
     with socket.socket() as probe:
         probe.bind(("127.0.0.1", 0))
         return probe.getsockname()[1]
+
+
+def _stop(server: subprocess.Popen) -> None:
+    try:
+        if hasattr(os, "killpg"):
+            os.killpg(server.pid, signal.SIGTERM)
+        else:  # Windows: no process groups
+            server.terminate()
+        server.wait(timeout=10)
+    except (OSError, subprocess.TimeoutExpired):
+        try:
+            os.killpg(server.pid, signal.SIGKILL) if hasattr(os, "killpg") else server.kill()
+        except OSError:
+            pass
 
 
 def _wait_for(url: str, server: subprocess.Popen, timeout: float) -> None:
@@ -120,79 +161,82 @@ def _wait_for(url: str, server: subprocess.Popen, timeout: float) -> None:
     raise RepoctlError(f"preview did not answer at {url} within {timeout:.0f}s")
 
 
+def _capture(root: Path, surface: dict[str, object], out: Path, version: str) -> list[str]:
+    identifier = str(surface.get("id"))
+    preview = surface["preview"]
+    command, url = preview.get("command"), str(preview.get("url", ""))
+    if not (isinstance(command, list) and command and urlsplit(url.replace("{port}", "1")).hostname in {"localhost", "127.0.0.1"}):
+        raise RepoctlError(f"surface {identifier}: preview needs command = [...] and url = \"http://localhost:{{port}}\"")
+    routes = [str(route) for route in (preview.get("routes") or ["/"])]
+    bad = [route for route in routes if not route.startswith("/")]
+    if bad:
+        raise RepoctlError(f"surface {identifier}: routes must start with '/': {', '.join(bad)}")
+    states: dict[str, str | None] = {"default": None, **(preview.get("states") or {})}
+    port = str(_free_port())  # {port}: a fresh free port, so another dev server is never reviewed by mistake
+    command = [str(part).replace("{port}", port) for part in command]
+    url = url.replace("{port}", port).rstrip("/")
+    if _answers(url):
+        raise RepoctlError(
+            f"surface {identifier}: something already answers at {url} before the preview started; "
+            "use a {port} placeholder in the preview command and url, or stop the other server"
+        )
+    cwd = ensure_inside_root(root, root / str(surface.get("path", ".")), f"surface {identifier} path")
+    server = subprocess.Popen(command, cwd=cwd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                              start_new_session=hasattr(os, "killpg"))
+    shots = []
+    try:
+        _wait_for(url, server, float(preview.get("timeout", 60)))
+        for route in routes:
+            for state, storage in states.items():
+                for size, viewport in VIEWPORTS.items():
+                    for scheme in SCHEMES:
+                        name = "-".join(SAFE.sub("-", part).strip("-") or "home" for part in (identifier, route, state, size, scheme)) + ".png"
+                        arguments = ["npx", "-y", f"playwright@{version}", "screenshot", *_browser_arguments(),
+                                     "--viewport-size", viewport, "--color-scheme", scheme,
+                                     "--wait-for-timeout", "800", "--full-page"]
+                        if storage:
+                            arguments += ["--load-storage", str(ensure_inside_root(root, root / storage, "storage state"))]
+                        result = subprocess.run([*arguments, url + route, str(out / name)],
+                                                cwd=root, capture_output=True, text=True, timeout=180, check=False)
+                        if result.returncode != 0:
+                            raise RepoctlError(
+                                f"screenshot failed for {name}: {result.stderr.strip()[-300:]} "
+                                f"(try: npx playwright@{version} install chromium)"
+                            )
+                        shots.append(name)
+    finally:
+        _stop(server)
+    return shots
+
+
 def run_review(root: Path) -> int:
     project = load_project(root)
-    surfaces = [s for s in product_surfaces(project) if isinstance(s.get("preview"), dict)]
+    surfaces = preview_surfaces(project)
     if not surfaces:
         raise RepoctlError("no surface declares a [surfaces.preview] table (command, url, routes); see docs/building.md")
     if shutil.which("npx") is None:
         raise RepoctlError("npx (Node.js) is required for screenshots; install Node 18+")
     version = str(setting(root, "playwright_version"))
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    run = f"{REVIEWS}/{stamp}"
-    out = ensure_inside_root(root, root / run, "review folder")
+    out = ensure_inside_root(root, root / SHOTS / stamp, "review folder")
     out.mkdir(parents=True, exist_ok=True)
-    latest = _latest(root)
     shots: list[str] = []
     for surface in surfaces:
-        identifier, path = str(surface.get("id")), str(surface.get("path", "."))
-        preview = surface["preview"]
-        command, url = preview.get("command"), str(preview.get("url", ""))
-        routes = preview.get("routes") or ["/"]
-        states = {"default": None, **(preview.get("states") or {})}
-        if not (isinstance(command, list) and command and url.startswith("http://localhost")):
-            raise RepoctlError(f"surface {identifier}: preview needs command = [...] and url = \"http://localhost:{{port}}\"")
-        # {port} placeholders get a free port per run, so another dev server can never be reviewed by mistake.
-        port = str(_free_port())
-        command = [str(part).replace("{port}", port) for part in command]
-        url = url.replace("{port}", port)
-        if _answers(url):
-            raise RepoctlError(
-                f"surface {identifier}: something already answers at {url} before the preview started; "
-                "use a {port} placeholder in the preview command and url, or stop the other server"
-            )
-        cwd = ensure_inside_root(root, root / path, f"surface {identifier} path")
-        server = subprocess.Popen(command, cwd=cwd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
-        try:
-            _wait_for(url, server, float(preview.get("timeout", 60)))
-            for route in routes:
-                for state, storage in states.items():
-                    for size, viewport in VIEWPORTS.items():
-                        for scheme in SCHEMES:
-                            name = f"{identifier}{route.strip('/').replace('/', '-') or '-home'}-{state}-{size}-{scheme}.png"
-                            arguments = ["npx", "-y", f"playwright@{version}", "screenshot", *_browser_arguments(),
-                                         "--viewport-size", viewport, "--color-scheme", scheme,
-                                         "--wait-for-timeout", "800", "--full-page"]
-                            if storage:
-                                arguments += ["--load-storage", str(ensure_inside_root(root, root / storage, "storage state"))]
-                            result = subprocess.run([*arguments, url.rstrip("/") + route, str(out / name)],
-                                                    cwd=root, capture_output=True, text=True, timeout=180, check=False)
-                            if result.returncode != 0:
-                                hint = "npx playwright@" + version + " install chromium"
-                                raise RepoctlError(f"screenshot failed for {name}: {result.stderr.strip()[-300:]} (try: {hint})")
-                            shots.append(name)
-        finally:
-            try:
-                os.killpg(server.pid, signal.SIGTERM)
-            except (OSError, ProcessLookupError):
-                server.terminate()
-        latest[identifier] = {"digest": surface_digest(root, path), "run": run, "at": stamp}
-    checklist = "\n".join(f"- [ ] {shot}" for shot in shots)
-    (out / "REVIEW.md").write_text(
-        f"# UI review {stamp}\n\n"
-        "Open every screenshot and judge it against the ux-quality skill, docs/design.md, and the design\n"
-        "references in docs/product/research.md. A reviewer that did not look at the images must not\n"
-        "write a verdict.\n\n"
-        "## Screenshots\n\n" + checklist + "\n\n"
-        "## Findings (screenshot, region, problem, fix)\n\n- \n\n"
-        "## Bar\n\n- Hierarchy, spacing rhythm, type scale, and contrast hold up next to the references\n"
-        "- Every state (empty, loading, error, filled) looks designed, not default\n"
-        "- Touch targets at least 44 pt; nothing clipped or overflowing at phone width\n"
-        "- Light and dark both intentional\n\n"
-        f"{VERDICT_PENDING}  (replace with: Verdict: pass | fix — <one line>)\n",
-        encoding="utf-8",
+        shots += _capture(root, surface, out, version)
+    digests = " ".join(f"{s.get('id')}={surface_digest(root, str(s.get('path', '.')))}" for s in surfaces)
+    entry = (
+        f"\n## Review {stamp}\n\n<!-- review: {digests} -->\n\n"
+        f"Screenshots in `{SHOTS}/{stamp}/` (local). Tick each after looking at it:\n\n"
+        + "".join(f"- [ ] {shot}\n" for shot in shots)
+        + "\nFindings (screenshot, region, problem, fix):\n\n- none yet\n\n"
+        "Bar: hierarchy, spacing rhythm, type scale, and contrast hold up next to the references; every\n"
+        "state looks designed; touch targets at least 44 pt; nothing clipped at phone width; light and dark\n"
+        "both intentional.\n\nVerdict: pending\n"
     )
-    (root / LATEST).write_text(json.dumps(latest, indent=2) + "\n", encoding="utf-8")
-    print(f"{len(shots)} screenshot(s) in {run}/. Look at each one, record findings and the verdict in {run}/REVIEW.md;")
-    print("fix and re-run until the verdict is pass. Cite the run folder as evidence in docs/product/features.csv.")
+    log = ensure_inside_root(root, root / LOG, "review log")
+    log.parent.mkdir(parents=True, exist_ok=True)
+    log.write_text((read_text_file(root, LOG) or LOG_HEADER) + entry, encoding="utf-8")
+    print(f"{len(shots)} screenshot(s) in {SHOTS}/{stamp}/; review entry appended to {LOG}.")
+    print("Open each image, tick it, record findings, and set `Verdict: pass` or `Verdict: fix`; fix and re-run until pass.")
+    print(f"Cite `{LOG}` as evidence in docs/product/features.csv once the verdict is pass.")
     return 0

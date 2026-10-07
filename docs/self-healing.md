@@ -128,7 +128,7 @@ the after-edit hook regenerates what depends on it. Agent-instruction paths are
 Policy a project may change lives in `project.toml`, with built-in defaults
 when a key is absent: `[kit]` (docs index groups, unbound-doc exemptions,
 overlap limit, deprecation warning window, skill review age, UI project kinds,
-eval model, Playwright version for `make ui-review`), `[adapters.claude]`
+eval model, Playwright version and previewable kinds for `make ui-review`), `[adapters.claude]`
 (tier-to-model and access-to-tools maps, pre-approved commands), `[risk]`
 (tier globs and optional ceremony text), and `[budgets]` (byte limits for any
 glob, including product code).

@@ -494,8 +494,10 @@ class ProductDriverTests(KitRepository):
         self.features("Add a habit,core,must,no,,Adding takes one tap,owner")
         self.assertEqual(self.phase(), "design")
         self.write("docs/design.md", "# Design\n")
+        self.assertEqual(self.phase(), "design", "a stub design doc is not a design record")
+        self.write("docs/design.md", "# Design\n\n" + "Calm, minimal direction with one indigo accent. " * 10)
         self.assertEqual(self.phase(), "stack")
-        self.write("docs/STACK-DECISION.md", "# Stack\n\nStatus: accepted\n")
+        self.write("docs/STACK-DECISION.md", "# Stack\n\n**Status:** accepted\n")
         self.assertEqual(self.phase(), "skeleton")
         surface = '[[surfaces]]\nid = "app"\npath = "src"\nkind = "code"\nquality_oracle = "tests plus ux-quality review"\nverification = [["true"]]\n'
         self.write("project.toml", (self.root / "project.toml").read_text() + surface)
@@ -505,13 +507,15 @@ class ProductDriverTests(KitRepository):
         step = product.next_step(self.root)
         self.assertEqual(step["phase"], "build")
         self.assertIn("Add a habit", step["action"])
-        self.features("Add a habit,core,must,yes,src/billing/invoice.py,Adding takes one tap,owner")
+        self.write("tests/test_habits.py", "def test_add():\n    assert True\n")
+        self.features("Add a habit,core,must,yes,tests/test_habits.py,Adding takes one tap,owner")
         self.assertEqual(self.phase(), "review")
         self.assertIn("never had a UI review", product.next_step(self.root)["action"])
 
     def test_score_and_evidence(self) -> None:
+        self.write("tests/test_a.py", "def test_a():\n    assert True\n")
         self.features(
-            "A,core,must,yes,src/billing/invoice.py,works,owner",
+            "A,core,must,yes,tests/test_a.py,works,owner",
             "B,core,must,partial,missing/file.py,works,owner",
             "C,core,should,no,,,owner",
             "D,core,could,skip,,,owner",
@@ -521,7 +525,16 @@ class ProductDriverTests(KitRepository):
         self.assertEqual([row["feature"] for row in open_must], ["B"])
         errors = product.feature_errors(self.root)
         self.assertEqual(len(errors), 1)
-        self.assertIn("'B' is marked partial without existing evidence", errors[0])
+        self.assertIn("'B' (partial) cites evidence that is not an existing file: missing/file.py", errors[0])
+
+    def test_evidence_cannot_be_gamed(self) -> None:
+        self.features("A,core,must,yes,README.md,works,owner", "B,core,should,yes,.,works,owner")
+        self.write("README.md", "# Demo\n")
+        errors = " ".join(product.feature_errors(self.root))
+        self.assertIn("without a test file", errors)
+        self.assertIn("not an existing file: .", errors)
+        self.features("C,core,should,no,,,owner")
+        self.assertIn("needs at least one must row", " ".join(product.feature_errors(self.root)))
 
     def test_must_needs_acceptance_and_valid_values(self) -> None:
         self.features("A,core,must,no,,,owner")
@@ -579,6 +592,12 @@ class UiReviewTests(KitRepository):
             foreign.terminate()
             foreign.wait()
 
+    def test_route_without_leading_slash_is_rejected(self) -> None:
+        self.write("project.toml", (self.root / "project.toml").read_text().replace('routes = ["/"]', 'routes = ["about"]'))
+        result = self.review()
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("routes must start with '/'", result.stderr)
+
     def test_dead_preview_fails_fast(self) -> None:
         text = (self.root / "project.toml").read_text()
         text = text.replace(f'command = ["{sys.executable}", "-m", "http.server", "{{port}}", "--bind", "127.0.0.1"]',
@@ -592,16 +611,21 @@ class UiReviewTests(KitRepository):
         self.assertIn("never had a UI review", " ".join(uireview.review_status(self.root)))
         result = self.review()
         self.assertEqual(result.returncode, 0, result.stderr)
-        run = json.loads((self.root / uireview.LATEST).read_text())["app"]["run"]
-        shots = sorted(path.name for path in (self.root / run).glob("*.png"))
+        run = uireview.latest_records(self.root)["app"][0]
+        shots = sorted(path.name for path in (self.root / uireview.SHOTS / run).glob("*.png"))
         self.assertEqual(len(shots), 4)
         self.assertIn("app-home-default-phone-dark.png", shots)
-        self.assertIn("has no verdict yet", " ".join(uireview.review_status(self.root)))
-        review = self.root / run / "REVIEW.md"
-        review.write_text(review.read_text().replace(uireview.VERDICT_PENDING, "Verdict: pass"))
+        log = self.root / uireview.LOG
+        self.assertIn("tick every screenshot", " ".join(uireview.review_status(self.root)))
+        log.write_text(log.read_text().replace("- [ ] ", "- [x] "))
+        self.assertIn("is not `Verdict: pass`", " ".join(uireview.review_status(self.root)))
+        log.write_text(log.read_text().replace("Verdict: pending", "Verdict: fix - contrast"))
+        self.assertIn("is not `Verdict: pass`", " ".join(uireview.review_status(self.root)), "fix must not pass")
+        log.write_text(log.read_text().replace("Verdict: fix - contrast", "Verdict: pass"))
         self.assertEqual(uireview.review_status(self.root), [])
+        self.assertIn("<!-- index:", log.read_text(), "the tracked log indexes itself")
         self.write("src/billing/invoice.py", "def render_invoice():\n    return 42\n")
-        self.assertIn("changed since its last UI review", " ".join(uireview.review_status(self.root)))
+        self.assertIn("changed since UI review", " ".join(uireview.review_status(self.root)))
 
 
 class DerivedContentTests(KitRepository):

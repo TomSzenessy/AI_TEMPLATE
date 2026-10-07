@@ -23,7 +23,8 @@ every later agent finds them. Then `make next` drives the build to launch.
 ## 2. Research the space (always)
 
 Delegate to the `researcher` role (web search and browser) and write
-`docs/product/research.md` with cited URLs (`make check` needs at least three):
+`docs/product/research.md` with cited URLs (`make check` needs at least three)
+and an `<!-- index: extend | ... | ... -->` line under its title:
 
 - **Comparable products:** the three to five best, what each does well, and
   what to borrow. For a named reference, run `product-recon`.
@@ -70,8 +71,9 @@ is a valid answer. Ask only what changes direction:
 Ask a second round only if an answer opens a new high-impact choice. Never
 assume answers: if you cannot ask (headless run, tool unavailable) or the owner
 has not answered, write the questions with your recommendations in your reply
-(and the kickoff issue when one exists), then stop. That is a correct, finished
-outcome. Only an explicit "use your picks" counts as approval.
+(and the kickoff issue when one exists), then stop and wait for answers. Once
+the owner has answered, never stop again before `make next` reaches launch.
+Only an explicit "use your picks" counts as approval.
 
 ## 4. Show mockups before building
 
