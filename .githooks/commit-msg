@@ -15,5 +15,5 @@ if [ "$status" -eq 126 ] || [ "$status" -eq 127 ]; then
 fi
 # Everything else blocks: 3 = the gate's findings; any other status means the kit
 # (a plugin, the registry, repoctl itself) is broken, which must never skip the gate.
-[ "$status" -ne 3 ] && echo "commit blocked: repoctl exited $status (see above); fix it, or bypass with --no-verify and say why in the PR" >&2
+[ "$status" -ne 3 ] && echo "Commit blocked: repoctl exited $status (see above); fix it, or bypass with --no-verify and say why in the PR" >&2
 exit 1
