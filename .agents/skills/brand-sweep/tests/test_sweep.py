@@ -83,6 +83,63 @@ class Sweep(unittest.TestCase):
         with redirect_stderr(io.StringIO()):
             self.assertEqual(sweep.main([clean]), 2)
 
+    def test_bare_and_alpha_hex_forms(self):
+        put(self.root, "src/b.css", "a { color: #006bffaa; b: #06fa }\n")
+        for form in ("006bff", "#006bff", "006bffff", "#006bff80"):
+            hits = sweep.sweep(self.root, colors=[form])
+            files = {os.path.basename(h["file"]) for h in hits}
+            self.assertIn("b.css", files, form)
+            self.assertIn("tokens.css", files, form)
+        short = {os.path.basename(h["file"]) for h in sweep.sweep(self.root, colors=["06f"])}
+        self.assertIn("b.css", short)  # #06fa is #0066ffaa
+
+    def test_invalid_colours_raise_and_cli_exits_2(self):
+        for bad in ("rgb(0,107,255)", "#12345", "zzzzzz", "#12"):
+            with self.assertRaises(ValueError):
+                sweep.sweep(self.root, colors=[bad])
+            err = io.StringIO()
+            with redirect_stdout(io.StringIO()), redirect_stderr(err):
+                self.assertEqual(sweep.main([self.root, "--colors", bad]), 2)
+            self.assertIn("colour", err.getvalue())
+
+    def test_cli_bare_hex_finds_colour(self):
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            self.assertEqual(sweep.main([self.root, "--colors", "006bff"]), 1)
+        self.assertIn("tokens.css", buf.getvalue())
+
+    def _kickoff(self):
+        d = tempfile.mkdtemp()
+        put(d, "src/app.ts", "export const x = 1\n")
+        put(d, "docs/product/research.md", "Comparable: Calendly (https://calendly.com)\n")
+        put(d, ".agent/references/calendly.md", "Calendly notes\n")
+        put(d, ".review/r.md", "Calendly\n")
+        return d
+
+    def test_kickoff_shaped_repo_sweeps_clean_with_exclude(self):
+        d = self._kickoff()
+        args = [d, "--avoid", "Calendly", "--domains", "calendly.com"]
+        with redirect_stdout(io.StringIO()):
+            self.assertEqual(sweep.main(args), 1)  # research doc still scanned
+            self.assertEqual(sweep.main(args + ["--exclude", "docs/product/research.md"]), 0)
+        files = {h["file"] for h in sweep.sweep(d, avoid=["Calendly"])}
+        self.assertEqual(files, {os.path.join("docs", "product", "research.md")})
+
+    def test_exclude_from_config_and_dir_glob(self):
+        d = self._kickoff()
+        cfg = put(tempfile.mkdtemp(), "brand.json", json.dumps({"avoid": ["Calendly"],
+                                                "exclude": ["docs/product/"]}))
+        with redirect_stdout(io.StringIO()):
+            self.assertEqual(sweep.main([d, "--config", cfg]), 0)
+            self.assertEqual(sweep.main([d, "--avoid", "Calendly", "--exclude", "*.md"]), 0)
+
+    def test_hit_in_src_still_exits_1_with_excludes(self):
+        d = self._kickoff()
+        put(d, "src/copy.ts", "// calendly\n")
+        with redirect_stdout(io.StringIO()):
+            self.assertEqual(sweep.main([d, "--avoid", "Calendly",
+                                         "--exclude", "docs/product/research.md"]), 1)
+
 
 if __name__ == "__main__":
     unittest.main()
