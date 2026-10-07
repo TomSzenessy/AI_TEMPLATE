@@ -484,7 +484,7 @@ rollback = "none"
         self.assertIn("[REDACTED]", result.stdout)
 
         root = Path(__file__).resolve().parents[2]
-        for name in ("config.yml", "bug.yml", "improvement.yml", "feature.yml"):
+        for name in ("issue-tracker.yml", "bug.yml", "improvement.yml", "feature.yml"):
             content = (root / ".github" / "ISSUE_TEMPLATE" / name).read_text(encoding="utf-8")
             self.assertIn("Disclosure classification", content)
             self.assertIn("public-safe", content)
@@ -513,7 +513,7 @@ stack_decision = "docs/STACK-DECISION.md"
         self.assertIn("exactly VISION.md", result.stderr)
 
         root = Path(__file__).resolve().parents[2]
-        for name in ("config.yml", "bug.yml", "improvement.yml", "feature.yml"):
+        for name in ("issue-tracker.yml", "bug.yml", "improvement.yml", "feature.yml"):
             content = (root / ".github" / "ISSUE_TEMPLATE" / name).read_text(encoding="utf-8")
             self.assertIn("Disclosure classification", content)
             self.assertIn("public-safe", content)
@@ -849,7 +849,7 @@ verification = [["python3", "-c", "print('ok')"]]
 
     def test_forms_and_pr_workflow_keep_public_contracts(self) -> None:
         root = Path(__file__).resolve().parents[2]
-        for name in ("config.yml", "bug.yml", "improvement.yml", "feature.yml"):
+        for name in ("issue-tracker.yml", "bug.yml", "improvement.yml", "feature.yml"):
             content = (root / ".github" / "ISSUE_TEMPLATE" / name).read_text(encoding="utf-8")
             self.assertIn("Disclosure classification", content)
             self.assertIn("Disclosure class", content)
