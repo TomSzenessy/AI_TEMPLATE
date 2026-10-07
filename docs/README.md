@@ -35,6 +35,7 @@ itself and this table cannot drift. Edit the line in the document, not here.
 | [`production.md`](./production.md) | Production evidence and release boundary | A real project is being prepared for deployment or release. |
 | [`self-healing.md`](./self-healing.md) | When a check may block, hooks, doc-code bindings, deprecation expiry, budgets, generated files, gardener, evals | A check fails, docs drift, a host is added, or the kit itself changes. |
 | [`verification.md`](./verification.md) | Definition of done, evidence ladder, and quality loop | A change is ready for review or a quality claim is made. |
+| [`handoffs/2026-10-07-1200-kit-hardening.md`](./handoffs/2026-10-07-1200-kit-hardening.md) | Continuation record for PR #11 (kit hardening) | Picking up PR #11 or the follow-up issues locally. |
 | [`handoffs/README.md`](./handoffs/README.md) | Cross-session continuity rules | Work must be transferred or resumed. |
 | [`handoffs/TEMPLATE.md`](./handoffs/TEMPLATE.md) | Handover record scaffold (local HANDOVER.md or committed handoff) | A fresh actor needs a focused continuation record. |
 | [`incidents/README.md`](./incidents/README.md) | Reviewed public incident record boundary | A public incident is promoted or a regression artifact is reviewed. |
