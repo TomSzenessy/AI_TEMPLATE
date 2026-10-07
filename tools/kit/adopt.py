@@ -119,6 +119,8 @@ def keep_project_license(target: Path, project_had_one: bool) -> str | None:
     manifest = target / "project.toml"
     text = manifest.read_text(encoding="utf-8")
     if not project_had_one:
+        if (target / "LICENSE").exists():
+            return "no LICENSE of yours: the kit's LICENSE was copied; replace it with your own and set license in project.toml"
         return None
     head = (target / "LICENSE").read_text(encoding="utf-8", errors="replace")[:400]
     label = next((spdx for marker, spdx in LICENSES if marker.lower() in head.lower()), "UNSELECTED")
@@ -146,7 +148,7 @@ def adopt(target: Path, kit: Path, name: str, kind: str, owner: str | None) -> N
         if not destination.exists():
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, destination)
-            copied.append(relative)
+            copied.append(destination.relative_to(target).as_posix())  # a renamed workflow is reported as renamed
         elif relative == "Makefile":
             renamed = merge_makefile(target, source.read_text(encoding="utf-8"))
             merged.append("Makefile (kit targets in kit.mk" + (f"; renamed: {', '.join('kit-' + n for n in renamed)}" if renamed else "") + ")")

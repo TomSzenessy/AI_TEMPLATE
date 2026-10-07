@@ -314,14 +314,19 @@ def _plugins(root: Path) -> tuple[list[Capability], list[tuple[str, str]]]:
 
 # --- Docs ----------------------------------------------------------------------
 
+def doc_name(relative: str) -> str:
+    """The capability name of a docs/ path: docs/a/b.md -> a-b."""
+    return relative.removeprefix("docs/").removesuffix(".md").replace("/", "-").lower()
+
+
 def _docs(root: Path, files: list[str]) -> list[Capability]:
     from .docsync import doc_meta  # docsync owns the comment carrier and its cache
     items = []
     for relative, meta in doc_meta(root, files).items():
         index = meta.get("index")
-        if not relative.startswith("docs/") or not index or len(index) < 3:
+        if not relative.startswith("docs/") or not index or len(index) != 3:  # index_errors reports the rest
             continue
-        name = relative.removeprefix("docs/").removesuffix(".md").replace("/", "-").lower()
+        name = doc_name(relative)
         items.append(Capability("doc", name, f"{index[1]}; {index[2]}", relative, CORE,
                                 {"group": index[0], "covers": list(meta.get("covers", []))}))
     return items

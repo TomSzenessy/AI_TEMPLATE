@@ -51,7 +51,9 @@ def doc_meta(root: Path, files: list[str]) -> dict[str, dict[str, object]]:
             continue
         stamp = [status.st_mtime_ns, status.st_size]
         cached = entries.get(relative)
-        if isinstance(cached, list) and len(cached) == 2 and cached[0] == stamp:
+        if (isinstance(cached, list) and len(cached) == 2 and cached[0] == stamp
+                and isinstance(cached[1], dict) and isinstance(cached[1].get("covers"), list)
+                and isinstance(cached[1].get("index", []), (list, type(None)))):
             meta = cached[1]
         else:
             text = INLINE_CODE.sub("", markdown_without_fenced_code(read_text_file(root, relative) or ""))
@@ -65,7 +67,9 @@ def doc_meta(root: Path, files: list[str]) -> dict[str, dict[str, object]]:
     if fresh != entries:
         try:
             cache_path.parent.mkdir(parents=True, exist_ok=True)
-            cache_path.write_text(json.dumps({"version": 3, "entries": fresh}), encoding="utf-8")
+            temporary = cache_path.with_name(cache_path.name + f".{os.getpid()}.tmp")
+            temporary.write_text(json.dumps({"version": 3, "entries": fresh}), encoding="utf-8")
+            os.replace(temporary, cache_path)  # atomic: a concurrent reader never sees half a file
         except OSError:
             pass  # the cache is an optimization only
     return result
@@ -86,6 +90,7 @@ def doc_groups(root: Path) -> dict[str, str]:
 def index_errors(root: Path, files: list[str]) -> list[str]:
     groups = doc_groups(root)
     errors = []
+    owners: dict[str, str] = {}
     for path, meta in sorted(doc_meta(root, files).items()):
         entry = meta["index"]
         if entry is not None and (len(entry) != 3 or entry[0] not in groups or not all(entry)):
@@ -93,6 +98,12 @@ def index_errors(root: Path, files: list[str]) -> list[str]:
                 f"{path}: index declaration must be '<!-- index: {'|'.join(groups)} | owns | read when -->' "
                 "(groups: project.toml [kit].doc_groups)"
             )
+        elif entry is not None and path.startswith("docs/"):
+            from .registry import doc_name  # registry imports this module lazily too
+            name = doc_name(path)
+            if name in owners:
+                errors.append(f"{path}: doc name {name!r} collides with {owners[name]}")
+            owners.setdefault(name, path)
     return errors
 
 

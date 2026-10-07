@@ -19,7 +19,7 @@ except ModuleNotFoundError as error:  # pragma: no cover - exercised on Python 3
     raise SystemExit("repoctl requires Python 3.11 or newer") from error
 
 from kit.core import RepoctlError
-from kit.registry import Registry
+from kit.registry import CORE, Registry
 
 DEFAULT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -56,7 +56,7 @@ def main(argv: list[str] | None = None) -> int:
         registry = Registry(root)
         arguments = build_parser(registry).parse_args(remaining)
         item = arguments.capability
-        if item.pack != "core" and not registry.enabled(item):
+        if item.pack != CORE and not registry.enabled(item):
             raise RepoctlError(registry.enable_hint(item))
         return int(item.fields["run"](root, arguments) or 0)
     except (OSError, RepoctlError) as error:
