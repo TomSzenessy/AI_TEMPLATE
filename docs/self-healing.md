@@ -228,9 +228,18 @@ fresh clone of `[template].source`) then, per kit file:
 | State | What happens |
 |---|---|
 | unchanged since shipped | replaced by the template's new version |
-| changed by the project | kept; the new version is saved under `.agent/kit-update/` and listed to merge by hand |
-| new in the template | added |
+| changed by the project, kit unchanged | kept, silently |
+| changed by the project and by the kit | kept; the kit's version is saved under `.agent/kit-update/` and listed once to merge by hand |
+| new in the template | added; if you already have your own file there, it is kept and listed once |
 | removed from the template | deleted when unchanged, listed otherwise |
+| your own file that `make adopt` kept at a kit path | never touched; listed only when the kit's version changes |
+
+A conflict is reported once per kit change: the lock then remembers the version
+offered, so the next update is quiet until the kit changes that file again. A
+project made before the lock existed gets every differing kit file listed once
+on its first update (nothing is overwritten); after that, updates apply
+automatically. A kit checkout without git history keeps the recorded
+`kit_version`.
 
 Project-owned files are never kit files: `project.toml`, `VISION.md`,
 `README.md`, `LICENSE`, `CONTEXT.md`, the stack decision, design, architecture,

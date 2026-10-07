@@ -50,8 +50,12 @@ def normalized(content: bytes) -> bytes:
     return DERIVED_BLOCK.sub(rb"\1\3", content)
 
 
+def digest_bytes(content: bytes) -> str:
+    return hashlib.sha256(normalized(content)).hexdigest()
+
+
 def digest(path: Path) -> str:
-    return hashlib.sha256(normalized(path.read_bytes())).hexdigest()
+    return digest_bytes(path.read_bytes())
 
 
 def kit_paths(kit: Path) -> list[str]:
@@ -78,17 +82,23 @@ def project_path(root: Path, path: str) -> str:
     return path
 
 
-def write_lock(root: Path, kit: Path, paths: list[str] | None = None) -> None:
-    """Record what the project now has from the kit (called by init, adopt, and update)."""
+def write_lock(root: Path, kit: Path, paths: list[str] | None = None, kept: list[str] = ()) -> None:
+    """Record what the project now has from the kit (init and adopt). `kept` are the project's own files
+    at kit paths (make adopt never overwrites them); only the kit's version of those is remembered."""
     shipped = paths if paths is not None else kit_paths(kit)
-    files = {}
-    for path in shipped:
-        local = project_path(root, path)
-        if (root / local).is_file():
-            files[path] = digest(root / local)
+    files = {path: digest(root / project_path(root, path)) for path in shipped if (root / project_path(root, path)).is_file()}
+    _save_lock(root, _kit_version(kit), files, {path: digest_bytes(_new_content(kit, root, path)) for path in kept})
+
+
+def _save_lock(root: Path, version: str, files: dict[str, str], kept: dict[str, str]) -> None:
+    previous = read_lock(root) if (root / LOCK).is_file() else {}
+    if version == "unknown" and previous.get("kit_version") not in (None, "none"):
+        version = str(previous["kit_version"])  # a non-git kit checkout does not erase a known version
+    data: dict[str, object] = {"kit_version": version, "files": dict(sorted(files.items()))}
+    if kept:
+        data["kept"] = dict(sorted(kept.items()))
     (root / LOCK).parent.mkdir(parents=True, exist_ok=True)
-    (root / LOCK).write_text(json.dumps({"kit_version": _kit_version(kit), "files": dict(sorted(files.items()))},
-                                        indent=1) + "\n", encoding="utf-8")
+    (root / LOCK).write_text(json.dumps(data, indent=1) + "\n", encoding="utf-8")
 
 
 def read_lock(root: Path) -> dict[str, object]:
@@ -107,7 +117,8 @@ def _new_content(kit: Path, root: Path, path: str) -> bytes:
     """The kit file as this project should have it (kit.mk is regenerated with the project's renames)."""
     if path == "Makefile" and project_path(root, path) == "kit.mk":
         from .adopt import render_kit_makefile
-        return render_kit_makefile((root / "Makefile").read_text(encoding="utf-8"), (kit / path).read_text(encoding="utf-8")).encode()
+        ours = (root / "Makefile").read_text(encoding="utf-8") if (root / "Makefile").is_file() else ""
+        return render_kit_makefile(ours, (kit / path).read_text(encoding="utf-8")).encode()
     if path.endswith(".md"):  # the same localization make init applied when the project was made
         from .bootstrap import localize_text
         template = load_project(kit).get("template", {})
@@ -133,27 +144,39 @@ def update(root: Path, kit: Path) -> int:
         raise RepoctlError("commit or stash your changes first, so the kit update is one reviewable change")
     lock = read_lock(root)
     locked: dict[str, str] = lock["files"]  # type: ignore[assignment]
+    kept: dict[str, str] = dict(lock.get("kept", {}))  # type: ignore[arg-type]
     new_paths = kit_paths(kit)
     updated, added, removed, conflicts = [], [], [], []
-    conflicted: set[str] = set()
+    files: dict[str, str] = {}
     if (root / STAGING).exists():
         shutil.rmtree(root / STAGING)
+    # A conflict is reported once per kit change: the lock then remembers the version offered, so an
+    # unchanged kit stays quiet about a file the project chose to keep its way.
     for path in new_paths:
         local = project_path(root, path)
         target = root / local
         content = _new_content(kit, root, path)
+        offered = digest_bytes(content)
+        if path in kept:  # the project's own file at a kit path (make adopt kept it)
+            if offered != kept[path]:
+                conflicts.append(f"{local} is yours; the kit changed its version (see {_stage(root, local, content)})")
+                kept[path] = offered
+            continue
         if not target.exists():
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(content)
             added.append(local)
-        elif normalized(target.read_bytes()) == normalized(content):
-            continue
+        elif digest(target) == offered:
+            pass
         elif path in locked and digest(target) == locked[path]:
             target.write_bytes(content)
             updated.append(local)
-        else:  # changed by the project, or never recorded: do not guess
+        elif path in locked and offered == locked[path]:
+            files[path] = locked[path]  # the kit did not change it; the project's edit stands
+            continue
+        else:  # changed by the project, or a file of its own where the kit now ships one
             conflicts.append(f"{local} (new version: {_stage(root, local, content)})")
-            conflicted.add(path)
+        files[path] = offered
     for path in sorted(set(locked) - set(new_paths)):
         local = project_path(root, path)
         target = root / local
@@ -162,12 +185,8 @@ def update(root: Path, kit: Path) -> int:
             removed.append(local)
         elif target.is_file():
             conflicts.append(f"{local} (removed from the kit; yours was changed, so it stays)")
-    write_lock(root, kit, [path for path in new_paths if path not in conflicted])
-    if conflicted:  # a conflicted file keeps its old hash, so the next update still sees the project's change
-        data = read_lock(root)
-        data["files"].update({path: locked[path] for path in conflicted if path in locked})  # type: ignore[union-attr]
-        data["files"] = dict(sorted(data["files"].items()))  # type: ignore[union-attr]
-        (root / LOCK).write_text(json.dumps(data, indent=1) + "\n", encoding="utf-8")
+    kept = {path: value for path, value in kept.items() if path in new_paths}
+    _save_lock(root, _kit_version(kit), files, kept)
     derive.sync(root)
     print(f"Kit updated to {read_lock(root)['kit_version'][:12]} (was {str(lock['kit_version'])[:12]}): "
           f"{len(updated)} updated, {len(added)} added, {len(removed)} removed, {len(conflicts)} to merge by hand.")

@@ -910,7 +910,11 @@ class KitUpdateTests(unittest.TestCase):
             self.assertEqual(check.returncode, 0, check.stderr)
             self.snapshot(project)
             again = update()
-            self.assertIn("0 updated, 0 added, 0 removed, 1 to merge", again.stdout, "idempotent; the conflict stays visible")
+            self.assertIn("0 updated, 0 added, 0 removed, 0 to merge", again.stdout, "reported once, not on every update")
+            (kit / "docs/delegation.md").write_text((kit / "docs/delegation.md").read_text() + "\nKit C note.\n")
+            self.snapshot(kit)
+            self.assertIn("merge: docs/delegation.md", update().stdout, "a new kit change to the same file is reported again")
+            self.assertIn("Our team rule.", (project / "docs/delegation.md").read_text())
 
 
 @template_only
@@ -972,6 +976,24 @@ class AdoptTests(unittest.TestCase):
         finish = subprocess.run([sys.executable, "tools/repoctl.py", "finish"], cwd=self.root, capture_output=True, text=True)
         self.assertEqual(finish.returncode, 0, finish.stdout)
         self.assertEqual(self.adopt().returncode, 1, "adopting twice is refused")
+        subprocess.run(["git", "-C", str(self.root), "add", "-A"], check=True)
+        subprocess.run(["git", "-C", str(self.root), "-c", "user.name=t", "-c", "user.email=t@example.invalid",
+                        "commit", "-qm", "adopt"], check=True, capture_output=True)
+        update = subprocess.run([sys.executable, "tools/repoctl.py", "kit-update", "--kit", str(TOOLS.parent)],
+                                cwd=self.root, capture_output=True, text=True)
+        self.assertIn("0 updated, 0 added, 0 removed, 0 to merge", update.stdout, update.stdout + update.stderr)
+
+    def test_adopted_project_passes_the_kit_suite_and_keeps_its_own_kit_paths_quiet(self) -> None:
+        # The project's own ci.yml and a doc at a kit path stay the project's, and the kit suite still passes.
+        (self.root / "docs/operations.md").write_text("# How we run it\n\nOur runbook.\n")
+        subprocess.run(["git", "-C", str(self.root), "add", "-A"], check=True)
+        subprocess.run(["git", "-C", str(self.root), "-c", "user.name=t", "-c", "user.email=t@example.invalid",
+                        "commit", "-qm", "runbook"], check=True, capture_output=True)
+        self.assertEqual(self.adopt().returncode, 0)
+        self.assertIn("Our runbook.", (self.root / "docs/operations.md").read_text())
+        suite = subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "tools/tests", "-p", "test_*.py"],
+                               cwd=self.root, capture_output=True, text=True, timeout=900)
+        self.assertEqual(suite.returncode, 0, suite.stderr[-2500:])
         subprocess.run(["git", "-C", str(self.root), "add", "-A"], check=True)
         subprocess.run(["git", "-C", str(self.root), "-c", "user.name=t", "-c", "user.email=t@example.invalid",
                         "commit", "-qm", "adopt"], check=True, capture_output=True)

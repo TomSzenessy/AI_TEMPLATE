@@ -170,7 +170,8 @@ def adopt(target: Path, kit: Path, name: str, kind: str, owner: str | None) -> N
     license_note = keep_project_license(target, "LICENSE" in kept)
     derive.sync(target)
     from .kitupdate import kit_paths, write_lock
-    write_lock(target, kit, [path for path in kit_paths(kit) if path not in kept])  # your kept files are never kit files
+    shipped = kit_paths(kit)  # your kept files are never kit files; only the kit's version of them is remembered
+    write_lock(target, kit, [path for path in shipped if path not in kept], [path for path in kept if path in shipped])
     print(f"Adopted the agent kit: {len(copied)} file(s) added, {len(merged)} merged, {len(kept)} of yours kept.")
     for item in merged:
         print(f"  merged: {item}")
