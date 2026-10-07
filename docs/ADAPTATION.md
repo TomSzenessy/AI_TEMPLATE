@@ -24,6 +24,7 @@ a project small:
 | `docs/ISSUE_TEMPLATE.md` and `.github/ISSUE_TEMPLATE/` | Keep as `agent-first` intake schemas. | Do not turn them into a status board; remove/disable native forms in `regulated` or `minimal` profiles. |
 | `docs/legal/*.template.md` | Keep while a document may apply. | Replace with a reviewed final document and update `legal_document_paths`; unused templates may be removed from a project copy. |
 | `docs/research/` | Keep as provenance while its guidance matters. | Archive/remove after the knowledge has been internalized and no decision cites it. |
+| `.agents/trials/` | Template maintenance: build-trial requests and seeds. | Pruned by `make init` and skipped by `make adopt`, together with any doc binding that only pointed at them; add your own requests to run `make trial`. |
 | `docs/ERROR_LOG.md` | Keep as an append-only solved-failure ledger. | Do not use it for open work; link open work to Issues. |
 | `.agents/skills/` | Keep the small first-party workflows and verified reusable capabilities. | Retain a reviewed skill while it remains trusted and useful; remove it only with a documented trust, permission, maintenance, or owner decision. |
 | `.security/` | Keep and refresh the threat model/config as security surfaces change. | Do not delete security evidence merely to make a check quiet. |

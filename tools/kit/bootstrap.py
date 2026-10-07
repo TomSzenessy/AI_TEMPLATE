@@ -173,6 +173,29 @@ def prune_template_material(root: Path, project: dict[str, object]) -> list[str]
     return removed
 
 
+COVERS = re.compile(r"<!--\s*covers:([^>]*?)-->")
+
+
+def strip_pruned_bindings(root: Path, prune: list[str]) -> list[str]:
+    """Drop covers patterns that only named pruned template material, so init leaves no dead binding."""
+    prefixes = [pattern.removesuffix("**").rstrip("/") for pattern in prune]
+    changed = []
+    for relative in repository_files(root):
+        if not relative.endswith(".md"):
+            continue
+        text = read_text_file(root, relative)
+        match = COVERS.search(text or "")
+        if not match:
+            continue
+        patterns = match.group(1).split()
+        kept = [p for p in patterns if not any(p == prefix or p.startswith(prefix + "/") for prefix in prefixes)]
+        if kept != patterns:
+            replacement = f"<!-- covers: {' '.join(kept)} -->" if kept else ""
+            (root / relative).write_text(text[:match.start()] + replacement + text[match.end():], encoding="utf-8")
+            changed.append(relative)
+    return changed
+
+
 def reset_repository_metadata(manifest: str) -> str:
     manifest = re.sub(r'(?m)^description\s*=\s*".*"$', 'description = ""', manifest, count=1)
     manifest = re.sub(r"(?m)^topics\s*=\s*\[[^\]]*\]", "topics = []", manifest, count=1)
@@ -213,7 +236,9 @@ def initialize_project(root: Path, name: str, kind: str, owner: str | None = Non
     manifest = manifest.replace('owner = "TomSzenessy"', 'owner = "project-owner"')
     manifest = reset_template_surface(manifest)
     manifest = reset_vision_for_project(root, manifest, name)
+    template = load_project(root).get("template", {})
     removed = prune_template_material(root, load_project(root))
+    strip_pruned_bindings(root, list(template.get("prune", [])) if isinstance(template, dict) else [])
     manifest = reset_repository_metadata(manifest)
     if owner:
         # Name the accountable owner once here instead of failing later checks on a placeholder.

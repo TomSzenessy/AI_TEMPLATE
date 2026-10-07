@@ -798,6 +798,9 @@ class TrialTests(unittest.TestCase):
                                             capture_output=True, text=True).stdout, "")
             self.assertIn("intake", subprocess.run([sys.executable, "tools/repoctl.py", "next"], cwd=project,
                                                    capture_output=True, text=True).stdout)
+            for command in ("check", "finish"):  # a fresh project starts green, so its first gate failure is the agent's
+                result = subprocess.run([sys.executable, "tools/repoctl.py", command], cwd=project, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
 
 class InitOwnerTests(unittest.TestCase):
@@ -851,6 +854,8 @@ class AdoptTests(unittest.TestCase):
         problems = [line for line in check.stderr.splitlines() if line.startswith("- ")]
         self.assertTrue(problems and all("unregistered product surface" in line for line in problems), check.stderr)
         self.assertIn("infrastructure_paths", check.stderr, "the message names the fix")
+        finish = subprocess.run([sys.executable, "tools/repoctl.py", "finish"], cwd=self.root, capture_output=True, text=True)
+        self.assertEqual(finish.returncode, 0, finish.stdout)
         self.assertEqual(self.adopt().returncode, 1, "adopting twice is refused")
 
     def test_adopt_refuses_uncommitted_work(self) -> None:
