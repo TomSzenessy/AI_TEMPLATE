@@ -186,6 +186,14 @@ read-only headless session (without MCP servers, so runs stay fast and
 deterministic) and records pass rate, turns, time, and cost under
 `.agent/evals/`. Re-run it after changing `AGENTS.md`, the map, or the docs.
 A change to the kit that lowers the pass rate or raises cost is a regression.
+For changes to the skills or gates, also run a **build trial**: give a
+cheap model (`claude -p --model sonnet`) a product request with the owner's
+answers in a fresh `make init` copy, then audit what it skipped. The first
+trial built a working prototype for $1.74 but skipped the design record, the
+owning doc, and the UI review; those became the product guardrails above. A
+second run told only to "run make done and fix what it reports" repaired all
+five findings for $0.70. Visual review still needs a browser in the run.
+
 A host-side failure, such as an expired login, is recorded as an error rather
 than as a wrong answer. Runs drop the launching session's host variables, so a
 benchmark started from inside an agent session uses the CLI's own login, as a
