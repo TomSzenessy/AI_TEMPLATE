@@ -341,7 +341,8 @@ A template bug is copied into every project made from it, so fixes flow both
 ways. `make init` and `make adopt` record `tools/kit-lock.json`, the hash of
 every kit file as shipped (generated `repoctl:` blocks excluded, so regenerated
 tables are not edits). `make kit-update [KIT=<template checkout>]` (default: a
-fresh clone of `[template].source`) then, per kit file:
+fresh clone of `[template].source`, at `KIT_REF=<commit or tag>` when given,
+printing the commit range it applies) then, per kit file:
 
 | State | What happens |
 |---|---|

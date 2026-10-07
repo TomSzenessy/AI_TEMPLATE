@@ -254,11 +254,12 @@ def adopt(root: Path, args) -> None:
 
 
 @command("kit-update", "Pull template fixes into this project (keeps your changes)", group="setup",
-         usage="make kit-update [KIT=<template checkout>]",
-         args=(arg("--kit", var="KIT", help="template checkout (default: clone [template].source)"),))
+         usage="make kit-update [KIT=<template checkout>] [KIT_REF=<sha>]",
+         args=(arg("--kit", var="KIT", help="template checkout (default: clone [template].source)"),
+               arg("--ref", var="KIT_REF", help="pin the update to this template commit (default: its HEAD)")))
 def kit_update(root: Path, args) -> int:
     from .kitupdate import update_from_source
-    return update_from_source(root, args.kit)
+    return update_from_source(root, args.kit, args.ref)
 
 
 @command("check", "Every blocking check of the enabled packs", group="setup", usage="make check")

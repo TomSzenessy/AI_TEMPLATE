@@ -211,18 +211,32 @@ def update(root: Path, kit: Path) -> int:
     return 0
 
 
-def update_from_source(root: Path, kit: str | None) -> int:
-    """KIT is a template checkout; without it, clone [template].source into a temporary directory."""
+def update_from_source(root: Path, kit: str | None, ref: str | None = None) -> int:
+    """KIT is a template checkout; without it, clone [template].source into a temporary directory.
+    KIT_REF pins the clone to one commit instead of the template's moving HEAD."""
     if kit:
+        if ref:
+            raise RepoctlError("KIT_REF applies to the clone of [template].source; with KIT=<checkout>, check out that commit yourself")
         return update(root, Path(kit))
     template = load_project(root).get("template", {})
     source = str(template.get("source", "")) if isinstance(template, dict) else ""
     if not source:
         raise RepoctlError("set KIT=<template checkout> or [template].source in project.toml")
+    if ref and (ref.startswith("-") or not re.fullmatch(r"[0-9A-Za-z][0-9A-Za-z._/-]{0,199}", ref)):
+        raise RepoctlError(f"KIT_REF {ref!r} is not a commit SHA, tag, or branch name")
     with tempfile.TemporaryDirectory() as folder:
-        result = subprocess.run(["git", "clone", "-q", "--depth", "1", source, folder], capture_output=True, text=True, timeout=300)
+        cloning = ["git", "clone", "-q", *([] if ref else ["--depth", "1"]), source, folder]
+        result = subprocess.run(cloning, capture_output=True, text=True, timeout=300)
         if result.returncode != 0:
             raise RepoctlError(f"could not clone {source}: {result.stderr.strip()[-300:]} (or pass KIT=<checkout>)")
+        if ref:
+            checkout = subprocess.run(["git", "-C", folder, "checkout", "-q", "--detach", f"{ref}^{{commit}}"],
+                                      capture_output=True, text=True, timeout=60)
+            if checkout.returncode != 0:
+                raise RepoctlError(f"KIT_REF {ref!r} is not a commit of {source}: {checkout.stderr.strip()[-200:]}")
+        before = str(read_lock(root).get("kit_version", "none"))
+        print(f"Applying kit commits {before[:12] if before not in ('none', 'unknown') else 'unrecorded'}"
+              f"..{_kit_version(Path(folder))[:12]} from {source}")
         return update(root, Path(folder))
 
 

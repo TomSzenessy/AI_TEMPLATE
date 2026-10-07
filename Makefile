@@ -61,6 +61,7 @@ export KIT_IN_GROUP = $(if $(filter command line,$(origin GROUP)),$(value GROUP)
 export KIT_IN_ISSUE_FILE = $(if $(filter command line,$(origin ISSUE_FILE)),$(value ISSUE_FILE))
 export KIT_IN_KIND = $(if $(filter command line,$(origin KIND)),$(value KIND))
 export KIT_IN_KIT = $(if $(filter command line,$(origin KIT)),$(value KIT))
+export KIT_IN_KIT_REF = $(if $(filter command line,$(origin KIT_REF)),$(value KIT_REF))
 export KIT_IN_MODEL = $(if $(filter command line,$(origin MODEL)),$(value MODEL))
 export KIT_IN_NAME = $(if $(filter command line,$(origin NAME)),$(value NAME))
 export KIT_IN_OWNER = $(if $(filter command line,$(origin OWNER)),$(value OWNER))
@@ -145,7 +146,7 @@ adopt: python-check
 	$(PYTHON) "$${KIT_DIR}/tools/repoctl.py" --root "$(CURDIR)" adopt --from "$${KIT_DIR}" --name "$${KIT_IN_NAME}" --kind "$${KIT_IN_KIND}" $(if $(KIT_IN_OWNER),--owner "$${KIT_IN_OWNER}",)
 
 kit-update: python-check
-	@$(REPOCTL) kit-update $(if $(KIT_IN_KIT),--kit "$${KIT_IN_KIT}",)
+	@$(REPOCTL) kit-update $(if $(KIT_IN_KIT),--kit "$${KIT_IN_KIT}",) $(if $(KIT_IN_KIT_REF),--ref "$${KIT_IN_KIT_REF}",)
 
 check: python-check
 	@$(REPOCTL) check

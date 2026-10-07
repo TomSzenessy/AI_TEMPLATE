@@ -138,7 +138,7 @@ PROJECT SETUP AND MAINTENANCE
                                      Turn the template into your project
   make -f <kit>/Makefile adopt NAME=x KIND=web OWNER=you
                                      Bring this kit into an existing repository (--root) without overwriting it
-  make kit-update [KIT=<template checkout>]
+  make kit-update [KIT=<template checkout>] [KIT_REF=<sha>]
                                      Pull template fixes into this project (keeps your changes)
   make check                         Every blocking check of the enabled packs
   make doctor                        Check initialization and the readiness of the declared phase

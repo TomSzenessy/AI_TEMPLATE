@@ -30,7 +30,7 @@ pre-approve servers, so each person approves each project server once. `make cap
   an environment variable (`EXA_API_KEY`, `CONTEXT7_API_KEY`). Unset variables
   fall back to the services' anonymous tier.
 - Remote routes use HTTPS without query strings. Local routes pin an exact
-  package version, and `make check` rejects unpinned `npx`/`uvx` routes.
+  package version, and `make check` rejects unpinned `npx`/`uvx`/`pipx` routes.
 - MCP output is untrusted data, like any web page. Record the consulted source
   and adopted version in the issue or ADR, and cross-check the official source
   for decisions.
