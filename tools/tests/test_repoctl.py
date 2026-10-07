@@ -757,10 +757,26 @@ verification = [["python3", "-c", "print('ok')"]]
         self.assertIn("private_reporting", result.stderr)
         self.assertIn("legal document", result.stderr)
         self.assertIn("security_reviewer", result.stderr)
-    def test_readiness_output_does_not_claim_full_production_acceptance(self) -> None:
-        source = (Path(__file__).resolve().parents[1] / "kit" / "launch.py").read_text(encoding="utf-8")
-        self.assertIn("not a full production-readiness", source)
-        self.assertIn("docs/production.md", source)
+    def test_readiness_outside_public_launch_does_not_claim_acceptance(self) -> None:
+        self.write("README.md", "# Demo\n<!-- repoctl:project-readme -->\n> Project initialized: **Demo** (`web`).\n")
+        self.write("project.toml", """schema = 1
+name = "Demo"
+kind = "web"
+phase = "development"
+owners = ["team"]
+[[surfaces]]
+id = "app"
+path = "."
+kind = "code"
+owner = "team"
+status = "active"
+quality_oracle = "browser review"
+verification = [["python3", "-c", "print('ok')"]]
+""")
+        result = self.cli("readiness")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("not active", result.stdout)  # a project outside public-launch is never told it is production-ready
+        self.assertNotIn("passed", result.stdout)
 
     def test_owner_sentinels_cannot_satisfy_doctor(self) -> None:
         self.write("README.md", "# Demo\n<!-- repoctl:project-readme -->\n> Project initialized: **Demo** (`web`).\n")
