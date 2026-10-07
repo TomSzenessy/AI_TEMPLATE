@@ -9,7 +9,8 @@ usually faster than this page.
 
 - [`../project.toml`](../project.toml): surfaces, checks, budgets, risk tiers,
   adapters, launch state, and reviewed skill provenance.
-- [`../resources.toml`](../resources.toml): read-only resource routes and MCP routes.
+- [`../resources.toml`](../resources.toml): read-only resource routes.
+- [`../.agents/`](../.agents/): every capability, one file each (`make capabilities` lists them by kind and pack).
 
 ## Documents
 
@@ -24,7 +25,7 @@ itself and this table cannot drift. Edit the line in the document, not here.
 |---|---|---|
 | [`../AGENTS.md`](../AGENTS.md) | Agent operating contract and trigger router | Any change is requested. |
 | [`../VISION.md`](../VISION.md) | Accepted product direction, constraints, and success evidence | Starting a project or making a high-impact scope decision. |
-| [`ADAPTATION.md`](./ADAPTATION.md) | Lean core, artifact lifecycle, and capability-pack selection | Turning the template into a project without generating unnecessary structure. |
+| [`ADAPTATION.md`](./ADAPTATION.md) | Lean core, artifact lifecycle, packs, and capability patterns | Turning the template into a project without generating unnecessary structure. |
 | [`ERROR_LOG.md`](./ERROR_LOG.md) | Solved failure signatures and permanent fixes | A recurring failure needs a durable regression/fix record. |
 | [`ISSUE_TEMPLATE.md`](./ISSUE_TEMPLATE.md) | Canonical issue shape and labels | Filing or materially updating an issue. |
 | [`STACK-DECISION.md`](./STACK-DECISION.md) | Framework/toolchain decision and rationale | Choosing a project stack or replacing an assumed tool. |
@@ -71,6 +72,7 @@ itself and this table cannot drift. Edit the line in the document, not here.
 | [`resources.md`](./resources.md) | Primary docs, MCP routes, licenses, and resource intake | A task needs a capability, example, current documentation, or external gate. |
 | [`skills.md`](./skills.md) | Skill discovery, provenance, and overlap rules | A task needs a capability the repository does not provide. |
 | [`adr/0001-issue-backed-write-ahead.md`](./adr/0001-issue-backed-write-ahead.md) | Accepted write-ahead and documentation-boundary decision | You need the rationale for issue-backed continuity. |
+| [`adr/0002-one-capability-model.md`](./adr/0002-one-capability-model.md) | The capability model: kinds, declaration fields, discovery, packs, and what is out of scope | You add, find, or switch off a skill, role, doc, rule, check, command, MCP route, or pack. |
 | [`adr/README.md`](./adr/README.md) | Architecture decision record rules | A hard-to-reverse, surprising trade-off is made. |
 | [`research/agentic-repository-baselines.md`](./research/agentic-repository-baselines.md) | Primary-source research behind the template | Guidance, legal boundaries, or external references need provenance. |
 | [`research/mcp-production-boundaries-2026-09-25.md`](./research/mcp-production-boundaries-2026-09-25.md) | MCP/resource and production-evidence boundaries | Adding a documentation provider or preparing a real release. |
