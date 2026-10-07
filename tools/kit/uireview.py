@@ -37,7 +37,9 @@ from urllib.parse import urlsplit
 
 from . import derive
 from .config import setting
-from .core import RepoctlError, ensure_inside_root, load_project, read_text_file, repository_files
+from .core import (
+    RepoctlError, ensure_inside_root, load_project, normalized_relative_path, read_text_file, repository_files,
+)
 from .product import is_product, is_ui, product_surfaces
 
 SHOTS = ".agent/reviews"
@@ -63,8 +65,11 @@ SAFE = re.compile(r"[^A-Za-z0-9-]+")
 def surface_digest(root: Path, path: str) -> str:
     """Content digest of a surface's tracked and untracked (non-ignored) files."""
     digest = hashlib.sha256()
-    prefix = path.rstrip("/") + "/"
+    surface = normalized_relative_path(path, "path") if path.strip() else "."
+    prefix = "" if surface == "." else surface + "/"  # the root surface covers every file
     for relative in repository_files(root):
+        if relative == LOG or relative.startswith(SHOTS + "/"):
+            continue  # the review record and its screenshots must not stale the review they describe
         if relative.startswith(prefix):
             digest.update(relative.encode())
             try:
