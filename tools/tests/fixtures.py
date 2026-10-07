@@ -23,6 +23,7 @@ import subprocess
 import sys
 import tempfile
 import textwrap
+import tomllib
 import unittest
 from datetime import date, timedelta
 from pathlib import Path
@@ -34,6 +35,19 @@ if str(TOOLS) not in sys.path:
 
 import repoctl  # noqa: E402  the CLI entry point, called in-process
 from kit import derive, docsync, registry  # noqa: E402
+
+# Template maintenance tests (they read the template's own history, Makefile wiring or
+# release material) run in the template checkout only, never in a project's copy of the suite.
+IN_TEMPLATE = tomllib.loads((TOOLS.parent / "project.toml").read_text(encoding="utf-8")).get("kind") == "template"
+template_only = unittest.skipUnless(IN_TEMPLATE, "template maintenance: runs in the template checkout only")
+
+
+def kit_makefile(root: Path) -> str:
+    """The kit's make targets: `kit.mk` in an adopted project (targets it collides on become
+    `kit-<name>`), else the Makefile."""
+    included = root / "kit.mk"
+    return (included if included.is_file() else root / "Makefile").read_text(encoding="utf-8")
+
 
 # Fixture dates follow the calendar so the suite never expires (#10).
 RECENT = (date.today() - timedelta(days=30)).isoformat()
@@ -49,6 +63,14 @@ GIT_ISOLATION = {
     "GIT_AUTHOR_EMAIL": "test@example.com",
     "GIT_COMMITTER_NAME": "Test",
     "GIT_COMMITTER_EMAIL": "test@example.com",
+    # No detached `gc --auto` / `maintenance`: a background git still writing into a
+    # fixture's .git after the command returns makes the temp-dir cleanup fail
+    # ("Directory not empty: '.git'", seen in CI on test_kit_update_ref).
+    "GIT_CONFIG_COUNT": "2",
+    "GIT_CONFIG_KEY_0": "gc.auto",
+    "GIT_CONFIG_VALUE_0": "0",
+    "GIT_CONFIG_KEY_1": "maintenance.auto",
+    "GIT_CONFIG_VALUE_1": "false",
 }
 
 

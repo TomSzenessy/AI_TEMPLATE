@@ -101,6 +101,8 @@ class MakeInputTests(unittest.TestCase):
         kit = Path(self.tmp.name) / name
         (kit / "tools").mkdir(parents=True)
         shutil.copy(ROOT / "Makefile", kit / "Makefile")
+        if (ROOT / "kit.mk").is_file():  # an adopted project's Makefile includes the kit's targets
+            shutil.copy(ROOT / "kit.mk", kit / "kit.mk")
         (kit / "tools" / "repoctl.py").write_text("")
         return kit
 

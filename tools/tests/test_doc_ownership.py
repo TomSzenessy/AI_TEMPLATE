@@ -10,7 +10,7 @@ template keeps its own docs, so they skip there (#47).
 from __future__ import annotations
 
 import re
-import tomllib
+import sys
 import unittest
 from pathlib import Path
 
@@ -19,8 +19,8 @@ DOCS = REPO / "docs"
 
 # Template-maintenance tests need the template's own docs; in a project made
 # from it they skip, so a fresh project's `make done` stays green (EL-001).
-IN_TEMPLATE = tomllib.loads((REPO / "project.toml").read_text(encoding="utf-8")).get("kind") == "template"
-template_only = unittest.skipUnless(IN_TEMPLATE, "doc ownership: template checkout only")
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from fixtures import template_only  # noqa: E402
 
 # Rules whose defining wording must live in exactly one document (#47). The
 # value is the only document allowed to contain the phrase; every other

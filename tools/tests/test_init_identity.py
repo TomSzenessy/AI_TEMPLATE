@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[2]
 RECORDS = ("project.toml", "VISION.md", "docs/STACK-DECISION.md", "README.md")
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # `fixtures`, however this file is invoked (#33)
-from fixtures import Scratch, git_in, run_cli  # noqa: E402  shared builders, in-process CLI, isolated git (#43)
+from fixtures import Scratch, git_in, run_cli, template_only  # noqa: E402  shared builders, in-process CLI, isolated git (#43)
 
 
 def run_init(root: Path, *extra: str) -> subprocess.CompletedProcess[str]:
@@ -68,6 +68,7 @@ class InitIdentityTests(Scratch):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("already initialized", result.stdout + result.stderr)
 
+    @template_only  # it runs the previous release's bootstrap from the template's history
     def test_unmodified_template_initializes_as_the_previous_release_did(self) -> None:
         root = self.copy_working_tree()
         baseline = self.copy_working_tree()  # identical, except it runs the previous release's bootstrap

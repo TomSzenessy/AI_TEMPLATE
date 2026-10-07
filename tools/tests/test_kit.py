@@ -18,7 +18,7 @@ from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # `fixtures`, however this file is invoked (#33)
 from fixtures import (RECENT, TOOLS, KitRepository, Scratch,  # noqa: E402  shared builders, in-process CLI, isolated git (#43)
-                      clean_env, fake_gh, git_in, http_server, run_cli)
+                      clean_env, fake_gh, git_in, http_server, run_cli, template_only)
 
 from kit import (  # noqa: E402
     core, ci, commands, coupling, derive, docsync, evals, garden, hygiene, navigate, product,
@@ -28,10 +28,6 @@ from kit.core import load_project  # noqa: E402
 from kit.gitinfo import path_matches  # noqa: E402
 
 # Built by concatenation so this test file never trips the marker scanner itself.
-# Template-maintenance tests need the uninitialized template (its seeds and trial requests);
-# in a project made from it they skip, so a fresh project's make done stays green.
-IN_TEMPLATE = tomllib.loads((TOOLS.parent / "project.toml").read_text(encoding="utf-8")).get("kind") == "template"
-template_only = unittest.skipUnless(IN_TEMPLATE, "template maintenance: runs in the template checkout only")
 
 TASK = "TO" + "DO"
 DEPRECATED = "DEPRE" + "CATED"

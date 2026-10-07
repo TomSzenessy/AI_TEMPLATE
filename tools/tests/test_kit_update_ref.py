@@ -6,7 +6,6 @@ import json
 import subprocess
 import sys
 import tempfile
-import tomllib
 import unittest
 from pathlib import Path
 
@@ -14,16 +13,14 @@ TOOLS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(TOOLS))
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # `fixtures`, however this file is invoked (#33)
-from fixtures import Scratch, git_in, run_cli  # noqa: E402  shared builders, in-process CLI, isolated git (#43)
-
-IN_TEMPLATE = tomllib.loads((TOOLS.parent / "project.toml").read_text(encoding="utf-8")).get("kind") == "template"
+from fixtures import Scratch, git_in, run_cli, template_only  # noqa: E402  shared builders, in-process CLI, isolated git (#43)
 
 
 def git(where: Path, *args: str) -> str:
     return git_in(where, *args).stdout
 
 
-@unittest.skipUnless(IN_TEMPLATE, "template maintenance: runs in the template checkout only")
+@template_only
 class KitRefTests(Scratch):
     def build(self, temp: str) -> tuple[Path, Path, str, str]:
         """A local template with commits A then B, and a project made from A whose [template].source is it."""

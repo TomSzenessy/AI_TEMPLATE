@@ -15,7 +15,7 @@ from pathlib import Path
 TOOLS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(TOOLS))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from fixtures import Scratch  # noqa: E402
+from fixtures import Scratch, kit_makefile  # noqa: E402
 
 from kit import session  # noqa: E402
 
@@ -39,8 +39,8 @@ def run(context) -> list[str]:
 
 def verify_recipe() -> list[str]:
     """The repoctl subcommands `make verify` runs, read from the real Makefile."""
-    text = (REPO / "Makefile").read_text(encoding="utf-8")
-    block = re.search(r"(?m)^verify:.*\n((?:\t.*\n)+)", text).group(1)
+    text = kit_makefile(REPO)
+    block = re.search(r"(?m)^(?:kit-)?verify:.*\n((?:\t.*\n)+)", text).group(1)
     return [line.split("$(REPOCTL)", 1)[1].split() for line in block.splitlines() if "$(REPOCTL)" in line]
 
 
@@ -108,7 +108,7 @@ class NoSecondImplementation(unittest.TestCase):
             self.assertNotIn(needle, text, f"session.py calls {needle} itself; name the check in registry_findings instead")
 
     def test_doctor_does_not_rerun_checks_a_gate_already_ran(self) -> None:
-        self.assertIn("doctor --checks-done", (REPO / "Makefile").read_text(encoding="utf-8"))
+        self.assertIn("doctor --checks-done", kit_makefile(REPO))
 
     def test_date_staleness_has_one_implementation(self) -> None:
         text = self.source("structure.py")
