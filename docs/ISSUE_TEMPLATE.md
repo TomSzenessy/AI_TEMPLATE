@@ -37,7 +37,9 @@ Native forms are lightweight intake in `agent-first`; an agent or maintainer
 adds the canonical labels during triage. The `repoctl issue` path always emits
 the full required label set. In `regulated`, use the validated CLI/private
 route rather than native forms so the review-evidence and disclosure gates are
-not bypassed.
+not bypassed. When a natively filed issue misses the contract, the issue-contract
+check comments with each problem and its fix. The `Reviewer/date` must not be in
+the future; it never expires, because it records the review of that text.
 
 ## Classification
 

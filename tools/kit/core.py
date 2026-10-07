@@ -262,6 +262,18 @@ def worktree_files(root: Path) -> list[Path]:
     return files
 
 
+def parse_iso_date(text: str | None) -> "datetime.date | None":
+    """A YYYY-MM-DD string as a date, or None when it is missing or not a real date."""
+    try:
+        return datetime.strptime(str(text).strip(), "%Y-%m-%d").date() if text else None
+    except ValueError:
+        return None
+
+
+def date_is_future(value: "datetime.date") -> bool:
+    return value > datetime.now(timezone.utc).date()
+
+
 def date_is_stale(value: datetime.date) -> bool:
     today = datetime.now(timezone.utc).date()
     return value > today or value < today - timedelta(days=365)

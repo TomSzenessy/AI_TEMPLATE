@@ -108,5 +108,5 @@ and public-launch prerequisites; it deliberately does **not** validate the
 whole matrix above. The template leaves those facts to the instantiated project.
 From `phase = "private-preview"` on it also requires a fresh, passing UI
 review for every web UI surface ([`building.md`](./building.md#ui-review)),
-and a vision, stack decision, and skill provenance reviewed within the last
-year; before that, their age is advice from `make garden`, never a failure.
+and a vision, stack decision, skill provenance, and critic evidence reviewed
+within the last year; before that, their age is advice from `make garden`, never a failure.

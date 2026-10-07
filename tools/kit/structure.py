@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 import re
 import subprocess
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 from .core import (
@@ -22,6 +22,7 @@ from .core import (
     is_link_like,
     is_placeholder,
     load_project,
+    parse_iso_date,
     normalized_relative_path,
     secret_matches,
 )
@@ -107,7 +108,7 @@ def critic_evidence_paths(surface: dict[str, object]) -> list[str]:
     return value
 
 
-def validate_critic_evidence(root: Path, surface: dict[str, object]) -> None:
+def validate_critic_evidence(root: Path, surface: dict[str, object], release_gate: bool = False) -> None:
     paths = critic_evidence_paths(surface)
     if not paths:
         raise RepoctlError(
@@ -143,13 +144,11 @@ def validate_critic_evidence(root: Path, surface: dict[str, object]) -> None:
                 raise RepoctlError(f"critic artifact does not exist: {artifact.group(1)}")
         reviewed = re.search(r"(?im)^Date:\s*(\d{4}-\d{2}-\d{2})", content)
         if reviewed:
-            try:
-                reviewed_date = datetime.strptime(reviewed.group(1), "%Y-%m-%d").date()
-            except ValueError as error:
-                raise RepoctlError(f"critic evidence has an invalid date: {value}") from error
-            today = datetime.now(timezone.utc).date()
-            if reviewed_date > today or reviewed_date < today - timedelta(days=365):
-                raise RepoctlError(f"critic evidence is stale or future-dated: {value}")
+            reviewed_date = parse_iso_date(reviewed.group(1))
+            if reviewed_date is None:
+                raise RepoctlError(f"critic evidence has an invalid date: {value}")
+            if _too_old_or_future(reviewed_date, release_gate):
+                raise RepoctlError(f"critic evidence is {'stale or ' if release_gate else ''}future-dated: {value}")
         commit = re.search(r"(?im)^Commit:\s*([0-9a-f]{40})\b", content)
         if commit:
             try:

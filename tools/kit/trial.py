@@ -39,7 +39,7 @@ import tomllib
 
 from .core import RepoctlError, ensure_inside_root
 from .evals import INHERITED_SESSION
-from .gitinfo import git
+from .gitinfo import git, listed_files
 
 TRIALS = ".agents/trials"
 REPORTS = ".agent/trials"
@@ -68,11 +68,6 @@ def load_trial(root: Path, identifier: str) -> dict[str, object]:
     return spec
 
 
-def _kit_files(root: Path) -> list[str]:
-    listed = git(root, "ls-files", "-z", "--cached", "--others", "--exclude-standard") or ""
-    return [path for path in listed.split("\0") if path and (root / path).is_file()]
-
-
 def _copy(root: Path, files: list[str], target: Path) -> None:
     for relative in files:
         destination = target / relative
@@ -99,7 +94,7 @@ def prepare(root: Path, spec: dict[str, object], project: Path) -> None:
     _run(["git", "config", "user.name", "Trial Owner"], project)
     _run(["git", "config", "user.email", "trial@example.invalid"], project)
     if spec["mode"] == "new":
-        _copy(root, _kit_files(root), project)
+        _copy(root, listed_files(root), project)
         _run([sys.executable, "tools/repoctl.py", "init", "--name", str(spec["id"]), "--kind", str(spec["kind"]),
               "--owner", "trial-owner"], project)  # as the README tells a real owner to
         _commit(project, f"chore: start {spec['id']} from the template")

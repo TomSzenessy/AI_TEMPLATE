@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import re
 import subprocess
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 
 try:
@@ -16,7 +16,9 @@ except ImportError:  # pragma: no cover - module import from a package context
 from .core import (
     RepoctlError,
     SENSITIVE_CONTENT_PATTERNS,
+    date_is_future,
     date_is_stale,
+    parse_iso_date,
     ensure_inside_root,
     governance_profile,
     is_placeholder,
@@ -66,12 +68,10 @@ def validate_review_evidence(
     date_match = re.search(r"(?im)^Date:\s*(\d{4}-\d{2}-\d{2})\s*$", content)
     if not date_match:
         raise RepoctlError("review evidence must contain an ISO date")
-    try:
-        reviewed_date = datetime.strptime(date_match.group(1), "%Y-%m-%d").date()
-    except ValueError as error:
-        raise RepoctlError("review evidence date is invalid") from error
-    today = datetime.now(timezone.utc).date()
-    if reviewed_date > today or reviewed_date < today - timedelta(days=365):
+    reviewed_date = parse_iso_date(date_match.group(1))
+    if reviewed_date is None:
+        raise RepoctlError("review evidence date is invalid")
+    if date_is_stale(reviewed_date):  # checked when filing: evidence for a new public issue must be current
         raise RepoctlError("review evidence date is stale or in the future")
     if not re.search(r"(?im)^Result:\s*(?:pass|approved|public-safe)\b", content):
         raise RepoctlError("review evidence must record a public-safe result")
@@ -201,12 +201,11 @@ def validate_issue_body(body: str, profile: str = "regulated") -> None:
     reviewer_date = re.search(r"\b(\d{4}-\d{2}-\d{2})\b", reviewer.group(1))
     if not reviewer_date:
         raise RepoctlError("issue reviewer/date must include an ISO date, e.g. '- **Reviewer/date:** octocat 2026-10-07'")
-    try:
-        parsed_reviewer_date = datetime.strptime(reviewer_date.group(1), "%Y-%m-%d").date()
-    except ValueError as error:
-        raise RepoctlError("issue reviewer/date is invalid") from error
-    if date_is_stale(parsed_reviewer_date):
-        raise RepoctlError("issue reviewer/date is stale or in the future")
+    parsed_reviewer_date = parse_iso_date(reviewer_date.group(1))
+    if parsed_reviewer_date is None:
+        raise RepoctlError("issue reviewer/date is invalid")
+    if date_is_future(parsed_reviewer_date):  # the review belongs to this text; it does not age out
+        raise RepoctlError("issue reviewer/date is in the future")
     classification = disclosure_class(disclosure)
     if classification not in {"ordinary", "public-reviewed"}:
         raise RepoctlError(

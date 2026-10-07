@@ -820,7 +820,7 @@ class InitOwnerTests(unittest.TestCase):
         from kit import trial
         with tempfile.TemporaryDirectory() as folder:
             project = Path(folder)
-            trial._copy(TOOLS.parent, trial._kit_files(TOOLS.parent), project)
+            trial._copy(TOOLS.parent, trial.listed_files(TOOLS.parent), project)
             def init(owner: str) -> subprocess.CompletedProcess[str]:
                 return subprocess.run([sys.executable, "tools/repoctl.py", "init", "--name", "demo", "--kind", "web",
                                        "--owner", owner], cwd=project, capture_output=True, text=True)
@@ -898,6 +898,19 @@ class DecisionAgeTests(unittest.TestCase):
         self.assertFalse(structure._too_old_or_future(old, release_gate=False), "make check must not rot with the calendar")
         self.assertTrue(structure._too_old_or_future(old, release_gate=True))
         self.assertTrue(structure._too_old_or_future(future, release_gate=False), "a future date is a typo")
+
+    def test_critic_evidence_age_gates_release_only(self) -> None:
+        from datetime import timedelta
+        from kit import structure
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            old = (date.today() - timedelta(days=500)).isoformat()
+            (root / "review.md").write_text(f"Issue: #1\nCommit: {'a' * 40}\nArtifact: review.md\nReviewer: octocat\n"
+                                            f"Date: {old}\nResult: pass\n")
+            surface = {"id": "app", "critic_evidence": ["review.md"]}
+            structure.validate_critic_evidence(root, surface)  # make check: an old review is still a review
+            with self.assertRaisesRegex(Exception, "stale or future-dated"):
+                structure.validate_critic_evidence(root, surface, release_gate=True)
 
     def test_skill_review_age_gates_release_only(self) -> None:
         import tomllib
@@ -1025,8 +1038,8 @@ class CiCheckTests(unittest.TestCase):
             + "### Dependencies and handoff\n- **Owner / next action:** maintainer\n"
             + "### Type\nbug\n### Priority\nP2\n### Area\nrepo\n### Topic\nci-checks\n### Status\ntriage\n"
         )
-        valid, labels = ci.issue_contract_check(body, set(), "agent-first", registry, today=date.today())
-        self.assertTrue(valid)
+        valid, labels, reasons = ci.issue_contract_check(body, set(), "agent-first", registry, today=date.today())
+        self.assertTrue(valid, reasons)
         self.assertIn("topic:ci-checks", labels)
         def rejected(text: str) -> bool:
             try:
@@ -1034,7 +1047,12 @@ class CiCheckTests(unittest.TestCase):
             except Exception:  # noqa: BLE001 - an early validator raising is also a rejection
                 return True
 
-        self.assertTrue(rejected(body.replace(RECENT, (date.today() - timedelta(days=500)).isoformat())))
+        self.assertFalse(rejected(body.replace(RECENT, (date.today() - timedelta(days=500)).isoformat())),
+                         "a review date belongs to the text it reviewed; it never ages out")
+        self.assertTrue(rejected(body.replace(RECENT, (date.today() + timedelta(days=3)).isoformat())))
+        reasons = ci.issue_contract_check(body.replace("### Topic\nci-checks", "### Topic\nNot Kebab"), set(),
+                                          "agent-first", registry)[2]
+        self.assertIn("Topic must be kebab-case: Not Kebab", reasons, "the comment names the fix")
         self.assertTrue(rejected(body.replace("ordinary", "unclassified")))
         self.assertTrue(rejected(body.replace("### Topic\nci-checks", "### Topic\nNot Kebab")))
         with self.assertRaisesRegex(Exception, "Regulated profile uses the CLI"):

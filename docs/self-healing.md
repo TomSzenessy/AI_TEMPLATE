@@ -34,8 +34,9 @@ Otherwise it is **advisory** (`make garden`, the session brief) or an
   inherits `high` ceremony.
 - **No calendar rot.** A check must not start failing on an unchanged
   repository because time passed. Record and review ages (vision, stack
-  decision, skill provenance) fail only `make readiness` from
-  `private-preview` on; during development `make garden` reports them and
+  decision, skill provenance, critic evidence) fail only `make readiness` from
+  `private-preview` on; an issue's reviewer date never ages, because it
+  belongs to the text it reviewed; during development `make garden` reports them and
   `make check` fails only on a future date.
   `make test-future` (also in CI) runs the whole suite 800 days ahead, so a
   fixture or check pinned to a date fails now instead of in two years.

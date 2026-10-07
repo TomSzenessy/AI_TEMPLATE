@@ -343,7 +343,7 @@ def check_readiness(root: Path) -> None:
             continue
         if profile != "minimal" and not validation_commands(surface):
             try:
-                validate_critic_evidence(root, surface)
+                validate_critic_evidence(root, surface, release_gate=releasing)
             except RepoctlError as error:
                 errors.append(str(error))
     if releasing:

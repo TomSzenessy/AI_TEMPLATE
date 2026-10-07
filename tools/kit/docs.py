@@ -168,6 +168,3 @@ def docs_index_link_content(root: Path, marker: str, link: str) -> str:
     return updated
 
 
-def add_docs_index_link(root: Path, marker: str, link: str) -> None:
-    index = ensure_inside_root(root, root / "docs" / "README.md", "documentation index")
-    index.write_text(docs_index_link_content(root, marker, link), encoding="utf-8")

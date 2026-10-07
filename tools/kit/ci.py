@@ -13,11 +13,11 @@ import os
 import re
 import subprocess
 import urllib.request
-from datetime import date, timedelta
+from datetime import date
 from pathlib import Path
 from typing import Callable
 
-from .core import RepoctlError, load_project, reject_secret_text
+from .core import RepoctlError, is_placeholder, load_project, parse_iso_date, reject_secret_text
 from .issues import validate_issue_body, validate_issue_content, validate_issue_state
 
 try:
@@ -117,8 +117,8 @@ def run_pr_reference(root: Path) -> str:
 # --- issues: native form intake contract -----------------------------------------
 
 
-def issue_contract_check(text: str, labels: set[str], profile: str, registry: dict, today: date | None = None) -> tuple[bool, list[str]]:
-    """Return (valid, labels_to_add) for a natively filed issue body."""
+def issue_contract_check(text: str, labels: set[str], profile: str, registry: dict, today: date | None = None) -> tuple[bool, list[str], list[str]]:
+    """Return (valid, labels_to_add, reasons) for a natively filed issue body; reasons name each fix."""
     today = today or date.today()
     if profile == "minimal":
         raise RepoctlError("Minimal profile delegates issue intake to the host organization; remove native forms")
@@ -128,18 +128,26 @@ def issue_contract_check(text: str, labels: set[str], profile: str, registry: di
     status_values = [label.split(":", 1)[1] for label in labels if label.startswith("status:")]
     status = status_values[0] if len(status_values) == 1 else "triage"
     reject_secret_text(text, "issue body")
-    validate_issue_body(text, profile)
-    validate_issue_content(text, status, profile)
-    validate_issue_state(text, status, profile)
+    reasons: list[str] = []
+    try:
+        validate_issue_body(text, profile)
+        validate_issue_content(text, status, profile)
+        validate_issue_state(text, status, profile)
+    except RepoctlError as error:
+        reasons.append(str(error))
 
     missing = [h for h in CANONICAL[profile] if not re.search(rf"^### {re.escape(h)}$", structural, re.MULTILINE)]
-    public_safe = bool(re.search(r"(?im)^\s*(?:-\s*)?(?:\*\*)?Public-safe:(?:\*\*)?\s*yes\b", structural))
-    duplicate = bool(re.search(
+    if missing:
+        reasons.append("missing headings: " + ", ".join(missing))
+    if not re.search(r"(?im)^\s*(?:-\s*)?(?:\*\*)?Public-safe:(?:\*\*)?\s*yes\b", structural):
+        reasons.append("Disclosure classification must say Public-safe: yes")
+    if not re.search(
         r"(?im)^Duplicate check:\s*searched\s+title,\s*symptom,\s*and\s+path\s+for\s+.+;\s*(?:reused\s+#[0-9]+|no duplicate found)\s*$",
         structural,
-    ))
-    reviewer = re.search(r"(?im)^\s*(?:-\s*)?(?:\*\*)?Reviewer/date:(?:\*\*)?\s*(.+?)\s*$", structural)
-    invalid = bool(missing) or not public_safe or not duplicate or disclosure_class(structural) not in {"ordinary", "public-reviewed"}
+    ):
+        reasons.append("add the line 'Duplicate check: searched title, symptom, and path for <terms>; no duplicate found'")
+    if disclosure_class(structural) not in {"ordinary", "public-reviewed"}:
+        reasons.append("Disclosure class must be ordinary or public-reviewed (sensitive findings use SECURITY.md)")
 
     label_values: dict[str, str] = {}
     for label in labels:
@@ -147,49 +155,52 @@ def issue_contract_check(text: str, labels: set[str], profile: str, registry: di
             continue
         family, value = label.split(":", 1)
         if family in REQUIRED_FAMILIES:
-            invalid |= family in label_values
+            if family in label_values:
+                reasons.append(f"more than one {family}: label")
             label_values[family] = value
         allowed = registry.get(family)
-        if family == "topic":
-            invalid |= not TOPIC.fullmatch(value)  # open kebab-case vocabulary
-        elif family in REQUIRED_FAMILIES and (not isinstance(allowed, list) or value not in allowed):
-            invalid = True
+        if family == "topic" and not TOPIC.fullmatch(value):
+            reasons.append(f"topic label must be kebab-case: {value}")
+        elif family in REQUIRED_FAMILIES and family != "topic" and (not isinstance(allowed, list) or value not in allowed):
+            reasons.append(f"unknown {family} label: {value} (see .github/issue-labels.json)")
     field_values: dict[str, str] = {}
     for field in ("Type", "Priority", "Area", "Topic", "Status"):
         match = re.search(rf"(?im)^### {field}\s*$\n\s*([^\n]+)", structural)
         if match:
             field_values[field.lower()] = match.group(1).strip().strip("`")
     if field_values:
-        invalid |= set(field_values) != set(REQUIRED_FAMILIES)
+        if set(field_values) != set(REQUIRED_FAMILIES):
+            reasons.append("fill every form field: Type, Priority, Area, Topic, Status")
         for family, value in field_values.items():
             allowed = registry.get(family)
             if family == "topic":
-                invalid |= not TOPIC.fullmatch(value)
+                if not TOPIC.fullmatch(value):
+                    reasons.append(f"Topic must be kebab-case: {value}")
             elif not isinstance(allowed, list) or value not in allowed:
-                invalid = True
-            invalid |= family in label_values and label_values[family] != value
+                reasons.append(f"unknown {family}: {value} (see .github/issue-labels.json)")
+            if family in label_values and label_values[family] != value:
+                reasons.append(f"{family} field ({value}) conflicts with its label ({label_values[family]})")
     elif set(label_values) != set(REQUIRED_FAMILIES):
-        invalid = True
-    invalid |= "security" in {label_values.get("type"), field_values.get("type")}
+        reasons.append("needs one label (or form field) each for type, priority, area, topic, and status")
+    if "security" in {label_values.get("type"), field_values.get("type")}:
+        reasons.append("security issues use the private route in SECURITY.md")
     labels_to_add = [f"{family}:{value}" for family, value in field_values.items()]
     for desired in labels_to_add:
         family, value = desired.split(":", 1)
-        conflicting = {label for label in labels if label.startswith(family + ":") and label != desired}
-        invalid |= bool(conflicting) or label_values.get(family, value) != value
+        if {label for label in labels if label.startswith(family + ":") and label != desired}:
+            reasons.append(f"conflicting {family}: labels")
     labels_to_add = [label for label in labels_to_add if label not in labels]
-    invalid |= bool(sensitive_issue_content(structural))
-    if reviewer is None or re.search(r"\[|required|tbd|never|pending", reviewer.group(1), re.I):
-        invalid = True
-    else:
-        name = re.split(r"\s+\d{4}-\d{2}-\d{2}\b", reviewer.group(1).strip(), maxsplit=1)[0].strip(" *_`")
-        invalid |= len(name) < 3 or name.lower() in {"x", "none", "n/a", "pending", "tbd"}
-        reviewed = re.search(r"\b(\d{4}-\d{2}-\d{2})\b", reviewer.group(1))
-        try:
-            reviewed_on = date.fromisoformat(reviewed.group(1)) if reviewed else None
-        except ValueError:
-            reviewed_on = None
-        invalid |= reviewed_on is None or reviewed_on > today or reviewed_on < today - timedelta(days=365)
-    return not invalid, labels_to_add
+    if sensitive_issue_content(structural):
+        reasons.append("possible sensitive content: redact it or use the private route in SECURITY.md")
+    reviewer = re.search(r"(?im)^\s*(?:-\s*)?(?:\*\*)?Reviewer/date:(?:\*\*)?\s*(.+?)\s*$", structural)
+    reviewed = parse_iso_date(re.search(r"\b(\d{4}-\d{2}-\d{2})\b", reviewer.group(1)).group(1)) \
+        if reviewer and re.search(r"\b\d{4}-\d{2}-\d{2}\b", reviewer.group(1)) else None
+    name = re.split(r"\s+\d{4}-\d{2}-\d{2}\b", reviewer.group(1).strip(), maxsplit=1)[0].strip(" *_`") if reviewer else ""
+    # The review date belongs to the text it reviewed, so it never ages out (no calendar rot); a future date is a typo.
+    if not reviewer or is_placeholder(name) or len(name) < 3 or reviewed is None or reviewed > today:
+        reasons.append("Reviewer/date needs a real name and an ISO date that is not in the future, e.g. octocat 2026-10-07")
+    reasons = list(dict.fromkeys(reasons))
+    return not reasons, labels_to_add, reasons
 
 
 INCOMPLETE = (
@@ -207,12 +218,13 @@ def run_issue_contract(root: Path) -> str:
     if registry_path.is_absolute() or ".." in registry_path.parts:
         raise RepoctlError("governance.label_registry must stay inside the repository")
     registry = json.loads((root / registry_path).read_text(encoding="utf-8"))
-    valid, labels_to_add = issue_contract_check(
+    valid, labels_to_add, reasons = issue_contract_check(
         issue.get("body") or "", {label.get("name", "") for label in issue.get("labels", [])}, profile_of(root), registry
     )
     number, repository = os.environ["ISSUE_NUMBER"], os.environ["GH_REPOSITORY"]
     if not valid:
-        subprocess.run(["gh", "issue", "comment", number, "--repo", repository, "--body", INCOMPLETE], check=True)
+        comment = INCOMPLETE + "\n\nTo fix:\n" + "\n".join(f"- {reason}" for reason in reasons)
+        subprocess.run(["gh", "issue", "comment", number, "--repo", repository, "--body", comment], check=True)
         raise RepoctlError("Issue contract validation failed")
     if labels_to_add:
         subprocess.run(

@@ -26,7 +26,7 @@ from pathlib import Path
 from . import derive
 from .bootstrap import initialize_project
 from .core import RepoctlError
-from .gitinfo import git
+from .gitinfo import git, listed_files
 
 MAKE_TARGET = re.compile(r"(?m)^([A-Za-z0-9][A-Za-z0-9_.-]*)\s*:(?!=)")
 H1 = re.compile(r"(?m)^# (.+)$")
@@ -36,8 +36,7 @@ INDEX_LINE = re.compile(r"<!--\s*index:")
 def kit_files(kit: Path) -> list[str]:
     """Every kit file. Template-only material is copied too, so init prunes it the same way it does for
     `make init`: links to it are rewritten to the template source and bindings to it are dropped."""
-    listed = git(kit, "ls-files", "-z", "--cached", "--others", "--exclude-standard") or ""
-    return sorted(path for path in listed.split("\0") if path and (kit / path).is_file())
+    return listed_files(kit)
 
 
 def merge_makefile(target: Path, kit_makefile: str) -> list[str]:

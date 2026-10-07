@@ -43,6 +43,12 @@ def head(root: Path) -> str:
     return (git(root, "rev-parse", "--short", "HEAD") or "").strip() or "(no commits)"
 
 
+def listed_files(root: Path) -> list[str]:
+    """Tracked and untracked files that git does not ignore, as they are on disk now."""
+    listed = git(root, "ls-files", "-z", "--cached", "--others", "--exclude-standard") or ""
+    return sorted(path for path in listed.split("\0") if path and (root / path).is_file())
+
+
 def changed_paths(root: Path) -> list[str]:
     """Uncommitted paths (staged, unstaged, untracked), repository-relative."""
     output = git(root, "status", "--porcelain=v1", "-z", "--untracked-files=all")
