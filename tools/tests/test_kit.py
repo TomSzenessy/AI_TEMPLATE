@@ -853,7 +853,8 @@ class GoldenPathTests(unittest.TestCase):
             trial.prepare(TOOLS.parent, {"id": "demo", "kind": "cli", "mode": "new", "prompt": "x"}, project)
             self.assertIn("[REQUIRED:", (project / "VISION.md").read_text(), "init leaves a fresh record, not the template's")
             self.assertNotIn("AI_TEMPLATE", (project / "VISION.md").read_text())
-            make = lambda *args: subprocess.run(["make", *args], cwd=project, capture_output=True, text=True, timeout=1200)
+            make = lambda *args: subprocess.run(["make", *args], cwd=project, capture_output=True, text=True, timeout=1200,
+                                                  env={**os.environ, **({} if os.environ.get("KIT_SLOW") == "1" else {"KIT_INNER": "1"})})
             self.intake(project, fill=False)
             self.assertIn("placeholders", make("check").stderr, "an accepted record with placeholders is refused")
             self.intake(project)
@@ -1066,8 +1067,8 @@ class AdoptTests(unittest.TestCase):
                         "commit", "-qm", "runbook"], check=True, capture_output=True)
         self.assertEqual(self.adopt().returncode, 0)
         self.assertIn("Our runbook.", (self.root / "docs/operations.md").read_text())
-        suite = subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "tools/tests", "-p", "test_*.py"],
-                               cwd=self.root, capture_output=True, text=True, timeout=900)
+        suite = subprocess.run(["make", "kit-test"], cwd=self.root, capture_output=True, text=True, timeout=900,
+                               env={**os.environ, **({} if os.environ.get("KIT_SLOW") == "1" else {"KIT_INNER": "1"})})
         self.assertEqual(suite.returncode, 0, suite.stderr[-2500:])
         subprocess.run(["git", "-C", str(self.root), "add", "-A"], check=True)
         subprocess.run(["git", "-C", str(self.root), "-c", "user.name=t", "-c", "user.email=t@example.invalid",
@@ -1465,9 +1466,6 @@ class NavigationTests(KitRepository):
         self.assertEqual(grouped["high"], ["src/auth/login.py"])
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 class OrphanFileTests(unittest.TestCase):
     """Issue #17: a tracked file nothing references fails `make check`; a named one does not."""
@@ -1712,3 +1710,7 @@ class FailureSignatureTests(unittest.TestCase):
             self.assertRegex(record.key, r"^EL-\d{3}$")
             self.assertTrue(record.literals, record.key)
             self.assertTrue(record.fix, f"{record.key} records no permanent fix")
+
+
+if __name__ == "__main__":
+    unittest.main()

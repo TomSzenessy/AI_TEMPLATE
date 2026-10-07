@@ -13,17 +13,27 @@ SKILL_TEST_SUITES := $(wildcard .agents/skills/*/tests)
 
 .DEFAULT_GOAL := help
 
-.PHONY: python-check test test-future verify done
+.PHONY: python-check test test-slow test-future verify done
 
 python-check:
 	@test -n "$(PYTHON)" && $(PYTHON) -c 'import sys; sys.exit(sys.version_info < (3, 11))' 2>/dev/null || { echo "Needs Python 3.11+ (found: '$(PYTHON)'); install python3.11 or newer, or run: make PYTHON=/path/to/python3.11 ..." >&2; exit 1; }
 
+# KIT_INNER=1 (set for a project's inner suite run) runs a smoke subset; KIT_SLOW=1 keeps the full inner run.
 test: python-check
+ifeq ($(KIT_INNER)$(KIT_SLOW),1)
+	$(PYTHON) -m unittest discover -s tools/tests -p 'test_repoctl.py' -k init
+	$(PYTHON) -m unittest discover -s tools/tests -p 'test_kit.py' -k GlobTests -k HygieneTests -k AdapterTests
+else
 	$(PYTHON) -m unittest discover -s tools/tests -p 'test_*.py'
+endif
 	@for suite in $(SKILL_TEST_SUITES); do \
 	  echo "-- $$suite"; \
 	  $(PYTHON) -m unittest discover -s "$$suite" -p 'test_*.py' || exit 1; \
 	done
+
+# The full suite including the full inner runs (golden-path and adopt tests re-run the suite in a new project).
+test-slow: python-check
+	KIT_SLOW=1 $(MAKE) --no-print-directory test
 
 # The same suite 800 days ahead: fails when a fixture or check rots with the calendar (#10).
 test-future: python-check

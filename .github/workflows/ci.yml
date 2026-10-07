@@ -56,4 +56,4 @@ jobs:
         with:
           python-version: "3.11"
       - name: Run the tests 800 days ahead
-        run: make test-future
+        run: KIT_SLOW=1 make test-future
