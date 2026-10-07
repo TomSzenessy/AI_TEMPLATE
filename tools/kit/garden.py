@@ -55,7 +55,10 @@ def pin_drift(root: Path, view=None) -> list[str]:
     for package, pinned, where in npm_pins(root):
         latest = view(package)
         if latest and latest != pinned:
-            findings.append(f"pin {package}@{pinned} ({where}) is behind {latest}: check its changelog, then bump and re-run the affected checks")
+            findings.append(
+                f"pin {package}@{pinned} ({where}) is behind {latest}: "
+                "check its changelog, then bump and re-run the affected checks"
+            )
     return findings
 
 
@@ -80,8 +83,10 @@ def garden_report(root: Path) -> tuple[str, int]:
     for identifier, command, path in surface_garden_commands(project):
         cwd = ensure_inside_root(root, root / path, f"surface {identifier} path")
         try:
-            result = subprocess.run(command, cwd=cwd if cwd.is_dir() else cwd.parent, capture_output=True, text=True, timeout=900, check=False,
-                                    env=verification_environment())
+            result = subprocess.run(
+                command, cwd=cwd if cwd.is_dir() else cwd.parent, capture_output=True, text=True,
+                timeout=900, check=False, env=verification_environment(),
+            )
             output = (result.stdout + result.stderr).strip().splitlines()[-15:]
             status = "ok" if result.returncode == 0 else f"exit {result.returncode}"
         except (FileNotFoundError, subprocess.TimeoutExpired) as error:
@@ -90,7 +95,10 @@ def garden_report(root: Path) -> tuple[str, int]:
         surface_results.append((identifier, " ".join(command), status, output))
 
     lines = ["# Garden report", ""]
-    lines.append(f"Hard findings (fail `make check`): {len(hard)} · advisory: {len(advisory)} · surface garden commands: {len(surface_results)}")
+    lines.append(
+        f"Hard findings (fail `make check`): {len(hard)} · advisory: {len(advisory)} · "
+        f"surface garden commands: {len(surface_results)}"
+    )
     for title, items in (("Hard findings", hard), ("Advisory", advisory)):
         lines += ["", f"## {title}", ""] + ([f"- {item}" for item in items] or ["- none"])
     if surface_results:

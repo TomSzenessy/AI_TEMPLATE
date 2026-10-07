@@ -89,7 +89,10 @@ def index_errors(root: Path, files: list[str]) -> list[str]:
     for path, meta in sorted(doc_meta(root, files).items()):
         entry = meta["index"]
         if entry is not None and (len(entry) != 3 or entry[0] not in groups or not all(entry)):
-            errors.append(f"{path}: index declaration must be '<!-- index: {'|'.join(groups)} | owns | read when -->' (groups: project.toml [kit].doc_groups)")
+            errors.append(
+                f"{path}: index declaration must be '<!-- index: {'|'.join(groups)} | owns | read when -->' "
+                "(groups: project.toml [kit].doc_groups)"
+            )
     return errors
 
 

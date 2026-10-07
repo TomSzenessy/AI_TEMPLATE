@@ -197,11 +197,19 @@ def markdown_link_target(raw_target: str) -> str:
 
 
 SENSITIVE_CONTENT_PATTERNS = {
-    "private key": re.compile(r"-----BEGIN (?:[A-Z0-9 ]*PRIVATE KEY|PGP PRIVATE KEY BLOCK)-----.*?-----END (?:[A-Z0-9 ]*PRIVATE KEY|PGP PRIVATE KEY BLOCK)-----", re.DOTALL),
+    "private key": re.compile(
+        r"-----BEGIN (?:[A-Z0-9 ]*PRIVATE KEY|PGP PRIVATE KEY BLOCK)-----"
+        r".*?"
+        r"-----END (?:[A-Z0-9 ]*PRIVATE KEY|PGP PRIVATE KEY BLOCK)-----",
+        re.DOTALL,
+    ),
     "GitHub token": re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b"),
     "AWS access key": re.compile(r"\bAKIA[0-9A-Z]{16}\b"),
     "authorization credential": re.compile(r"(?i)\b(?:authorization|proxy-authorization)\s*:\s*(?:bearer|basic)\s+[^\s]+"),
-    "credential assignment": re.compile(r"(?i)\b(?:api[_-]?key|password|passwd|access[_-]?token|client[_-]?secret|token|secret)\s*[:=]\s*[^\s]{12,}"),
+    "credential assignment": re.compile(
+        r"(?i)\b(?:api[_-]?key|password|passwd|access[_-]?token|client[_-]?secret|token|secret)"
+        r"\s*[:=]\s*[^\s]{12,}"
+    ),
 }
 
 

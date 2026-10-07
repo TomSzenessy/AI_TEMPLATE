@@ -116,7 +116,9 @@ def render_readme(root: Path, readme: str, registry: Registry) -> str:
     (an adopted project's own file) is returned untouched."""
     text = readme
     if "<!-- repoctl:description -->" in text:
-        value = description(load_project(root)) or "Describe this project in `project.toml` `[repository].description`, then run `make sync`."
+        value = description(load_project(root)) or (
+            "Describe this project in `project.toml` `[repository].description`, then run `make sync`."
+        )
         text = replace_block(text, "description", value)
     if "<!-- repoctl:commands -->" in text:
         text = replace_block(text, "commands", render_command_help(registry))
