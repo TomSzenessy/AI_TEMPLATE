@@ -92,12 +92,18 @@ def kill_group(process: subprocess.Popen) -> None:
 def load_tasks(root: Path, only: str | None = None) -> list[dict[str, str]]:
     tasks = []
     for suite in sorted((root / ".agents" / "evals").glob("*.toml")):
-        with suite.open("rb") as handle:
-            data = tomllib.load(handle)
+        try:
+            with suite.open("rb") as handle:
+                data = tomllib.load(handle)
+        except tomllib.TOMLDecodeError as error:
+            raise RepoctlError(f"{suite.name}: invalid TOML: {error}") from error
         for task in data.get("tasks", []):
             if not all(isinstance(task.get(key), str) and task[key] for key in ("id", "prompt", "expect")):
                 raise RepoctlError(f"{suite.name}: every task needs id, prompt, and expect")
-            re.compile(task["expect"])
+            try:
+                re.compile(task["expect"])
+            except re.error as error:
+                raise RepoctlError(f"{suite.name}: task {task['id']} has an invalid expect regex: {error}") from error
             if only is None or task["id"] in only.split(","):
                 tasks.append(task)
     if only is not None:

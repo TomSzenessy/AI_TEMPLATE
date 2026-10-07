@@ -16,6 +16,7 @@ from .core import (
     REPOSITORY_INFRASTRUCTURE_DIRECTORIES,
     RepoctlError,
     date_is_stale,
+    read_utf8,
     declared_surfaces,
     ensure_inside_root,
     governance_profile,
@@ -120,7 +121,7 @@ def validate_critic_evidence(root: Path, surface: dict[str, object], release_gat
             raise RepoctlError("critic evidence paths must be repository-relative")
         path = ensure_inside_root(root, root / value, "critic evidence")
         try:
-            content = path.read_text(encoding="utf-8")
+            content = read_utf8(path)
         except FileNotFoundError as error:
             raise RepoctlError(f"critic evidence does not exist: {value}") from error
         if secret_matches(content):
@@ -362,12 +363,31 @@ def is_template(project: dict[str, object]) -> bool:
     return isinstance(repository, dict) and repository.get("is_template") is True
 
 
+def manifest_type_errors(project: dict[str, object]) -> list[str]:
+    """Findings for manifest fields whose type other checks index into (checked once, here)."""
+    errors = []
+    owners = project.get("owners", [])
+    if not isinstance(owners, list) or not all(isinstance(owner, str) for owner in owners):
+        errors.append("project.toml owners must be an array of strings (handles or team names)")
+    skills = project.get("skills", [])
+    if not isinstance(skills, list) or not all(isinstance(entry, dict) for entry in skills):
+        errors.append("project.toml [[skills]] must be an array of tables")
+    if not isinstance(project.get("repository", {}), dict):
+        errors.append("project.toml repository must be a table")
+    surfaces = project.get("surfaces", [])
+    if isinstance(surfaces, list):
+        for surface in surfaces:
+            if isinstance(surface, dict) and not isinstance(surface.get("garden", []), list):
+                errors.append(f"surface {surface.get('id', '<missing id>')} garden must be an array of command arrays")
+    return errors
+
+
 def check_readme_identity(root: Path, project: dict[str, object]) -> None:
     if project.get("name") == "REPLACE_WITH_PROJECT_NAME" or is_template(project):
         return  # the template states template mode; only `make init` writes a project identity
     readme = root / "README.md"
     try:
-        content = readme.read_text(encoding="utf-8")
+        content = read_utf8(readme)
     except (FileNotFoundError, OSError) as error:
         raise RepoctlError("initialized project README.md is missing") from error
     marker = "<!-- repoctl:project-readme -->"
@@ -453,8 +473,9 @@ def print_inventory(root: Path) -> None:
 
     print(f"Project: {project['name']} ({project['kind']})")
     print("Infrastructure defaults: " + ", ".join(sorted(REPOSITORY_INFRASTRUCTURE_DIRECTORIES)))
-    configured_paths = project.get("repository", {}).get("infrastructure_paths", [])
-    if configured_paths:
+    repository = project.get("repository", {})
+    configured_paths = repository.get("infrastructure_paths", []) if isinstance(repository, dict) else []
+    if configured_paths and isinstance(configured_paths, list):
         print("Configured infrastructure paths: " + ", ".join(sorted(configured_paths)))
     print("Candidate product surfaces:")
     if candidates:

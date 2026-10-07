@@ -25,7 +25,7 @@ try:
 except ModuleNotFoundError as error:  # pragma: no cover - exercised on Python 3.10
     raise SystemExit("repoctl requires Python 3.11 or newer") from error
 
-from .core import RepoctlError, load_project, repository_files
+from .core import RepoctlError, load_project, read_utf8, repository_files
 
 KINDS = ("skill", "agent", "rule", "pack", "mcp", "check", "command", "doc")
 CORE = "core"
@@ -93,7 +93,7 @@ def yaml_string(value: str) -> str:
 
 
 def _markdown(root: Path, kind: str, relative: str, name: str) -> Capability:
-    values = frontmatter((root / relative).read_text(encoding="utf-8"))
+    values = frontmatter(read_utf8(root / relative))
     if values.get("name") != name or not values.get("description"):
         raise RepoctlError(f"{relative} needs name: {name} and a description")
     if len(values["description"]) > MAX_DESCRIPTION:
@@ -130,9 +130,12 @@ def _mcp(root: Path) -> list[Capability]:
     for path in sorted((root / ".agents" / "mcp").glob("*.toml")):
         relative = path.relative_to(root).as_posix()
         try:
-            route = tomllib.loads(path.read_text(encoding="utf-8"))
+            route = tomllib.loads(read_utf8(path))
         except tomllib.TOMLDecodeError as error:
             errors.append(f"{relative} is invalid TOML: {error}")
+            continue
+        except RepoctlError as error:
+            errors.append(f"{relative}: {error}")
             continue
         label = relative
         if route.get("name") != path.stem:
@@ -394,10 +397,26 @@ class Context:
         return signatures(self.root)
 
 
+FINDING_PREFIX = re.compile(r"^\[([a-z0-9-]+)\] ")
+
+
+def blocking_reasons(registry: "Registry", findings: list[str]) -> list[str]:
+    """One `[check] why it blocks: reason` line per blocking check named in `findings`, in order."""
+    lines, seen = [], set()
+    for finding in findings:
+        match = FINDING_PREFIX.match(finding)
+        item = registry.get("check", match.group(1)) if match else None
+        if item is not None and item.fields["blocks"] and item.name not in seen:
+            seen.add(item.name)
+            lines.append(f"[{item.name}] why it blocks: {' '.join(item.fields['reason'].split())}")
+    return lines
+
+
 def run_checks(root: Path, *, blocking_only: bool, context: Context | None = None,
                skip: frozenset[str] = frozenset()) -> tuple[list[str], list[str]]:
     """(blocking findings, advisory findings) from every check of an enabled pack, minus `skip`.
 
+    Each finding is prefixed `[check-name] ` so the reader knows its source.
     A finding that repeats a signature already in docs/ERROR_LOG.md is followed by that
     signature's key and permanent fix, so a known failure is recognised rather than
     diagnosed again.
@@ -412,7 +431,10 @@ def run_checks(root: Path, *, blocking_only: bool, context: Context | None = Non
             findings = list(item.fields["run"](context))
         except RepoctlError as error:
             findings = [str(error)]
-        (hard if item.fields["blocks"] else advisory).extend(findings)
+        except Exception as error:  # noqa: BLE001 - one broken check must not hide every other check's result
+            findings = [f"check {item.name} crashed: {type(error).__name__}: {error} "
+                        "(fix the check or the manifest value it reads)"]
+        (hard if item.fields["blocks"] else advisory).extend(f"[{item.name}] {finding}" for finding in findings)
     if hard:
         from .signatures import recognition
         hard += recognition(hard, context.signatures)

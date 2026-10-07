@@ -34,6 +34,9 @@ def _raised(function, *arguments) -> list[str]:
 @check("manifest-structure", "project.toml surfaces, governance, vision, and verification are coherent; run by make check",
        blocks=True, reason="Every command reads project.toml; an incoherent manifest breaks all of them at once.")
 def manifest_structure(context) -> list[str]:
+    typed = structure.manifest_type_errors(context.project)
+    if typed:
+        return typed
     return _raised(structure.check_structure, context.root, context.project) + _raised(
         structure.check_readme_identity, context.root, context.project)
 
@@ -166,10 +169,11 @@ def surface_docs(context) -> list[str]:
        blocks=True, reason="Manifests are public; an email there is personal data published by default.")
 def owner_handles(context) -> list[str]:
     project = context.project
-    owners = [*project.get("owners", []), *(surface.get("owner", "") for surface in declared_surfaces(project))]
+    listed = project.get("owners", [])
+    owners = [*(listed if isinstance(listed, list) else []), *(surface.get("owner", "") for surface in declared_surfaces(project))]
     return [
         f"project.toml owner {owner!r} looks like an email; manifests are public, use a handle or team name"
-        for owner in sorted(set(owners))
+        for owner in sorted({owner for owner in owners if isinstance(owner, str)})
         if isinstance(owner, str) and EMAIL.fullmatch(owner.strip())
     ]
 
@@ -229,7 +233,10 @@ def unbound_docs(context) -> list[str]:
 @check("skill-review-age", "Third-party skill reviews older than the review window; re-review before release", blocks=False)
 def skill_review_age(context) -> list[str]:
     findings = []
-    for entry in context.project.get("skills", []):
+    entries = context.project.get("skills", [])
+    for entry in entries if isinstance(entries, list) else []:
+        if not isinstance(entry, dict):
+            continue
         reviewed = str(entry.get("reviewed_on", ""))
         try:
             age = (date.today() - date.fromisoformat(reviewed)).days
@@ -274,3 +281,22 @@ def shallow_history(context) -> list[str]:
     if has_history(context.root):
         return []
     return ["git history unavailable or shallow: stale-document detection skipped (use fetch-depth: 0 in CI)"]
+
+
+@check("history-read", "Stale-doc detection could not read git history (failed or timed out); rerun with a full clone",
+       blocks=False)
+def history_read_failed(context) -> list[str]:
+    if not context.bindings or not has_history(context.root) or docsync.history_read(context.root) is not None:
+        return []
+    return ["history read failed or timed out: stale-document detection skipped (rerun, or fetch full history)"]
+
+
+@check("final-newline", "Tracked text files that end without a newline; append one", blocks=False)
+def final_newline(context) -> list[str]:
+    return hygiene.final_newline_errors(context.root, context.files)
+
+
+@check("host-twins", "CLAUDE.md and GEMINI.md differ beyond the host name; keep the twins identical", blocks=False)
+def host_twins(context) -> list[str]:
+    return hygiene.host_twin_errors(context.root)
+

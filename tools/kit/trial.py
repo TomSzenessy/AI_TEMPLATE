@@ -52,8 +52,11 @@ def load_trial(root: Path, identifier: str) -> dict[str, object]:
     if not path.is_file():
         known = ", ".join(sorted(p.stem for p in (root / TRIALS).glob("*.toml"))) or "none"
         raise RepoctlError(f"no trial {identifier!r} in {TRIALS}/ (known: {known})")
-    with path.open("rb") as handle:
-        spec = tomllib.load(handle)
+    try:
+        with path.open("rb") as handle:
+            spec = tomllib.load(handle)
+    except tomllib.TOMLDecodeError as error:
+        raise RepoctlError(f"{path.name}: invalid TOML: {error}") from error
     for key in ("id", "kind", "prompt"):
         if not isinstance(spec.get(key), str) or not spec[key].strip():
             raise RepoctlError(f"{path.name}: needs a non-empty {key}")

@@ -177,7 +177,8 @@ def markdown_link_target(raw_target: str) -> str:
     target = raw_target.strip()
     if target.startswith("<") and ">" in target:
         return target[1 : target.index(">")]
-    return target.split(maxsplit=1)[0]
+    parts = target.split(maxsplit=1)
+    return parts[0] if parts else ""
 
 
 IGNORED_WALK_DIRECTORIES = {
@@ -356,6 +357,14 @@ def repository_files(root: Path) -> list[str]:
         for path in worktree_files(root)
         if path.is_file() and not is_link_like(path)
     )
+
+
+def read_utf8(path: Path) -> str:
+    """UTF-8 text of `path`; a file that is not valid UTF-8 becomes a RepoctlError naming it (never a traceback)."""
+    try:
+        return path.read_text(encoding="utf-8")
+    except UnicodeDecodeError as error:
+        raise RepoctlError(f"not valid UTF-8: {path}") from error
 
 
 def read_text_file(root: Path, relative: str, limit: int = 1_000_000) -> str | None:

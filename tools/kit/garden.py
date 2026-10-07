@@ -64,7 +64,8 @@ def surface_garden_commands(project: dict[str, object]) -> list[tuple[str, list[
     for surface in declared_surfaces(project):
         if surface.get("status", "active") != "active":
             continue
-        for command in surface.get("garden", []):
+        garden = surface.get("garden", [])
+        for command in garden if isinstance(garden, list) else []:
             if isinstance(command, list) and command and all(isinstance(part, str) for part in command):
                 commands.append((str(surface.get("id")), command, str(surface.get("path", "."))))
     return commands

@@ -94,6 +94,16 @@ Bind documents that explain behavior (architecture, module cards, runbooks, API
 notes). Pure policy documents need no binding. Staleness needs full history:
 CI checks out with `fetch-depth: 0`, and shallow clones skip it.
 
+## A broken check is a finding, not a traceback
+
+Every finding in `make check` and `make garden` is prefixed `[check-name]`, and
+a failing blocking check's `reason` is printed once under it. A check that raises
+becomes `[name] check name crashed: <Type>: <message>` (blocking when the check
+blocks) while the others still run; a malformed doc, invalid UTF-8 file, eval,
+trial, or manifest value yields one named line, and `REPOCTL_DEBUG=1` restores
+the traceback for an internal error. A closed pipe (`repoctl map | head`) exits
+quietly with status 0.
+
 ## Code that cannot rot silently
 
 Markers are plain comments and work in any language:

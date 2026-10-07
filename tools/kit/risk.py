@@ -44,7 +44,8 @@ def classify(path: str, rules: dict[str, list[str]]) -> str:
 def assess(root: Path, base: str | None = None) -> tuple[str, dict[str, list[str]]]:
     project = load_project(root)
     rules = tier_rules(project)
-    base = base or str(project.get("repository", {}).get("default_branch", "main"))
+    repository = project.get("repository", {})
+    base = base or str((repository if isinstance(repository, dict) else {}).get("default_branch", "main"))
     grouped: dict[str, list[str]] = {tier: [] for tier in ORDER}
     for path in branch_paths(root, base):
         grouped[classify(path, rules)].append(path)

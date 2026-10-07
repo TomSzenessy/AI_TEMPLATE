@@ -16,6 +16,7 @@ from .core import (
     is_link_like,
     markdown_link_target,
     markdown_without_fenced_code,
+    read_utf8,
     secret_matches,
     worktree_files,
 )
@@ -32,7 +33,11 @@ def check_markdown_links(root: Path) -> None:
         if is_link_like(document) or has_link_component(root, document):
             errors.append(f"unsafe Markdown document symlink or reparse point: {document_label}")
             continue
-        markdown = markdown_without_fenced_code(document.read_text(encoding="utf-8"))
+        try:
+            markdown = markdown_without_fenced_code(document.read_text(encoding="utf-8"))
+        except UnicodeDecodeError:
+            errors.append(f"not valid UTF-8: {document_label}")
+            continue
         for raw_target in link_pattern.findall(markdown):
             target = markdown_link_target(raw_target)
             if not target or target.startswith("#"):
@@ -86,7 +91,7 @@ def check_docs_index(root: Path) -> None:
     docs = root / "docs"
     index = ensure_inside_root(root, docs / "README.md", "documentation index")
     try:
-        index_content = index.read_text(encoding="utf-8")
+        index_content = read_utf8(index)
     except FileNotFoundError as error:
         raise RepoctlError("docs/README.md is missing") from error
 
@@ -188,7 +193,7 @@ def scan_file_for_secrets(path: Path) -> tuple[list[str], bool]:
 
 def docs_index_link_content(root: Path, marker: str, link: str) -> str:
     index = ensure_inside_root(root, root / "docs" / "README.md", "documentation index")
-    content = index.read_text(encoding="utf-8")
+    content = read_utf8(index)
     start_marker = f"<!-- repoctl:{marker} -->"
     end_marker = f"<!-- /repoctl:{marker} -->"
     block = f"{start_marker}\n{link}\n{end_marker}"
