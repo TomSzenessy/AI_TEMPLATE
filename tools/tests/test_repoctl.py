@@ -217,7 +217,9 @@ rollback = "remove the project-local skill and restore the previous lockfile"
         self.assertIn('id = "template-bootstrap"', manifest)
         self.assertIn("[[skills]]", manifest)
         self.assertIn("content_digest", manifest)
-        self.assertNotIn("make init NAME=my-project", (self.root / "README.md").read_text(encoding="utf-8"))
+        # Column 0 is the hand-written quickstart; the generated command list prints the same
+        # command indented, and listing it is not leftover scaffolding (#16).
+        self.assertNotIn("\nmake init NAME=my-project", (self.root / "README.md").read_text(encoding="utf-8"))
 
     def test_infrastructure_defaults_and_root_surface_rogue_detection(self) -> None:
         (self.root / "tests").mkdir()
@@ -867,6 +869,7 @@ verification = [["python3", "-c", "print('ok')"]]
     def test_public_incident_requires_reviewed_safe_flag(self) -> None:
         body_hash = hashlib.sha256(b"A redacted failure").hexdigest()
         self.write("incident-review.md", "Issue: #42\nCommit: " + "a" * 40 + "\nArtifact: incident-review.md\nReviewer: reviewer\nDate: " + RECENT + "\nResult: public-safe\n" + f"Body-SHA256: {body_hash}\n")
+        self.write("docs/README.md", "# Docs\n- [Incident evidence](../incident-review.md)\n")  # indexed, so it is not orphaned
         result = self.cli("incident", "--title", "Public failure", "--summary", "A redacted failure", "--public-safe", "--review-evidence", "incident-review.md")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.cli("check").returncode, 0)
@@ -875,21 +878,25 @@ verification = [["python3", "-c", "print('ok')"]]
         self.assertIn("private incident draft", sensitive.stderr)
 
     def test_multiple_public_incidents_remain_indexed(self) -> None:
-        for index, title in enumerate(("First failure", "Second failure"), start=1):
-            summary = f"A redacted failure {index}"
+        for number, title in enumerate(("First failure", "Second failure"), start=1):
+            summary = f"A redacted failure {number}"
             body_hash = hashlib.sha256(summary.encode()).hexdigest()
-            evidence = f"incident-review-{index}.md"
+            evidence = f"incident-review-{number}.md"
             self.write(evidence, "Issue: #42\nCommit: " + "a" * 40 + "\nArtifact: " + evidence + "\nReviewer: reviewer\nDate: " + RECENT + "\nResult: public-safe\n" + f"Body-SHA256: {body_hash}\n")
+            listed = self.root / "docs" / "README.md"
+            listed.write_text(listed.read_text(encoding="utf-8") + f"- [Evidence {number}](../{evidence})\n")  # indexed, so it is not orphaned
             result = self.cli("incident", "--title", title, "--summary", summary, "--public-safe", "--review-evidence", evidence)
             self.assertEqual(result.returncode, 0, result.stderr)
-        index = (self.root / "docs" / "README.md").read_text(encoding="utf-8")
-        self.assertIn("First failure", index)
-        self.assertIn("Second failure", index)
+        listed = (self.root / "docs" / "README.md").read_text(encoding="utf-8")
+        self.assertIn("First failure", listed)
+        self.assertIn("Second failure", listed)
         self.assertEqual(self.cli("check").returncode, 0)
 
     def test_third_party_skill_digest_binds_tree_and_mode(self) -> None:
         self.write(".agents/skills/example/SKILL.md", "# Reviewed skill\n")
         self.write(".agents/skills/example/reference.md", "bounded reference\n")
+        self.write("docs/skills.md", "# Skills\n\n<!-- covers: .agents/skills/** -->\n")  # the owner doc binds the tree
+        self.write("docs/README.md", "# Docs\n- [Skills](skills.md)\n")
         digest_result = self.cli("skill-digest", ".agents/skills/example")
         self.assertEqual(digest_result.returncode, 0, digest_result.stderr)
         digest = digest_result.stdout.strip()

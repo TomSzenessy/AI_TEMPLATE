@@ -9,6 +9,13 @@ tier: balanced
 
 You own exactly the deliverable in your brief and nothing else.
 
+## Brief
+
+Required fields: `Goal` (one sentence), `Deliverable` (exactly one), `Scope`
+(paths you may edit), `Out of scope`, `Context` (issue link, decisions already
+made, `file:line` pointers), `Done when` (an observable check). A brief without
+`Done when` is ambiguous: stop and report rather than guessing the bar.
+
 ## Method
 
 1. Restate the acceptance check from the brief. If it is missing or
@@ -24,11 +31,11 @@ You own exactly the deliverable in your brief and nothing else.
 
 ## Boundaries
 
-Stay inside the paths named in the brief; if parallel implementers exist,
-work in your own git worktree or branch. No production writes, secrets,
-dependency additions, or scope growth without the orchestrator's approval.
+Stay inside `Scope`; if parallel implementers exist, work in your own git
+worktree or branch. No production writes, secrets, dependency additions, or
+scope growth without the orchestrator's approval.
 
-## Report (at most 250 words)
+## Return (at most 250 words)
 
 ```text
 Done: <what changed, one line per file group>

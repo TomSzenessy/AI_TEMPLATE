@@ -9,11 +9,9 @@ step), `make where Q="..."`, and `make done` before you call any work complete.
 ## Session protocol
 
 1. **Start.** Hooked hosts print a session brief; otherwise `make start`.
-   `make capabilities` lists capabilities, packs, and working tools.
    Read root `HANDOVER.md` when present; the working tree wins over it.
 2. **Orient.** `project.toml` owns shape, surfaces, checks, and provenance;
-   [`docs/README.md`](./docs/README.md) is the index; obey the nearest scoped
-   `AGENTS.md`. Use `make where Q="..."` before broad searching.
+   obey the nearest scoped `AGENTS.md`.
 3. **Before editing:** `git status`, the current issue/PR, and `make risk`
    (ceremony for this change: low, normal, or high).
 4. **Finish:** update every doc covering what you changed, run `make done`,
@@ -24,10 +22,12 @@ is not a diagnosis.
 
 ## Orchestrate and delegate
 
-You keep the goal, acceptance bar, and decisions. Hand bounded work to the
-roles in [`.agents/agents/`](./.agents/agents/) using the brief and the role
-table in [`docs/delegation.md`](./docs/delegation.md).
-Reports cite `path:line`; keep raw dumps out of your context.
+You keep the goal, acceptance bar, and decisions. **Delegate** when a subtask
+needs its own context or gains from independence (the critic); **do it
+directly** otherwise — a subagent costs more than the change. Each role file in
+[`.agents/agents/`](./.agents/agents/) fixes the brief it takes and the block it
+returns ([`docs/delegation.md`](./docs/delegation.md)). Reports cite `path:line`;
+keep raw dumps out of your context.
 
 ## Extend the system
 
@@ -52,25 +52,18 @@ Project rules (scoped rules arrive when you edit a matching path):
 ## Issue-backed write-ahead record
 
 Before a behavior, schema, contract, security, privacy, or operational change:
+search open and closed issues and `docs/ERROR_LOG.md` by symptom, path, and
+topic, then file one with `make issue` — intended behavior, scope, risks, and
+evidence-producing acceptance criteria **before** implementation. One issue per
+independent root cause; file confirmed residuals before completion. Mechanics
+and the private security route: [`docs/self-healing.md`](./docs/self-healing.md).
 
-1. Search open and closed issues and `docs/ERROR_LOG.md` by symptom, path,
-   and topic. Update the matching issue when root cause and acceptance match.
-2. Otherwise create one from [`docs/ISSUE_TEMPLATE.md`](./docs/ISSUE_TEMPLATE.md)
-   with `make issue`: intended behavior, scope, risks, and evidence-producing
-   acceptance criteria **before** implementation (no remote: a `Local-WAL`
-   draft in ignored `.agent/wal/`). Active vulnerabilities and
-   sensitive personal data go to the private route in [`SECURITY.md`](./SECURITY.md);
-   the disclosure class is an owner decision, and uncertain content stays private.
-3. One issue per independent root cause; file confirmed residuals before
-   completion. Never rebuild the issue register as a Markdown backlog.
-
-`[governance].profile` sets friction: `agent-first` (default, compact
-contract), `regulated` (full contract and launch gates), `minimal` (host owns
-issues). Never change it silently; record the reason in the issue.
+`[governance].profile` sets friction; change it deliberately and record the
+reason in the issue.
 
 ## Navigate by trigger
 
-[`docs/README.md`](./docs/README.md) lists every document and when to read it. Never skip:
+[`docs/README.md`](./docs/README.md) lists every document and when to read it:
 
 - **New product:** `product-kickoff` (headless with no owner answers: write the questions with your picks, then stop), then `stack-foundation`, then `make next` until launch ([`docs/building.md`](./docs/building.md)). **Anything users see:** `ux-quality` and `make ui-review`.
 - **Vocabulary, architecture, seams:** [`CONTEXT.md`](./CONTEXT.md), [`docs/architecture/README.md`](./docs/architecture/README.md).

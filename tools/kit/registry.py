@@ -375,10 +375,33 @@ class Context:
         from .docsync import bindings
         return bindings(self.root, self.files)
 
+    @cached_property
+    def derived(self) -> set[str]:
+        """Files `make sync` writes; a generated file is referenced by its generator."""
+        from .derive import render_all  # local import: derive imports this module
+        return set(render_all(self.root))
+
+    @cached_property
+    def orphans(self) -> tuple[list[str], list[str]]:
+        """(blocking, advisory) tracked files nothing references; computed once per run."""
+        from .reachability import orphans
+        return orphans(self)
+
+    @cached_property
+    def signatures(self) -> tuple:
+        """The failure signatures in docs/ERROR_LOG.md, so a repeat is recognised in one step."""
+        from .signatures import signatures
+        return signatures(self.root)
+
 
 def run_checks(root: Path, *, blocking_only: bool, context: Context | None = None,
                skip: frozenset[str] = frozenset()) -> tuple[list[str], list[str]]:
-    """(blocking findings, advisory findings) from every check of an enabled pack, minus `skip`."""
+    """(blocking findings, advisory findings) from every check of an enabled pack, minus `skip`.
+
+    A finding that repeats a signature already in docs/ERROR_LOG.md is followed by that
+    signature's key and permanent fix, so a known failure is recognised rather than
+    diagnosed again.
+    """
     context = context or Context(root)
     hard: list[str] = []
     advisory: list[str] = []
@@ -390,4 +413,7 @@ def run_checks(root: Path, *, blocking_only: bool, context: Context | None = Non
         except RepoctlError as error:
             findings = [str(error)]
         (hard if item.fields["blocks"] else advisory).extend(findings)
+    if hard:
+        from .signatures import recognition
+        hard += recognition(hard, context.signatures)
     return hard, advisory

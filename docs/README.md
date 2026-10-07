@@ -31,7 +31,7 @@ itself and this table cannot drift. Edit the line in the document, not here.
 | [`STACK-DECISION.md`](./STACK-DECISION.md) | Framework/toolchain decision and rationale | Choosing a project stack or replacing an assumed tool. |
 | [`audit.md`](./audit.md) | Whole-repository audit protocol | Finding, prioritizing, and filing improvements without implementing them. |
 | [`building.md`](./building.md) | Product driver: feature list, research record, make next phases, product done, UI review | building or judging a product |
-| [`delegation.md`](./delegation.md) | Orchestrator/subagent roles, brief and report contract | Work is bounded enough to hand to a scout, implementer, critic, researcher, doc-gardener, or skill-scout. |
+| [`delegation.md`](./delegation.md) | Orchestrator/subagent roles, brief, return, and critic verdict contract | Work is bounded enough to hand to a scout, implementer, critic, researcher, doc-gardener, or skill-scout. |
 | [`operations.md`](./operations.md) | Failure loop and error ledger rules | A bug, outage, flaky test, or operational failure occurs. |
 | [`production.md`](./production.md) | Production evidence and release boundary | A real project is being prepared for deployment or release. |
 | [`self-healing.md`](./self-healing.md) | When a check may block, hooks, doc-code bindings, deprecation expiry, budgets, generated files, gardener, evals | A check fails, docs drift, a host is added, or the kit itself changes. |

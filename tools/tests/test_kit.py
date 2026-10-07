@@ -20,7 +20,8 @@ TOOLS = Path(__file__).resolve().parents[1]
 REPOCTL = TOOLS / "repoctl.py"
 sys.path.insert(0, str(TOOLS))
 
-from kit import ci, derive, docsync, evals, garden, hygiene, navigate, product, registry, risk, uireview  # noqa: E402
+from kit import (ci, commands, coupling, derive, docsync, evals, garden, hygiene, navigate, product,  # noqa: E402
+                  reachability, registry, risk, signatures, structure, uireview)
 from kit.gitinfo import path_matches  # noqa: E402
 
 # Built by concatenation so this test file never trips the marker scanner itself.
@@ -109,7 +110,10 @@ class KitRepository(unittest.TestCase):
         )
 
     # The fixture is a bare repository, not an initialized project: skip the repository-contract checks.
-    CONTRACT = frozenset({"manifest-structure", "skill-provenance", "file-hygiene", "markdown-links", "docs-index"})
+    # Its files (a role, a skill, an MCP route, resources.toml) are capability carriers nothing names,
+    # so the compactness gate would report every one of them; OrphanFileTests covers that gate directly.
+    CONTRACT = frozenset({"manifest-structure", "skill-provenance", "file-hygiene", "markdown-links", "docs-index",
+                          "orphan-files", "host-read-config"})
 
     def self_heal(self) -> str:
         """The self-healing findings `make check` adds on top of the repository-contract checks."""
@@ -860,6 +864,26 @@ class GoldenPathTests(unittest.TestCase):
             commit = subprocess.run(["git", "-C", str(project), "commit", "-qm", "feat: hello surface"], capture_output=True, text=True)
             self.assertEqual(commit.returncode, 0, commit.stderr)
 
+    @template_only
+    def test_a_project_made_from_this_readme_passes_check(self) -> None:
+        """#16: the generated command block must never read as un-rewritten template scaffolding."""
+        from kit import trial
+        with tempfile.TemporaryDirectory() as folder:
+            project = Path(folder) / "demo"
+            trial.prepare(TOOLS.parent, {"id": "demo", "kind": "cli", "mode": "new", "prompt": "x"}, project)
+            readme = project / "README.md"
+            self.assertNotIn("Template mode", readme.read_text(), "make init rewrote the template's own line")
+            self.assertIn("Project initialized: **demo** (`cli`)", readme.read_text())
+            check = lambda: subprocess.run([sys.executable, "tools/repoctl.py", "check"], cwd=project,
+                                           capture_output=True, text=True)
+            generated = check()
+            self.assertEqual(generated.returncode, 0, (generated.stdout + generated.stderr)[-2000:])
+            readme.write_text(readme.read_text().replace(
+                "# This project is initialized.", "make init NAME=my-project KIND=web OWNER=your-handle"))
+            bootstrap = check()
+            self.assertEqual(bootstrap.returncode, 1, "column-0 quickstart prose is still template scaffolding")
+            self.assertIn("still contains template bootstrap text", bootstrap.stderr)
+
 
 @template_only
 class KitUpdateTests(unittest.TestCase):
@@ -1123,6 +1147,27 @@ class DerivedContentTests(KitRepository):
         derive.sync(self.root)
         self.assertIn("\nInvoices for everyone.\n", (self.root / "README.md").read_text())
 
+    def test_readme_command_list_is_make_help_and_a_hand_edit_is_drift(self) -> None:
+        self.write("README.md", "# Demo\n\n<!-- repoctl:description -->\nold\n<!-- /repoctl:description -->\n"
+                                "## Commands\n\n<!-- repoctl:commands -->\n<!-- /repoctl:commands -->\n")
+        derive.sync(self.root)
+        readme = (self.root / "README.md").read_text()
+        self.assertIn(f"<!-- repoctl:commands -->\n```bash\n{commands.help_text(registry.Registry(self.root))}\n```\n"
+                      "<!-- /repoctl:commands -->", readme)
+        self.write("README.md", readme.replace("make where", "make wherever"))
+        self.assertIn("derived file out of date: README.md", self.self_heal())
+
+    def test_a_removed_command_leaves_the_readme(self) -> None:
+        self.write("README.md", "# Demo\n\n<!-- repoctl:commands -->\n<!-- /repoctl:commands -->\n")
+        self.write(".agents/commands/seed-demo.py", "from kit.registry import command\n\n"
+                   "@command('seed-demo', 'Load demo data for a walkthrough of the product')\n"
+                   "def run(root, args):\n    print('seeded')\n")
+        derive.sync(self.root)
+        self.assertIn("make seed-demo", (self.root / "README.md").read_text())
+        (self.root / ".agents/commands/seed-demo.py").unlink()
+        derive.sync(self.root)
+        self.assertNotIn("seed-demo", (self.root / "README.md").read_text())
+
     def test_handover_prefills_git_facts_and_never_overwrites(self) -> None:
         self.write("docs/handoffs/TEMPLATE.md", "# Handoff\n\n- **Created (UTC):** `<timestamp>`\n- **Working tree:** `<clean or exact uncommitted paths>`\n")
         self.write("src/billing/invoice.py", "def render_invoice():\n    return 7\n")
@@ -1131,6 +1176,39 @@ class DerivedContentTests(KitRepository):
         self.assertIn("`src/billing/invoice.py`", text)
         self.assertIn("docs/billing.md (covers src/billing/invoice.py)", text)
         self.assertIn("already exists", self.cli("handover").stdout)
+
+
+class TemplateReadmeTests(KitRepository):
+    """#16: the template states template mode; only `make init` writes a project identity."""
+
+    MODE = "# Demo\n\n<!-- repoctl:project-readme -->\n> **Template mode:** the template itself.\n"
+    INITIALIZED = "# Demo\n\n<!-- repoctl:project-readme -->\n> Project initialized: **Demo** (`web`).\n"
+
+    def manifest(self, template: bool) -> dict:
+        text = (self.root / "project.toml").read_text().replace(
+            "[adapters]", f"[repository]\nis_template = {str(template).lower()}\n\n[adapters]")
+        self.write("project.toml", text)
+        return tomllib.loads(text)
+
+    def test_the_template_repository_ships_template_mode(self) -> None:
+        self.write("README.md", self.MODE)
+        structure.check_readme_identity(self.root, self.manifest(True))
+
+    def test_an_initialized_project_still_needs_its_identity_line(self) -> None:
+        self.write("README.md", self.MODE)
+        with self.assertRaisesRegex(Exception, "needs a project identity marker value"):
+            structure.check_readme_identity(self.root, self.manifest(False))
+
+    def test_a_generated_command_list_is_not_template_bootstrap_prose(self) -> None:
+        self.write("README.md", self.INITIALIZED + "\n## Commands\n\n<!-- repoctl:commands -->\n<!-- /repoctl:commands -->\n")
+        derive.sync(self.root)
+        structure.check_readme_identity(self.root, self.manifest(False))
+        self.assertIn("make init NAME=my-project", (self.root / "README.md").read_text())
+
+    def test_unrewritten_quickstart_prose_still_fails(self) -> None:
+        self.write("README.md", self.INITIALIZED + "\n```bash\nmake init NAME=my-project KIND=web OWNER=you\n```\n")
+        with self.assertRaisesRegex(Exception, "still contains template bootstrap text"):
+            structure.check_readme_identity(self.root, self.manifest(False))
 
 
 class ScaffoldTests(KitRepository):
@@ -1389,3 +1467,248 @@ class NavigationTests(KitRepository):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class OrphanFileTests(unittest.TestCase):
+    """Issue #17: a tracked file nothing references fails `make check`; a named one does not."""
+
+    MANIFEST = 'schema = 1\nname = "Demo"\nkind = "cli"\nphase = "development"\n'
+
+    def setUp(self) -> None:
+        self.temp = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp.name).resolve()
+
+    def tearDown(self) -> None:
+        self.temp.cleanup()
+
+    def build(self, files: dict[str, str], manifest: str = MANIFEST) -> None:
+        self.write("project.toml", manifest)
+        for name, content in files.items():
+            self.write(name, content)
+        for command in (("init", "-q", "-b", "main"), ("config", "user.email", "test@example.com"),
+                        ("config", "user.name", "Test"), ("add", "-A"), ("commit", "-q", "-m", "fixture")):
+            subprocess.run(["git", "-C", str(self.root), *command], check=True, capture_output=True, text=True)
+
+    def write(self, name: str, content: str) -> Path:
+        path = self.root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(textwrap.dedent(content), encoding="utf-8")
+        return path
+
+    def orphans(self) -> tuple[list[str], list[str]]:
+        return reachability.orphans(registry.Context(self.root))
+
+    def test_an_unreferenced_file_is_a_finding_that_names_its_fix(self) -> None:
+        self.build({
+            "docs/README.md": "# Docs\n\n- [API](api.md)\n",
+            "docs/api.md": "# API\n\n<!-- covers: src/used.py -->\n",
+            "src/used.py": "VALUE = 1\n",
+            "src/leftover.py": "VALUE = 2\n",
+        })
+        blocking, _ = self.orphans()
+        self.assertEqual([item.split(":")[0] for item in blocking], ["src/leftover.py"])
+        self.assertIn("<!-- covers: src/leftover.py -->", blocking[0])
+        self.assertIn("[repository].infrastructure_paths", blocking[0])
+
+    def test_a_named_file_is_not_an_orphan(self) -> None:
+        # A module an import reaches, a file a binding claims, and one a test root loads.
+        self.build({
+            "docs/README.md": "# Docs\n\n- [API](api.md)\n",
+            "docs/api.md": "# API\n\n<!-- covers: src/bound.py src/app.py -->\n",
+            "src/bound.py": "VALUE = 1\n",
+            "src/imported.py": "VALUE = 2\n",
+            "src/app.py": "from . import imported\n\nprint(imported.VALUE)\n",
+            "tests/test_app.py": "def test_app():\n    assert True\n",
+            "Makefile": "test:\n\tpython3 -m unittest discover -s tests\n",
+        })
+        blocking, _ = self.orphans()
+        self.assertEqual(blocking, [], "a bound, imported, or discovered file is not an orphan")
+
+    def test_host_read_configuration_is_reported_without_blocking(self) -> None:
+        self.build({"docs/README.md": "# Docs\n\n- [API](api.md)\n",
+                    "docs/api.md": "# API\n\n<!-- covers: src/kept.py -->\n",
+                    ".editorconfig": "root = true\n", "src/kept.py": "VALUE = 1\n"})
+        blocking, advisory = self.orphans()
+        self.assertEqual(blocking, [], "a host-read configuration file never blocks")
+        self.assertTrue(any(item.startswith(".editorconfig:") for item in advisory), advisory)
+
+    def test_declared_infrastructure_silences_the_finding(self) -> None:
+        self.build({"docs/README.md": "# Docs\n\n- [API](api.md)\n", "docs/api.md": "# API\n",
+                    "vendor/thing.py": "VALUE = 1\n"},
+                   manifest=self.MANIFEST + '[repository]\ninfrastructure_paths = ["vendor"]\n')
+        self.assertEqual(self.orphans(), ([], []))
+
+    def test_a_kit_artifact_never_needs_a_project_declaration(self) -> None:
+        self.build({"docs/README.md": "# Docs\n\n- [API](api.md)\n", "docs/api.md": "# API\n",
+                    "review.md": "Issue: #1\nReviewer: octocat\nDate: 2026-09-01\n",
+                    "HANDOVER.md": "# Handover\n"})
+        self.assertEqual(self.orphans(), ([], []), "kit-owned paths are exempt by default")
+
+    def test_it_runs_in_the_blocking_gate(self) -> None:
+        self.build({"docs/README.md": "# Docs\n\n- [API](api.md)\n",
+                    "docs/api.md": "# API\n\n<!-- covers: src/used.py -->\n", "src/used.py": "VALUE = 1\n",
+                    "src/leftover.py": "VALUE = 2\n"})
+        hard, _ = registry.run_checks(self.root, blocking_only=True,
+                                     skip=KitRepository.CONTRACT - {"orphan-files"})
+        self.assertIn("src/leftover.py", "\n".join(hard), "make check reports an orphan file")
+
+    @template_only
+    def test_this_repository_has_no_blocking_orphan(self) -> None:
+        # Naming a path here would itself make it a reference, so this asserts the shape, not the names.
+        blocking, advisory = reachability.orphans(registry.Context(TOOLS.parent))
+        self.assertEqual(blocking, [], "the kit's own files are all named by code, binding, or configuration")
+        self.assertTrue(all("host-read configuration" in item for item in advisory), advisory)
+
+
+class ChangeCouplingTests(unittest.TestCase):
+    """Issue #18: recent history reports the areas that co-change, and never blocks."""
+
+    def setUp(self) -> None:
+        self.temp = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp.name).resolve()
+
+    def tearDown(self) -> None:
+        self.temp.cleanup()
+
+    def git(self, *arguments: str) -> None:
+        subprocess.run(["git", "-C", str(self.root), *arguments], check=True, capture_output=True, text=True)
+
+    def commit_touching(self, paths: list[str], message: str) -> None:
+        for path in paths:
+            target = self.root / path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(f"{message}\n", encoding="utf-8")
+            self.git("add", path)
+        self.git("commit", "-q", "-m", message)
+
+    def history(self) -> None:
+        self.git("init", "-q", "-b", "main")
+        self.git("config", "user.email", "test@example.com")
+        self.git("config", "user.name", "Test")
+
+    def test_areas_are_directories_and_root_files(self) -> None:
+        self.assertEqual(coupling.area("tools/kit/checks.py"), "tools/kit")
+        self.assertEqual(coupling.area(".agents/skills/demo/SKILL.md"), ".agents/skills")
+        self.assertEqual(coupling.area("Makefile"), "Makefile")
+        self.assertEqual(coupling.area("docs/README.md"), "docs")
+
+    def test_the_pair_that_keeps_changing_together_is_named(self) -> None:
+        self.history()
+        for number in range(coupling.MIN_SHARED + 1):
+            self.commit_touching(["src/billing/invoice.py", "tools/tests/test_billing.py"], f"billing {number}")
+        self.commit_touching(["docs/notes.md"], "notes")
+        findings = coupling.coupling_findings(self.root)
+        self.assertTrue(any(item.startswith("src/billing + tools/tests:") for item in findings), findings)
+        self.assertEqual(sum("co-change" in item for item in findings), 1, findings)
+
+    def test_a_pair_seen_twice_is_a_coincidence_not_a_seam(self) -> None:
+        self.history()
+        for number in range(2):
+            self.commit_touching(["src/a/one.py", "src/b/two.py"], f"pair {number}")
+        self.assertEqual(coupling.coupling_findings(self.root), [])
+
+    def test_a_sweeping_commit_is_not_a_coupling_signal(self) -> None:
+        self.history()
+        for number in range(3):
+            self.commit_touching([f"area{index}/file.py" for index in range(coupling.MAX_AREAS + 1)], f"sweep {number}")
+        self.assertEqual(coupling.coupling_findings(self.root), [])
+
+    def test_it_stays_advisory_and_out_of_the_blocking_gate(self) -> None:
+        self.history()
+        for number in range(coupling.MIN_SHARED + 1):
+            self.commit_touching(["src/billing/invoice.py", "tools/tests/test_billing.py"], f"billing {number}")
+        declared = registry.Registry(self.root).get("check", "change-coupling")
+        self.assertIsNotNone(declared, "the check is declared")
+        self.assertFalse(declared.fields["blocks"], "coupling is a judgement, so it never blocks")
+        self.write_manifest()
+        hard, advisory = registry.run_checks(self.root, blocking_only=False)
+        self.assertNotIn("co-change", "\n".join(hard), "make check never reports coupling")
+        self.assertIn("co-change", "\n".join(advisory), "make garden reports it")
+
+    def write_manifest(self) -> None:
+        (self.root / "project.toml").write_text('schema = 1\nname = "Demo"\nkind = "cli"\nphase = "development"\n',
+                                                encoding="utf-8")
+        self.git("add", "project.toml")
+        self.git("commit", "-q", "-m", "manifest")
+
+    def test_it_costs_nothing_measurable_on_this_repository(self) -> None:
+        started = time.perf_counter()
+        coupling.coupling_findings(TOOLS.parent)
+        self.assertLess(time.perf_counter() - started, 5.0, "one bounded git log stays well inside the garden budget")
+
+
+class FailureSignatureTests(unittest.TestCase):
+    """Issue #19: a finding that repeats a recorded signature is recognised, not re-diagnosed."""
+
+    LEDGER = """# Error ledger
+
+| Key | Date | Signature / symptom | Confirmed cause | Permanent fix |
+|---|---|---|---|---|
+| EL-001 | 2026-01-01 | `covers pattern matches no file: legacy/**` right after init | Pruning left a binding pointing at removed material | localize_text drops bindings to pruned material |
+"""
+
+    def setUp(self) -> None:
+        self.temp = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp.name).resolve()
+        (self.root / "project.toml").write_text('schema = 1\nname = "Demo"\nkind = "cli"\nphase = "development"\n',
+                                                encoding="utf-8")
+
+    def tearDown(self) -> None:
+        self.temp.cleanup()
+
+    def ledger(self, text: str = LEDGER) -> None:
+        (self.root / "docs").mkdir(exist_ok=True)
+        (self.root / "docs" / "ERROR_LOG.md").write_text(textwrap.dedent(text), encoding="utf-8")
+
+    def test_a_repeated_failure_is_named_with_its_recorded_fix(self) -> None:
+        self.ledger()
+        records = signatures.signatures(self.root)
+        hit = signatures.match("docs/api.md: covers pattern matches no file: legacy/**", records)
+        self.assertIsNotNone(hit, "a recorded signature is recognised")
+        self.assertEqual(hit.key, "EL-001")
+        self.assertIn("localize_text drops bindings", hit.fix)
+
+    def test_a_fresh_failure_matches_no_prior_signature(self) -> None:
+        self.ledger()
+        records = signatures.signatures(self.root)
+        for finding in ("src/billing/invoice.py: nothing references it", "AGENTS.md: 812 bytes, over its 200-byte budget"):
+            self.assertIsNone(signatures.match(finding, records), finding)
+        self.assertEqual(signatures.recognition(["src/billing/invoice.py: nothing references it"], records), [])
+
+    def test_the_check_runner_reports_the_signature_next_to_the_finding(self) -> None:
+        self.ledger()
+        (self.root / "docs").mkdir(exist_ok=True)
+        (self.root / "docs" / "api.md").write_text("# API\n\n<!-- covers: legacy/** -->\n", encoding="utf-8")
+        hard, _ = registry.run_checks(self.root, blocking_only=True)
+        findings = "\n".join(hard)
+        self.assertIn("covers pattern matches no file: legacy/**", findings)
+        self.assertIn("known failure EL-001", findings, "a repeat reports its key and fix")
+        self.assertIn("localize_text drops bindings", findings)
+
+    def test_no_ledger_means_no_matching_and_no_crash(self) -> None:
+        self.assertEqual(signatures.signatures(self.root), ())
+        self.assertIsNone(signatures.match("anything at all", ()))
+        hard, _ = registry.run_checks(self.root, blocking_only=True, skip=KitRepository.CONTRACT)
+        self.assertNotIn("known failure", "\n".join(hard))
+
+    def test_columns_are_read_from_the_header(self) -> None:
+        self.ledger("""\
+            # Error ledger
+
+            | Date | Permanent fix | Signature / symptom | Key | Confirmed cause |
+            |---|---|---|---|---|
+            | 2026-01-01 | shrink the router | `over its 200-byte budget` | EL-009 | an always-loaded doc grew |
+            """)
+        records = signatures.signatures(self.root)
+        self.assertEqual([record.key for record in records], ["EL-009"])
+        self.assertEqual(records[0].fix, "shrink the router")
+        self.assertIsNotNone(signatures.match("AGENTS.md is 812 bytes, over its 200-byte budget (AGENTS.md)", records))
+
+    @template_only
+    def test_this_ledger_is_keyed_and_every_row_has_a_fix(self) -> None:
+        records = signatures.signatures(TOOLS.parent)
+        self.assertGreaterEqual(len(records), 5)
+        for record in records:
+            self.assertRegex(record.key, r"^EL-\d{3}$")
+            self.assertTrue(record.literals, record.key)
+            self.assertTrue(record.fix, f"{record.key} records no permanent fix")

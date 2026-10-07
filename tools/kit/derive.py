@@ -4,6 +4,8 @@
 - The documentation index block in `docs/README.md` from each document's
   `<!-- index: -->` declaration.
 - The README description block from `project.toml [repository].description`.
+- The README command block from the same `@command` declarations `make help`
+  prints, so the README and the terminal never disagree.
 - The role table in `docs/delegation.md` from `.agents/agents/*.md` frontmatter.
 - The global rules block in `AGENTS.md` from `.agents/rules/*.md` without a scope.
 - The command block in the Makefile (or `kit.mk` after `make adopt`) from the
@@ -86,6 +88,24 @@ def description(project: dict[str, object]) -> str:
     return str(value).strip()
 
 
+def render_command_help(registry: Registry) -> str:
+    """`make help` verbatim, fenced for Markdown: one declaration set, two surfaces."""
+    from .commands import help_text  # deferred: commands imports this module
+    return "```bash\n" + help_text(registry) + "\n```"
+
+
+def render_readme(root: Path, readme: str, registry: Registry) -> str:
+    """Both README blocks compose into one write. A README carrying neither marker
+    (an adopted project's own file) is returned untouched."""
+    text = readme
+    if "<!-- repoctl:description -->" in text:
+        value = description(load_project(root)) or "Describe this project in `project.toml` `[repository].description`, then run `make sync`."
+        text = replace_block(text, "description", value)
+    if "<!-- repoctl:commands -->" in text:
+        text = replace_block(text, "commands", render_command_help(registry))
+    return text
+
+
 def render_blocks(root: Path) -> dict[str, str]:
     """Hand-written files whose marked blocks are generated."""
     files: dict[str, str] = {}
@@ -109,9 +129,10 @@ def render_blocks(root: Path) -> dict[str, str]:
             files[makefile] = replace_make_block(text, "commands", block)
             break
     readme = read_text_file(root, "README.md")
-    if readme is not None and "<!-- repoctl:description -->" in readme:
-        text = description(load_project(root)) or "Describe this project in `project.toml` `[repository].description`, then run `make sync`."
-        files["README.md"] = replace_block(readme, "description", text)
+    if readme is not None:
+        composed = render_readme(root, readme, registry)
+        if composed != readme:
+            files["README.md"] = composed
     return files
 
 

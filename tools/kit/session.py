@@ -22,7 +22,7 @@ from .gitinfo import branch, branch_paths, changed_paths, git, head, path_matche
 from .navigate import print_map
 from .product import next_step, product_summary
 from .registry import Registry
-from .risk import assess
+from .risk import assess, classify, tier_rules
 from .uireview import review_status
 
 
@@ -37,6 +37,8 @@ CHECKPOINT = ".agent/checkpoint.md"
 MAP_LIMIT = 15
 STATE = ".agent/hook-state.json"
 CANONICAL_INPUTS = (".agents/", "tools/kit/commands.py", "project.toml")
+CRITIC_RECORD = ".agent/critic.md"
+CRITIC_VERDICTS = ("blocker", "ship-with-residuals")
 
 
 def read_event() -> dict[str, object]:
@@ -105,8 +107,11 @@ def session_start(root: Path) -> None:
     print("\n".join(f"- {item}" for item in findings[:15]) or "- nothing: the self-healing checks are green")
     print(
         "\n## Working agreement\n"
-        "- You orchestrate and keep the goal; delegate bounded searches, builds, reviews, and doc fixes to the roles\n"
-        "  in .agents/agents/ using the brief in docs/delegation.md. Subagent reports must stay short and cite file:line.\n"
+        "- You orchestrate and keep the goal; hand a subtask that needs its own context or independence (the critic)\n"
+        "  to the roles in .agents/agents/, and do everything else directly. Each role fixes the brief it takes and the\n"
+        "  block it returns; reports stay short and cite file:line.\n"
+        "- The critic returns one verdict, `blocker` or `ship-with-residuals`; save that block verbatim to\n"
+        f"  {CRITIC_RECORD}, which `make done` reads before a high-risk change set can be called done.\n"
         "- Navigate with `make where Q=\"...\"` before broad searching; `make risk` sets the ceremony for your change.\n"
         "- Before declaring done: update the docs that cover what you changed, then `make done`."
         "\n- Missing a capability? `make similar Q=\"...\"`, then `make new KIND=...` (skill, agent, doc, rule, check,"
@@ -201,9 +206,54 @@ def after_edit(root: Path, event: dict[str, object]) -> None:
         print(json.dumps({"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": " ".join(notes)}}))
 
 
+def _committed_paths(root: Path, base: str) -> list[str]:
+    """This branch's committed change set. A critic reviews a diff; a dirty tree is not one yet."""
+    merge_base = (git(root, "merge-base", "HEAD", base) or "").strip()
+    if not merge_base:
+        return []
+    return [line for line in (git(root, "diff", "--name-only", merge_base, "HEAD") or "").splitlines() if line]
+
+
+def critic_findings(root: Path, project: dict[str, object], base: str) -> list[str]:
+    """High-risk work needs an independent critic whose verdict this gate can read.
+
+    The record is the critic's return saved verbatim to `.agent/critic.md`; a
+    verdict outside the fixed vocabulary is a failure, not a softer pass.
+    """
+    if governance_profile(project) == "minimal":
+        return []  # the host owns issues, review, and ceremony
+    rules = tier_rules(project)
+    risky = [path for path in _committed_paths(root, base) if classify(path, rules) == "high"]
+    if not risky:
+        return []
+    vocabulary = " | ".join(CRITIC_VERDICTS)
+    content = read_text_file(root, CRITIC_RECORD) or ""
+    if not content.strip():
+        return [
+            f"high-risk change ({', '.join(risky[:4])}) has no critic evidence: run the critic role on this change"
+            f" set and save its return verbatim to {CRITIC_RECORD}"
+        ]
+    verdict = re.search(r"(?im)^Verdict:\s*(\S+)", content)
+    if verdict is None:
+        return [f"{CRITIC_RECORD} states no verdict; the critic returns exactly one of: {vocabulary}"]
+    word = verdict.group(1).strip().lower()
+    if word not in CRITIC_VERDICTS:
+        return [f"{CRITIC_RECORD} verdict {word!r} is outside the fixed vocabulary ({vocabulary}); prose is not a verdict"]
+    if word == CRITIC_VERDICTS[0]:
+        return [f"{CRITIC_RECORD} verdict is {word}: fix what it lists, then ask the critic again"]
+    reviewed = re.search(r"(?im)^Commit:\s*([0-9a-f]{40})\b", content)
+    if not reviewed:
+        return [f"{CRITIC_RECORD} has no 'Commit: <40-hex>' line, so it is not bound to a reviewed change set"]
+    current = (git(root, "rev-parse", "HEAD") or "").strip()
+    if current and reviewed.group(1) != current:
+        return [f"{CRITIC_RECORD} reviews {reviewed.group(1)[:12]}, not HEAD {current[:12]}: the critic read older work"]
+    return []
+
+
 def finish_findings(root: Path) -> list[str]:
     """Fast completion gate over this branch's change set (commits since the base plus uncommitted)."""
-    repository = load_project(root).get("repository", {})
+    project = load_project(root)
+    repository = project.get("repository", {})
     base = str(repository.get("default_branch", "main")) if isinstance(repository, dict) else "main"
     changed = branch_paths(root, base)
     if not changed:
@@ -225,6 +275,7 @@ def finish_findings(root: Path) -> list[str]:
     findings += docsync.dead_bindings(doc_bindings, files)
     present = [path for path in changed if path in set(files)]
     findings += hygiene.scan_markers(root, present).errors
+    findings += critic_findings(root, project, base)
     return findings
 
 

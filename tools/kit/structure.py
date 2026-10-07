@@ -356,9 +356,14 @@ def check_vision(root: Path, project: dict[str, object], enforce: bool = True, r
             raise RepoctlError("project stack decision date is invalid") from error
 
 
+def is_template(project: dict[str, object]) -> bool:
+    repository = project.get("repository")
+    return isinstance(repository, dict) and repository.get("is_template") is True
+
+
 def check_readme_identity(root: Path, project: dict[str, object]) -> None:
-    if project.get("name") == "REPLACE_WITH_PROJECT_NAME":
-        return
+    if project.get("name") == "REPLACE_WITH_PROJECT_NAME" or is_template(project):
+        return  # the template states template mode; only `make init` writes a project identity
     readme = root / "README.md"
     try:
         content = readme.read_text(encoding="utf-8")
@@ -375,7 +380,10 @@ def check_readme_identity(root: Path, project: dict[str, object]) -> None:
         raise RepoctlError("initialized project README.md needs a project identity marker value")
     if identity.group("name") != project.get("name") or identity.group("kind") != project.get("kind"):
         raise RepoctlError("README project identity does not match project.toml")
-    if project.get("name") != "AI_TEMPLATE" and re.search(r"(?m)^# Agent Template$|cp -R AGENT_TEMPLATE my-project|make init NAME=my-project", content):
+    # Column 0 is hand-written quickstart prose; a generated block (the `make help` listing
+    # renders `make init NAME=my-project ...` indented) is `make sync`'s, not template scaffolding.
+    if project.get("name") != "AI_TEMPLATE" and re.search(
+            r"(?m)^# Agent Template$|^cp -R AGENT_TEMPLATE my-project|^make init NAME=my-project", content):
         raise RepoctlError("initialized project README.md still contains template bootstrap text")
 
 

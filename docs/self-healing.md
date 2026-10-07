@@ -1,7 +1,7 @@
 # Self-healing mechanics
 
 <!-- index: operate | When a check may block, hooks, doc-code bindings, deprecation expiry, budgets, generated files, gardener, evals | A check fails, docs drift, a host is added, or the kit itself changes. -->
-<!-- covers: tools/kit/checks.py tools/kit/docsync.py tools/kit/hygiene.py tools/kit/adapters.py tools/kit/session.py tools/kit/garden.py tools/kit/navigate.py tools/kit/risk.py tools/kit/capabilities.py tools/kit/evals.py tools/kit/trial.py tools/kit/kitupdate.py .agents/trials/** tools/kit/gitinfo.py tools/kit/derive.py tools/kit/scaffold.py tools/kit/config.py .githooks/** .github/workflows/garden.yml .agents/evals/** -->
+<!-- covers: tools/kit/checks.py tools/kit/docsync.py tools/kit/hygiene.py tools/kit/adapters.py tools/kit/session.py tools/kit/garden.py tools/kit/navigate.py tools/kit/risk.py tools/kit/capabilities.py tools/kit/evals.py tools/kit/trial.py tools/kit/kitupdate.py .agents/trials/** tools/kit/gitinfo.py tools/kit/derive.py tools/kit/scaffold.py tools/kit/config.py tools/kit/reachability.py tools/kit/coupling.py tools/kit/signatures.py .githooks/** .github/workflows/garden.yml .agents/evals/** -->
 
 Agents follow written rules well at the start of a session and worst at the end,
 after compaction, which is when cleanup and documentation get skipped. So the
@@ -51,7 +51,7 @@ Otherwise it is **advisory** (`make garden`, the session brief) or an
 | Session start or resume | `repoctl hook session-start` | `make start` | Brief: branch, recent commits, `HANDOVER.md`, map, the `make next` step, open self-healing findings. Derived files are regenerated and the git commit gate is installed. |
 | Before context compaction | `repoctl hook pre-compact` | — | Writes `.agent/checkpoint.md` (uncommitted paths, docs still owed). |
 | After a file edit | `repoctl hook after-edit` | — | Names the docs covering the edited path (once per session); regenerates derived files when a source changed; warns on edits to generated files. |
-| Before declaring done | `repoctl hook stop` | `make done` | Gate over this branch's change set: owed docs, derived-file drift, dead bindings, expired, undated, or unfinished markers; `make done` also prints product completeness and, as advice, a stale UI review ([`building.md`](./building.md)). The hook blocks once; `make done` also runs every test and predicts the commit gate for uncommitted work, so the two never disagree. |
+| Before declaring done | `repoctl hook stop` | `make done` | Gate over this branch's change set: owed docs, derived-file drift, dead bindings, expired, undated, or unfinished markers, plus critic evidence when committed `high`-risk paths changed (see [Ceremony by risk](#ceremony-by-risk)); `make done` also prints product completeness and, as advice, a stale UI review ([`building.md`](./building.md)). The hook blocks once; `make done` also runs every test and predicts the commit gate for uncommitted work, so the two never disagree. |
 | Every commit | `.githooks/commit-msg` (any agent or human) | same | Refuses a commit whose staged covered code skips its doc (unless the message carries a `Docs-Unaffected:` trailer), plus marker checks, and derived-file drift when the commit touches a source. In a merge commit, paths the merged branch brought in skip the owed-doc check (its commits already passed it or recorded a trailer); anything else staged is checked as usual. Exit 3 means blocked; a crashed kit never blocks a commit. Bypass deliberately with `--no-verify`. |
 
 The commit gate is installed (`core.hooksPath=.githooks`) only when the
@@ -108,6 +108,37 @@ Markers are plain comments and work in any language:
   half-written skill, role, or doc cannot rot unnoticed.
 - A workflow `run:` block longer than 10 lines fails: CI logic belongs in
   `tools/` where it is unit-tested and runs locally (`repoctl ci <check>`).
+
+## Files that justify themselves
+
+A compact repository is the one property that every reader pays for, so it is
+checked rather than hoped for.
+
+- `orphan-files` **blocks** on a tracked file that nothing reaches: no document's
+  `covers:` glob claims it, `make sync` does not generate it, no code imports or
+  names it, and it is not in `[repository].infrastructure_paths`. The fix is one
+  edit — import it, bind it, or delete it.
+- Kit artifacts are exempt by default, from a list built out of the kit's own
+  constants (`tools/kit/reachability.py`), so a project never has to justify a
+  file the kit itself wrote.
+- `host-read-config` **advises** on files only a host convention reads (editor,
+  git, hosting, scanner config). Advice, not a block: the kit cannot model every
+  host's conventions, and a wrong block is permanent in a project that has no
+  upgrade path.
+
+## Structure you can see
+
+- `change-coupling` **advises**, from recent git history, when two areas keep
+  changing together. That is what a wrong seam looks like over time, and it is a
+  judgement, so it never blocks.
+
+## Known failures, recognised
+
+Every entry in `docs/ERROR_LOG.md` carries a key (`EL-001`…). When a blocking
+check produces a finding matching a recorded signature, `make check` prints the
+key and its permanent fix. A known failure is recognised in one step instead of
+re-derived — the difference between debugging and pattern-matching. Fresh
+failures add no line, so the ledger cannot manufacture a match.
 
 ## Product guardrails
 
@@ -217,6 +248,57 @@ task, which the `AGENTS.md` budget keeps bounded.
 globs: `low` needs `make check` only, `normal` follows the full build and repair
 loop (with a critic for subjective or commandless work), and `high` (CI, tooling, agent instructions, security, auth, and migrations by default) adds an
 independent critic. Tune the globs per project. Never widen `low` to dodge a gate.
+
+### Critic evidence the gate can read
+
+A critic is cheap to request and easy to skip, so the completion gate reads proof
+that one ran (`tools/kit/session.py`): when this branch has **committed** `high`
+paths, `make done` and the stop hook look for `.agent/critic.md` (ignored, so the
+evidence never rides along in a commit).
+
+The record is the [`critic`](../.agents/agents/critic.md) role's return saved
+verbatim, and it is checked field by field:
+
+- **`Verdict:`** must be exactly `blocker` or `ship-with-residuals`. `blocker`
+  fails the gate (fix what it lists, then ask again), and any other word — prose,
+  "looks good", `accept` — fails as an unknown verdict rather than a softer pass.
+- **`Commit:`** must be the current HEAD, so evidence about older work cannot
+  vouch for today's change set. That fixes the order: commit the change, then run
+  the critic on that commit, then save its return — a record written before the
+  commit goes stale the moment the commit lands.
+- Missing record, missing `Verdict:`, or a record bound to another commit each
+  fail with a message naming the fix, so the gate teaches the protocol instead of
+  only reporting it.
+
+Two deliberate exemptions keep the gate from being friction: it reads committed
+paths only (a critic reviews a diff; a dirty tree is not one yet), and
+`[governance].profile = "minimal"` skips it, because that profile hands issues and
+review to the host.
+
+## Write-ahead issues
+
+Before a behavior, schema, contract, security, privacy, or operational change,
+the router in [`AGENTS.md`](../AGENTS.md) requires a search of the issue register
+and `docs/ERROR_LOG.md` first, then one issue per independent root cause carrying
+intended behavior, scope, risks, and evidence-producing acceptance criteria
+**before** implementation. The mechanics behind that rule:
+
+- `make issue TITLE=... BODY=<file> TYPE=... PRIORITY=... AREA=... TOPIC=...`
+  validates against the open and closed register and files on GitHub; the body
+  format is [`ISSUE_TEMPLATE.md`](./ISSUE_TEMPLATE.md).
+- With no GitHub remote, `make issue WAL=Local-WAL-001 …` (or `WAL=all`) writes
+  the draft to ignored `.agent/wal/` instead, which counts as the write-ahead
+  record.
+- Active vulnerabilities and sensitive personal data never go in a public issue:
+  use the private route in [`SECURITY.md`](../SECURITY.md). The disclosure class
+  is an owner decision, and uncertain content stays private.
+- Live work lives in the issue register, never in a Markdown backlog; the tracked
+  backlog check above fails `docs/*WAL*.md`, `TODO.md`, `BACKLOG.md`, `TASKS.md`,
+  and `ROADMAP.md`.
+- `[governance].profile` sets how much friction the gates apply: `agent-first`
+  (default, compact contract), `regulated` (full contract and launch gates),
+  `minimal` (the host owns issues). Change it deliberately and record the reason
+  in the issue.
 
 ## The gardener
 

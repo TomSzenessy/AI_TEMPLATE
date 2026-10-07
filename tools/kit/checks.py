@@ -56,6 +56,22 @@ def markdown_links(context) -> list[str]:
     return _raised(docs.check_markdown_links, context.root)
 
 
+@check("orphan-files", "Every tracked file is named by code, a test, toolchain config, or a covers binding; on every change",
+       blocks=True, reason="Issue #17: a module nothing imports and no document claims passed every gate indefinitely "
+                           "in this repository, and a template that accumulates unjustified files breaks its own "
+                           "promise to be readable cold. The fix is one edit (import, bind, or delete), and files a "
+                           "tool loads by convention are exempt by default rather than left to each project.")
+def orphan_files(context) -> list[str]:
+    return context.orphans[0]
+
+
+@check("host-read-config", "Tracked host configuration no file names (editor, git, hosting, or scanner conventions); "
+                          "reference it or declare it in [repository].infrastructure_paths",
+       blocks=False)
+def host_read_config(context) -> list[str]:
+    return context.orphans[1]
+
+
 # --- Derived files and the docs index ----------------------------------------------
 
 @check("derived-drift", "Generated files (host adapters, docs index, Makefile commands, rules) match their sources; run make sync",
@@ -236,6 +252,13 @@ def github_metadata(context) -> list[str]:
 def pin_drift(context) -> list[str]:
     from .garden import pin_drift as drift
     return drift(context.root)
+
+
+@check("change-coupling", "Directory pairs that keep changing together; a wrong seam shows up in history first",
+       blocks=False)
+def change_coupling(context) -> list[str]:
+    from .coupling import coupling_findings
+    return coupling_findings(context.root)
 
 
 @check("kit-updates", "Template fixes not yet merged into this project, or a template that moved on; run make kit-update",
