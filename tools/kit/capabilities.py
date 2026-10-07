@@ -25,7 +25,10 @@ TOOLS = {
     "uv": "Python tool runner",
     "docker": "containers / reproducible services",
 }
-AGENT_HOSTS = {"claude": "Claude Code", "codex": "Codex CLI", "gemini": "Gemini CLI", "cursor-agent": "Cursor CLI", "copilot": "Copilot CLI"}
+AGENT_HOSTS = {
+    "claude": "Claude Code", "codex": "Codex CLI", "gemini": "Gemini CLI",
+    "cursor-agent": "Cursor CLI", "copilot": "Copilot CLI",
+}
 
 
 def _gh_authenticated() -> bool:
@@ -58,7 +61,10 @@ def print_capabilities(root: Path) -> None:
         print(f"- {tool}: {status} — {purpose}")
     print("\n## Agent hosts installed")
     print("- " + ", ".join(f"{label}: {'yes' if shutil.which(binary) else 'no'}" for binary, label in AGENT_HOSTS.items()))
-    print(f"- adapters generated for: {', '.join(configured_hosts(root)) or 'none'} (Codex/Copilot/Cursor read AGENTS.md and .agents/ directly)")
+    print(
+        f"- adapters generated for: {', '.join(configured_hosts(root)) or 'none'} "
+        "(Codex/Copilot/Cursor read AGENTS.md and .agents/ directly)"
+    )
     print("\n## MCP routes (.agents/mcp/)")
     routes = registry.of("mcp", enabled_only=False)
     if not routes:

@@ -88,7 +88,7 @@ def budget_errors(root: Path, project: dict[str, object], files: list[str]) -> l
         raise RepoctlError("budgets must be a table of glob = max_bytes")
     errors = []
     for pattern, limit in budgets.items():
-        if not isinstance(limit, int) or limit <= 0:
+        if isinstance(limit, bool) or not isinstance(limit, int) or limit <= 0:
             errors.append(f"budget for {pattern} must be a positive integer byte count")
             continue
         for relative in files:
@@ -120,7 +120,7 @@ def duplicate_paragraphs(root: Path, files: list[str], min_words: int = 40, thre
                 shingles.append((relative, " ".join(paragraph.split())[:60], grams))
     findings = []
     for position, (path_a, head_a, grams_a) in enumerate(shingles):
-        for path_b, head_b, grams_b in shingles[position + 1 :]:
+        for path_b, _, grams_b in shingles[position + 1 :]:
             if path_a != path_b and len(grams_a & grams_b) / min(len(grams_a), len(grams_b)) >= threshold:
                 findings.append(f"{path_a} and {path_b} repeat a paragraph (\"{head_a}…\"); keep it in one owner and link")
     return findings

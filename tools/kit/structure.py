@@ -32,8 +32,7 @@ from .core import (
 )
 from .gitinfo import git
 from .names import STACK_DECISION, VISION
-from .docs import check_docs_index, check_file_hygiene, check_markdown_links
-from .skills import check_skill_admission, check_skill_provenance, load_resource_registry
+from .skills import check_skill_admission, load_resource_registry
 
 
 def discover_candidate_surfaces(
