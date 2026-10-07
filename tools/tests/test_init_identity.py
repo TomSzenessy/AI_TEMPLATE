@@ -21,6 +21,7 @@ def run_init(root: Path, *extra: str) -> subprocess.CompletedProcess[str]:
     return run_cli(root, "init", "--name", "x", "--kind", "web", *extra)
 
 
+@template_only  # every test initializes a copy of the uninitialized template
 class InitIdentityTests(Scratch):
     def copy_working_tree(self) -> Path:
         directory = Path(tempfile.mkdtemp())
@@ -68,7 +69,6 @@ class InitIdentityTests(Scratch):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("already initialized", result.stdout + result.stderr)
 
-    @template_only  # it runs the previous release's bootstrap from the template's history
     def test_unmodified_template_initializes_as_the_previous_release_did(self) -> None:
         root = self.copy_working_tree()
         baseline = self.copy_working_tree()  # identical, except it runs the previous release's bootstrap

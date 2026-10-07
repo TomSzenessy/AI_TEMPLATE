@@ -10,7 +10,7 @@ TOOLS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(TOOLS))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from fixtures import Scratch, git_in  # noqa: E402
+from fixtures import Scratch, git_in, template_only  # noqa: E402
 
 from kit import adopt, config, hygiene, launch, product, risk  # noqa: E402
 from kit.core import RepoctlError  # noqa: E402
@@ -115,14 +115,14 @@ class SecondPassTests(Scratch):
 
     def test_malformed_doc_meta_cache_is_recomputed(self) -> None:
         import json
-        from kit import docsync
+        from kit import docmeta
         self.write("docs/a.md", "# A\n<!-- covers: tools/** -->\n")
-        path = self.root / docsync.META_CACHE
+        path = self.root / docmeta.META_CACHE
         status = (self.root / "docs/a.md").stat()
         path.parent.mkdir(parents=True, exist_ok=True)
         stamp = [status.st_mtime_ns, status.st_size]
         path.write_text(json.dumps({"version": 3, "entries": {"docs/a.md": [stamp, {"index": None}]}}))
-        meta = docsync.doc_meta(self.root, ["docs/a.md"])
+        meta = docmeta.doc_meta(self.root, ["docs/a.md"])
         self.assertEqual(meta["docs/a.md"]["covers"], ["tools/**"])
 
     def test_doc_name_collisions_are_reported(self) -> None:
@@ -134,6 +134,7 @@ class SecondPassTests(Scratch):
         errors = docsync.index_errors(self.root, ["docs/a-b.md", "docs/a/b.md"])
         self.assertTrue(any("collides" in item for item in errors), errors)
 
+    @template_only  # adopts from the template checkout
     def test_adopt_reports_renamed_workflow_and_copied_license(self) -> None:
         import contextlib
         import io

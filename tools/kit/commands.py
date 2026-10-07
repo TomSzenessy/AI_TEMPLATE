@@ -12,7 +12,7 @@ from pathlib import Path
 
 from . import ci, derive, scaffold, session
 from .core import RepoctlError, check_failed, ensure_inside_root, load_project
-from .helptext import GROUPS, RECIPES, help_text  # noqa: F401  (help_text stays this module's surface)
+from .helptext import help_text
 from .registry import KINDS, arg, command
 
 

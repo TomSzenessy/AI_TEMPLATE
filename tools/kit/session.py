@@ -16,7 +16,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import derive, docsync
+from . import derive, docmeta, docsync
 from .core import (
     GATE_COMMIT_BLOCKED, GATE_NOT_FINISHED, GATE_STOP_BLOCKED,
     RepoctlError, default_branch, governance_profile, load_project, read_text_file, repository_files,
@@ -174,7 +174,7 @@ def session_start(root: Path, event: dict[str, object] | None = None) -> None:
 
 def pre_compact(root: Path) -> None:
     changed = changed_paths(root)
-    doc_bindings = docsync.bindings(root, repository_files(root))
+    doc_bindings = docmeta.bindings(root, repository_files(root))
     pending = docsync.pending_documents(doc_bindings, changed)
     lines = [
         "# Pre-compaction checkpoint",
@@ -206,7 +206,7 @@ def write_handover(root: Path) -> str:
     if template is None:
         raise RepoctlError(f"{HANDOVER_TEMPLATE} is missing")
     changed = changed_paths(root)
-    owed = docsync.pending_documents(docsync.bindings(root, repository_files(root)), changed)
+    owed = docsync.pending_documents(docmeta.bindings(root, repository_files(root)), changed)
     facts = {
         "`<timestamp>`": datetime.now(timezone.utc).isoformat(timespec="minutes"),
         "`<branch/commit or issue links>`": f"`{branch(root)}` @ `{head(root)}`",
@@ -243,7 +243,7 @@ def after_edit(root: Path, event: dict[str, object]) -> None:
             notes.append("Derived files regenerated from their sources: " + ", ".join(healed))
     session = str(event.get("session_id", "local"))
     state = _load_state(root, session)
-    owned = [doc for doc in docsync.owners(docsync.bindings(root, repository_files(root)), relative) if doc not in state["noted"]]
+    owned = [doc for doc in docmeta.owners(docmeta.bindings(root, repository_files(root)), relative) if doc not in state["noted"]]
     if owned:
         notes.append(f"{relative} is documented by {', '.join(owned)}; keep it true in this change (the stop gate checks).")
     # Scoped rules arrive when they apply, once per session, instead of living in the router.
@@ -313,7 +313,7 @@ def finish_findings(root: Path, session_paths: list[str] | None = None, since: s
         return []
     files = repository_files(root)
     file_set = set(files)
-    doc_bindings = docsync.bindings(root, files)
+    doc_bindings = docmeta.bindings(root, files)
     if scoped:
         dirty = set(changed_paths(root))
         uncommitted = [path for path in changed if path in dirty]
@@ -371,7 +371,7 @@ def commit_findings(root: Path, message_file: str | None) -> list[str]:
     exempt = docsync.exemption_scope(docsync.message_trailers(root, message)) or set()
     files = repository_files(root)
     file_set = set(files)
-    doc_bindings = docsync.bindings(root, files)
+    doc_bindings = docmeta.bindings(root, files)
     # A merge commit brings in commits that already passed this gate or recorded a
     # Docs-Unaffected decision; re-asking would re-litigate it. make done and CI's
     # stale-document check still read those commits' trailers.

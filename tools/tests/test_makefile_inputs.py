@@ -6,9 +6,13 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from fixtures import template_only  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 STUB = """#!/usr/bin/env python3
@@ -19,6 +23,7 @@ print("ARGV" + json.dumps(sys.argv[1:]))
 """
 
 
+@template_only  # it drives the template's own Makefile as a kit: `make adopt` exists only there
 class MakeInputTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -101,8 +106,6 @@ class MakeInputTests(unittest.TestCase):
         kit = Path(self.tmp.name) / name
         (kit / "tools").mkdir(parents=True)
         shutil.copy(ROOT / "Makefile", kit / "Makefile")
-        if (ROOT / "kit.mk").is_file():  # an adopted project's Makefile includes the kit's targets
-            shutil.copy(ROOT / "kit.mk", kit / "kit.mk")
         (kit / "tools" / "repoctl.py").write_text("")
         return kit
 

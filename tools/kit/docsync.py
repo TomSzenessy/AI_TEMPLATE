@@ -17,7 +17,7 @@ import re
 from pathlib import Path
 
 from .core import FENCED_CODE, read_text_file
-from .docmeta import COVERS_PATTERN, INDEX_PATTERN, META_CACHE, bindings, doc_meta, owners  # noqa: F401
+from .docmeta import doc_meta, owners
 from .gitinfo import git, has_history, path_matches
 from .registry import Registry, doc_name
 

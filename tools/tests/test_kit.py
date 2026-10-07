@@ -21,7 +21,7 @@ from fixtures import (RECENT, TOOLS, KitRepository, Scratch,  # noqa: E402  shar
                       clean_env, fake_gh, git_in, http_server, run_cli, template_only)
 
 from kit import (  # noqa: E402
-    checkrun, core, ci, commands, coupling, derive, docsync, evals, garden, hygiene, navigate, product,
+    checkrun, core, ci, commands, coupling, derive, docmeta, docsync, evals, garden, hygiene, navigate, product,
     reachability, registry, risk, session, signatures, structure, uireview,
 )
 from kit.core import load_project  # noqa: E402
@@ -47,13 +47,13 @@ class GlobTests(unittest.TestCase):
 
 class DocSyncTests(KitRepository):
     def test_binding_and_owner_lookup(self) -> None:
-        doc_bindings = docsync.bindings(self.root, self.files())
+        doc_bindings = docmeta.bindings(self.root, self.files())
         self.assertEqual(doc_bindings, {"docs/billing.md": ["src/billing/**"]})
         self.assertEqual(docsync.owners(doc_bindings, "src/billing/invoice.py"), ["docs/billing.md"])
 
     def test_inline_code_examples_are_not_bindings(self) -> None:
         self.write("docs/guide.md", "# Guide\n\nWrite `<!-- covers: nowhere/** -->` near the top.\n")
-        self.assertNotIn("docs/guide.md", docsync.bindings(self.root, self.files() + ["docs/guide.md"]))
+        self.assertNotIn("docs/guide.md", docmeta.bindings(self.root, self.files() + ["docs/guide.md"]))
 
     def test_dead_binding_is_a_finding(self) -> None:
         (self.root / "src/billing/invoice.py").unlink()
@@ -931,7 +931,7 @@ class AdoptTests(Scratch):
         # project prunes the specs, so every binding to them must go with them (EL-002): nothing in
         # the project may claim them any more, and in the template they are claimed exactly once.
         def trial_binders(root: Path, files: list[str]) -> set[str]:
-            bindings = docsync.bindings(root, files)
+            bindings = docmeta.bindings(root, files)
             return {doc for doc, globs in bindings.items() if any(".agents/trials" in glob for glob in globs)}
 
         self.assertEqual(trial_binders(self.root, core.repository_files(self.root)), set(),

@@ -11,7 +11,7 @@ import re
 from pathlib import Path
 
 from .core import declared_surfaces, governance_profile, load_project, read_text_file, repository_files
-from .docsync import bindings, owners
+from .docmeta import bindings, owners
 from .gitinfo import git, is_repository, path_matches
 from .names import ERROR_LOG
 from .registry import Registry
