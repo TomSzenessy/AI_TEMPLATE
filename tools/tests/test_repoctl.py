@@ -36,10 +36,8 @@ profile = "regulated"
     def write(self, name: str, content: str | bytes) -> Path:
         if name == "project.toml" and isinstance(content, str) and "[vision]" not in content:
             name_match = re.search(r'^name = "([^"]+)"', content, re.MULTILINE)
-            kind_match = re.search(r'^kind = "([^"]+)"', content, re.MULTILINE)
             project_name = name_match.group(1) if name_match else "Demo"
-            project_kind = kind_match.group(1) if kind_match else "web"
-            content += f'''\n[vision]\nstatus = "accepted"\nrecord = "VISION.md"\nstack_decision = "docs/STACK-DECISION.md"\n'''
+            content += '''\n[vision]\nstatus = "accepted"\nrecord = "VISION.md"\nstack_decision = "docs/STACK-DECISION.md"\n'''
             (self.root / "VISION.md").write_text(
                 f"# Project vision\n\nStatus: accepted\nProject: {project_name}\nOwner: test owner\nDate: " + RECENT + "\n",
                 encoding="utf-8",

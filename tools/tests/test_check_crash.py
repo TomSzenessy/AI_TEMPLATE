@@ -5,7 +5,6 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
-import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -14,7 +13,7 @@ TOOLS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(TOOLS))
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # `fixtures`, however this file is invoked (#33)
-from fixtures import Scratch, git_in  # noqa: E402  shared builders, in-process CLI, isolated git (#43)
+from fixtures import Scratch  # noqa: E402  shared builders, in-process CLI, isolated git (#43)
 
 from kit import docsync  # noqa: E402
 from kit.core import RepoctlError, markdown_link_target  # noqa: E402
