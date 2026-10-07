@@ -1,7 +1,7 @@
 # Self-healing mechanics
 
 <!-- index: operate | When a check may block, hooks, doc-code bindings, deprecation expiry, budgets, generated files, gardener, evals | A check fails, docs drift, a host is added, or the kit itself changes. -->
-<!-- covers: tools/kit/docsync.py tools/kit/hygiene.py tools/kit/adapters.py tools/kit/session.py tools/kit/garden.py tools/kit/navigate.py tools/kit/risk.py tools/kit/capabilities.py tools/kit/evals.py tools/kit/trial.py .agents/trials/** tools/kit/gitinfo.py tools/kit/derive.py tools/kit/scaffold.py tools/kit/config.py .githooks/** .github/workflows/garden.yml .agents/evals/** -->
+<!-- covers: tools/kit/docsync.py tools/kit/hygiene.py tools/kit/adapters.py tools/kit/session.py tools/kit/garden.py tools/kit/navigate.py tools/kit/risk.py tools/kit/capabilities.py tools/kit/evals.py tools/kit/trial.py tools/kit/kitupdate.py .agents/trials/** tools/kit/gitinfo.py tools/kit/derive.py tools/kit/scaffold.py tools/kit/config.py .githooks/** .github/workflows/garden.yml .agents/evals/** -->
 
 Agents follow written rules well at the start of a session and worst at the end,
 after compaction, which is when cleanup and documentation get skipped. So the
@@ -216,6 +216,37 @@ findings, one root cause per change (see [`delegation.md`](./delegation.md)).
   newest Python 3.11+ on `PATH` even when `python3` is an older system
   interpreter (override with `REPOCTL_PYTHON` or `make PYTHON=...`). Windows
   hosts run it from Git Bash or WSL.
+
+## Fixes reach every project: `make kit-update`
+
+A template bug is copied into every project made from it, so fixes flow both
+ways. `make init` and `make adopt` record `tools/kit-lock.json`, the hash of
+every kit file as shipped (generated `repoctl:` blocks excluded, so regenerated
+tables are not edits). `make kit-update [KIT=<template checkout>]` (default: a
+fresh clone of `[template].source`) then, per kit file:
+
+| State | What happens |
+|---|---|
+| unchanged since shipped | replaced by the template's new version |
+| changed by the project | kept; the new version is saved under `.agent/kit-update/` and listed to merge by hand |
+| new in the template | added |
+| removed from the template | deleted when unchanged, listed otherwise |
+
+Project-owned files are never kit files: `project.toml`, `VISION.md`,
+`README.md`, `LICENSE`, `CONTEXT.md`, the stack decision, design, architecture,
+product, ADR, and incident docs, `.security/`, and generated host files.
+Project make targets go in `project.mk`, which the kit Makefile includes, so the
+Makefile stays the kit's (adopted projects keep `kit.mk`, regenerated with
+their renames). Markdown is localized the same way `make init` does it. The
+update refuses a dirty tree, so it lands as one reviewable change; run
+`make done` after it. `make garden` reports when the template has moved past
+the recorded `kit_version`.
+
+The other direction: an agent that finds a kit bug in a project fixes it there
+and reports it at `[template].source` (AGENTS.md), and the template's fix then
+reaches every project through `make kit-update`. Tests prove that init or adopt
+followed by an update from the same kit changes nothing, and that an update
+applies fixes, additions, and removals while keeping the project's edits.
 
 ## The golden path is a test
 

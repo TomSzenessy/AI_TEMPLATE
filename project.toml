@@ -70,7 +70,7 @@ local_skills = ["product-kickoff", "stack-foundation", "ux-quality"]
 
 [budgets]
 # Byte limits (~4 bytes/token) for files agents load often; make check enforces.
-"AGENTS.md" = 7000
+"AGENTS.md" = 7500
 "docs/README.md" = 9500
 "tools/kit/*.py" = 32000  # keep kit modules agent-sized; add budgets for product code too
 ".agents/agents/*.md" = 3000

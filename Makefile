@@ -9,10 +9,10 @@ SKILL_TEST_SUITES := $(wildcard .agents/skills/*/tests)
 .DEFAULT_GOAL := help
 
 .PHONY: help python-check init inventory resources skill-digest check doctor readiness test test-future verify validate incident issue labels review-packet \
-	start next ui-review done new handover map where risk garden capabilities sync github-sync similar eval trial adopt
+	start next ui-review done new handover map where risk garden capabilities sync github-sync similar eval trial adopt kit-update
 
 # Export user-supplied values so recipes pass them as data, not as shell source.
-export Q AGENT MODEL TASKS DESC GROUP COVERS ACCESS TIER FORCE NAME KIND OWNER BUDGET WAL TITLE SUMMARY BODY TYPE PRIORITY AREA TOPIC STATUS SURFACE GATE PUBLIC_REVIEWED REVIEW_EVIDENCE ISSUE_FILE PUBLIC_SAFE
+export Q AGENT MODEL TASKS DESC GROUP COVERS ACCESS TIER FORCE NAME KIND OWNER BUDGET WAL KIT TITLE SUMMARY BODY TYPE PRIORITY AREA TOPIC STATUS SURFACE GATE PUBLIC_REVIEWED REVIEW_EVIDENCE ISSUE_FILE PUBLIC_SAFE
 
 help:
 	@printf '%s\n' \
@@ -46,6 +46,7 @@ help:
 	  '  make eval AGENT=claude [MODEL=haiku]   Fresh-agent navigation benchmark (cheap model by default)' \
 	  '  make trial NAME=<request> [MODEL=sonnet] [BUDGET=25]   Build trial: an agent builds a product; friction report' \
 	  '  make -f <kit>/Makefile adopt NAME=x KIND=web OWNER=you   Bring this kit into an existing repository' \
+	  '  make kit-update [KIT=<template checkout>]   Pull template fixes into this project (keeps your changes)' \
 	  '  make validate BODY=path | skill-digest SKILL_PATH=.agents/skills/name'
 
 python-check:
@@ -180,3 +181,10 @@ adopt: python-check
 trial: python-check
 	$(if $(NAME),,$(error Name a request in .agents/trials/: make trial NAME=waypoint))
 	$(REPOCTL) trial "$${NAME}" $(if $(MODEL),--model "$${MODEL}",) $(if $(BUDGET),--budget "$${BUDGET}",)
+
+# Pull template fixes into this project: make kit-update [KIT=<template checkout>] (docs/self-healing.md)
+kit-update: python-check
+	$(REPOCTL) kit-update $(if $(KIT),--kit "$${KIT}",)
+
+# Project-specific targets live in project.mk, so this Makefile stays the kit's and kit-update can refresh it.
+-include project.mk

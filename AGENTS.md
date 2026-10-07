@@ -41,6 +41,8 @@ improve the system instead of working around it:
   its `FILL-IN:` lines before `make done`.
 - External skills, MCP servers, or tools: ask the `skill-scout` role, then follow
   [`docs/skills.md`](./docs/skills.md). Nothing third-party runs unreviewed.
+- **Kit bug** (in `tools/`, `.agents/`, `.githooks/`, or a kit doc): fix it here, then
+  report it at `[template].source` so `make kit-update` fixes every project.
 
 ## Issue-backed write-ahead record
 

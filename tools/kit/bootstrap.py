@@ -187,37 +187,51 @@ def reset_vision_for_project(root: Path, manifest: str, project_name: str) -> st
     return manifest
 
 
+LINK = re.compile(r"(\]\()([^)\s]+)(\))")
+
+
+def localize_text(relative: str, text: str, pruned: set[str], prune: list[str], source: str) -> str:
+    """A kit Markdown file as a project should have it: links to pruned template material point at
+    the template source, and covers patterns that only named pruned material are dropped.
+    Used by make init, make adopt, and make kit-update, so all three agree."""
+    def absolute(match: re.Match[str]) -> str:
+        target = match.group(2)
+        if "://" in target or target.startswith("#"):
+            return match.group(0)
+        path, _, anchor = target.partition("#")
+        resolved = os.path.normpath(os.path.join(os.path.dirname(relative), path)).replace(os.sep, "/")
+        if resolved not in pruned or not source:
+            return match.group(0)
+        return f"{match.group(1)}{source}/blob/main/{resolved}{'#' + anchor if anchor else ''}{match.group(3)}"
+
+    text = LINK.sub(absolute, text)
+    prefixes = [pattern.removesuffix("**").rstrip("/") for pattern in prune]
+    covers = COVERS.search(text)
+    if covers:
+        patterns = covers.group(1).split()
+        kept = [p for p in patterns if not any(p == prefix or p.startswith(prefix + "/") for prefix in prefixes)]
+        if kept != patterns:
+            text = text[:covers.start()] + (f"<!-- covers: {' '.join(kept)} -->" if kept else "") + text[covers.end():]
+    return text
+
+
 def prune_template_material(root: Path, project: dict[str, object]) -> list[str]:
-    """Remove [template].prune files and point links to them at the template source."""
+    """Remove [template].prune files; localize every remaining Markdown file (links, bindings)."""
     template = project.get("template", {})
     if not isinstance(template, dict):
         return []
-    patterns = template.get("prune", [])
+    patterns = list(template.get("prune", []))
     source = str(template.get("source", "")).rstrip("/")
     files = repository_files(root)
     removed = [path for path in files if any(path_matches(path, pattern) for pattern in patterns)]
-    if not removed:
-        return []
     removed_set = set(removed)
-    link = re.compile(r"(\]\()([^)\s]+)(\))")
     for relative in files:
         if not relative.endswith(".md") or relative in removed_set:
             continue
         text = read_text_file(root, relative)
         if text is None:
             continue
-
-        def absolute(match: re.Match[str]) -> str:
-            target = match.group(2)
-            if "://" in target or target.startswith("#"):
-                return match.group(0)
-            path, _, anchor = target.partition("#")
-            resolved = os.path.normpath(os.path.join(os.path.dirname(relative), path)).replace(os.sep, "/")
-            if resolved not in removed_set or not source:
-                return match.group(0)
-            return f"{match.group(1)}{source}/blob/main/{resolved}{'#' + anchor if anchor else ''}{match.group(3)}"
-
-        updated = link.sub(absolute, text)
+        updated = localize_text(relative, text, removed_set, patterns, source)
         if updated != text:
             (root / relative).write_text(updated, encoding="utf-8")
     for relative in removed:
@@ -233,24 +247,6 @@ def prune_template_material(root: Path, project: dict[str, object]) -> list[str]
 COVERS = re.compile(r"<!--\s*covers:([^>]*?)-->")
 
 
-def strip_pruned_bindings(root: Path, prune: list[str]) -> list[str]:
-    """Drop covers patterns that only named pruned template material, so init leaves no dead binding."""
-    prefixes = [pattern.removesuffix("**").rstrip("/") for pattern in prune]
-    changed = []
-    for relative in repository_files(root):
-        if not relative.endswith(".md"):
-            continue
-        text = read_text_file(root, relative)
-        match = COVERS.search(text or "")
-        if not match:
-            continue
-        patterns = match.group(1).split()
-        kept = [p for p in patterns if not any(p == prefix or p.startswith(prefix + "/") for prefix in prefixes)]
-        if kept != patterns:
-            replacement = f"<!-- covers: {' '.join(kept)} -->" if kept else ""
-            (root / relative).write_text(text[:match.start()] + replacement + text[match.end():], encoding="utf-8")
-            changed.append(relative)
-    return changed
 
 
 def reset_repository_metadata(manifest: str) -> str:
@@ -293,9 +289,7 @@ def initialize_project(root: Path, name: str, kind: str, owner: str | None = Non
     manifest = manifest.replace('owner = "TomSzenessy"', 'owner = "project-owner"')
     manifest = reset_template_surface(manifest)
     manifest = reset_vision_for_project(root, manifest, name)
-    template = load_project(root).get("template", {})
     removed = prune_template_material(root, load_project(root))
-    strip_pruned_bindings(root, list(template.get("prune", [])) if isinstance(template, dict) else [])
     manifest = reset_repository_metadata(manifest)
     if owner:
         # Name the accountable owner once here instead of failing later checks on a placeholder.
@@ -307,6 +301,8 @@ def initialize_project(root: Path, name: str, kind: str, owner: str | None = Non
     manifest_path.write_text(manifest, encoding="utf-8")
     update_readme_identity(root, name, kind)
     derive.sync(root)
+    from .kitupdate import write_lock  # what this project got from the kit, so make kit-update can tell your edits apart
+    write_lock(root, root)
     if removed:
         print(f"Removed {len(removed)} template-only file(s); links now point to the template source.")
     print(f"Initialized {name} ({kind}). Declare real surfaces before implementation.")

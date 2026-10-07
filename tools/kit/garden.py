@@ -156,6 +156,10 @@ def garden_report(root: Path) -> tuple[str, int]:
     except Exception as error:  # noqa: BLE001 - metadata drift is advisory only
         advisory.append(f"GitHub metadata check skipped: {error}")
     advisory += pin_drift(root)
+    from .kitupdate import behind_template
+    behind = behind_template(root)
+    if behind:
+        advisory.append(behind)
     if not has_history(root):
         advisory.append("git history unavailable or shallow: stale-document detection skipped (use fetch-depth: 0 in CI)")
 

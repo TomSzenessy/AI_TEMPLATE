@@ -857,6 +857,63 @@ class GoldenPathTests(unittest.TestCase):
 
 
 @template_only
+class KitUpdateTests(unittest.TestCase):
+    """Template fixes reach projects already made from it, without overwriting the project's changes."""
+
+    def git(self, where: Path, *args: str) -> str:
+        return subprocess.run(["git", "-C", str(where), "-c", "user.name=t", "-c", "user.email=t@example.invalid", *args],
+                              check=True, capture_output=True, text=True).stdout
+
+    def snapshot(self, folder: Path) -> None:
+        self.git(folder, "add", "-A")
+        self.git(folder, "commit", "-qm", "snapshot")
+
+    def test_update_applies_fixes_and_keeps_project_changes(self) -> None:
+        from kit import trial
+        with tempfile.TemporaryDirectory() as temp:
+            kit, project = Path(temp) / "kit", Path(temp) / "project"
+            trial._copy(TOOLS.parent, trial.listed_files(TOOLS.parent), kit)
+            (kit / "tools/kit/obsolete.py").write_text("OLD = 1\n")
+            self.git(kit, "init", "-q", "-b", "main")
+            self.snapshot(kit)
+            trial.prepare(kit, {"id": "demo", "kind": "cli", "mode": "new", "prompt": "x"}, project)
+            lock = json.loads((project / "tools/kit-lock.json").read_text())
+            self.assertIn("tools/kit/navigate.py", lock["files"])
+            self.assertNotIn("project.toml", lock["files"], "project-owned files are never kit files")
+            same = subprocess.run([sys.executable, "tools/repoctl.py", "kit-update", "--kit", str(kit)],
+                                  cwd=project, capture_output=True, text=True)
+            self.assertIn("0 updated, 0 added, 0 removed, 0 to merge", same.stdout, "init and update agree")
+            # The project customizes a kit doc and adds its own make target.
+            (project / "docs/delegation.md").write_text((project / "docs/delegation.md").read_text() + "\nOur team rule.\n")
+            (project / "project.mk").write_text("hello:\n\techo hi\n")
+            self.snapshot(project)
+            # The template ships version B: a fix, a new file, a removal, and a change to the customized doc.
+            (kit / "tools/kit/navigate.py").write_text((kit / "tools/kit/navigate.py").read_text() + "\n# fixed in B\n")
+            (kit / "tools/kit/extra_helper.py").write_text("NEW = 2\n")
+            (kit / "tools/kit/obsolete.py").unlink()
+            (kit / "docs/delegation.md").write_text((kit / "docs/delegation.md").read_text() + "\nKit B note.\n")
+            self.snapshot(kit)
+            update = lambda: subprocess.run([sys.executable, "tools/repoctl.py", "kit-update", "--kit", str(kit)],
+                                            cwd=project, capture_output=True, text=True)
+            result = update()
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue((project / "tools/kit/navigate.py").read_text().endswith("# fixed in B\n"))
+            self.assertTrue((project / "tools/kit/extra_helper.py").is_file())
+            self.assertFalse((project / "tools/kit/obsolete.py").exists())
+            self.assertIn("Our team rule.", (project / "docs/delegation.md").read_text(), "the project's change stays")
+            self.assertIn("merge: docs/delegation.md", result.stdout)
+            self.assertIn("Kit B note.", (project / ".agent/kit-update/docs/delegation.md").read_text())
+            self.assertEqual((project / "project.mk").read_text(), "hello:\n\techo hi\n")
+            head = self.git(kit, "rev-parse", "HEAD").strip()
+            self.assertEqual(json.loads((project / "tools/kit-lock.json").read_text())["kit_version"], head)
+            check = subprocess.run([sys.executable, "tools/repoctl.py", "check"], cwd=project, capture_output=True, text=True)
+            self.assertEqual(check.returncode, 0, check.stderr)
+            self.snapshot(project)
+            again = update()
+            self.assertIn("0 updated, 0 added, 0 removed, 1 to merge", again.stdout, "idempotent; the conflict stays visible")
+
+
+@template_only
 class InitOwnerTests(unittest.TestCase):
     def test_init_names_the_owner_everywhere_and_refuses_emails(self) -> None:
         from kit import trial
@@ -915,6 +972,12 @@ class AdoptTests(unittest.TestCase):
         finish = subprocess.run([sys.executable, "tools/repoctl.py", "finish"], cwd=self.root, capture_output=True, text=True)
         self.assertEqual(finish.returncode, 0, finish.stdout)
         self.assertEqual(self.adopt().returncode, 1, "adopting twice is refused")
+        subprocess.run(["git", "-C", str(self.root), "add", "-A"], check=True)
+        subprocess.run(["git", "-C", str(self.root), "-c", "user.name=t", "-c", "user.email=t@example.invalid",
+                        "commit", "-qm", "adopt"], check=True, capture_output=True)
+        update = subprocess.run([sys.executable, "tools/repoctl.py", "kit-update", "--kit", str(TOOLS.parent)],
+                                cwd=self.root, capture_output=True, text=True)
+        self.assertIn("0 updated, 0 added, 0 removed, 0 to merge", update.stdout, update.stdout + update.stderr)
 
     def test_adopt_refuses_uncommitted_work(self) -> None:
         (self.root / "notes/new.py").write_text("X = 1\n")
