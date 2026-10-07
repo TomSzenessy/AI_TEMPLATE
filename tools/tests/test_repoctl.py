@@ -237,6 +237,22 @@ infrastructure_paths = ["tests", "config"]
         self.assertEqual(result.returncode, 1)
         self.assertIn("unregistered product surface: apps/rogue", result.stderr)
 
+    def test_test_and_example_folders_are_infrastructure_by_default(self) -> None:
+        for folder in ("tests", "e2e", "test-results", "examples", "scripts"):
+            self.write(f"{folder}/x.py", "X = 1\n")
+        self.write("project.toml", """schema = 1
+name = "Demo"
+kind = "web"
+phase = "development"
+license = "MIT"
+owners = ["team"]
+""")
+        self.write("LICENSE", "MIT")
+        result = self.cli("check")
+        for folder in ("tests", "e2e", "test-results", "examples"):
+            self.assertNotIn(f"unregistered product surface: {folder}", result.stderr)
+        self.assertIn("unregistered product surface: scripts", result.stderr, "ambiguous names still need a declaration")
+
     def test_infrastructure_cannot_hide_container_or_surface(self) -> None:
         self.write("project.toml", """schema = 1
 name = "Demo"

@@ -18,9 +18,20 @@ PROJECT_NAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 PROJECT_KIND_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 CONTAINER_DIRECTORIES = {"apps", "frontends", "packages", "services", "workers"}
 FILE_SURFACE_KINDS = {"file", "script", "document", "asset"}
-# Ambiguous names such as tests/, config/, and fixtures/ are intentionally not
-# implicit infrastructure: a project must declare them or opt in explicitly.
+# Test and example folders support a surface rather than being one: every build
+# trial (five runs) was blocked into declaring tests/, e2e/, test-results/, or
+# examples/ as products. Ambiguous names such as config/ and scripts/ still need
+# a declaration or an explicit [repository].infrastructure_paths entry.
 REPOSITORY_INFRASTRUCTURE_DIRECTORIES = {
+    "tests",
+    "test",
+    "e2e",
+    "__tests__",
+    "spec",
+    "fixtures",
+    "examples",
+    "test-results",
+    "playwright-report",
     "docs",
     "tools",
     "incidents",

@@ -38,3 +38,6 @@ vendor/
 .claude/settings.local.json
 .claude/worktrees/
 .mcp.local.json
+# Test runner output
+test-results/
+playwright-report/

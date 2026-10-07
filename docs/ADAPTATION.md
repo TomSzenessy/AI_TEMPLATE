@@ -70,6 +70,10 @@ subprojects keep their own targets.
    surface before treating verification as product evidence.
 3. Run `make inventory` and classify each candidate as product, infrastructure,
    generated output, or unresolved.
+   Test and example folders (`tests/`, `test/`, `e2e/`, `__tests__/`, `spec/`,
+   `fixtures/`, `examples/`, `test-results/`, `playwright-report/`) count as
+   infrastructure by default; ambiguous ones such as `scripts/` or `config/`
+   need a surface or an `[repository].infrastructure_paths` entry.
 4. Ask the owner only for choices that change product direction, data/security
    boundaries, deployment, cost, or an irreversible dependency. The
    `product-kickoff` skill bundles these into one round of questions with
