@@ -120,8 +120,8 @@ class OneDefinitionTests(unittest.TestCase):
             with self.subTest(literal=literal):
                 self.assert_single(fact, {n for n, t in SOURCES.items() if literal in t}, owner)
         self.assertFalse(hasattr(gitinfo, "listed_files"), "core.repository_files is the single file-lister")
-        self.assertNotIn("ModuleNotFoundError", "".join(SOURCES.values()), "the tomllib fail-fast is the launcher's")
-        self.assertIn("except ModuleNotFoundError", REPOCTL.read_text(encoding="utf-8"))
+        self.assertNotIn("ModuleNotFoundError", "".join(SOURCES.values()), "the Python-version fail-fast is the launcher's")
+        self.assertIn("sys.version_info < (3, 11)", REPOCTL.read_text(encoding="utf-8"))
 
 
 class TrialGitRoutingTests(Scratch):
