@@ -73,7 +73,8 @@ class EvalTests(unittest.TestCase):
             "kickoff-without-owner": (
                 ["Write the questions with my recommended picks, then stop."],
                 ["I would not stop", "I would not write the questions; I would guess", "Stop and do nothing"]),
-            "add-an-mcp-server": ([".agents/mcp/", "`.agents/mcp`"], [".claude/mcp/", "Not .agents/mcp/, but .mcp.json", ".agents/mcpx"]),
+            "add-an-mcp-server": ([".agents/mcp/", "`.agents/mcp`",
+                                   "`.agents/mcp/` (Shown in the doc bindings map: `docs/resources.md ← resources.toml .agents/mcp/**`)"], [".claude/mcp/", "Not .agents/mcp/, but .mcp.json", ".agents/mcpx"]),
         }
         for task_id, (good, bad) in cases.items():
             for answer in good:

@@ -46,7 +46,7 @@ def print_map(root: Path, limit: int | None = None) -> None:
         print(f"- … {len(surfaces) - limit} more (make map)")
     doc_bindings = bindings(root, files)
     if doc_bindings:
-        print("\n## Doc ownership (<!-- covers: --> bindings)")
+        print("\n## Doc ownership (<!-- covers: --> bindings; for one file: make where Q=<path>)")
         items = sorted(doc_bindings.items())
         for doc, patterns in items[:limit]:
             print(f"- {doc} ← {_short(' '.join(patterns), 110)}")

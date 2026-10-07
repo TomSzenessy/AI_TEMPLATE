@@ -62,7 +62,7 @@ expect = "make new KIND=check"
 [[tasks]]
 id = "add-an-mcp-server"
 prompt = "Where does a new MCP server route go in this repository? Reply with the repository-relative directory only."
-expect = '''^[\s`'"*]*(\./)?\.agents/mcp/?[\s`'"*.]*$'''
+expect = '''^[\s`'"*]*(\./)?\.agents/mcp/?(?=[\s`'"*.,;:—-]|$)(?!.*\b(?:not|never|no|instead|directly)\b)'''
 
 [[tasks]]
 id = "switch-off-a-pack"
