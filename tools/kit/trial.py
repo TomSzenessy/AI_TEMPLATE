@@ -28,6 +28,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -229,12 +230,20 @@ def run_trial(root: Path, identifier: str, model: str = "sonnet", budget: float 
         environment.setdefault("IS_SANDBOX", "1")  # the CLI refuses bypassed permissions as root outside a sandbox
     transcript = report_dir / "transcript.jsonl"
     started = time.monotonic()
+    print(f"If this runner is interrupted, report later with: python3 tools/repoctl.py trial {identifier} "
+          f"--analyze {transcript.relative_to(root)} --project {project}")
+    # Agents clean up with `pkill -f <name>`, which also matches this runner's command line (a Waypoint
+    # trial killed its runner that way); ignore SIGTERM while the agent runs so the report still gets written.
+    previous = signal.signal(signal.SIGTERM, signal.SIG_IGN) if hasattr(signal, "SIGTERM") else None
     with transcript.open("w", encoding="utf-8") as output:
         try:
             subprocess.run(host_command(spec, model, budget), cwd=project, env=environment, stdout=output,
-                           stderr=subprocess.STDOUT, timeout=timeout, check=False)
+                           stderr=subprocess.STDOUT, timeout=timeout, check=False, start_new_session=True)
         except subprocess.TimeoutExpired:
             print(f"trial stopped after {timeout}s")
+        finally:
+            if previous is not None:
+                signal.signal(signal.SIGTERM, previous)
     print(f"agent finished in {(time.monotonic() - started) / 60:.0f} min; analyzing")
     return write_report(root, spec, model, transcript, project, report_dir)
 

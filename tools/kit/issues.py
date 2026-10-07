@@ -320,7 +320,7 @@ def check_issue_for_duplicates(
 ) -> str:
     """Validate and file (or write a Local-WAL draft); returns the issue URL or the draft notice."""
     if body_file.is_absolute():
-        raise RepoctlError("issue body file must be repository-relative")
+        raise RepoctlError("issue body file must be repository-relative: write it inside the repository, for example .agent/bodies/<name>.md (ignored)")
     body_file = root / body_file
     try:
         body_file = ensure_inside_root(root, body_file, "issue body file")
@@ -457,7 +457,7 @@ def file_local_wal(root: Path, which: str, public_reviewed: bool = False, review
 
 def validate_issue_file(root: Path, body_file: Path, status: str) -> None:
     if body_file.is_absolute():
-        raise RepoctlError("issue body file must be repository-relative")
+        raise RepoctlError("issue body file must be repository-relative: write it inside the repository, for example .agent/bodies/<name>.md (ignored)")
     try:
         safe_path = ensure_inside_root(root, root / body_file, "issue body file")
         body = safe_path.read_text(encoding="utf-8")

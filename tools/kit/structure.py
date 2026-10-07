@@ -326,7 +326,7 @@ def check_vision(root: Path, project: dict[str, object], enforce: bool = True, r
     vision_owner = re.search(r"(?im)^Owner:\s*(.+?)\s*$", content)
     vision_date = re.search(r"(?im)^Date:\s*(\d{4}-\d{2}-\d{2})\s*$", content)
     if not vision_owner or is_placeholder(vision_owner.group(1)) or not vision_date:
-        raise RepoctlError("accepted vision record must name an owner and valid date")
+        raise RepoctlError("accepted vision record must name an owner and valid date: lines 'Owner: <handle>' and 'Date: YYYY-MM-DD' in VISION.md")
     try:
         if _too_old_or_future(datetime.strptime(vision_date.group(1), "%Y-%m-%d").date(), release_gate):
             raise RepoctlError("accepted vision record date is stale or future-dated")
@@ -348,7 +348,7 @@ def check_vision(root: Path, project: dict[str, object], enforce: bool = True, r
         stack_owner = re.search(r"(?im)^Owner:\s*(.+?)\s*$", stack_content)
         stack_date = re.search(r"(?im)^Date:\s*(\d{4}-\d{2}-\d{2})\s*$", stack_content)
         if not stack_owner or is_placeholder(stack_owner.group(1)) or not stack_date:
-            raise RepoctlError("project stack decision must name an owner and valid date")
+            raise RepoctlError("project stack decision must name an owner and valid date: lines 'Owner: <handle>' and 'Date: YYYY-MM-DD' in docs/STACK-DECISION.md")
         try:
             if _too_old_or_future(datetime.strptime(stack_date.group(1), "%Y-%m-%d").date(), release_gate):
                 raise RepoctlError("project stack decision date is stale or future-dated")
