@@ -44,7 +44,7 @@ Otherwise it is **advisory** (`make garden`, the session brief) or an
 | Before context compaction | `repoctl hook pre-compact` | — | Writes `.agent/checkpoint.md` (uncommitted paths, docs still owed). |
 | After a file edit | `repoctl hook after-edit` | — | Names the docs covering the edited path (once per session); regenerates derived files when a source changed; warns on edits to generated files. |
 | Before declaring done | `repoctl hook stop` | `make done` | Gate over this branch's change set: owed docs, derived-file drift, dead bindings, expired, undated, or unfinished markers. The hook blocks once; `make done` also runs every test. |
-| Every commit | `.githooks/commit-msg` (any agent or human) | same | Refuses a commit whose staged covered code skips its doc (unless the message carries a `Docs-Unaffected:` trailer), plus marker checks, and derived-file drift when the commit touches a source. Exit 3 means blocked; a crashed kit never blocks a commit. Bypass deliberately with `--no-verify`. |
+| Every commit | `.githooks/commit-msg` (any agent or human) | same | Refuses a commit whose staged covered code skips its doc (unless the message carries a `Docs-Unaffected:` trailer), plus marker checks, and derived-file drift when the commit touches a source. A merge commit skips the owed-doc check: its commits already passed it or recorded a trailer. Exit 3 means blocked; a crashed kit never blocks a commit. Bypass deliberately with `--no-verify`. |
 
 The commit gate is installed (`core.hooksPath=.githooks`) only when the
 repository has no hooks path and no active hooks in `.git/hooks`; otherwise

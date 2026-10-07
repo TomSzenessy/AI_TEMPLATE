@@ -219,7 +219,11 @@ def commit_gate(root: Path, message_file: str | None) -> int:
     exempt = docsync.exemption_scope(docsync.message_trailers(root, message)) or set()
     files = repository_files(root)
     doc_bindings = docsync.bindings(root, files)
-    findings = [
+    # A merge commit brings in commits that already passed this gate or recorded a
+    # Docs-Unaffected decision; re-asking would re-litigate it. make done and CI's
+    # stale-document check still read those commits' trailers.
+    merging = git(root, "rev-parse", "-q", "--verify", "MERGE_HEAD") is not None
+    findings = [] if merging else [
         f"{doc} covers staged {', '.join(paths[:4])} but is not staged"
         for doc, paths in docsync.pending_documents(doc_bindings, staged).items()
         if "*" not in exempt and doc not in exempt

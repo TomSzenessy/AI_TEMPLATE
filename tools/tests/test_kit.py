@@ -337,6 +337,19 @@ class CommitGateTests(KitRepository):
         commented = self.message("change\n# Docs-Unaffected: docs/billing.md\n")
         self.assertEqual(self.cli("hook", "commit-msg", commented).returncode, 3)
 
+    def test_merge_commit_defers_to_merged_commits(self) -> None:
+        # The branch commit recorded its decision; merging it must not ask again.
+        self.git("checkout", "-q", "-b", "side")
+        self.write("src/billing/invoice.py", "def render_invoice():\n    return 9\n")
+        self.git("add", "src/billing/invoice.py")
+        self.git("commit", "-q", "-m", "tidy\n\nDocs-Unaffected: docs/billing.md rename only")
+        self.git("checkout", "-q", "-")
+        self.write("README.md", "# Other work\n")
+        self.git("add", "README.md")
+        self.git("commit", "-q", "-m", "other")
+        self.git("merge", "-q", "--no-commit", "--no-ff", "side")
+        self.assertEqual(self.cli("hook", "commit-msg", self.message("Merge side\n")).returncode, 0)
+
     def test_installed_git_hook_blocks_commit(self) -> None:
         hooks = self.root / ".githooks"
         hooks.mkdir()
