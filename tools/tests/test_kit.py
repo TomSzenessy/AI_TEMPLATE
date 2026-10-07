@@ -582,9 +582,10 @@ class UiReviewTests(KitRepository):
                    + 'url = "http://localhost:{port}"\nroutes = ["/"]\n')
         bin_dir = self.root / "fakebin"
         bin_dir.mkdir()
-        fake = bin_dir / "npx"  # stands in for Playwright: writes the screenshot file it was asked for
-        fake.write_text("#!/bin/sh\nfor last; do :; done\nprintf png > \"$last\"\n")
-        fake.chmod(0o755)
+        for name in ("npx", "playwright"):  # stand in for Playwright: write the screenshot file asked for
+            fake = bin_dir / name
+            fake.write_text("#!/bin/sh\nfor last; do :; done\nprintf png > \"$last\"\n")
+            fake.chmod(0o755)
         self.environment = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}"}
 
     def review(self) -> subprocess.CompletedProcess[str]:
@@ -637,6 +638,15 @@ class UiReviewTests(KitRepository):
         self.assertIn("<!-- index:", log.read_text(), "the tracked log indexes itself")
         self.write("src/billing/invoice.py", "def render_invoice():\n    return 42\n")
         self.assertIn("changed since UI review", " ".join(uireview.review_status(self.root)))
+
+    def test_installed_playwright_wins_unless_pinned(self) -> None:
+        os.environ["PATH"], saved = self.environment["PATH"], os.environ["PATH"]
+        try:
+            self.assertTrue(uireview._playwright(self.root)[0].endswith("fakebin/playwright"))
+            self.write("project.toml", (self.root / "project.toml").read_text() + '[kit]\nplaywright_version = "1.50.0"\n')
+            self.assertEqual(uireview._playwright(self.root), ["npx", "-y", "playwright@1.50.0"])
+        finally:
+            os.environ["PATH"] = saved
 
     def test_review_gates_feature_and_release_not_every_change(self) -> None:
         from kit import launch, session

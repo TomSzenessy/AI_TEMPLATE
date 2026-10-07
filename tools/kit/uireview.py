@@ -116,6 +116,20 @@ def _browser_arguments() -> list[str]:
     return ["-b", "chromium"]
 
 
+def _playwright(root: Path) -> list[str]:
+    """The Playwright command: an explicit [kit] pin, else an installed Playwright, else the default pin.
+
+    An installed Playwright already has browsers that match its version (CI images and cloud
+    containers ship one); forcing a different pinned version there fails on a missing browser build.
+    """
+    kit = load_project(root).get("kit", {})
+    pinned = isinstance(kit, dict) and "playwright_version" in kit
+    installed = shutil.which("playwright")
+    if installed and not pinned:
+        return [installed]
+    return ["npx", "-y", f"playwright@{setting(root, 'playwright_version')}"]
+
+
 def _answers(url: str) -> bool:
     """True when anything HTTP answers, including error statuses."""
     try:
@@ -159,7 +173,7 @@ def _wait_for(url: str, server: subprocess.Popen, timeout: float) -> None:
     raise RepoctlError(f"preview did not answer at {url} within {timeout:.0f}s")
 
 
-def _capture(root: Path, surface: dict[str, object], out: Path, version: str) -> list[str]:
+def _capture(root: Path, surface: dict[str, object], out: Path, playwright: list[str]) -> list[str]:
     identifier = str(surface.get("id"))
     preview = surface["preview"]
     command, url = preview.get("command"), str(preview.get("url", ""))
@@ -189,7 +203,7 @@ def _capture(root: Path, surface: dict[str, object], out: Path, version: str) ->
                 for size, viewport in VIEWPORTS.items():
                     for scheme in SCHEMES:
                         name = "-".join(SAFE.sub("-", part).strip("-") or "home" for part in (identifier, route, state, size, scheme)) + ".png"
-                        arguments = ["npx", "-y", f"playwright@{version}", "screenshot", *_browser_arguments(),
+                        arguments = [*playwright, "screenshot", *_browser_arguments(),
                                      "--viewport-size", viewport, "--color-scheme", scheme,
                                      "--wait-for-timeout", "800", "--full-page"]
                         if storage:
@@ -199,7 +213,7 @@ def _capture(root: Path, surface: dict[str, object], out: Path, version: str) ->
                         if result.returncode != 0:
                             raise RepoctlError(
                                 f"screenshot failed for {name}: {result.stderr.strip()[-300:]} "
-                                f"(try: npx playwright@{version} install chromium)"
+                                f"(try: {' '.join(playwright)} install chromium)"
                             )
                         shots.append(name)
     finally:
@@ -212,15 +226,15 @@ def run_review(root: Path) -> int:
     surfaces = preview_surfaces(project)
     if not surfaces:
         raise RepoctlError("no surface declares a [surfaces.preview] table (command, url, routes); see docs/building.md")
-    if shutil.which("npx") is None:
+    playwright = _playwright(root)
+    if shutil.which(playwright[0]) is None:
         raise RepoctlError("npx (Node.js) is required for screenshots; install Node 18+")
-    version = str(setting(root, "playwright_version"))
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     out = ensure_inside_root(root, root / SHOTS / stamp, "review folder")
     out.mkdir(parents=True, exist_ok=True)
     shots: list[str] = []
     for surface in surfaces:
-        shots += _capture(root, surface, out, version)
+        shots += _capture(root, surface, out, playwright)
     digests = " ".join(f"{s.get('id')}={surface_digest(root, str(s.get('path', '.')))}" for s in surfaces)
     entry = (
         f"\n## Review {stamp}\n\n<!-- review: {digests} -->\n\n"

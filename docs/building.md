@@ -60,8 +60,11 @@ cited sources once a UI product has a surface.
 
 `make ui-review` starts each UI surface's preview, captures every route at phone
 (390x844) and desktop (1440x900) sizes in light and dark mode, plus any seeded
-storage states, with a pinned Playwright (`[kit].playwright_version`; the
-installed Chrome when present, otherwise `npx playwright install chromium`):
+storage states. It uses an installed `playwright` CLI when one is on `PATH`
+(CI images and cloud containers ship one with matching browsers), otherwise
+`npx playwright@<[kit].playwright_version>`; setting that key pins it always.
+The installed Chrome is used when present, otherwise Chromium
+(`npx playwright install chromium`):
 
 ```toml
 [surfaces.preview]
