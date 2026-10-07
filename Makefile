@@ -12,7 +12,7 @@ SKILL_TEST_SUITES := $(wildcard .agents/skills/*/tests)
 	start next ui-review done new handover map where risk garden capabilities sync github-sync similar eval trial adopt
 
 # Export user-supplied values so recipes pass them as data, not as shell source.
-export Q AGENT MODEL TASKS DESC GROUP COVERS ACCESS TIER FORCE NAME KIND OWNER BUDGET TITLE SUMMARY BODY TYPE PRIORITY AREA TOPIC STATUS SURFACE GATE PUBLIC_REVIEWED REVIEW_EVIDENCE ISSUE_FILE PUBLIC_SAFE
+export Q AGENT MODEL TASKS DESC GROUP COVERS ACCESS TIER FORCE NAME KIND OWNER BUDGET WAL TITLE SUMMARY BODY TYPE PRIORITY AREA TOPIC STATUS SURFACE GATE PUBLIC_REVIEWED REVIEW_EVIDENCE ISSUE_FILE PUBLIC_SAFE
 
 help:
 	@printf '%s\n' \
@@ -95,14 +95,14 @@ incident:
 	$(REPOCTL) incident --title "$${TITLE}" --summary "$${SUMMARY}" $(if $(filter 1 yes true,$(PUBLIC_SAFE)),--public-safe --review-evidence "$${REVIEW_EVIDENCE}",)
 
 issue:
-	$(REPOCTL) issue \
-	  --title "$${TITLE}" \
-	  --body-file "$${BODY}" \
-	  --type "$${TYPE}" \
-	  --priority "$${PRIORITY}" \
-	  --area "$${AREA}" \
-	  --topic "$${TOPIC}" \
-	  --status "$${STATUS}" \
+	$(REPOCTL) issue $(if $(WAL),--wal "$${WAL}",) \
+	  $(if $(TITLE),--title "$${TITLE}",) \
+	  $(if $(BODY),--body-file "$${BODY}",) \
+	  $(if $(TYPE),--type "$${TYPE}",) \
+	  $(if $(PRIORITY),--priority "$${PRIORITY}",) \
+	  $(if $(AREA),--area "$${AREA}",) \
+	  $(if $(TOPIC),--topic "$${TOPIC}",) \
+	  $(if $(STATUS),--status "$${STATUS}",) \
 	  --surface "$${SURFACE}" \
 	  --gate "$${GATE}" \
 	  $(if $(filter 1 yes true,$(PUBLIC_REVIEWED)),--public-reviewed,) \

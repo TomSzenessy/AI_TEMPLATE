@@ -318,7 +318,8 @@ def check_issue_for_duplicates(
     gate: str | None,
     public_reviewed: bool,
     review_evidence: str | None,
-) -> None:
+) -> str:
+    """Validate and file (or write a Local-WAL draft); returns the issue URL or the draft notice."""
     if body_file.is_absolute():
         raise RepoctlError("issue body file must be repository-relative")
     body_file = root / body_file
@@ -370,9 +371,10 @@ def check_issue_for_duplicates(
     except RepoctlError as error:
         if github_target_configured(root, project):
             raise  # a configured target that fails is a real error, not "no remote yet"
-        print(write_local_wal(root, title, body, labels))
+        notice = write_local_wal(root, title, body, labels)
+        print(notice)
         print(f"(GitHub target unavailable: {error})")
-        return
+        return notice
     where = issue_section(body, "Where")
     search_terms = tuple(term for term in (topic, where) if term.strip())
     duplicate_results = check_github_duplicates(root, title, repository, search_terms)
@@ -385,7 +387,9 @@ def check_issue_for_duplicates(
         numbers = ", ".join(f"#{issue.get('number')}" for issue in duplicates)
         raise RepoctlError(f"possible duplicate {numbers}; update the existing issue instead")
     print(f"Filing in {repository}.")
-    print(create_github_issue(root, repository, title, body, labels))
+    created = create_github_issue(root, repository, title, body, labels)
+    print(created)
+    return created
 
 
 LOCAL_WAL_DIR = ".agent/wal"
@@ -408,6 +412,48 @@ def write_local_wal(root: Path, title: str, body: str, labels: list[str]) -> str
         f"No GitHub target configured: wrote Local-WAL-{number:03d} to {target.relative_to(root).as_posix()} "
         "(ignored; cite it as Local-WAL-NNN in commits and file it with make issue once a remote exists)"
     )
+
+
+WAL_HEADER = re.compile(r"\A# (?P<id>Local-WAL-\d+): (?P<title>.+)\n\nLabels: (?P<labels>[^\n]*)\n\n", re.M)
+
+
+def file_local_wal(root: Path, which: str, public_reviewed: bool = False, review_evidence: str | None = None) -> int:
+    """File Local-WAL drafts as real issues once a GitHub target exists (full contract applies now)."""
+    project = load_project(root)
+    if not github_target_configured(root, project):
+        raise RepoctlError("no GitHub target yet: set [repository].github in project.toml or add an origin remote")
+    drafts = sorted((root / LOCAL_WAL_DIR).glob("[0-9]*-*.md"))
+    wanted = [path for path in drafts if which == "all" or path.name.startswith(which.removeprefix("Local-WAL-").zfill(3) + "-")]
+    if not wanted:
+        raise RepoctlError(f"no Local-WAL draft matches {which!r} in {LOCAL_WAL_DIR}/")
+    failures = 0
+    for path in wanted:
+        text = path.read_text(encoding="utf-8")
+        if re.search(r"(?m)^Filed: ", text):
+            continue
+        header = WAL_HEADER.match(text)
+        if not header:
+            print(f"{path.name}: not a Local-WAL draft written by make issue; file it by hand")
+            failures += 1
+            continue
+        labels = dict(label.strip().split(":", 1) for label in header.group("labels").split(",") if ":" in label)
+        body_file = Path(LOCAL_WAL_DIR) / ".filing-body.md"
+        (root / body_file).write_text(text[header.end():], encoding="utf-8")
+        try:
+            url = check_issue_for_duplicates(
+                root, header.group("title"), body_file, labels.get("type", "task"), labels.get("priority", "P2"),
+                labels.get("area", "repo"), labels.get("topic", "local-draft"), labels.get("status", "triage"),
+                labels.get("surface"), labels.get("gate"), public_reviewed, review_evidence,
+            )
+        except RepoctlError as error:
+            print(f"{header.group('id')}: not filed: {error}\n  edit {path.relative_to(root).as_posix()} and run again")
+            failures += 1
+            continue
+        finally:
+            (root / body_file).unlink(missing_ok=True)
+        path.write_text(f"Filed: {url.strip()}\n\n{text}", encoding="utf-8")
+        print(f"{header.group('id')} -> {url.strip()} (mention it where commits cite {header.group('id')})")
+    return 1 if failures else 0
 
 
 def validate_issue_file(root: Path, body_file: Path, status: str) -> None:

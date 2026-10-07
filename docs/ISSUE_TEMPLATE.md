@@ -16,7 +16,10 @@ plan needs now: a `### Summary` with the outcome and at least one
 `- [ ]` acceptance criterion (plus the labels and the secret scan). The full
 contract below applies when you file the draft for real once a remote exists,
 so a local plan never costs a round of disclosure paperwork. Cite the id in
-commits. Never keep live work in a tracked Markdown file; `make check` rejects
+commits. Once the repository has a GitHub target, `make issue WAL=all` (or
+`WAL=Local-WAL-002`) files each draft under the full contract, prints the new
+issue URL, and marks the draft `Filed:` so it is never filed twice; a draft
+that does not meet the contract yet is listed with the reason and left as is. Never keep live work in a tracked Markdown file; `make check` rejects
 tracked backlogs.
 
 ## Duplicate check

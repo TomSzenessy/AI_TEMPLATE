@@ -519,6 +519,38 @@ verification = [["true"]]
         self.assertIn("Local-WAL-001", result.stdout)
         self.assertTrue((self.root / ".agent/wal/001-first-slice.md").is_file())
 
+    def test_local_wal_drafts_are_filed_once_a_remote_exists(self) -> None:
+        self.write(".github/issue-labels.json", (TOOLS.parent / ".github/issue-labels.json").read_text())
+        self.write("draft.md", "### Summary\nShare a trip by link.\n### Acceptance criteria\n- [ ] A second browser sees the trip.\n")
+        arguments = ("issue", "--title", "Share by link", "--body-file", "draft.md", "--type", "task",
+                     "--priority", "P2", "--area", "web", "--topic", "share-link")
+        self.assertIn("Local-WAL-001", self.cli(*arguments).stdout)
+        bin_dir = self.root / "bin"
+        bin_dir.mkdir()
+        (bin_dir / "gh").write_text("#!/bin/sh\ncase \"$1 $2\" in\n  'issue list') echo '[]';;\n"
+                                    "  'issue create') echo https://github.com/example/demo/issues/7;;\nesac\n")
+        (bin_dir / "gh").chmod(0o755)
+        environment = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}"}
+        self.write("project.toml", (self.root / "project.toml").read_text().replace("[adapters]", '[repository]\ngithub = "example/demo"\n\n[adapters]', 1))
+        filing = lambda: subprocess.run([sys.executable, str(REPOCTL), "--root", str(self.root), "issue", "--wal", "all"],
+                                        capture_output=True, text=True, env=environment)
+        first = filing()
+        self.assertEqual(first.returncode, 1, "a draft must meet the full contract before it is public")
+        self.assertIn("missing headings", first.stdout)
+        draft = next((self.root / ".agent/wal").glob("001-*.md"))
+        header, _, _ = draft.read_text().partition("### Summary")
+        full = (DUPLICATE_LINE + "### Summary\nShare a trip by link.\n### Acceptance criteria\n- [ ] A second browser sees "
+                "the trip (e2e test).\n- [ ] A wrong link does not open a trip.\n### Evidence\nTest: e2e\n"
+                "### Disclosure classification\n- **Disclosure class:** ordinary\n- **Public-safe:** yes\n"
+                "- **Security/privacy review:** not applicable\n- **Reviewer/date:** tester " + RECENT + "\n"
+                "### Dependencies and handoff\n- **Owner / next action:** maintainer\n")
+        draft.write_text(header + full)
+        second = filing()
+        self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
+        self.assertIn("Local-WAL-001 -> https://github.com/example/demo/issues/7", second.stdout)
+        self.assertTrue(draft.read_text().startswith("Filed: https://github.com/example/demo/issues/7"))
+        self.assertEqual(filing().returncode, 0, "a filed draft is skipped")
+
     def test_local_draft_needs_only_outcome_and_criteria(self) -> None:
         self.write(".github/issue-labels.json", (TOOLS.parent / ".github/issue-labels.json").read_text())
         arguments = ("issue", "--title", "Second slice", "--body-file", "draft.md", "--type", "task",

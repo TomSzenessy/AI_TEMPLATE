@@ -30,6 +30,7 @@ from kit.github import sync_issue_labels, sync_repository_metadata
 from kit.issues import (
     check_issue_for_duplicates,
     create_incident,
+    file_local_wal,
     print_review_packet,
     validate_issue_file,
 )
@@ -77,12 +78,13 @@ def build_parser() -> argparse.ArgumentParser:
     incident_parser.add_argument("--review-evidence")
 
     issue_parser = subparsers.add_parser("issue", help="validate and file a duplicate-aware issue")
-    issue_parser.add_argument("--title", required=True)
-    issue_parser.add_argument("--body-file", type=Path, required=True)
-    issue_parser.add_argument("--type", required=True)
-    issue_parser.add_argument("--priority", required=True)
-    issue_parser.add_argument("--area", required=True)
-    issue_parser.add_argument("--topic", required=True)
+    issue_parser.add_argument("--wal", help="file Local-WAL drafts instead: an id such as Local-WAL-002, or all")
+    issue_parser.add_argument("--title")
+    issue_parser.add_argument("--body-file", type=Path)
+    issue_parser.add_argument("--type")
+    issue_parser.add_argument("--priority")
+    issue_parser.add_argument("--area")
+    issue_parser.add_argument("--topic")
     issue_parser.add_argument("--status", default="triage")
     issue_parser.add_argument("--surface")
     issue_parser.add_argument("--gate")
@@ -206,7 +208,12 @@ def main(argv: list[str] | None = None) -> int:
             run_verification(arguments.root.resolve())
         elif arguments.command == "incident":
             create_incident(arguments.root.resolve(), arguments.title, arguments.summary, arguments.public_safe, arguments.review_evidence)
+        elif arguments.command == "issue" and arguments.wal:
+            return file_local_wal(arguments.root.resolve(), arguments.wal, arguments.public_reviewed, arguments.review_evidence)
         elif arguments.command == "issue":
+            missing = [flag for flag in ("title", "body_file", "type", "priority", "area", "topic") if not getattr(arguments, flag)]
+            if missing:
+                raise RepoctlError("issue needs " + ", ".join("--" + flag.replace("_", "-") for flag in missing) + " (or --wal)")
             check_issue_for_duplicates(
                 arguments.root.resolve(),
                 arguments.title,
