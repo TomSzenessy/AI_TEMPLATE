@@ -36,9 +36,9 @@ from pathlib import Path
 
 import tomllib
 
-from .core import RepoctlError, ensure_inside_root
+from .core import RepoctlError, ensure_inside_root, repository_files
 from .evals import run_headless
-from .gitinfo import git, listed_files
+from .gitinfo import git
 
 TRIALS = ".agents/trials"
 REPORTS = ".agent/trials"
@@ -96,7 +96,7 @@ def prepare(root: Path, spec: dict[str, object], project: Path) -> None:
     _run(["git", "config", "user.name", "Trial Owner"], project)
     _run(["git", "config", "user.email", "trial@example.invalid"], project)
     if spec["mode"] == "new":
-        _copy(root, listed_files(root), project)
+        _copy(root, repository_files(root), project)
         _run([sys.executable, "tools/repoctl.py", "init", "--name", str(spec["id"]), "--kind", str(spec["kind"]),
               "--owner", "trial-owner"], project)  # as the README tells a real owner to
         _commit(project, f"chore: start {spec['id']} from the template")

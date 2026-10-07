@@ -48,6 +48,9 @@ event; runs for the same issue cancel each other, so a filing with several label
 `make issue` treats an existing issue as a duplicate when its normalized title matches, it carries the same
 `topic:` label, or it shares at least two path-shaped tokens with the new body. The `Reviewer/date` must not be in
 the future; it never expires, because it records the review of that text.
+What changed in the covered code last: `issues.py`, `github.py`, and `ci.py`
+now run every git call through one wrapper (`gitinfo.run_git`) and date records
+with `core.today()` (one UTC day); the contract above is unchanged.
 
 ## Classification
 

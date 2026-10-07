@@ -21,6 +21,7 @@ from pathlib import Path
 
 from .config import setting
 from .core import RepoctlError, declared_surfaces, load_project, read_text_file
+from .names import DESIGN, STACK_DECISION
 
 FEATURES = "docs/product/features.csv"
 RESEARCH = "docs/product/research.md"
@@ -145,7 +146,7 @@ def research_errors(root: Path, project: dict[str, object]) -> list[str]:
 
 
 def _stack_accepted(root: Path) -> bool:
-    text = read_text_file(root, "docs/STACK-DECISION.md") or ""
+    text = read_text_file(root, STACK_DECISION) or ""
     return bool(re.search(r"(?im)^\W*status\W*:?\W*accepted\b", text))
 
 
@@ -172,7 +173,7 @@ def next_step(root: Path) -> dict[str, str]:
          f"Write {FEATURES} from the research and owner answers, then append the relevant production rows "
          "(.agents/skills/product-kickoff/production-features.csv). Every must row gets an acceptance criterion.",
          "product-kickoff skill, step 4", "make next shows the build phase"),
-        (ui and len(read_text_file(root, "docs/design.md") or "") < 300, "design",
+        (ui and len(read_text_file(root, DESIGN) or "") < 300, "design",
          "Render two or three mockup directions, choose with the owner, and record docs/design.md (direction, tokens, references).",
          "product-kickoff step 3; ux-quality skill", "docs/design.md exists"),
         (not _stack_accepted(root), "stack",

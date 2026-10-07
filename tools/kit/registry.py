@@ -21,16 +21,12 @@ from functools import cached_property
 from pathlib import Path
 from typing import Callable
 
-try:
-    import tomllib
-except ModuleNotFoundError as error:  # pragma: no cover - exercised on Python 3.10
-    raise SystemExit("repoctl requires Python 3.11 or newer") from error
+import tomllib  # repoctl.py fails fast on Python < 3.11
 
-from .core import RepoctlError, load_project, read_utf8, repository_files
+from .core import KEBAB, RepoctlError, load_project, package_skill, read_utf8, repository_files
 
-KINDS = ("skill", "agent", "rule", "pack", "mcp", "check", "command", "doc")
+KINDS = ("skill", "agent", "doc", "rule", "check", "command", "mcp", "pack")  # the one list of capability kinds
 CORE = "core"
-NAME = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 FRONTMATTER = re.compile(r"\A---\n(.*?)\n---\n", re.DOTALL)
 BLOCK_SCALAR = re.compile(r"[>|][+-]?")
 MAX_DESCRIPTION = 1024  # host skill catalogs truncate or reject longer descriptions
@@ -230,7 +226,7 @@ def _module_capabilities(module: object, relative: str) -> list[Capability]:
 
 def _validate(found: list[Capability]) -> None:
     for item in found:
-        if not NAME.fullmatch(item.name):
+        if not KEBAB.fullmatch(item.name):
             raise RepoctlError(f"{item.path}: {item.kind} name {item.name!r} must be kebab-case")
         if len(item.description) < 20:
             raise RepoctlError(f"{item.path}: {item.label} needs a description of what it does and when (20+ characters)")
@@ -358,7 +354,7 @@ class Registry:
         packs = {}
         for entry in self.project.get("skills", []):
             if isinstance(entry, dict) and isinstance(entry.get("pack"), str):
-                packs[str(entry.get("package", "")).rpartition("@")[2]] = entry["pack"]
+                packs[package_skill(entry.get("package", ""))] = entry["pack"]
         return [Capability(item.kind, item.name, item.description, item.path, packs.get(item.name, item.pack), item.fields)
                 for item in skills]
 
@@ -439,10 +435,10 @@ class Context:
         return set(render_all(self.root))
 
     @cached_property
-    def orphans(self) -> tuple[list[str], list[str]]:
-        """(blocking, advisory) tracked files nothing references; computed once per run."""
-        from .reachability import orphans
-        return orphans(self)
+    def advisories(self) -> tuple[list[str], list[str]]:
+        """(unreferenced, host-read) files nothing names; computed once per run."""
+        from .reachability import advisories
+        return advisories(self)
 
     @cached_property
     def signatures(self) -> tuple:

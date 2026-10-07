@@ -5,12 +5,11 @@ from __future__ import annotations
 import ipaddress
 import json
 import re
-from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlsplit
 
 from .core import (
-    PROJECT_KIND_PATTERN,
+    KEBAB,
     RepoctlError,
     date_is_stale,
     declared_surfaces,
@@ -19,15 +18,13 @@ from .core import (
     is_placeholder,
     load_project,
     normalized_relative_path,
+    parse_iso_date,
     secret_matches,
 )
-from .docs import check_docs_index, check_file_hygiene, check_markdown_links
 from .github import github_target_configured
 from .skills import check_skill_provenance
 from .uireview import review_status
 from .structure import (
-    check_readme_identity,
-    check_structure,
     check_vision,
     validate_critic_evidence,
     validation_commands,
@@ -84,9 +81,8 @@ def read_evidence_file(
     dates = re.findall(r"(?im)^Date:\s*(\d{4}-\d{2}-\d{2})\s*$", content)
     if not dates:
         return None, f"{label} is missing a dated review"
-    try:
-        parsed_dates = [datetime.strptime(value, "%Y-%m-%d").date() for value in dates]
-    except ValueError:
+    parsed_dates = [parse_iso_date(value) for value in dates]
+    if None in parsed_dates:
         return None, f"{label} has an invalid review date"
     if any(date_is_stale(date_value) for date_value in parsed_dates):
         return None, f"{label} review date is stale or in the future"
@@ -97,96 +93,105 @@ def read_evidence_file(
     return content, None
 
 
-def check_public_launch_evidence(root: Path, project: dict[str, object]) -> list[str]:
-    errors: list[str] = []
-    contact: str | None = None
-    private_reporting: str | None = None
+def _dated(value: str, stale: str, invalid: str) -> str | None:
+    """The problem with an ISO date that must be recent and not in the future, or None."""
+    parsed = parse_iso_date(value)
+    if parsed is None:
+        return invalid
+    return stale if date_is_stale(parsed) else None
+
+
+def _read_inside(root: Path, relative: str, label: str) -> tuple[str | None, str, str]:
+    """(text, state, detail) for a repository file; state is ok, escapes (detail says why), missing, or unreadable."""
+    try:
+        path = ensure_inside_root(root, root / relative, label)
+    except RepoctlError as error:
+        return None, "escapes", str(error)
+    if not path.is_file():
+        return None, "missing", ""
+    try:
+        return path.read_text(encoding="utf-8"), "ok", ""
+    except (OSError, UnicodeDecodeError):
+        return None, "unreadable", ""
+
+
+def _launch_routes(project: dict[str, object]) -> tuple[list[str], object, object]:
     security = project.get("security", {})
     if not isinstance(security, dict):
-        errors.append("security must be a table")
-    else:
-        contact = security.get("contact")
-        private_reporting = security.get("private_reporting")
-        if not isinstance(contact, str) or not valid_private_route(contact) or re.search(
-            r"\[|replace|example\.com", contact, re.I
-        ):
-            errors.append("public launch requires a real monitored security.contact email or HTTPS route")
-        if not isinstance(private_reporting, str) or not valid_private_route(private_reporting) or re.search(
-            r"\[|replace|example\.com", private_reporting, re.I
-        ):
-            errors.append("public launch requires a real security.private_reporting email or HTTPS route")
-    security_document = root / "SECURITY.md"
+        return ["security must be a table"], None, None
+    errors: list[str] = []
+    contact, private_reporting = security.get("contact"), security.get("private_reporting")
+    if not isinstance(contact, str) or not valid_private_route(contact) or re.search(r"\[|replace|example\.com", contact, re.I):
+        errors.append("public launch requires a real monitored security.contact email or HTTPS route")
+    if not isinstance(private_reporting, str) or not valid_private_route(private_reporting) or re.search(
+        r"\[|replace|example\.com", private_reporting, re.I
+    ):
+        errors.append("public launch requires a real security.private_reporting email or HTTPS route")
+    return errors, contact, private_reporting
+
+
+def _check_security_policy(root: Path, contact: object, private_reporting: object) -> list[str]:
+    text, state, detail = _read_inside(root, "SECURITY.md", "security policy")
+    errors = [detail] if state == "escapes" else []
+    if state in {"escapes", "missing"}:
+        return errors + ["public launch requires SECURITY.md"]
+    if state == "unreadable":
+        return ["public security policy is unreadable"]
+    if re.search(r"\[(?:REQUIRED|pending|TBD)|REPLACE_WITH", text, re.I):
+        errors.append("public launch requires a filled private security route in SECURITY.md")
+    if isinstance(contact, str) and contact not in text:
+        errors.append("SECURITY.md must name the manifest security.contact")
+    if isinstance(private_reporting, str) and private_reporting not in text:
+        errors.append("SECURITY.md must name the manifest security.private_reporting route")
+    return errors
+
+
+def _check_threat_model(root: Path) -> list[str]:
+    text, state, _ = _read_inside(root, ".security/threat-model.md", "threat model")
+    if state != "ok":
+        return ["public launch requires a readable .security/threat-model.md"]
+    found = re.search(r"(?im)^\*{0,2}Last Updated:\*{0,2}\s*(\d{4}-\d{2}-\d{2})\s*$", text)
+    if not found:
+        return ["threat model must record Last Updated"]
+    problem = _dated(found.group(1), "threat model review is stale or in the future", "threat model Last Updated is invalid")
+    return [problem] if problem else []
+
+
+def _check_security_config(root: Path, contact: object) -> list[str]:
+    text, state, detail = _read_inside(root, ".security/config.json", "security configuration")
+    errors = [detail] if state == "escapes" else []
+    if state in {"escapes", "missing"}:
+        return errors + ["public launch requires .security/config.json"]
     try:
-        security_document = ensure_inside_root(root, security_document, "security policy")
-    except RepoctlError as error:
-        errors.append(str(error))
-        security_document = Path("/nonexistent")
-    if not security_document.is_file():
-        errors.append("public launch requires SECURITY.md")
+        config = json.loads(text) if text is not None else None
+    except json.JSONDecodeError:
+        config = None
+        state = "unreadable"
+    if state == "unreadable":
+        return ["public security configuration is unreadable"]
+    if not isinstance(config, dict):
+        return ["public security configuration must be a JSON object"]
+    contacts = config.get("security_team_contacts", [])
+    if not isinstance(contacts, list) or not contacts or not all(isinstance(item, str) and valid_private_route(item) for item in contacts):
+        errors.append("public launch requires valid security_team_contacts")
+    elif isinstance(contact, str) and contact not in contacts:
+        errors.append("security_team_contacts must include security.contact")
+    reviewed_on, reviewer = config.get("security_reviewed_on"), config.get("security_reviewer")
+    if not isinstance(reviewed_on, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", reviewed_on):
+        errors.append("public security configuration needs security_reviewed_on")
     else:
-        try:
-            security_text = security_document.read_text(encoding="utf-8")
-            if re.search(r"\[(?:REQUIRED|pending|TBD)|REPLACE_WITH", security_text, re.I):
-                errors.append("public launch requires a filled private security route in SECURITY.md")
-            if isinstance(contact, str) and contact not in security_text:
-                errors.append("SECURITY.md must name the manifest security.contact")
-            if isinstance(private_reporting, str) and private_reporting not in security_text:
-                errors.append("SECURITY.md must name the manifest security.private_reporting route")
-        except (OSError, UnicodeDecodeError):
-            errors.append("public security policy is unreadable")
-    threat_model = root / ".security" / "threat-model.md"
-    try:
-        threat_model = ensure_inside_root(root, threat_model, "threat model")
-        threat_text = threat_model.read_text(encoding="utf-8")
-    except (RepoctlError, OSError, UnicodeDecodeError):
-        errors.append("public launch requires a readable .security/threat-model.md")
-    else:
-        threat_date = re.search(r"(?im)^\*{0,2}Last Updated:\*{0,2}\s*(\d{4}-\d{2}-\d{2})\s*$", threat_text)
-        if not threat_date:
-            errors.append("threat model must record Last Updated")
-        else:
-            try:
-                updated = datetime.strptime(threat_date.group(1), "%Y-%m-%d").date()
-                if date_is_stale(updated):
-                    errors.append("threat model review is stale or in the future")
-            except ValueError:
-                errors.append("threat model Last Updated is invalid")
-    config_path = root / ".security" / "config.json"
-    try:
-        config_path = ensure_inside_root(root, config_path, "security configuration")
-    except RepoctlError as error:
-        errors.append(str(error))
-        config_path = Path("/nonexistent")
-    if not config_path.is_file():
-        errors.append("public launch requires .security/config.json")
-    else:
-        try:
-            security_config = json.loads(config_path.read_text(encoding="utf-8"))
-            if not isinstance(security_config, dict):
-                errors.append("public security configuration must be a JSON object")
-            else:
-                contacts = security_config.get("security_team_contacts", [])
-                if not isinstance(contacts, list) or not contacts or not all(
-                    isinstance(item, str) and valid_private_route(item) for item in contacts
-                ):
-                    errors.append("public launch requires valid security_team_contacts")
-                elif isinstance(contact, str) and contact not in contacts:
-                    errors.append("security_team_contacts must include security.contact")
-                reviewed_on = security_config.get("security_reviewed_on")
-                reviewer = security_config.get("security_reviewer")
-                if not isinstance(reviewed_on, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", reviewed_on):
-                    errors.append("public security configuration needs security_reviewed_on")
-                else:
-                    try:
-                        reviewed_date = datetime.strptime(reviewed_on, "%Y-%m-%d").date()
-                        if date_is_stale(reviewed_date):
-                            errors.append("security review date is stale or in the future")
-                    except ValueError:
-                        errors.append("security_reviewed_on is invalid")
-                if not isinstance(reviewer, str) or is_placeholder(reviewer) or re.search(r"[\[\]]", reviewer) or len(reviewer.strip()) < 3:
-                    errors.append("public security configuration needs a named security_reviewer")
-        except (OSError, json.JSONDecodeError):
-            errors.append("public security configuration is unreadable")
+        problem = _dated(reviewed_on, "security review date is stale or in the future", "security_reviewed_on is invalid")
+        if problem:
+            errors.append(problem)
+    if not isinstance(reviewer, str) or is_placeholder(reviewer) or re.search(r"[\[\]]", reviewer) or len(reviewer.strip()) < 3:
+        errors.append("public security configuration needs a named security_reviewer")
+    return errors
+
+
+def _check_launch_evidence(root: Path, project: dict[str, object]) -> list[str]:
+    """Legal approval, production evidence, and the public legal documents."""
+    errors: list[str] = []
+    name = str(project.get("name"))
     launch = project.get("launch", {})
     if not isinstance(launch, dict):
         errors.append("launch must be a table")
@@ -198,81 +203,80 @@ def check_public_launch_evidence(root: Path, project: dict[str, object]) -> list
             errors.append("public launch requires a legal review artifact path")
         else:
             _, error = read_evidence_file(
-                root,
-                legal_ref,
-                "legal review evidence",
-                (r"^Counsel review:\s*approved\s*$", r"^Reviewer:\s*\S+", r"^Date:\s*\d{4}-\d{2}-\d{2}"),
-                str(project.get("name")),
+                root, legal_ref, "legal review evidence",
+                (r"^Counsel review:\s*approved\s*$", r"^Reviewer:\s*\S+", r"^Date:\s*\d{4}-\d{2}-\d{2}"), name,
             )
             if error:
                 errors.append(error)
         if launch.get("production_evidence") != "verified":
             errors.append("public launch requires verified production evidence")
         refs = launch.get("production_evidence_refs", [])
-        if not isinstance(refs, list) or not refs or not all(
-            isinstance(ref, str) and ref.strip() for ref in refs
-        ):
+        if not isinstance(refs, list) or not refs or not all(isinstance(ref, str) and ref.strip() for ref in refs):
             errors.append("public launch requires repository production evidence paths")
         else:
             for ref in refs:
                 _, error = read_evidence_file(
-                    root,
-                    ref,
-                    "production evidence",
-                    (r"^Evidence type:\s*deployed\s*$", r"^Deployment:\s*\S+", r"^Observed:\s*(?!no\b|not\b|none\b)\S+", r"^Reviewer:\s*\S+", r"^Date:\s*\d{4}-\d{2}-\d{2}"),
-                    str(project.get("name")),
+                    root, ref, "production evidence",
+                    (r"^Evidence type:\s*deployed\s*$", r"^Deployment:\s*\S+", r"^Observed:\s*(?!no\b|not\b|none\b)\S+",
+                     r"^Reviewer:\s*\S+", r"^Date:\s*\d{4}-\d{2}-\d{2}"), name,
                 )
                 if error:
                     errors.append(error)
     legal_paths = launch.get("legal_document_paths", []) if isinstance(launch, dict) else []
     if not isinstance(legal_paths, list) or not legal_paths:
-        errors.append("public launch requires an explicit legal_document_paths list")
+        return errors + ["public launch requires an explicit legal_document_paths list"]
+    for value in legal_paths:
+        if not isinstance(value, str) or Path(value).is_absolute() or not value.startswith("docs/legal/"):
+            errors.append("public legal documents must be repository-relative paths under docs/legal/")
+            continue
+        try:
+            normalized_legal = normalized_relative_path(value, "public legal document")
+            if not normalized_legal.startswith("docs/legal/"):
+                raise RepoctlError("public legal document escapes docs/legal/")
+        except RepoctlError as error:
+            errors.append(str(error))
+            continue
+        _, error = read_evidence_file(
+            root, normalized_legal, "public legal document",
+            (r"^Legal owner:\s*\S+", r"^Reviewer:\s*\S+", r"^Date:\s*\d{4}-\d{2}-\d{2}"), name,
+        )
+        if error:
+            errors.append(error)
+    return errors
+
+
+def _check_data_inventory(root: Path, project: dict[str, object]) -> list[str]:
+    text, state, _ = _read_inside(root, "docs/legal/data-inventory.md", "data inventory")
+    if state != "ok":
+        return ["public launch requires a readable docs/legal/data-inventory.md"]
+    errors: list[str] = []
+    if not text.strip() or re.search(r"\[(?:REQUIRED|pending|TBD)|REPLACE_WITH|UNSELECTED", text, re.I):
+        errors.append("public data inventory must be complete and placeholder-free")
+    if not re.search(rf"(?im)^Project:\s*{re.escape(str(project.get('name', '')))}\s*$", text):
+        errors.append("public data inventory is not bound to project.toml")
+    found = re.search(r"(?im)^Date:\s*(\d{4}-\d{2}-\d{2})\s*$", text)
+    if not found:
+        errors.append("public data inventory must record its review date")
     else:
-        for value in legal_paths:
-            if not isinstance(value, str) or Path(value).is_absolute() or not value.startswith("docs/legal/"):
-                errors.append("public legal documents must be repository-relative paths under docs/legal/")
-                continue
-            try:
-                normalized_legal = normalized_relative_path(value, "public legal document")
-                if not normalized_legal.startswith("docs/legal/"):
-                    raise RepoctlError("public legal document escapes docs/legal/")
-            except RepoctlError as error:
-                errors.append(str(error))
-                continue
-            _, error = read_evidence_file(
-                root,
-                normalized_legal,
-                "public legal document",
-                (r"^Legal owner:\s*\S+", r"^Reviewer:\s*\S+", r"^Date:\s*\d{4}-\d{2}-\d{2}"),
-                str(project.get("name")),
-            )
-            if error:
-                errors.append(error)
-    inventory = root / "docs" / "legal" / "data-inventory.md"
-    try:
-        inventory = ensure_inside_root(root, inventory, "data inventory")
-        inventory_content = inventory.read_text(encoding="utf-8")
-    except (RepoctlError, OSError, UnicodeDecodeError) as error:
-        errors.append("public launch requires a readable docs/legal/data-inventory.md")
-    else:
-        if not inventory_content.strip() or re.search(r"\[(?:REQUIRED|pending|TBD)|REPLACE_WITH|UNSELECTED", inventory_content, re.I):
-            errors.append("public data inventory must be complete and placeholder-free")
-        if not re.search(rf"(?im)^Project:\s*{re.escape(str(project.get('name', '')))}\s*$", inventory_content):
-            errors.append("public data inventory is not bound to project.toml")
-        inventory_date = re.search(r"(?im)^Date:\s*(\d{4}-\d{2}-\d{2})\s*$", inventory_content)
-        if not inventory_date:
-            errors.append("public data inventory must record its review date")
-        else:
-            try:
-                if date_is_stale(datetime.strptime(inventory_date.group(1), "%Y-%m-%d").date()):
-                    errors.append("public data inventory review is stale or future-dated")
-            except ValueError:
-                errors.append("public data inventory review date is invalid")
-        reviewer = re.search(r"(?im)^Reviewer:\s*(.+?)\s*$", inventory_content)
-        if not reviewer or is_placeholder(reviewer.group(1)):
-            errors.append("public data inventory must name a real reviewer")
-        if not re.search(r"(?i)retention", inventory_content) or not re.search(r"(?i)rights|deletion|export", inventory_content):
-            errors.append("public data inventory must cover retention and rights/deletion evidence")
+        problem = _dated(found.group(1), "public data inventory review is stale or future-dated",
+                         "public data inventory review date is invalid")
+        if problem:
+            errors.append(problem)
+    reviewer = re.search(r"(?im)^Reviewer:\s*(.+?)\s*$", text)
+    if not reviewer or is_placeholder(reviewer.group(1)):
+        errors.append("public data inventory must name a real reviewer")
+    if not re.search(r"(?i)retention", text) or not re.search(r"(?i)rights|deletion|export", text):
+        errors.append("public data inventory must cover retention and rights/deletion evidence")
+    return errors
+
+
+def check_public_launch_evidence(root: Path, project: dict[str, object]) -> list[str]:
+    errors, contact, private_reporting = _launch_routes(project)
+    errors += _check_security_policy(root, contact, private_reporting)
+    errors += _check_threat_model(root)
+    errors += _check_security_config(root, contact)
+    errors += _check_launch_evidence(root, project)
+    errors += _check_data_inventory(root, project)
     if not github_target_configured(root, project):
         errors.append("public launch requires a configured GitHub issue register (repository.github or origin)")
     return errors
@@ -295,20 +299,16 @@ def check_readiness(root: Path) -> None:
         check_vision(root, project, release_gate=releasing)
     except RepoctlError as error:
         errors.append(str(error))
-    for check in (check_structure, check_docs_index, check_markdown_links, check_file_hygiene):
-        try:
-            check(root) if check is not check_structure else check(root, project)
-        except RepoctlError as error:
-            errors.append(str(error))
+    from .registry import run_checks  # the registry owns the blocking-check list; doctor adds only what it alone knows
+    errors += run_checks(root, blocking_only=True)[0]
     try:
-        check_skill_provenance(project, release_gate=releasing)
-        check_readme_identity(root, project)
+        check_skill_provenance(project, release_gate=releasing)  # the release-gated variant of a registry check
     except RepoctlError as error:
         errors.append(str(error))
 
     if project.get("name") == "REPLACE_WITH_PROJECT_NAME":
         errors.append("project name is not initialized")
-    if not isinstance(project.get("kind"), str) or not PROJECT_KIND_PATTERN.fullmatch(project["kind"]):
+    if not isinstance(project.get("kind"), str) or not KEBAB.fullmatch(project["kind"]):
         errors.append(f"project kind is invalid: {project.get('kind')}")
     if project.get("phase") not in {"bootstrap", "development", "private-preview", "public-launch"}:
         errors.append(f"project phase is invalid: {project.get('phase')}")

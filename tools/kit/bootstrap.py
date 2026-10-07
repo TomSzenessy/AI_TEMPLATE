@@ -8,7 +8,7 @@ from pathlib import Path
 
 from . import derive
 from .core import (
-    PROJECT_KIND_PATTERN,
+    KEBAB,
     PROJECT_NAME_PATTERN,
     RepoctlError,
     ensure_inside_root,
@@ -272,7 +272,7 @@ def initialize_project(root: Path, name: str, kind: str, owner: str | None = Non
         raise RepoctlError(
             "project name must be 1-64 characters using letters, digits, '.', '_' or '-'"
         )
-    if not PROJECT_KIND_PATTERN.fullmatch(kind):
+    if not KEBAB.fullmatch(kind):
         raise RepoctlError("project kind must be lowercase kebab-case")
     if owner is not None and (not OWNER_HANDLE.fullmatch(owner) or is_placeholder(owner)):
         raise RepoctlError("owner must be a handle or team name such as octocat or acme/web-team, not an email")

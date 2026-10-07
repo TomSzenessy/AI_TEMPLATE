@@ -10,18 +10,21 @@ import subprocess
 import sys
 import tempfile
 import textwrap
-import time
 import tomllib
 import unittest
 from datetime import date, timedelta
 from pathlib import Path
+from unittest import mock
 
-TOOLS = Path(__file__).resolve().parents[1]
-REPOCTL = TOOLS / "repoctl.py"
-sys.path.insert(0, str(TOOLS))
+import fixtures  # noqa: E402  shared builders, in-process CLI, isolated git (#43)
+from fixtures import (RECENT, REPOCTL, TOOLS, KitRepository, Scratch,  # noqa: E402
+                      clean_env, fake_gh, git_in, http_server, run_cli)
 
-from kit import (ci, commands, coupling, derive, docsync, evals, garden, hygiene, navigate, product,  # noqa: E402
-                  reachability, registry, risk, signatures, structure, uireview)
+from kit import (  # noqa: E402
+    core, ci, commands, coupling, derive, docsync, evals, garden, hygiene, navigate, product,
+    reachability, registry, risk, session, signatures, structure, uireview,
+)
+from kit.core import load_project  # noqa: E402
 from kit.gitinfo import path_matches  # noqa: E402
 
 # Built by concatenation so this test file never trips the marker scanner itself.
@@ -30,98 +33,9 @@ from kit.gitinfo import path_matches  # noqa: E402
 IN_TEMPLATE = tomllib.loads((TOOLS.parent / "project.toml").read_text(encoding="utf-8")).get("kind") == "template"
 template_only = unittest.skipUnless(IN_TEMPLATE, "template maintenance: runs in the template checkout only")
 
-# Fixture dates follow the calendar so the suite never expires (#10).
-RECENT = (date.today() - timedelta(days=30)).isoformat()
 TASK = "TO" + "DO"
 DEPRECATED = "DEPRE" + "CATED"
 ANNOTATION = "@" + "deprecated"
-
-
-class KitRepository(unittest.TestCase):
-    """A throwaway git repository with one bound doc, one skill, and one role."""
-
-    def setUp(self) -> None:
-        self.temp = tempfile.TemporaryDirectory()
-        self.root = Path(self.temp.name).resolve()
-        self.write("project.toml", """\
-            schema = 1
-            name = "Demo"
-            kind = "web"
-            phase = "development"
-            [adapters]
-            hosts = ["claude"]
-            [budgets]
-            "AGENTS.md" = 200
-            [risk]
-            high = ["src/auth/**"]
-            low = ["docs/**"]
-            """)
-        self.write("resources.toml", """\
-            schema = 1
-            [[resources]]
-            id = "docs"
-            kind = "library-docs"
-            source = "https://example.com/"
-            trust = "official"
-            access = "read-only"
-            scope = "web"
-            summary = "Example docs."
-            """)
-        self.write(".agents/mcp/browser.toml", """\
-            name = "browser"
-            description = "Drive a browser for UI checks."
-            transport = "stdio"
-            command = ["npx", "-y", "@example/mcp@1.2.3"]
-            enabled = true
-            """)
-        self.write("Makefile", "check:\n\t@true\nverify:\n\t@true\n")
-        self.write("AGENTS.md", "# Agents\n")
-        self.write("src/billing/invoice.py", "def render_invoice():\n    return 1\n")
-        self.write("src/auth/login.py", "def login():\n    return True\n")
-        self.write("docs/billing.md", "# Billing\n\n<!-- covers: src/billing/** -->\n\nRun `make check`.\n")
-        self.write(".agents/skills/demo-skill/SKILL.md", "---\nname: demo-skill\ndescription: Render invoices for billing customers.\n---\n\n# Demo\n")
-        self.write(".agents/agents/scout.md", "---\nname: scout\ndescription: Read-only locator for files.\naccess: read-only\ntier: fast\n---\n\n# Scout\n")
-        self.git("init", "-q", "-b", "main")
-        self.git("config", "user.email", "test@example.com")
-        self.git("config", "user.name", "Test")
-        derive.sync(self.root)
-        self.commit("initial")
-
-    def tearDown(self) -> None:
-        self.temp.cleanup()
-
-    def write(self, name: str, content: str) -> Path:
-        path = self.root / name
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(textwrap.dedent(content), encoding="utf-8")
-        return path
-
-    def git(self, *arguments: str) -> str:
-        return subprocess.run(["git", "-C", str(self.root), *arguments], check=True, capture_output=True, text=True).stdout
-
-    def commit(self, message: str) -> None:
-        self.git("add", "-A")
-        self.git("commit", "-q", "-m", message)
-
-    def cli(self, *arguments: str, stdin: str | None = None) -> subprocess.CompletedProcess[str]:
-        return subprocess.run(
-            [sys.executable, str(REPOCTL), "--root", str(self.root), *arguments],
-            input=stdin, capture_output=True, text=True, check=False,
-        )
-
-    # The fixture is a bare repository, not an initialized project: skip the repository-contract checks.
-    # Its files (a role, a skill, an MCP route, resources.toml) are capability carriers nothing names,
-    # so the compactness gate would report every one of them; OrphanFileTests covers that gate directly.
-    CONTRACT = frozenset({"manifest-structure", "skill-provenance", "file-hygiene", "markdown-links", "docs-index",
-                          "orphan-files", "host-read-config"})
-
-    def self_heal(self) -> str:
-        """The self-healing findings `make check` adds on top of the repository-contract checks."""
-        hard, _ = registry.run_checks(self.root, blocking_only=True, skip=self.CONTRACT)
-        return "\n".join(hard + docsync.index_errors(self.root, self.files()))
-
-    def files(self) -> list[str]:
-        return [line for line in self.git("ls-files").splitlines() if line]
 
 
 class GlobTests(unittest.TestCase):
@@ -402,7 +316,7 @@ class CommitGateTests(KitRepository):
         self.assertIn("installed git hooks", self.cli("hook", "session-start", stdin="{}").stdout)
         self.write("src/billing/invoice.py", "def render_invoice():\n    return 9\n")
         self.git("add", "src/billing/invoice.py")
-        blocked = subprocess.run(["git", "-C", str(self.root), "commit", "-q", "-m", "x"], capture_output=True, text=True)
+        blocked = self.git_result("commit", "-q", "-m", "x")
         self.assertNotEqual(blocked.returncode, 0)
         self.assertIn("Commit blocked", blocked.stderr)
 
@@ -431,8 +345,7 @@ class CriticRegressionTests(KitRepository):
         hook.chmod(0o755)
         brief = self.cli("hook", "session-start", stdin="{}").stdout
         self.assertIn("git commit gate NOT installed", brief)
-        result = subprocess.run(["git", "-C", str(self.root), "config", "--get", "core.hooksPath"], capture_output=True, text=True)
-        self.assertEqual(result.stdout.strip(), "")
+        self.assertEqual(self.git_result("config", "--get", "core.hooksPath").stdout.strip(), "")
 
     def test_bare_or_misplaced_trailer_exempts_nothing_in_gate_or_history(self) -> None:
         self.stage_billing_change()
@@ -467,11 +380,9 @@ class CriticRegressionTests(KitRepository):
             "diff --git a/src/billing/invoice.py b/src/billing/invoice.py\n+    return 11\n"
         )
         self.assertEqual(self.gate(message), 0)
-        verbose = subprocess.run(
-            ["git", "-C", str(self.root), "-c", "core.hooksPath=/dev/null", "commit", "-q", "-v",
-             "-m", "change\n\nDocs-Unaffected: docs/billing.md comment only"],
-            capture_output=True, text=True,
-        )
+        verbose = self.git_result(
+            "-c", "core.hooksPath=/dev/null", "commit", "-q", "-v",
+            "-m", "change\n\nDocs-Unaffected: docs/billing.md comment only")
         self.assertEqual(verbose.returncode, 0, verbose.stderr)
         self.assertEqual(self.self_heal(), "")
 
@@ -542,14 +453,10 @@ verification = [["true"]]
                      "--priority", "P2", "--area", "web", "--topic", "share-link")
         self.assertIn("Local-WAL-001", self.cli(*arguments).stdout)
         bin_dir = self.root / "bin"
-        bin_dir.mkdir()
-        (bin_dir / "gh").write_text("#!/bin/sh\ncase \"$1 $2\" in\n  'issue list') echo '[]';;\n"
-                                    "  'issue create') echo https://github.com/example/demo/issues/7;;\nesac\n")
-        (bin_dir / "gh").chmod(0o755)
-        environment = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}"}
+        fake_gh(bin_dir, repo="example/demo", url="https://github.com/example/demo/issues/7")
+        environment = {"PATH": f"{bin_dir}:{os.environ['PATH']}"}
         self.write("project.toml", (self.root / "project.toml").read_text().replace("[adapters]", '[repository]\ngithub = "example/demo"\n\n[adapters]', 1))
-        filing = lambda: subprocess.run([sys.executable, str(REPOCTL), "--root", str(self.root), "issue", "--wal", "all"],
-                                        capture_output=True, text=True, env=environment)
+        filing = lambda: self.cli("issue", "--wal", "all", env=environment)
         first = filing()
         self.assertEqual(first.returncode, 1, "a draft must meet the full contract before it is public")
         self.assertIn("missing headings", first.stdout)
@@ -668,10 +575,6 @@ class ProductDriverTests(KitRepository):
 class UiReviewTests(KitRepository):
     def setUp(self) -> None:
         super().setUp()
-        import socket
-        with socket.socket() as probe:
-            probe.bind(("127.0.0.1", 0))
-            self.port = probe.getsockname()[1]
         self.write("project.toml", (self.root / "project.toml").read_text()
                    + '[[surfaces]]\nid = "app"\npath = "src"\nkind = "code"\nquality_oracle = "ux-quality"\n'
                    + f'[surfaces.preview]\ncommand = ["{sys.executable}", "-m", "http.server", "{{port}}", "--bind", "127.0.0.1"]\n'
@@ -682,25 +585,19 @@ class UiReviewTests(KitRepository):
             fake = bin_dir / name
             fake.write_text("#!/bin/sh\nfor last; do :; done\nprintf png > \"$last\"\n")
             fake.chmod(0o755)
-        self.environment = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}"}
+        self.environment = {"PATH": f"{bin_dir}:{os.environ['PATH']}"}
 
     def review(self) -> subprocess.CompletedProcess[str]:
-        return subprocess.run([sys.executable, str(REPOCTL), "--root", str(self.root), "ui-review"],
-                              capture_output=True, text=True, env=self.environment, check=False)
+        return self.cli("ui-review", env=self.environment)
 
     def test_refuses_a_server_it_did_not_start(self) -> None:
-        foreign = subprocess.Popen([sys.executable, "-m", "http.server", str(self.port), "--bind", "127.0.0.1"],
-                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        try:
-            time.sleep(1)
-            text = (self.root / "project.toml").read_text().replace("{port}", str(self.port))
+        # A real HTTP answer on a port the operating system picked: no free-port probe to race on (#43 T-08).
+        with http_server() as port:
+            text = (self.root / "project.toml").read_text().replace("{port}", str(port))
             self.write("project.toml", text)
             result = self.review()
-            self.assertEqual(result.returncode, 1)
-            self.assertIn("something already answers", result.stderr)
-        finally:
-            foreign.terminate()
-            foreign.wait()
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("something already answers", result.stderr)
 
     def test_route_without_leading_slash_is_rejected(self) -> None:
         self.write("project.toml", (self.root / "project.toml").read_text().replace('routes = ["/"]', 'routes = ["about"]'))
@@ -739,13 +636,11 @@ class UiReviewTests(KitRepository):
         self.assertIn("changed since UI review", " ".join(uireview.review_status(self.root)))
 
     def test_installed_playwright_wins_unless_pinned(self) -> None:
-        os.environ["PATH"], saved = self.environment["PATH"], os.environ["PATH"]
-        try:
+        # patch.dict restores the process environment even when the assertion fails (#43 T-08).
+        with mock.patch.dict(os.environ, self.environment):
             self.assertTrue(uireview._playwright(self.root)[0].endswith("fakebin/playwright"))
             self.write("project.toml", (self.root / "project.toml").read_text() + '[kit]\nplaywright_version = "1.50.0"\n')
             self.assertEqual(uireview._playwright(self.root), ["npx", "-y", "playwright@1.50.0"])
-        finally:
-            os.environ["PATH"] = saved
 
     def test_review_gates_feature_and_release_not_every_change(self) -> None:
         from kit import launch, session
@@ -811,12 +706,10 @@ class TrialTests(unittest.TestCase):
             project = Path(folder) / "demo"
             trial.prepare(TOOLS.parent, {"id": "demo", "kind": "web", "mode": "new", "prompt": "x"}, project)
             self.assertIn('name = "demo"', (project / "project.toml").read_text())
-            self.assertEqual(subprocess.run(["git", "-C", str(project), "status", "--porcelain"],
-                                            capture_output=True, text=True).stdout, "")
-            self.assertIn("intake", subprocess.run([sys.executable, "tools/repoctl.py", "next"], cwd=project,
-                                                   capture_output=True, text=True).stdout)
+            self.assertEqual(git_in(project, "status", "--porcelain").stdout, "")
+            self.assertIn("intake", run_cli(project, "next").stdout)
             for command in ("check", "finish"):  # a fresh project starts green, so its first gate failure is the agent's
-                result = subprocess.run([sys.executable, "tools/repoctl.py", command], cwd=project, capture_output=True, text=True)
+                result = run_cli(project, command)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
 
@@ -845,7 +738,6 @@ class GoldenPathTests(unittest.TestCase):
         manifest.write_text(text)
         (project / "hello.py").write_text('print("hello")\n')
 
-    @template_only
     def test_init_intake_done_commit(self) -> None:
         from kit import trial
         with tempfile.TemporaryDirectory() as folder:
@@ -854,18 +746,17 @@ class GoldenPathTests(unittest.TestCase):
             self.assertIn("[REQUIRED:", (project / "VISION.md").read_text(), "init leaves a fresh record, not the template's")
             self.assertNotIn("AI_TEMPLATE", (project / "VISION.md").read_text())
             make = lambda *args: subprocess.run(["make", *args], cwd=project, capture_output=True, text=True, timeout=1200,
-                                                  env={**os.environ, **({} if os.environ.get("KIT_SLOW") == "1" else {"KIT_INNER": "1"})})
+                                                  env=clean_env(**({} if os.environ.get("KIT_SLOW") == "1" else {"KIT_INNER": "1"})))
             self.intake(project, fill=False)
             self.assertIn("placeholders", make("check").stderr, "an accepted record with placeholders is refused")
             self.intake(project)
             done = make("done")
             self.assertEqual(done.returncode, 0, (done.stdout + done.stderr)[-3000:])
             self.assertEqual(make("start").returncode, 0)
-            subprocess.run(["git", "-C", str(project), "add", "-A"], check=True)
-            commit = subprocess.run(["git", "-C", str(project), "commit", "-qm", "feat: hello surface"], capture_output=True, text=True)
+            git_in(project, "add", "-A")
+            commit = git_in(project, "commit", "-qm", "feat: hello surface", check=False)
             self.assertEqual(commit.returncode, 0, commit.stderr)
 
-    @template_only
     def test_a_project_made_from_this_readme_passes_check(self) -> None:
         """#16: the generated command block must never read as un-rewritten template scaffolding."""
         from kit import trial
@@ -875,8 +766,7 @@ class GoldenPathTests(unittest.TestCase):
             readme = project / "README.md"
             self.assertNotIn("Template mode", readme.read_text(), "make init rewrote the template's own line")
             self.assertIn("Project initialized: **demo** (`cli`)", readme.read_text())
-            check = lambda: subprocess.run([sys.executable, "tools/repoctl.py", "check"], cwd=project,
-                                           capture_output=True, text=True)
+            check = lambda: run_cli(project, "check")
             generated = check()
             self.assertEqual(generated.returncode, 0, (generated.stdout + generated.stderr)[-2000:])
             readme.write_text(readme.read_text().replace(
@@ -891,8 +781,7 @@ class KitUpdateTests(unittest.TestCase):
     """Template fixes reach projects already made from it, without overwriting the project's changes."""
 
     def git(self, where: Path, *args: str) -> str:
-        return subprocess.run(["git", "-C", str(where), "-c", "user.name=t", "-c", "user.email=t@example.invalid", *args],
-                              check=True, capture_output=True, text=True).stdout
+        return git_in(where, *args).stdout
 
     def snapshot(self, folder: Path) -> None:
         self.git(folder, "add", "-A")
@@ -902,7 +791,7 @@ class KitUpdateTests(unittest.TestCase):
         from kit import trial
         with tempfile.TemporaryDirectory() as temp:
             kit, project = Path(temp) / "kit", Path(temp) / "project"
-            trial._copy(TOOLS.parent, trial.listed_files(TOOLS.parent), kit)
+            trial._copy(TOOLS.parent, core.repository_files(TOOLS.parent), kit)
             (kit / "tools/kit/obsolete.py").write_text("OLD = 1\n")
             self.git(kit, "init", "-q", "-b", "main")
             self.snapshot(kit)
@@ -910,8 +799,7 @@ class KitUpdateTests(unittest.TestCase):
             lock = json.loads((project / "tools/kit-lock.json").read_text())
             self.assertIn("tools/kit/navigate.py", lock["files"])
             self.assertNotIn("project.toml", lock["files"], "project-owned files are never kit files")
-            same = subprocess.run([sys.executable, "tools/repoctl.py", "kit-update", "--kit", str(kit)],
-                                  cwd=project, capture_output=True, text=True)
+            same = run_cli(project, "kit-update", "--kit", str(kit))
             self.assertIn("0 updated, 0 added, 0 removed, 0 to merge", same.stdout, "init and update agree")
             # The project customizes a kit doc and adds its own make target.
             (project / "docs/delegation.md").write_text((project / "docs/delegation.md").read_text() + "\nOur team rule.\n")
@@ -923,8 +811,7 @@ class KitUpdateTests(unittest.TestCase):
             (kit / "tools/kit/obsolete.py").unlink()
             (kit / "docs/delegation.md").write_text((kit / "docs/delegation.md").read_text() + "\nKit B note.\n")
             self.snapshot(kit)
-            update = lambda: subprocess.run([sys.executable, "tools/repoctl.py", "kit-update", "--kit", str(kit)],
-                                            cwd=project, capture_output=True, text=True)
+            update = lambda: run_cli(project, "kit-update", "--kit", str(kit))
             result = update()
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertTrue((project / "tools/kit/navigate.py").read_text().endswith("# fixed in B\n"))
@@ -938,7 +825,7 @@ class KitUpdateTests(unittest.TestCase):
             self.assertEqual((project / "project.mk").read_text(), "hello:\n\techo hi\n")
             head = self.git(kit, "rev-parse", "HEAD").strip()
             self.assertEqual(json.loads((project / "tools/kit-lock.json").read_text())["kit_version"], head)
-            check = subprocess.run([sys.executable, "tools/repoctl.py", "check"], cwd=project, capture_output=True, text=True)
+            check = run_cli(project, "check")
             self.assertEqual(check.returncode, 0, check.stderr)
             self.snapshot(project)
             again = update()
@@ -955,7 +842,7 @@ class KitUpdateTests(unittest.TestCase):
         from kit import trial
         with tempfile.TemporaryDirectory() as temp:
             kit, project = Path(temp) / "kit", Path(temp) / "project"
-            trial._copy(TOOLS.parent, trial.listed_files(TOOLS.parent), kit)
+            trial._copy(TOOLS.parent, core.repository_files(TOOLS.parent), kit)
             self.git(kit, "init", "-q", "-b", "main")
             self.snapshot(kit)
             trial.prepare(kit, {"id": "demo", "kind": "cli", "mode": "new", "prompt": "x"}, project)
@@ -970,8 +857,7 @@ class KitUpdateTests(unittest.TestCase):
             for doc in ("docs/delegation.md", "docs/operations.md"):
                 (kit / doc).write_text((kit / doc).read_text() + "\nKit B note.\n")
             self.snapshot(kit)
-            update = lambda: subprocess.run([sys.executable, "tools/repoctl.py", "kit-update", "--kit", str(kit)],
-                                            cwd=project, capture_output=True, text=True)
+            update = lambda: run_cli(project, "kit-update", "--kit", str(kit))
             first = update()
             self.assertIn("no version recorded before", first.stdout, first.stdout + first.stderr)
             self.assertNotIn("was unknown", first.stdout)
@@ -999,10 +885,9 @@ class InitOwnerTests(unittest.TestCase):
         from kit import trial
         with tempfile.TemporaryDirectory() as folder:
             project = Path(folder)
-            trial._copy(TOOLS.parent, trial.listed_files(TOOLS.parent), project)
+            trial._copy(TOOLS.parent, core.repository_files(TOOLS.parent), project)
             def init(owner: str) -> subprocess.CompletedProcess[str]:
-                return subprocess.run([sys.executable, "tools/repoctl.py", "init", "--name", "demo", "--kind", "web",
-                                       "--owner", owner], cwd=project, capture_output=True, text=True)
+                return run_cli(project, "init", "--name", "demo", "--kind", "web", "--owner", owner)
             self.assertIn("not an email", init("me@example.com").stderr)
             self.assertEqual(init("octocat").returncode, 0)
             self.assertIn('owners = ["octocat"]', (project / "project.toml").read_text())
@@ -1011,23 +896,20 @@ class InitOwnerTests(unittest.TestCase):
 
 
 @template_only
-class AdoptTests(unittest.TestCase):
+class AdoptTests(Scratch):
     """make adopt brings the kit into an existing repository without overwriting it."""
 
     def setUp(self) -> None:
-        self.temp = tempfile.TemporaryDirectory()
-        self.root = Path(self.temp.name) / "notes"
-        shutil.copytree(TOOLS.parent / ".agents/trials/seeds/notes-api", self.root)
-        for command in (["init", "-q", "-b", "main"], ["add", "-A"],
-                        ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", "existing"]):
-            subprocess.run(["git", "-C", str(self.root), *command], check=True, capture_output=True)
-
-    def tearDown(self) -> None:
-        self.temp.cleanup()
+        super().setUp()
+        shutil.copytree(TOOLS.parent / ".agents/trials/seeds/notes-api", self.root / "notes")
+        self.root = self.root / "notes"
+        git_in(self.root, "init", "-q", "-b", "main")
+        git_in(self.root, "add", "-A")
+        git_in(self.root, "commit", "-q", "-m", "existing")
 
     def adopt(self) -> subprocess.CompletedProcess[str]:
-        return subprocess.run([sys.executable, str(REPOCTL), "--root", str(self.root), "adopt", "--from", str(TOOLS.parent),
-                               "--name", "notes-api", "--kind", "api", "--owner", "notes-team"], capture_output=True, text=True)
+        return self.cli("adopt", "--from", str(TOOLS.parent),
+                        "--name", "notes-api", "--kind", "api", "--owner", "notes-team")
 
     def test_adopt_merges_instead_of_overwriting(self) -> None:
         readme_before = (self.root / "README.md").read_text()
@@ -1039,42 +921,38 @@ class AdoptTests(unittest.TestCase):
         self.assertIn('license = "MIT"', (self.root / "project.toml").read_text())
         self.assertTrue((self.root / ".github/workflows/kit-ci.yml").is_file(), "colliding workflow written beside it")
         self.assertIn("<!-- index: design | Notes API |", (self.root / "docs/api.md").read_text())
-        make = lambda *args: subprocess.run(["make", "-s", *args], cwd=self.root, capture_output=True, text=True)
+        make = lambda *args: subprocess.run(["make", "-s", *args], cwd=self.root, capture_output=True, text=True,
+                                            env=clean_env())
         self.assertIn("make test     run the tests", make().stdout, "the project's default goal stays first")
         self.assertIn("Next (intake)", make("next").stdout, "kit targets work through include kit.mk")
-        check = subprocess.run([sys.executable, "tools/repoctl.py", "check"], cwd=self.root, capture_output=True, text=True)
+        check = self.cli("check")
         problems = [line for line in check.stderr.splitlines() if line.startswith("- ")]
         self.assertTrue(problems and all("unregistered product surface" in line for line in problems), check.stderr)
         self.assertIn("infrastructure_paths", check.stderr, "the message names the fix")
         from kit import docs
         docs.check_markdown_links(self.root)  # links to pruned template material point at the template source
         self.assertNotIn(".agents/trials", (self.root / "docs/self-healing.md").read_text().split("-->")[1])
-        finish = subprocess.run([sys.executable, "tools/repoctl.py", "finish"], cwd=self.root, capture_output=True, text=True)
+        finish = self.cli("finish")
         self.assertEqual(finish.returncode, 0, finish.stdout)
         self.assertEqual(self.adopt().returncode, 1, "adopting twice is refused")
-        subprocess.run(["git", "-C", str(self.root), "add", "-A"], check=True)
-        subprocess.run(["git", "-C", str(self.root), "-c", "user.name=t", "-c", "user.email=t@example.invalid",
-                        "commit", "-qm", "adopt"], check=True, capture_output=True)
-        update = subprocess.run([sys.executable, "tools/repoctl.py", "kit-update", "--kit", str(TOOLS.parent)],
-                                cwd=self.root, capture_output=True, text=True)
+        self.git("add", "-A")
+        self.git("commit", "-qm", "adopt")
+        update = self.cli("kit-update", "--kit", str(TOOLS.parent))
         self.assertIn("0 updated, 0 added, 0 removed, 0 to merge", update.stdout, update.stdout + update.stderr)
 
     def test_adopted_project_passes_the_kit_suite_and_keeps_its_own_kit_paths_quiet(self) -> None:
         # The project's own ci.yml and a doc at a kit path stay the project's, and the kit suite still passes.
         (self.root / "docs/operations.md").write_text("# How we run it\n\nOur runbook.\n")
-        subprocess.run(["git", "-C", str(self.root), "add", "-A"], check=True)
-        subprocess.run(["git", "-C", str(self.root), "-c", "user.name=t", "-c", "user.email=t@example.invalid",
-                        "commit", "-qm", "runbook"], check=True, capture_output=True)
+        self.git("add", "-A")
+        self.git("commit", "-qm", "runbook")
         self.assertEqual(self.adopt().returncode, 0)
         self.assertIn("Our runbook.", (self.root / "docs/operations.md").read_text())
         suite = subprocess.run(["make", "kit-test"], cwd=self.root, capture_output=True, text=True, timeout=900,
-                               env={**os.environ, **({} if os.environ.get("KIT_SLOW") == "1" else {"KIT_INNER": "1"})})
+                               env=clean_env(**({} if os.environ.get("KIT_SLOW") == "1" else {"KIT_INNER": "1"})))
         self.assertEqual(suite.returncode, 0, suite.stderr[-2500:])
-        subprocess.run(["git", "-C", str(self.root), "add", "-A"], check=True)
-        subprocess.run(["git", "-C", str(self.root), "-c", "user.name=t", "-c", "user.email=t@example.invalid",
-                        "commit", "-qm", "adopt"], check=True, capture_output=True)
-        update = subprocess.run([sys.executable, "tools/repoctl.py", "kit-update", "--kit", str(TOOLS.parent)],
-                                cwd=self.root, capture_output=True, text=True)
+        self.git("add", "-A")
+        self.git("commit", "-qm", "adopt")
+        update = self.cli("kit-update", "--kit", str(TOOLS.parent))
         self.assertIn("0 updated, 0 added, 0 removed, 0 to merge", update.stdout, update.stdout + update.stderr)
 
     def test_adopt_refuses_uncommitted_work(self) -> None:
@@ -1364,7 +1242,7 @@ class CapabilityModelTests(KitRepository):
     def test_make_variables_reach_repoctl_as_data(self) -> None:
         marker = self.root / "pwned"
         result = subprocess.run(["make", "-s", "where", f"Q=x\"; touch {marker}; echo \""], cwd=self.root,
-                                capture_output=True, text=True)
+                                capture_output=True, text=True, env=clean_env())
         self.assertFalse(marker.exists(), result.stdout + result.stderr)
 
 
@@ -1467,122 +1345,118 @@ class NavigationTests(KitRepository):
 
 
 
-class OrphanFileTests(unittest.TestCase):
-    """Issue #17: a tracked file nothing references fails `make check`; a named one does not."""
+class ReachabilityAdvisoryTests(Scratch):
+    """Issue #17 as it now stands: advice about files nothing names, never a gate.
+
+    Every assertion is on message *content*, so a revert of the classification shows up as
+    changed text instead of passing quietly. Fixtures use paths outside the kit's own tree
+    on purpose: the blocking class that once covered only `tools/` is gone, and a test
+    written around `tools/` paths would keep passing whatever the rule became.
+    """
 
     MANIFEST = 'schema = 1\nname = "Demo"\nkind = "cli"\nphase = "development"\n'
 
     def setUp(self) -> None:
-        self.temp = tempfile.TemporaryDirectory()
-        self.root = Path(self.temp.name).resolve()
+        super().setUp()
+        self.write("project.toml", self.MANIFEST)
+        self.documents()
 
-    def tearDown(self) -> None:
-        self.temp.cleanup()
+    def documents(self, body: str = "# API\n") -> None:
+        """An indexed document, so the fixture's own prose is never part of what is judged."""
+        self.write("docs/README.md", "# Docs\n\n- [API](api.md)\n")
+        self.write("docs/api.md", body)
 
-    def build(self, files: dict[str, str], manifest: str = MANIFEST) -> None:
-        self.write("project.toml", manifest)
-        for name, content in files.items():
-            self.write(name, content)
-        for command in (("init", "-q", "-b", "main"), ("config", "user.email", "test@example.com"),
-                        ("config", "user.name", "Test"), ("add", "-A"), ("commit", "-q", "-m", "fixture")):
-            subprocess.run(["git", "-C", str(self.root), *command], check=True, capture_output=True, text=True)
+    def advisories(self) -> tuple[dict[str, str], dict[str, str]]:
+        unreferenced, host_read = reachability.advisories(registry.Context(self.root))
+        return ({item.split(":")[0]: item for item in unreferenced},
+                {item.split(":")[0]: item for item in host_read})
 
-    def write(self, name: str, content: str) -> Path:
-        path = self.root / name
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(textwrap.dedent(content), encoding="utf-8")
-        return path
+    def test_an_unnamed_file_is_reported_with_the_three_fixes(self) -> None:
+        self.write("src/app/thing.py", "VALUE = 1\n")
+        reported, _ = self.advisories()
+        self.assertIn("src/app/thing.py", reported)
+        message = reported["src/app/thing.py"]
+        self.assertIn("nothing in the tree names it unambiguously", message)
+        self.assertIn("import or call it", message)
+        self.assertIn("<!-- covers: src/app/thing.py -->", message)
+        self.assertIn("delete it if it is dead", message)
 
-    def orphans(self) -> tuple[list[str], list[str]]:
-        return reachability.orphans(registry.Context(self.root))
+    def test_a_bound_imported_or_loaded_file_is_not_reported(self) -> None:
+        # main.py is the entry point a doc binds; imported.py is named only by the import.
+        self.documents("# API\n\n<!-- covers: src/app/used.py src/app/main.py -->\n")
+        self.write("src/app/used.py", "VALUE = 1\n")
+        self.write("src/app/imported.py", "VALUE = 2\n")
+        self.write("src/app/main.py", "from . import imported\n\nprint(imported.VALUE)\n")
+        self.write("tests/test_main.py", "def test_main():\n    assert True\n")
+        self.write("Makefile", "test:\n\tpython3 -m unittest discover -s tests\n")
+        reported, _ = self.advisories()
+        self.assertEqual([path for path in reported if path.endswith(".py")], [], reported)
 
-    def test_an_unreferenced_file_is_a_finding_that_names_its_fix(self) -> None:
-        self.build({
-            "docs/README.md": "# Docs\n\n- [API](api.md)\n",
-            "docs/api.md": "# API\n\n<!-- covers: src/used.py -->\n",
-            "src/used.py": "VALUE = 1\n",
-            "src/leftover.py": "VALUE = 2\n",
-        })
-        blocking, _ = self.orphans()
-        self.assertEqual([item.split(":")[0] for item in blocking], ["src/leftover.py"])
-        self.assertIn("<!-- covers: src/leftover.py -->", blocking[0])
-        self.assertIn("[repository].infrastructure_paths", blocking[0])
+    def test_host_read_configuration_has_its_own_report(self) -> None:
+        self.write(".editorconfig", "root = true\n")
+        reported, host_read = self.advisories()
+        self.assertNotIn(".editorconfig", reported, "it has its own report, not the general one")
+        self.assertIn(".editorconfig", host_read)
+        self.assertIn("a host reads it by fixed path", host_read[".editorconfig"])
 
-    def test_a_named_file_is_not_an_orphan(self) -> None:
-        # A module an import reaches, a file a binding claims, and one a test root loads.
-        self.build({
-            "docs/README.md": "# Docs\n\n- [API](api.md)\n",
-            "docs/api.md": "# API\n\n<!-- covers: src/bound.py src/app.py -->\n",
-            "src/bound.py": "VALUE = 1\n",
-            "src/imported.py": "VALUE = 2\n",
-            "src/app.py": "from . import imported\n\nprint(imported.VALUE)\n",
-            "tests/test_app.py": "def test_app():\n    assert True\n",
-            "Makefile": "test:\n\tpython3 -m unittest discover -s tests\n",
-        })
-        blocking, _ = self.orphans()
-        self.assertEqual(blocking, [], "a bound, imported, or discovered file is not an orphan")
+    def test_a_discovered_tree_is_reported_with_the_runner_reason(self) -> None:
+        self.write("tests/test_main.py", "def test_main():\n    assert True\n")
+        self.write("Makefile", "lint:\n\ttrue\n")  # nothing loads the tree by name: the runner does
+        reported, _ = self.advisories()
+        self.assertIn("tests/test_main.py", reported)
+        self.assertIn("a test or build runner discovers it", reported["tests/test_main.py"])
 
-    def test_host_read_configuration_is_reported_without_blocking(self) -> None:
-        self.build({"docs/README.md": "# Docs\n\n- [API](api.md)\n",
-                    "docs/api.md": "# API\n\n<!-- covers: src/kept.py -->\n",
-                    ".editorconfig": "root = true\n", "src/kept.py": "VALUE = 1\n"})
-        blocking, advisory = self.orphans()
-        self.assertEqual(blocking, [], "a host-read configuration file never blocks")
-        self.assertTrue(any(item.startswith(".editorconfig:") for item in advisory), advisory)
+    def test_a_framework_tree_is_reported_with_its_reason(self) -> None:
+        self.write("apps/store/migrations/0002_add_email.py", "def upgrade():\n    pass\n")
+        reported, _ = self.advisories()
+        self.assertIn("apps/store/migrations/0002_add_email.py", reported)
+        self.assertIn("a framework tree a tool walks by convention", reported["apps/store/migrations/0002_add_email.py"])
 
-    def test_declared_infrastructure_silences_the_finding(self) -> None:
-        self.build({"docs/README.md": "# Docs\n\n- [API](api.md)\n", "docs/api.md": "# API\n",
-                    "vendor/thing.py": "VALUE = 1\n"},
-                   manifest=self.MANIFEST + '[repository]\ninfrastructure_paths = ["vendor"]\n')
-        self.assertEqual(self.orphans(), ([], []))
+    def test_a_shared_name_does_not_mask_a_dead_file(self) -> None:
+        """Defends: the residual where one stray mention of a common stem hid a dead file.
 
-    def test_a_kit_artifact_never_needs_a_project_declaration(self) -> None:
-        self.build({"docs/README.md": "# Docs\n\n- [API](api.md)\n", "docs/api.md": "# API\n",
-                    "review.md": "Issue: #1\nReviewer: octocat\nDate: 2026-09-01\n",
-                    "HANDOVER.md": "# Handover\n"})
-        self.assertEqual(self.orphans(), ([], []), "kit-owned paths are exempt by default")
+        The ambiguity rule was written after `.gitignore` and `LICENSE` dropped out of this
+        repository's report. The fixture uses two modules with the same name instead, which
+        is the shape the rule was not written from.
+        """
+        self.write("tools/alpha/helper.py", "VALUE = 1\n")
+        self.write("tools/beta/helper.py", "VALUE = 2\n")
+        self.write("tools/user.py", "from .alpha import helper\n\nprint(helper.VALUE)\n")
+        self.documents("# API\n\n<!-- covers: tools/user.py -->\n")
+        reported, _ = self.advisories()
+        self.assertIn("tools/beta/helper.py", reported, "the dead twin must not hide behind its name")
 
-    def test_it_runs_in_the_blocking_gate(self) -> None:
-        self.build({"docs/README.md": "# Docs\n\n- [API](api.md)\n",
-                    "docs/api.md": "# API\n\n<!-- covers: src/used.py -->\n", "src/used.py": "VALUE = 1\n",
-                    "src/leftover.py": "VALUE = 2\n"})
-        hard, _ = registry.run_checks(self.root, blocking_only=True,
-                                     skip=KitRepository.CONTRACT - {"orphan-files"})
-        self.assertIn("src/leftover.py", "\n".join(hard), "make check reports an orphan file")
+    def test_declared_infrastructure_is_silenced(self) -> None:
+        self.write("vendor/thing.py", "VALUE = 1\n")
+        self.write("project.toml", self.MANIFEST + '[repository]\ninfrastructure_paths = ["vendor"]\n')
+        reported, host_read = self.advisories()
+        self.assertEqual((reported, host_read), ({}, {}), "a declared tree is not judged at all")
+
+    def test_kit_artifacts_need_no_project_declaration(self) -> None:
+        self.write("review.md", "Issue: #1\nReviewer: octocat\nDate: 2026-09-01\n")
+        self.write("HANDOVER.md", "# Handover\n")
+        self.write("VISION.md", "# Vision\n")
+        reported, host_read = self.advisories()
+        self.assertEqual((reported, host_read), ({}, {}), "kit-owned paths are exempt by default")
 
     @template_only
-    def test_this_repository_has_no_blocking_orphan(self) -> None:
-        # Naming a path here would itself make it a reference, so this asserts the shape, not the names.
-        blocking, advisory = reachability.orphans(registry.Context(TOOLS.parent))
-        self.assertEqual(blocking, [], "the kit's own files are all named by code, binding, or configuration")
-        self.assertTrue(all("host-read configuration" in item for item in advisory), advisory)
+    def test_this_repository_reports_no_module_of_its_own(self) -> None:
+        unreferenced, _ = reachability.advisories(registry.Context(TOOLS.parent))
+        modules = [item.split(":")[0] for item in unreferenced if item.split(":")[0].startswith("tools/")]
+        self.assertEqual(modules, [], "every module of the kit is reachable from something in the tree")
 
 
-class ChangeCouplingTests(unittest.TestCase):
-    """Issue #18: recent history reports the areas that co-change, and never blocks."""
-
-    def setUp(self) -> None:
-        self.temp = tempfile.TemporaryDirectory()
-        self.root = Path(self.temp.name).resolve()
-
-    def tearDown(self) -> None:
-        self.temp.cleanup()
-
-    def git(self, *arguments: str) -> None:
-        subprocess.run(["git", "-C", str(self.root), *arguments], check=True, capture_output=True, text=True)
+class ChangeCouplingTests(Scratch):
+    """Issue #24: recent history reports the areas that co-change, and never blocks."""
 
     def commit_touching(self, paths: list[str], message: str) -> None:
         for path in paths:
-            target = self.root / path
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(f"{message}\n", encoding="utf-8")
+            self.write(path, f"{message}\n")
             self.git("add", path)
         self.git("commit", "-q", "-m", message)
 
     def history(self) -> None:
         self.git("init", "-q", "-b", "main")
-        self.git("config", "user.email", "test@example.com")
-        self.git("config", "user.name", "Test")
 
     def test_areas_are_directories_and_root_files(self) -> None:
         self.assertEqual(coupling.area("tools/kit/checks.py"), "tools/kit")
@@ -1624,19 +1498,29 @@ class ChangeCouplingTests(unittest.TestCase):
         self.assertIn("co-change", "\n".join(advisory), "make garden reports it")
 
     def write_manifest(self) -> None:
-        (self.root / "project.toml").write_text('schema = 1\nname = "Demo"\nkind = "cli"\nphase = "development"\n',
-                                                encoding="utf-8")
+        self.write("project.toml", 'schema = 1\nname = "Demo"\nkind = "cli"\nphase = "development"\n')
         self.git("add", "project.toml")
         self.git("commit", "-q", "-m", "manifest")
 
-    def test_it_costs_nothing_measurable_on_this_repository(self) -> None:
-        started = time.perf_counter()
-        coupling.coupling_findings(TOOLS.parent)
-        self.assertLess(time.perf_counter() - started, 5.0, "one bounded git log stays well inside the garden budget")
+    def test_the_history_scan_is_a_bounded_window_not_a_stopwatch(self) -> None:
+        """#24's cost claim is the bounded window, so assert the window (#43 T-08), never elapsed time."""
+        self.history()
+        for number in range(coupling.MIN_SHARED + 1):
+            self.commit_touching(["src/a/one.py", "src/b/two.py"], f"old pair {number}")
+        for number in range(coupling.MIN_SHARED + 1):
+            self.commit_touching(["src/c/three.py", "src/d/four.py"], f"recent pair {number}")
+        deep = coupling.coupling_findings(self.root, limit=100)
+        self.assertTrue(any("src/a" in item and "src/b" in item for item in deep), deep)
+        shallow = coupling.coupling_findings(self.root, limit=coupling.MIN_SHARED + 1)
+        self.assertFalse(any("src/a" in item and "src/b" in item for item in shallow),
+                         "history past the window is never read")
+        self.assertTrue(any("src/c" in item and "src/d" in item for item in shallow), shallow)
+        self.assertIsInstance(coupling.coupling_findings(TOOLS.parent), list,
+                              "the kit's own history goes through the same bounded scan")
 
 
-class FailureSignatureTests(unittest.TestCase):
-    """Issue #19: a finding that repeats a recorded signature is recognised, not re-diagnosed."""
+class FailureSignatureTests(Scratch):
+    """Issue #18: a finding that repeats a recorded signature is recognised, not re-diagnosed."""
 
     LEDGER = """# Error ledger
 
@@ -1646,17 +1530,11 @@ class FailureSignatureTests(unittest.TestCase):
 """
 
     def setUp(self) -> None:
-        self.temp = tempfile.TemporaryDirectory()
-        self.root = Path(self.temp.name).resolve()
-        (self.root / "project.toml").write_text('schema = 1\nname = "Demo"\nkind = "cli"\nphase = "development"\n',
-                                                encoding="utf-8")
-
-    def tearDown(self) -> None:
-        self.temp.cleanup()
+        super().setUp()
+        self.write("project.toml", 'schema = 1\nname = "Demo"\nkind = "cli"\nphase = "development"\n')
 
     def ledger(self, text: str = LEDGER) -> None:
-        (self.root / "docs").mkdir(exist_ok=True)
-        (self.root / "docs" / "ERROR_LOG.md").write_text(textwrap.dedent(text), encoding="utf-8")
+        self.write("docs/ERROR_LOG.md", text)
 
     def test_a_repeated_failure_is_named_with_its_recorded_fix(self) -> None:
         self.ledger()
@@ -1704,12 +1582,268 @@ class FailureSignatureTests(unittest.TestCase):
 
     @template_only
     def test_this_ledger_is_keyed_and_every_row_has_a_fix(self) -> None:
+        # Every ledger row is a record a human wrote for a failure they had to re-diagnose.
+        # The matcher was built against synthetic ledgers, so this asserts on the real one:
+        # a row that stops being matchable loses its recognition, which is the whole point.
         records = signatures.signatures(TOOLS.parent)
-        self.assertGreaterEqual(len(records), 5)
+        self.assertEqual([record.key for record in records],
+                         [f"EL-{number:03d}" for number in range(1, len(records) + 1)],
+                         "every ledger row is keyed, in order, and matchable")
         for record in records:
             self.assertRegex(record.key, r"^EL-\d{3}$")
             self.assertTrue(record.literals, record.key)
             self.assertTrue(record.fix, f"{record.key} records no permanent fix")
+
+
+class SignatureLiteralTests(Scratch):
+    """A literal that shares vocabulary with ordinary findings must not match them."""
+
+    LEDGER = """# Error ledger
+
+| Key | Date | Signature / symptom | Confirmed cause | Permanent fix |
+|---|---|---|---|---|
+| EL-001 | 2026-01-01 | `make check` starts failing a year later on an unchanged repo | Ages blocked every phase | Ages gate releases only |
+| EL-002 | 2026-01-01 | Every trial blocked by `unregistered product surface: tests` (or `e2e`, `test-results`, `examples`) | Test folders were not infrastructure | Infrastructure by default |
+"""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.write("docs/ERROR_LOG.md", self.LEDGER)
+        self.records = signatures.signatures(self.root)
+
+    def test_instructions_are_not_a_failure(self) -> None:
+        self.assertIsNone(signatures.match("run make check before pushing", self.records),
+                          "a command in prose is not this failure")
+
+    def test_a_directory_name_is_not_a_failure(self) -> None:
+        self.assertIsNone(signatures.match("examples/demo.md: surface demo has no owning doc", self.records),
+                          "the word in a path is not this failure")
+
+    def test_the_distinctive_part_still_matches(self) -> None:
+        hit = signatures.match("src/notes: unregistered product surface: tests", self.records)
+        self.assertIsNotNone(hit, "the literal that identifies the failure still matches")
+        self.assertEqual(hit.key, "EL-002")
+
+    def test_a_row_with_no_distinctive_literal_is_simply_not_matched(self) -> None:
+        self.assertNotIn("EL-001", [record.key for record in self.records],
+                         "a row whose symptom offers only shared vocabulary cannot cause a false match")
+
+
+class CriticRecordGateTests(KitRepository):
+    """The completion gate that reads a critic's verdict: every way it can refuse, guarded.
+
+    This gate blocks `make done` on high-risk work, so each refusal needs a test rather
+    than a hand check.
+    """
+
+    def project(self) -> dict:
+        return load_project(self.root)
+
+    def findings(self) -> str:
+        return "\n".join(session.critic_findings(self.root, self.project(), "main"))
+
+    def head(self) -> str:
+        return self.git("rev-parse", "HEAD").strip()
+
+    def high_risk_change(self) -> None:
+        """A committed change on a branch: a critic reviews a diff, not the base commit."""
+        self.git("checkout", "-q", "-b", "feature")
+        self.write("src/auth/login.py", "def login():\n    return 'changed'\n")
+        self.commit("fix(auth): rotate the session token")
+
+    def record(self, body: str) -> None:
+        self.write(".agent/critic.md", body)
+        self.git("add", "-f", ".agent/critic.md")
+
+    def test_low_risk_work_needs_no_critic(self) -> None:
+        self.git("checkout", "-q", "-b", "feature")
+        self.write("docs/billing.md", "# Billing\n\n<!-- covers: src/billing/** -->\n")
+        self.commit("docs: clarify billing")
+        self.assertEqual(self.findings(), "", "the gate only judges high-risk changes")
+
+    def test_a_high_risk_change_with_no_record_is_refused(self) -> None:
+        self.high_risk_change()
+        finding = self.findings()
+        self.assertIn("no critic evidence", finding)
+        self.assertIn("src/auth/login.py", finding, "the finding names the risky work")
+        self.assertIn(".agent/critic.md", finding, "and the record to write")
+
+    def test_a_verdict_outside_the_vocabulary_is_refused(self) -> None:
+        self.high_risk_change()
+        self.record(f"Verdict: looks good\nCommit: {self.head()}\n")
+        finding = self.findings()
+        self.assertIn("outside the fixed vocabulary", finding)
+        self.assertIn("'looks'", finding, "the message quotes the word it refused")
+
+    def test_a_record_with_no_verdict_is_refused(self) -> None:
+        self.high_risk_change()
+        self.record(f"Commit: {self.head()}\n")
+        self.assertIn("states no verdict", self.findings())
+
+    def test_a_record_with_no_commit_line_is_refused(self) -> None:
+        self.high_risk_change()
+        self.record("Verdict: ship-with-residuals\n")
+        finding = self.findings()
+        self.assertIn("no 'Commit: <40-hex>' line", finding)
+        self.assertIn("not bound to a reviewed change set", finding)
+
+    def test_a_stale_commit_line_is_refused(self) -> None:
+        self.high_risk_change()
+        self.write(".agent/critic.md", f"Verdict: ship-with-residuals\nCommit: {'a' * 40}\n")
+        self.assertIn("the critic read older work", self.findings())
+
+    def test_a_blocker_verdict_is_refused(self) -> None:
+        self.high_risk_change()
+        self.write(".agent/critic.md", f"Verdict: blocker\nCommit: {self.head()}\n")
+        finding = self.findings()
+        self.assertIn("verdict is blocker", finding)
+        self.assertIn("ask the critic again", finding)
+
+    def test_ship_with_residuals_at_head_passes(self) -> None:
+        self.high_risk_change()
+        self.write(".agent/critic.md", f"Verdict: ship-with-residuals\nCommit: {self.head()}\n")
+        self.assertEqual(self.findings(), "", "the only passing verdict is the one bound to HEAD")
+
+    def test_the_minimal_profile_opts_out_of_the_gate(self) -> None:
+        self.high_risk_change()
+        manifest = (self.root / "project.toml").read_text(encoding="utf-8")
+        self.write("project.toml", manifest.replace("[governance]\n", "")
+                   if "[governance]" in manifest else manifest + '\n[governance]\nprofile = "minimal"\n')
+        self.assertEqual(self.findings(), "", "a minimal-profile project owns its own review")
+
+
+class ReferenceShapesTests(Scratch):
+    """Reference shapes the resolver had to grow, each from a layout the fix did not target.
+
+    Each test names the shape it defends and why the fix was not written with it in mind,
+    and each asserts on what the resolver *reported*, so reverting the resolution change
+    puts the fixture's file back into the report and the test fails. A fixture invented
+    alongside its fix is a comment, not a test.
+    """
+
+    MANIFEST = 'schema = 1\nname = "Demo"\nkind = "cli"\nphase = "development"\n'
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.write("project.toml", self.MANIFEST)
+        self.write("docs/README.md", "# Docs\n\n- [API](api.md)\n")
+        self.write("docs/api.md", "# API\n")
+
+    def reported(self) -> set[str]:
+        unreferenced, host_read = reachability.advisories(registry.Context(self.root))
+        return {item.split(":")[0] for item in (*unreferenced, *host_read)}
+
+    def test_a_procfile_callable_names_its_module(self) -> None:
+        """Defends: a Procfile, not a Dockerfile.
+
+        `module:callable` support was written from `CMD gunicorn app:app` in a Dockerfile.
+        A Procfile puts the same grammar in a colon-separated line (`web: notes.app:create_app`)
+        where the line's own colon must not eat the module, and the release line has no
+        callable at all (`python3 -m notes.migrate`), so it defends the dotted-module half
+        of the same change.
+        """
+        self.write("Procfile", "web: gunicorn notes.app:create_app\nrelease: python3 -m notes.migrate\n")
+        self.write("notes/app.py", "def create_app():\n    return None\n")
+        self.write("notes/migrate.py", "def main():\n    return None\n")
+        reported = self.reported()
+        self.assertNotIn("notes/app.py", reported, "the Procfile's callable names the module")
+        self.assertNotIn("notes/migrate.py", reported, "and so does a dotted `python -m`")
+        self.assertIn("Procfile", reported, "and the control: the report still has teeth")
+
+    def test_a_compose_command_array_names_its_module(self) -> None:
+        """Defends: a compose YAML command list, not an image Dockerfile.
+
+        The change was written for a shell-form `CMD`. A JSON-array command
+        (`command: ["uvicorn", "asgi:application"]`) has the same grammar in YAML the kit
+        never shell-parses, and it is what an adopted service ships.
+        """
+        self.write("compose.yaml", "services:\n  web:\n    command: [\"uvicorn\", \"asgi:application\"]\n")
+        self.write("asgi.py", "application = None\n")
+        reported = self.reported()
+        self.assertNotIn("asgi.py", reported, "a compose command names the module it serves")
+        self.assertIn("compose.yaml", reported, "and the control: the report still has teeth")
+
+    def test_a_framework_tree_nested_under_an_app_package_is_reported_as_such(self) -> None:
+        """Defends: `apps/store/migrations/`, not a top-level `migrations/`.
+
+        The framework-tree rule was written from the first reading of its own comment — a
+        root-level `migrations/` — and matched only `path.split("/")[0]`, so it was dead
+        code for the layout Django and Alembic actually produce.
+        """
+        self.write("apps/store/migrations/0002_add_email.py", "def upgrade():\n    pass\n")
+        self.write("apps/store/management/commands/reindex.py", "def handle():\n    pass\n")
+        unreferenced, _ = reachability.advisories(registry.Context(self.root))
+        message = {item.split(":")[0]: item for item in unreferenced}
+        self.assertIn("a framework tree a tool walks by convention", message["apps/store/migrations/0002_add_email.py"])
+        self.assertIn("a framework tree a tool walks by convention", message["apps/store/management/commands/reindex.py"])
+
+    def test_a_package_imported_by_its_dotted_path_reaches_its_initialiser(self) -> None:
+        """Defends: `importlib.import_module("pkg.mod")`, not `import pkg`.
+
+        The initialiser change was written from the plain `import pkg` reading. The kit
+        itself loads modules by dotted name (`registry._plugins`), which never spells the
+        package alone, so keying the initialiser by `__init__` alone left it looking dead.
+        The control package in the same fixture is the other side of that rule.
+        """
+        self.write("tools/pkg/__init__.py", "NAME = 'pkg'\n")
+        self.write("tools/pkg/mod.py", "VALUE = 1\n")
+        self.write("tools/abandoned/__init__.py", "NAME = 'abandoned'\n")
+        self.write("tools/abandoned/mod.py", "VALUE = 2\n")
+        self.write("tools/loader.py", "import importlib\n\nmod = importlib.import_module('pkg.mod')\n")
+        self.write("docs/api.md", "# API\n\n<!-- covers: tools/loader.py -->\n")
+        reported = self.reported()
+        self.assertNotIn("tools/pkg/__init__.py", reported, "importing pkg.mod executes pkg/__init__.py")
+        self.assertIn("tools/abandoned/__init__.py", reported, "a package nobody imports is still reported")
+        self.assertIn("tools/abandoned/mod.py", reported, "and so is the module inside it")
+
+    def test_a_path_with_a_callable_suffix_still_resolves(self) -> None:
+        """Defends: `file.py:12`, a traceback frame, which the fix did not consider.
+
+        The colon split was added for `module:callable`; it also has to keep a path
+        reference intact when a stack-trace line appends `:line`, and keep a Windows-free
+        `path:line` in a Makefile recipe from becoming two unrelated names.
+        """
+        self.write("docs/api.md", "# API\n\n<!-- covers: tools/used.py -->\n")
+        self.write("tools/used.py", "VALUE = 1\n")
+        self.write("Makefile", "trace:\n\tpython3 -X dev tools/used.py:12\n")
+        self.assertNotIn("tools/used.py", self.reported(), "a path with a line number still names the file")
+
+
+class BareLiteralSignatureTests(Scratch):
+    """A ledger row whose symptom quotes one bare filename is not matched, and that is correct.
+
+    Defends: a row whose only backticked span is `kit-lock.json`, the shape a maintainer
+    writes when recording "the lock file was stale". The matcher was written around
+    message-shaped spans, so a single token is dropped rather than risking a match on any
+    path that happens to share a name. The alternative failure mode, a row that silently
+    stops being recognised, is what the restored count assertion above exists to catch.
+    """
+
+    LEDGER = """# Error ledger
+
+| Key | Date | Signature / symptom | Confirmed cause | Permanent fix |
+|---|---|---|---|---|
+| EL-010 | 2026-01-01 | A stale `kit-lock.json` after adopt | The lock kept the template revision | Re-run `make kit-update` |
+"""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.write("docs/ERROR_LOG.md", self.LEDGER)
+
+    def test_a_bare_filename_does_not_become_a_match(self) -> None:
+        records = signatures.signatures(self.root)
+        self.assertEqual(records, (), "no message-shaped literal, no matcher")
+        self.assertIsNone(signatures.match("tools/kit-lock.json is stale: re-run make kit-update", records))
+
+    def test_adding_one_shaped_literal_restores_recognition(self) -> None:
+        (self.root / "docs" / "ERROR_LOG.md").write_text(
+            self.LEDGER.replace("A stale `kit-lock.json` after adopt", "A stale `kit-lock.json`: `0 updated, 0 added` is wrong"),
+            encoding="utf-8")
+        records = signatures.signatures(self.root)
+        self.assertEqual([record.key for record in records], ["EL-010"])
+        hit = signatures.match("kit-update reports: 0 updated, 0 added, 3 removed", records)
+        self.assertIsNotNone(hit)
+        self.assertEqual(hit.key, "EL-010")
 
 
 if __name__ == "__main__":

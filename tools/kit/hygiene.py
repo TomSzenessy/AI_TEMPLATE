@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 from pathlib import Path
 
-from .core import RepoctlError, read_text_file
+from .core import FENCED_CODE, INLINE_CODE, RepoctlError, read_text_file, today as core_today
 from .gitinfo import path_matches
 
 # Character classes keep these patterns from matching their own source text.
@@ -27,7 +27,6 @@ DEPRECATION = re.compile(r"DEPRECATED\(remove-by=(\d{4}-\d{2}-\d{2})([^)]*)\)")
 ANNOTATION = re.compile(r"@[Dd]eprecated\b")
 TASK = re.compile(r"\b(T[O]DO|F[I]XME|H[A]CK|X[X]X)\b")
 SCAFFOLD = re.compile(r"\bF[I]LL-IN:")
-INLINE_CODE = re.compile(r"`[^`\n]*`")  # documentation may name the marker in code spans
 TASK_REFERENCE = re.compile(r"#\d+|https?://|Local-WAL")
 PROSE_SUFFIXES = {".md", ".markdown", ".txt", ".csv", ".tsv", ".json", ".lock", ".svg"}
 
@@ -51,7 +50,7 @@ class MarkerReport:
 
 
 def scan_markers(root: Path, files: list[str], today: date | None = None, warning_days: int = 30) -> MarkerReport:
-    today = today or date.today()
+    today = today or core_today()
     report = MarkerReport()
     for relative in files:
         suffix = Path(relative).suffix.lower()
@@ -105,7 +104,6 @@ def budget_errors(root: Path, project: dict[str, object], files: list[str]) -> l
     return errors
 
 
-FENCE = re.compile(r"```.*?```", re.DOTALL)
 WORDS = re.compile(r"[a-z0-9]+")
 
 
@@ -116,7 +114,7 @@ def duplicate_paragraphs(root: Path, files: list[str], min_words: int = 40, thre
         if not relative.endswith(".md") or relative.startswith((".claude/", ".agents/")):
             continue
         text = read_text_file(root, relative)
-        for paragraph in re.split(r"\n\s*\n", FENCE.sub("", text or "")):
+        for paragraph in re.split(r"\n\s*\n", FENCED_CODE.sub("", text or "")):
             words = WORDS.findall(paragraph.lower())
             if len(words) >= min_words:
                 grams = {tuple(words[index : index + 6]) for index in range(len(words) - 5)}

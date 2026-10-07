@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .core import RepoctlError, load_project
+from .core import RepoctlError, default_branch, load_project
 from .gitinfo import branch_paths, path_matches
 
 CEREMONY = {
@@ -44,8 +44,7 @@ def classify(path: str, rules: dict[str, list[str]]) -> str:
 def assess(root: Path, base: str | None = None) -> tuple[str, dict[str, list[str]]]:
     project = load_project(root)
     rules = tier_rules(project)
-    repository = project.get("repository", {})
-    base = base or str((repository if isinstance(repository, dict) else {}).get("default_branch", "main"))
+    base = base or default_branch(project)
     grouped: dict[str, list[str]] = {tier: [] for tier in ORDER}
     for path in branch_paths(root, base):
         grouped[classify(path, rules)].append(path)

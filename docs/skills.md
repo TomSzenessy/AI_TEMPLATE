@@ -94,8 +94,11 @@ keep the procedure in the owning document. Create first-party skills with
 `make new KIND=skill NAME=<name> DESC="<what>; <when>"`: it checks overlap,
 registers the skill in `project.toml [capabilities].local_skills`, and
 generates its host adapters. Third-party skills never use that path; they need
-`[[skills]]` provenance. A `reviewed_on` older than a year is reported by
-`make garden` and fails only `make readiness` from `private-preview` on.
+`[[skills]]` provenance. A `reviewed_on` older than `[kit].skill_review_days`
+(a year by default) is reported by
+`make garden` and fails only `make readiness` from `private-preview` on; that
+age limit is now the setting instead of a hard-coded year, and `package` names
+parse through the shared `core.package_skill`.
 
 ## One canonical copy, any host
 

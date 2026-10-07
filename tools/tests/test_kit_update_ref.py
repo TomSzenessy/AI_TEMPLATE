@@ -25,9 +25,9 @@ def git(where: Path, *args: str) -> str:
 class KitRefTests(unittest.TestCase):
     def build(self, temp: str) -> tuple[Path, Path, str, str]:
         """A local template with commits A then B, and a project made from A whose [template].source is it."""
-        from kit import trial
+        from kit import core, trial
         kit, project = Path(temp) / "kit", Path(temp) / "project"
-        trial._copy(TOOLS.parent, trial.listed_files(TOOLS.parent), kit)
+        trial._copy(TOOLS.parent, core.repository_files(TOOLS.parent), kit)
         git(kit, "init", "-q", "-b", "main")
         git(kit, "add", "-A")
         git(kit, "commit", "-qm", "A")

@@ -22,22 +22,22 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-import subprocess
 import tempfile
 from pathlib import Path
 
 from . import derive
 from .core import RepoctlError, load_project, repository_files
-from .gitinfo import git, path_matches
+from .gitinfo import git, path_matches, run_git
+from .names import DESIGN, ERROR_LOG, HANDOVER, STACK_DECISION, VISION
 
 LOCK = "tools/kit-lock.json"
 STAGING = ".agent/kit-update"
 # Never kit files: the project's identity, decisions, product docs, and generated output.
 PROJECT_OWNED = (
-    LOCK, "project.toml", "VISION.md", "README.md", "LICENSE", "CONTEXT.md", ".gitignore", "project.mk",
-    "docs/STACK-DECISION.md", "docs/README.md", "docs/design.md", "docs/ERROR_LOG.md",
+    LOCK, "project.toml", VISION, "README.md", "LICENSE", "CONTEXT.md", ".gitignore", "project.mk",
+    STACK_DECISION, "docs/README.md", DESIGN, ERROR_LOG,
     "docs/architecture/**", "docs/product/**", "docs/adr/**", "docs/incidents/**", ".security/**",
-    ".claude/**", ".mcp.json", "HANDOVER.md",
+    ".claude/**", ".mcp.json", HANDOVER,
 )
 
 
@@ -225,15 +225,14 @@ def update_from_source(root: Path, kit: str | None, ref: str | None = None) -> i
     if ref and (ref.startswith("-") or not re.fullmatch(r"[0-9A-Za-z][0-9A-Za-z._/-]{0,199}", ref)):
         raise RepoctlError(f"KIT_REF {ref!r} is not a commit SHA, tag, or branch name")
     with tempfile.TemporaryDirectory() as folder:
-        cloning = ["git", "clone", "-q", *([] if ref else ["--depth", "1"]), source, folder]
-        result = subprocess.run(cloning, capture_output=True, text=True, timeout=300)
-        if result.returncode != 0:
-            raise RepoctlError(f"could not clone {source}: {result.stderr.strip()[-300:]} (or pass KIT=<checkout>)")
+        cloning = ["clone", "-q", *([] if ref else ["--depth", "1"]), source, folder]
+        result = run_git(None, *cloning, timeout=300)
+        if result is None or result.returncode != 0:
+            raise RepoctlError(f"could not clone {source}: {result.stderr.strip()[-300:] if result else 'git unavailable'} (or pass KIT=<checkout>)")
         if ref:
-            checkout = subprocess.run(["git", "-C", folder, "checkout", "-q", "--detach", f"{ref}^{{commit}}"],
-                                      capture_output=True, text=True, timeout=60)
-            if checkout.returncode != 0:
-                raise RepoctlError(f"KIT_REF {ref!r} is not a commit of {source}: {checkout.stderr.strip()[-200:]}")
+            checkout = run_git(Path(folder), "checkout", "-q", "--detach", f"{ref}^{{commit}}", timeout=60)
+            if checkout is None or checkout.returncode != 0:
+                raise RepoctlError(f"KIT_REF {ref!r} is not a commit of {source}: {checkout.stderr.strip()[-200:] if checkout else 'git unavailable'}")
         before = str(read_lock(root).get("kit_version", "none"))
         print(f"Applying kit commits {before[:12] if before not in ('none', 'unknown') else 'unrecorded'}"
               f"..{_kit_version(Path(folder))[:12]} from {source}")
@@ -257,11 +256,8 @@ def behind_template(root: Path) -> str | None:
     source = str(template.get("source", "")) if isinstance(template, dict) else ""
     if not source or not re.fullmatch(r"[0-9a-f]{40}", str(lock.get("kit_version", ""))):
         return None
-    try:
-        result = subprocess.run(["git", "ls-remote", source, "HEAD"], capture_output=True, text=True, timeout=30)
-    except (OSError, subprocess.TimeoutExpired):
-        return None
-    head = result.stdout.split()[0] if result.returncode == 0 and result.stdout.split() else ""
+    listing = (git(None, "ls-remote", source, "HEAD") or "").split()
+    head = listing[0] if listing else ""
     if head and head != lock["kit_version"]:
         return f"the template ({source}) has moved past this kit ({str(lock['kit_version'])[:12]}): run make kit-update"
     return None

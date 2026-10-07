@@ -17,9 +17,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from . import derive, docsync, hygiene
-from .core import RepoctlError, governance_profile, load_project, read_text_file, repository_files
+from .core import RepoctlError, default_branch, governance_profile, load_project, read_text_file, repository_files
 from .garden import self_heal_errors
-from .gitinfo import branch, branch_paths, changed_paths, git, head, path_matches
+from .gitinfo import branch, branch_paths, changed_paths, committed_paths, git, head, path_matches
+from .names import HANDOVER
 from .navigate import print_map
 from .product import next_step, product_summary
 from .registry import Registry, project_plugin_files
@@ -122,7 +123,7 @@ def session_start(root: Path, event: dict[str, object] | None = None) -> None:
     recent = (git(root, "log", "-5", "--format=- %h %s") or "").strip()
     if recent:
         print("\nRecent commits:\n" + recent)
-    handover = read_text_file(root, "HANDOVER.md")
+    handover = read_text_file(root, HANDOVER)
     if handover:
         clipped = handover[:HANDOVER_LIMIT] + ("\n… (truncated; read HANDOVER.md)" if len(handover) > HANDOVER_LIMIT else "")
         print("\n## HANDOVER.md (read first; verify against the working tree)\n" + clipped)
@@ -195,7 +196,7 @@ HANDOVER_TEMPLATE = "docs/handoffs/TEMPLATE.md"
 
 def write_handover(root: Path) -> str:
     """Create root HANDOVER.md from the one template with git facts pre-filled."""
-    target = root / "HANDOVER.md"
+    target = root / HANDOVER
     if target.exists():
         return "HANDOVER.md already exists; update it in place (it is never overwritten)."
     template = read_text_file(root, HANDOVER_TEMPLATE)
@@ -255,14 +256,6 @@ def after_edit(root: Path, event: dict[str, object]) -> None:
         print(json.dumps({"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": " ".join(notes)}}))
 
 
-def _committed_paths(root: Path, base: str) -> list[str]:
-    """This branch's committed change set. A critic reviews a diff; a dirty tree is not one yet."""
-    merge_base = (git(root, "merge-base", "HEAD", base) or "").strip()
-    if not merge_base:
-        return []
-    return [line for line in (git(root, "diff", "--name-only", merge_base, "HEAD") or "").splitlines() if line]
-
-
 def critic_findings(root: Path, project: dict[str, object], base: str, only: list[str] | None = None) -> list[str]:
     """High-risk work needs an independent critic whose verdict this gate can read.
 
@@ -274,7 +267,7 @@ def critic_findings(root: Path, project: dict[str, object], base: str, only: lis
     rules = tier_rules(project)
     if only is not None and not any(classify(path, rules) == "high" for path in only):
         return []  # a session scope demands evidence only for high-risk work it changed
-    risky = [path for path in _committed_paths(root, base) if classify(path, rules) == "high"]
+    risky = [path for path in committed_paths(root, base) if classify(path, rules) == "high"]
     if not risky:
         return []
     vocabulary = " | ".join(CRITIC_VERDICTS)
@@ -308,8 +301,7 @@ def finish_findings(root: Path, session_paths: list[str] | None = None) -> list[
     None judges the whole change set (`finish`, `make done`).
     """
     project = load_project(root)
-    repository = project.get("repository", {})
-    base = str(repository.get("default_branch", "main")) if isinstance(repository, dict) else "main"
+    base = default_branch(project)
     scoped = session_paths is not None
     changed = session_paths if session_paths is not None else branch_paths(root, base)
     if not changed:
@@ -447,6 +439,16 @@ def finish(root: Path) -> int:
     return 0
 
 
+# The one list of hook events: `repoctl hook <event>`, its argument choices, and the dispatcher all derive from it.
+HANDLERS = {
+    "session-start": lambda root, event: session_start(root, event),
+    "pre-compact": lambda root, event: pre_compact(root),
+    "after-edit": lambda root, event: after_edit(root, event),
+    "stop": lambda root, event: stop(root, event),
+}
+HOOK_EVENTS = (*HANDLERS, "commit-msg")
+
+
 def run_hook(root: Path, event_name: str, message_file: str | None = None) -> int:
     if event_name == "commit-msg":
         try:
@@ -456,14 +458,8 @@ def run_hook(root: Path, event_name: str, message_file: str | None = None) -> in
                   "(`git commit --no-verify` bypasses it; say why in the PR)", file=sys.stderr)
             return GATE_BLOCKED
     event = read_event()
-    handlers = {
-        "session-start": lambda: session_start(root, event),
-        "pre-compact": lambda: pre_compact(root),
-        "after-edit": lambda: after_edit(root, event),
-        "stop": lambda: stop(root, event),
-    }
     try:
-        handlers[event_name]()
+        HANDLERS[event_name](root, event)
     except Exception as error:  # noqa: BLE001 - a hook must never fail the host session
         print(f"repoctl hook {event_name}: {type(error).__name__}: {error}", file=sys.stderr)
     return 0

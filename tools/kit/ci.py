@@ -20,6 +20,7 @@ from typing import Callable
 
 from .github import _gh, load_label_registry
 from .core import RepoctlError, load_project, markdown_without_fenced_code, reject_secret_text
+from .core import today as core_today
 from .issues import contract, issue_problems, parse_sections
 
 CANONICAL = contract.HEADINGS  # the contract owns the headings; the name stays for callers
@@ -113,7 +114,7 @@ def run_pr_reference(root: Path) -> str:
 
 def issue_contract_check(text: str, labels: set[str], profile: str, registry: dict, today: date | None = None) -> tuple[bool, list[str], list[str]]:
     """Return (valid, labels_to_add, reasons) for a natively filed issue body; reasons name each fix."""
-    today = today or date.today()
+    today = today or core_today()
     if profile == "minimal":
         raise RepoctlError("Minimal profile delegates issue intake to the host organization; remove native forms")
     if profile == "regulated":

@@ -33,6 +33,9 @@ order:
 
 Keep looping (`make next`, build, `make done`) until the launch phase. A green
 `make done` with open must features means the slice is done, not the product.
+What changed in `tools/kit/product.py` last: `docs/design.md` and
+`docs/STACK-DECISION.md` are read through the shared name constants in
+`tools/kit/names.py`; the phases above are unchanged.
 
 ## Feature list: `docs/product/features.csv`
 

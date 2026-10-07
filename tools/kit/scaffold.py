@@ -16,14 +16,12 @@ import tomllib
 from pathlib import Path
 
 from . import derive
-from .core import RepoctlError, ensure_inside_root
+from .core import KEBAB, RepoctlError, ensure_inside_root
 from .config import setting
 from .docsync import doc_groups
 from .navigate import skill_overlap
-from .registry import CORE, ROLE_ACCESS, ROLE_TIERS, Registry, yaml_string
+from .registry import CORE, KINDS, ROLE_ACCESS, ROLE_TIERS, Registry, yaml_string
 
-KINDS = ("skill", "agent", "doc", "rule", "check", "command", "mcp", "pack")
-NAME = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 FILL = "FILL" + "-IN:"  # split so the marker scanner never flags this module
 
 
@@ -111,7 +109,7 @@ def create(
 ) -> list[str]:
     if kind not in KINDS:
         raise RepoctlError(f"KIND must be one of: {', '.join(KINDS)}")
-    if not NAME.fullmatch(name or ""):
+    if not KEBAB.fullmatch(name or ""):
         raise RepoctlError("NAME must be lowercase kebab-case, for example NAME=release-notes")
     description = " ".join((description or "").split())
     if len(description) < 20:

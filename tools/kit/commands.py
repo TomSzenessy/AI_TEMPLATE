@@ -12,7 +12,7 @@ from pathlib import Path
 
 from . import ci, derive, scaffold, session
 from .core import RepoctlError, ensure_inside_root, load_project
-from .registry import arg, command
+from .registry import KINDS, arg, command
 
 # make help groups, in display order.
 GROUPS = {
@@ -76,7 +76,7 @@ def finish(root: Path, args) -> int:
 
 
 @command("hook", "Run a host lifecycle hook (reads optional host JSON on stdin)", make=None, args=(
-    arg("event", choices=["session-start", "pre-compact", "after-edit", "stop", "commit-msg"]),
+    arg("event", choices=list(session.HOOK_EVENTS)),
     arg("message_file", nargs="?", help="commit message file (commit-msg only)"),
 ))
 def hook(root: Path, args) -> int:
@@ -86,9 +86,9 @@ def hook(root: Path, args) -> int:
 # --- Extend the system -------------------------------------------------------------
 
 @command("new", "Create any capability with valid metadata and wire it in", group="extend",
-         usage='make new KIND=skill|agent|doc|rule|check|command|mcp|pack NAME=x DESC="what; when"', args=(
-    arg("--kind", required=True, choices=list(scaffold.KINDS), var="KIND",
-        hint="Choose what to create: make new KIND=skill|agent|doc|rule|check|command|mcp|pack NAME=my-name DESC=\"what it does; when to use it\""),
+         usage=f'make new KIND={"|".join(KINDS)} NAME=x DESC="what; when"', args=(
+    arg("--kind", required=True, choices=list(KINDS), var="KIND",
+        hint=f"Choose what to create: make new KIND={'|'.join(KINDS)} NAME=my-name DESC=\"what it does; when to use it\""),
     arg("--name", required=True, var="NAME", hint="Name it: NAME=kebab-case-name"),
     arg("--description", required=True, var="DESC", hint='Describe it: DESC="what it does; when to use it"'),
     arg("--pack", default="", var="PACK", help="pack the capability belongs to (default: core, always on)"),

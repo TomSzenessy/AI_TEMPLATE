@@ -25,8 +25,8 @@ from pathlib import Path
 
 from . import derive
 from .bootstrap import initialize_project
-from .core import RepoctlError
-from .gitinfo import git, listed_files
+from .core import RepoctlError, repository_files
+from .gitinfo import git
 
 MAKE_TARGET = re.compile(r"(?m)^([A-Za-z0-9][A-Za-z0-9_.-]*)\s*:(?!=)")
 H1 = re.compile(r"(?m)^# (.+)$")
@@ -36,7 +36,7 @@ INDEX_LINE = re.compile(r"<!--\s*index:")
 def kit_files(kit: Path) -> list[str]:
     """Every kit file. Template-only material is copied too, so init prunes it the same way it does for
     `make init`: links to it are rewritten to the template source and bindings to it are dropped."""
-    return listed_files(kit)
+    return repository_files(kit, walk=False)
 
 
 def colliding_targets(project_makefile: str, kit_makefile: str) -> list[str]:

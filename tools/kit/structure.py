@@ -5,16 +5,17 @@ from __future__ import annotations
 import os
 import re
 import subprocess
-from datetime import date, datetime, timezone
+from datetime import date
 from pathlib import Path
 
 from .core import (
     verification_environment,
     CONTAINER_DIRECTORIES,
     FILE_SURFACE_KINDS,
-    PROJECT_KIND_PATTERN,
+    KEBAB,
     REPOSITORY_INFRASTRUCTURE_DIRECTORIES,
     RepoctlError,
+    date_is_future,
     date_is_stale,
     read_utf8,
     declared_surfaces,
@@ -28,6 +29,8 @@ from .core import (
     normalized_relative_path,
     secret_matches,
 )
+from .gitinfo import git
+from .names import STACK_DECISION, VISION
 from .docs import check_docs_index, check_file_hygiene, check_markdown_links
 from .skills import check_skill_admission, check_skill_provenance, load_resource_registry
 
@@ -153,17 +156,8 @@ def validate_critic_evidence(root: Path, surface: dict[str, object], release_gat
                 raise RepoctlError(f"critic evidence is {'stale or ' if release_gate else ''}future-dated: {value}")
         commit = re.search(r"(?im)^Commit:\s*([0-9a-f]{40})\b", content)
         if commit:
-            try:
-                head = subprocess.run(
-                    ["git", "-C", str(root), "rev-parse", "HEAD"],
-                    check=False,
-                    capture_output=True,
-                    text=True,
-                    timeout=10,
-                )
-            except (FileNotFoundError, subprocess.TimeoutExpired):
-                head = None
-            if head is not None and head.returncode == 0 and head.stdout.strip() != commit.group(1):
+            head = git(root, "rev-parse", "HEAD", timeout=10)
+            if head is not None and head.strip() != commit.group(1):
                 raise RepoctlError(f"critic evidence is not bound to current HEAD: {value}")
 
 
@@ -211,7 +205,7 @@ def check_structure(root: Path, project: dict[str, object]) -> None:
 
     for position, surface in enumerate(surfaces, start=1):
         identifier = surface.get("id")
-        if not isinstance(identifier, str) or not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", identifier):
+        if not isinstance(identifier, str) or not KEBAB.fullmatch(identifier):
             errors.append(f"surface #{position} needs a kebab-case id")
         elif identifier in surface_ids:
             errors.append(f"duplicate surface id: {identifier}")
@@ -235,7 +229,7 @@ def check_structure(root: Path, project: dict[str, object]) -> None:
         if status not in {"active", "planned", "retired"}:
             errors.append(f"surface {identifier or position} has invalid status: {status}")
         surface_kind = surface.get("kind")
-        if not isinstance(surface_kind, str) or not PROJECT_KIND_PATTERN.fullmatch(surface_kind):
+        if not isinstance(surface_kind, str) or not KEBAB.fullmatch(surface_kind):
             errors.append(f"surface {identifier or position} needs a kebab-case kind")
         if status == "active" and not surface_path.exists():
             errors.append(f"active surface path does not exist: {path_value}")
@@ -294,7 +288,7 @@ def _too_old_or_future(value: date, release_gate: bool) -> bool:
     during development; from private-preview on, `make readiness` asks for a fresh confirmation:
     re-dating a file to satisfy a clock is ritual, not evidence.
     """
-    return date_is_stale(value) if release_gate else value > datetime.now(timezone.utc).date()
+    return date_is_stale(value) if release_gate else date_is_future(value)
 
 
 def check_vision(root: Path, project: dict[str, object], enforce: bool = True, release_gate: bool = False) -> None:
@@ -312,50 +306,52 @@ def check_vision(root: Path, project: dict[str, object], enforce: bool = True, r
                 'then set Status: accepted with Owner and Date in VISION.md and [vision].status = "accepted" in project.toml'
             )
         return
-    if record != "VISION.md":
+    if record != VISION:
         raise RepoctlError("vision.record must be exactly VISION.md")
-    try:
-        path = ensure_inside_root(root, root / record, "vision record")
-        content = path.read_text(encoding="utf-8")
-    except (RepoctlError, OSError, UnicodeDecodeError) as error:
-        raise RepoctlError("vision record is unavailable or outside the repository") from error
-    if not re.search(r"(?im)^Status:\s*accepted\s*$", content):
-        raise RepoctlError("VISION.md must record Status: accepted")
-    if not re.search(rf"(?im)^Project:\s*{re.escape(str(project.get('name', '')))}\s*$", content):
-        raise RepoctlError("VISION.md is not bound to project.toml")
-    if re.search(r"\[(?:REQUIRED|TBD|pending)|\bTBD\b", content, re.I):
-        raise RepoctlError("accepted vision record still contains intake placeholders")
-    vision_owner = re.search(r"(?im)^Owner:\s*(.+?)\s*$", content)
-    vision_date = re.search(r"(?im)^Date:\s*(\d{4}-\d{2}-\d{2})\s*$", content)
-    if not vision_owner or is_placeholder(vision_owner.group(1)) or not vision_date:
-        raise RepoctlError("accepted vision record must name an owner and valid date: lines 'Owner: <handle>' and 'Date: YYYY-MM-DD' in VISION.md")
-    try:
-        if _too_old_or_future(datetime.strptime(vision_date.group(1), "%Y-%m-%d").date(), release_gate):
-            raise RepoctlError("accepted vision record date is stale or future-dated")
-    except ValueError as error:
-        raise RepoctlError("accepted vision record date is invalid") from error
+    _check_record(
+        root, project, record, "vision record", "accepted vision record", release_gate,
+        status_message="VISION.md must record Status: accepted", unbound_message="VISION.md is not bound to project.toml",
+        accepted_first=True, placeholders="accepted vision record still contains intake placeholders",
+    )
     stack = vision.get("stack_decision")
-    if stack != "docs/STACK-DECISION.md":
+    if stack != STACK_DECISION:
         raise RepoctlError("vision.stack_decision must be exactly docs/STACK-DECISION.md")
+    _check_record(
+        root, project, stack, "stack decision record", "project stack decision", release_gate,
+        status_message="project stack decision must be accepted before scaffolding" if project.get("kind") != "template" else None,
+        unbound_message="stack decision record is not bound to project.toml", accepted_first=False,
+    )
+
+
+def _check_record(root: Path, project: dict[str, object], relative: str, label: str, noun: str, release_gate: bool, *,
+                  status_message: str | None, unbound_message: str, accepted_first: bool,
+                  placeholders: str | None = None) -> None:
+    """One validation for an owner-accepted record (the vision, the stack decision): readable, bound to this
+    project, accepted (when `status_message` is given), and carrying an owner and a date inside the window."""
     try:
-        stack_path = ensure_inside_root(root, root / stack, "stack decision record")
-        stack_content = stack_path.read_text(encoding="utf-8")
+        content = ensure_inside_root(root, root / relative, label).read_text(encoding="utf-8")
     except (RepoctlError, OSError, UnicodeDecodeError) as error:
-        raise RepoctlError("stack decision record is unavailable or outside the repository") from error
-    if not re.search(rf"(?im)^Project:\s*{re.escape(str(project.get('name', '')))}\s*$", stack_content):
-        raise RepoctlError("stack decision record is not bound to project.toml")
-    if project.get("kind") != "template":
-        if not re.search(r"(?im)^Status:\s*accepted\s*$", stack_content):
-            raise RepoctlError("project stack decision must be accepted before scaffolding")
-        stack_owner = re.search(r"(?im)^Owner:\s*(.+?)\s*$", stack_content)
-        stack_date = re.search(r"(?im)^Date:\s*(\d{4}-\d{2}-\d{2})\s*$", stack_content)
-        if not stack_owner or is_placeholder(stack_owner.group(1)) or not stack_date:
-            raise RepoctlError("project stack decision must name an owner and valid date: lines 'Owner: <handle>' and 'Date: YYYY-MM-DD' in docs/STACK-DECISION.md")
-        try:
-            if _too_old_or_future(datetime.strptime(stack_date.group(1), "%Y-%m-%d").date(), release_gate):
-                raise RepoctlError("project stack decision date is stale or future-dated")
-        except ValueError as error:
-            raise RepoctlError("project stack decision date is invalid") from error
+        raise RepoctlError(f"{label} is unavailable or outside the repository") from error
+    unaccepted = status_message is not None and not re.search(r"(?im)^Status:\s*accepted\s*$", content)
+    if unaccepted and accepted_first:
+        raise RepoctlError(status_message)
+    if not re.search(rf"(?im)^Project:\s*{re.escape(str(project.get('name', '')))}\s*$", content):
+        raise RepoctlError(unbound_message)
+    if unaccepted:
+        raise RepoctlError(status_message)
+    if placeholders and re.search(r"\[(?:REQUIRED|TBD|pending)|\bTBD\b", content, re.I):
+        raise RepoctlError(placeholders)
+    if status_message is None:
+        return  # the template's own record is a placeholder; only its binding matters
+    owner = re.search(r"(?im)^Owner:\s*(.+?)\s*$", content)
+    found = re.search(r"(?im)^Date:\s*(\d{4}-\d{2}-\d{2})\s*$", content)
+    if not owner or is_placeholder(owner.group(1)) or not found:
+        raise RepoctlError(f"{noun} must name an owner and valid date: lines 'Owner: <handle>' and 'Date: YYYY-MM-DD' in {relative}")
+    recorded = parse_iso_date(found.group(1))
+    if recorded is None:
+        raise RepoctlError(f"{noun} date is invalid")
+    if _too_old_or_future(recorded, release_gate):
+        raise RepoctlError(f"{noun} date is stale or future-dated")
 
 
 def is_template(project: dict[str, object]) -> bool:
@@ -417,13 +413,8 @@ def run_verification(root: Path) -> None:
         raise RepoctlError("surface verification recursion depth exceeded")
     project = load_project(root)
     profile = governance_profile(project)
-    check_structure(root, project)
-    check_readme_identity(root, project)
-    check_docs_index(root)
-    check_markdown_links(root)
-    check_file_hygiene(root)
-    check_skill_provenance(project)
-
+    # The registry's blocking checks (structure, docs, hygiene, provenance) already ran in
+    # `repoctl verify` before this; running them again here made each run twice.
     for surface in declared_surfaces(project):
         if surface.get("status", "active") != "active":
             continue

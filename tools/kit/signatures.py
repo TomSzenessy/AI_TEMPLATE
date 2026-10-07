@@ -1,4 +1,4 @@
-"""Failure signatures: a known failure recognised in one step, not re-diagnosed (issue #19).
+"""Failure signatures: a known failure recognised in one step, not re-diagnosed (issue #18).
 
 `docs/ERROR_LOG.md` records solved failure signatures and their permanent fixes,
 and `make where` surfaces them by keyword. Storing them is half the value; the
@@ -13,8 +13,14 @@ A signature is a row of the ledger's Markdown table:
 The key (`EL-001`) is the stable name a finding cites. The backticked spans in
 the symptom are the literals that identify it, and the permanent-fix cell is what
 the match reports. So matching reads the ledger the reader already maintains: no
-second index, nothing to drift, and a rewritten row keeps working. Cost is one
-small file read, only when there is a finding to match.
+second index, nothing to drift, and a rewritten row keeps working.
+
+A literal counts only when it is long enough and shaped like a message, a path, or
+a command rather than a word: `make check` appears in instructions that are not
+this failure, and `examples` appears in any directory listing. A row whose symptom
+offers no such literal is not matched, which errs in the direction that matters —
+a new failure stays a new failure. Cost is one small file read, and only when
+there is a finding to match.
 """
 
 from __future__ import annotations
@@ -28,9 +34,10 @@ from .core import read_text_file
 LEDGER = "docs/ERROR_LOG.md"
 KEY = re.compile(r"EL-\d{3}")
 CODE_SPAN = re.compile(r"`([^`\n]+)`")
-# A literal that identifies a failure: a quoted message fragment, a path, a command.
-# Shorter spans are shared vocabulary ("tests", "review") and would match by accident.
-MINIMUM_LITERAL = 8
+# A literal that identifies one failure rather than sharing vocabulary with many:
+# long enough to be a message fragment, a path, or a command, and shaped like one.
+MINIMUM_LITERAL = 12
+SHAPED_LITERAL = re.compile(r"[ /:]")
 LEDGER_LIMIT = 200_000
 
 
@@ -68,7 +75,8 @@ def signatures(root: Path) -> tuple[Signature, ...]:
             continue
         symptom = cells[columns.get("signature / symptom", 2)]
         literals = tuple(dict.fromkeys(
-            literal.strip() for literal in CODE_SPAN.findall(symptom) if len(literal.strip()) >= MINIMUM_LITERAL
+            literal.strip() for literal in CODE_SPAN.findall(symptom)
+            if len(literal.strip()) >= MINIMUM_LITERAL and SHAPED_LITERAL.search(literal)
         ))
         if literals:
             found.append(Signature(key, literals, " ".join(symptom.split()), cells[columns.get("permanent fix", 4)]))

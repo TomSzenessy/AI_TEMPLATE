@@ -11,6 +11,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from .core import RepoctlError, ensure_inside_root, governance_profile, load_project
+from .gitinfo import git
 
 
 OWNER_NAME = r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"
@@ -58,17 +59,8 @@ def _gh_json(root: Path | None, args: list[str], what: str, kind: type) -> objec
 
 def origin_target(root: Path) -> str | None:
     """owner/name of the checkout's origin remote, or None when unknown."""
-    try:
-        remote = subprocess.run(
-            ["git", "-C", str(root), "remote", "get-url", "origin"],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        return None
-    return github_target_from_remote(remote.stdout) if remote.returncode == 0 else None
+    remote = git(root, "remote", "get-url", "origin", timeout=10)
+    return github_target_from_remote(remote) if remote is not None else None
 
 
 def resolve_github_repo(root: Path) -> str:

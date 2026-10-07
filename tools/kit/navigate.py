@@ -13,6 +13,7 @@ from pathlib import Path
 from .core import declared_surfaces, governance_profile, load_project, read_text_file, repository_files
 from .docsync import bindings, owners
 from .gitinfo import git, is_repository, path_matches
+from .names import ERROR_LOG
 from .registry import Registry
 
 SYMBOL = re.compile(
@@ -21,7 +22,7 @@ SYMBOL = re.compile(
     r"([A-Za-z_][A-Za-z0-9_]*)"
 )
 HEADING = re.compile(r"^#{1,4}\s+(.+)$")
-MEMORY_FILES = ("docs/ERROR_LOG.md",)
+MEMORY_FILES = (ERROR_LOG,)
 SKIP_PREFIXES = (".claude/",)
 WORD = re.compile(r"[a-z0-9]+")
 

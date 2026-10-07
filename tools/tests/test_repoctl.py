@@ -12,10 +12,8 @@ import unittest
 from datetime import date, timedelta
 from pathlib import Path
 
-REPOCTL = Path(__file__).resolve().parents[1] / "repoctl.py"
-
-# Fixture dates follow the calendar so the suite never expires (#10).
-RECENT = (date.today() - timedelta(days=30)).isoformat()
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # `fixtures`, however this file is invoked (#33)
+from fixtures import RECENT, Scratch, fake_gh  # noqa: E402  shared builders, in-process CLI (#43)
 
 
 def kit_workflow(root: Path, name: str) -> Path:
@@ -24,10 +22,9 @@ def kit_workflow(root: Path, name: str) -> Path:
     return renamed if renamed.is_file() else root / ".github/workflows" / name
 
 
-class RepoctlCliTests(unittest.TestCase):
+class RepoctlCliTests(Scratch):
     def setUp(self) -> None:
-        self.temp = tempfile.TemporaryDirectory()
-        self.root = Path(self.temp.name)
+        super().setUp()
         self.write("project.toml", """schema = 1
 name = "REPLACE_WITH_PROJECT_NAME"
 kind = "template"
@@ -39,9 +36,6 @@ profile = "regulated"
 """)
         self.write("docs/README.md", "# Docs\n")
         self.write("review.md", "Issue: #42\nCommit: " + "a" * 40 + "\nArtifact: review.md\nReviewer: test reviewer\nDate: " + RECENT + "\nResult: pass\n")
-
-    def tearDown(self) -> None:
-        self.temp.cleanup()
 
     def write(self, name: str, content: str | bytes) -> Path:
         if name == "project.toml" and isinstance(content, str) and "[vision]" not in content:
@@ -61,25 +55,7 @@ profile = "regulated"
             )
         if name == "docs/README.md" and isinstance(content, str) and "STACK-DECISION.md" not in content:
             content += "\n- [Stack decision](STACK-DECISION.md)\n"
-        path = self.root / name
-        path.parent.mkdir(parents=True, exist_ok=True)
-        if isinstance(content, bytes):
-            path.write_bytes(content)
-        else:
-            path.write_text(textwrap.dedent(content), encoding="utf-8")
-        return path
-
-    def cli(self, *args: str, env: dict[str, str] | None = None):
-        environment = os.environ.copy()
-        if env:
-            environment.update(env)
-        return subprocess.run(
-            [sys.executable, str(REPOCTL), "--root", str(self.root), *args],
-            capture_output=True,
-            text=True,
-            check=False,
-            env=environment,
-        )
+        return super().write(name, content)
 
     def issue_body(self, safe: bool = True) -> str:
         review = "not applicable" if safe else "private security review"
@@ -134,30 +110,8 @@ profile = "regulated"
 
     def github(self, duplicate: bool = False, results: list[dict] | None = None) -> tuple[Path, Path]:
         directory = self.root / "bin"
-        directory.mkdir(exist_ok=True)
-        log = directory / "gh.log"
         search_results = results if results is not None else ([{"number": 12, "title": "Login refresh rejects valid sessions", "url": "https://example.test/12", "state": "OPEN"}] if duplicate else [])
-        results_literal = json.dumps(search_results)
-        script = f"""#!/usr/bin/env python3
-import json, os, sys
-from pathlib import Path
-args = sys.argv[1:]
-if args[:2] == ['repo', 'view']:
-    print(json.dumps({{'nameWithOwner': 'example/project'}}))
-elif args[:2] == ['issue', 'list']:
-    print({results_literal!r})
-elif args[:2] == ['issue', 'create']:
-    Path(os.environ['GH_LOG']).open('a', encoding='utf-8').write(json.dumps({{'args': args, 'stdin': sys.stdin.read()}}) + '\\n')
-    print('https://github.com/example/project/issues/17')
-elif args[:2] == ['label', 'create']:
-    Path(os.environ['GH_LOG']).open('a', encoding='utf-8').write('\\n'.join(args) + '\\n')
-else:
-    raise SystemExit(2)
-"""
-        fake = directory / "gh"
-        fake.write_text(script, encoding="utf-8")
-        fake.chmod(0o755)
-        return directory, log
+        return directory, fake_gh(directory, results=search_results)
 
     def test_init_replaces_template_readme(self) -> None:
         self.write("README.md", """# Agent Template
@@ -420,10 +374,16 @@ critic_evidence = ["review.md"]
         result = self.cli("incident", "--title", "ghp_" + "a" * 30, "--summary", "safe")
         self.assertEqual(result.returncode, 1)
         self.assertIn("possible secret", result.stderr)
+        self.git("init", "-q", "-b", "main")
         self.write("issue.md", "Issue #42\n" + self.issue_body())
-        self.write("secret.txt", "ghp_" + "a" * 30)
+        self.write("deploy.sh", "echo safe\n")
+        self.git("add", "issue.md", "deploy.sh")
+        self.git("commit", "-qm", "base")
+        self.write("deploy.sh", "ghp_" + "a" * 30 + "\n")  # the token now sits in the patch the packet shows
         result = self.cli("review-packet", "--issue-file", "issue.md")
         self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("ghp_" + "a" * 30, result.stdout, "a token in the patch is redacted, not copied into the packet")
+        self.assertIn("[REDACTED]", result.stdout)
 
     def test_review_packet_requires_canonical_issue(self) -> None:
         self.write("issue.md", "Issue #42\n" + self.issue_body())
@@ -467,12 +427,10 @@ rollback = "none"
         self.assertIn("neither first-party", result.stderr)
 
     def test_review_packet_redacts_private_key_blocks_from_patch(self) -> None:
-        subprocess.run(["git", "init", "-q"], cwd=self.root, check=True)
-        subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=self.root, check=True)
-        subprocess.run(["git", "config", "user.name", "Test"], cwd=self.root, check=True)
+        self.git("init", "-q", "-b", "main")
         self.write("tracked.txt", "safe\n")
-        subprocess.run(["git", "add", "tracked.txt"], cwd=self.root, check=True)
-        subprocess.run(["git", "commit", "-qm", "base"], cwd=self.root, check=True)
+        self.git("add", "tracked.txt")
+        self.git("commit", "-qm", "base")
         self.write(
             "tracked.txt",
             "-----BEGIN " + "PRIVATE KEY-----\nsecret-base64-body\n" + "-----END PRIVATE KEY-----\n",
@@ -482,16 +440,6 @@ rollback = "none"
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertNotIn("secret-base64-body", result.stdout)
         self.assertIn("[REDACTED]", result.stdout)
-
-        root = Path(__file__).resolve().parents[2]
-        for name in ("issue-tracker.yml", "bug.yml", "improvement.yml", "feature.yml"):
-            content = (root / ".github" / "ISSUE_TEMPLATE" / name).read_text(encoding="utf-8")
-            self.assertIn("Disclosure classification", content)
-            self.assertIn("public-safe", content)
-        self.assertIn("[enhancement/P2]", (root / ".github/ISSUE_TEMPLATE/feature.yml").read_text(encoding="utf-8"))
-        workflow = kit_workflow(root, "require-issue-reference.yml").read_text(encoding="utf-8") + (root / "tools/kit/ci.py").read_text(encoding="utf-8")
-        self.assertIn("Fixes", workflow)
-        self.assertIn("Security-Reference", workflow)
 
     def test_vision_intake_is_required_and_path_bound(self) -> None:
         (self.root / "project.toml").write_text("schema = 1\nname = \"Demo\"\nkind = \"web\"\nphase = \"development\"\n", encoding="utf-8")
@@ -511,16 +459,6 @@ stack_decision = "docs/STACK-DECISION.md"
         result = self.cli("check")
         self.assertEqual(result.returncode, 1)
         self.assertIn("exactly VISION.md", result.stderr)
-
-        root = Path(__file__).resolve().parents[2]
-        for name in ("issue-tracker.yml", "bug.yml", "improvement.yml", "feature.yml"):
-            content = (root / ".github" / "ISSUE_TEMPLATE" / name).read_text(encoding="utf-8")
-            self.assertIn("Disclosure classification", content)
-            self.assertIn("public-safe", content)
-        self.assertIn("[enhancement/P2]", (root / ".github/ISSUE_TEMPLATE/feature.yml").read_text(encoding="utf-8"))
-        workflow = kit_workflow(root, "require-issue-reference.yml").read_text(encoding="utf-8") + (root / "tools/kit/ci.py").read_text(encoding="utf-8")
-        self.assertIn("Fixes", workflow)
-        self.assertIn("Security-Reference", workflow)
 
     def test_agent_first_rendered_form_shape_validates(self) -> None:
         self.write("project.toml", """schema = 1

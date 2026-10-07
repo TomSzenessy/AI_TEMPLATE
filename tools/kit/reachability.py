@@ -22,15 +22,25 @@ check.
 
 What is left is an orphan: no code imports it, no test exercises it, no config
 reads it, and no document claims it, so every reader pays for a file nobody owns.
-`orphans` splits them by how certain the kit can be, and each finding names its
-fix. Blocking: files a person reads through a binding or an import, where nothing
-else could have meant it. Advisory: files a runner, a build, or a host reads by
-convention (`tests/`, `.editorconfig`, `.github/pull_request_template.md`), where
-the kit cannot tell a stray file from a discovered one — a wrongly blocked project
-has no upgrade path, and this is scaffolding a project adapts forever.
 
-The scan is one regex pass over the text already on disk plus dict lookups, so
-it costs the same order as the marker and budget checks reading the same files.
+`advisories` reports them, and every one is advice rather than a gate. A blocking
+finding is a claim about a file whose loader the kit has to model, and three rounds
+of narrowing showed that claim failing in a new ecosystem each time: an uncovered
+`src/`, an unresolvable `module:callable`, an adopted project's own `tools/`. The
+honest claim is "nothing in this tree names this file", and that is a judgement for
+the person who owns the file — especially in a repository with no upgrade path, where
+a wrong block is permanent and there is no way out but editing kit files.
+
+What the classification is for is making the advice trustworthy rather than noisy.
+Each message says *why* a file may still be legitimate — a test tree a runner
+discovers, a framework tree a migration runner walks, host configuration a tool
+reads by fixed name — and names the fix for the rest. The enforcement the repository
+actually relies on lives elsewhere and is exact: `covers:` bindings through
+`dead-bindings` and `surface-docs`.
+
+Every finding names its fix. The scan is one regex pass over the text already on
+disk plus dict lookups, so it costs the same order as the marker and budget checks
+reading the same files.
 """
 
 from __future__ import annotations
@@ -44,13 +54,19 @@ from .derive import DELEGATION_DOC, INDEX_DOC
 from .gitinfo import path_matches
 from .kitupdate import LOCK
 
-# A path-like run: a name, a relative path, or a directory. Starts with a word
-# character so prose ("3 days") never looks like a path. The constant avoids the
-# bare word "token", which the secret scanner reads as a credential assignment.
-PATH_TOKEN = re.compile(r"[A-Za-z0-9_.][A-Za-z0-9_.*/+@-]*")
+# A path-like run: a name, a relative path, a directory, or `module:callable`. Starts
+# with a word character so prose ("3 days") never looks like a path. The colon keeps
+# `gunicorn notes.app:create_app` and `uvicorn asgi:application` in one token, so the
+# callable half does not hide the module half. The constant avoids the bare word
+# "token", which the secret scanner reads as a credential assignment.
+PATH_TOKEN = re.compile(r"[A-Za-z0-9_.][A-Za-z0-9_.:/+@-]*")
+CALLED = ":"  # `module:callable` and `path:line` name the same file twice over
 RELATIVE_PREFIX = re.compile(r"^(?:\./|\.\./)+")  # a Markdown link names the target relative to its document
 SCAN_LIMIT = 400_000  # the size navigate.py searches; larger files are not reference sources
 CONFIG_SUFFIXES = frozenset({".toml", ".yml", ".yaml", ".json", ".ini", ".cfg", ".mk"})
+# Runtime files a tool loads by a fixed name and no suffix, so the suffix rule misses them.
+# Their commands are real references: a Procfile's `web: app:factory` runs the module.
+NAMED_CONFIGS = frozenset({"Makefile", "Procfile", "Dockerfile", "Containerfile"})
 # Paths the kit itself creates or opens by name, collected from the kit's own
 # constants so the list cannot drift from the code that writes them. A project must
 # never declare one of these in project.toml to make a check pass: a kit artifact is
@@ -71,26 +87,36 @@ KIT_OWNED_PATTERNS = tuple(config.DEFAULTS["unbound_docs_ok"])
 # Infrastructure a runner or a build loads by convention rather than by a path some
 # file spells out, so the kit cannot tell a stray file from a discovered one. Every
 # infrastructure directory except the two a person reads through a `covers:` binding
-# or an import; `docs/` and `tools/` stay blocking, because nothing else reads them.
+# or an import, which get the plain "nothing names it" message instead.
 DISCOVERED_ROOTS = REPOSITORY_INFRASTRUCTURE_DIRECTORIES - {"docs", "tools"}
+# Framework trees a Python tool walks by convention rather than by import: a migration
+# runner applies `migrations/`, Django loads `management/commands/`. Neither is an
+# import graph, so an unimported module there is not evidence of an orphan. Matched on
+# any path segment, because a real app nests them: `apps/store/migrations/`. Reported
+# with that explanation rather than dropped: silence would mask a file the framework
+# stopped using, which is the one thing a gardener should hear about.
+FRAMEWORK_TREES = frozenset({"migrations", "management"})
 # Files a host or an external tool reads by fixed path: editors open a root
-# dot-file, git reads the attributes file, a host renders the root entry
-# documents and its own conventions, a scanner reads its state directory.
-# Nothing inside the tree can name them, so the kit reports them (with the fix)
-# but never blocks: this is scaffolding a project adapts forever, and a wrongly
-# blocked project has no upgrade path out.
+# dot-file, git reads the attributes file, a host renders the root entry documents
+# and its own conventions, a scanner reads its state directory. Nothing inside the
+# tree can name them, so they get their own report rather than the plain one.
 ENTRY_DOCUMENTS = frozenset({"README.md", "CHANGELOG.md", "LICENSE", "CONTRIBUTING.md", "SECURITY.md",
                              "CODE_OF_CONDUCT.md"})
 CONVENTION_DIRECTORIES = (".github", ".security")
+AUTO_LOADED_PYTHON = frozenset({"conftest.py", "sitecustomize.py", "usercustomize.py"})
 
 
 def _is_configuration(path: str) -> bool:
-    """Toolchain configuration: the one place a directory names a load path."""
-    return path == "Makefile" or path.startswith("Makefile.") or path.endswith(tuple(CONFIG_SUFFIXES))
+    """Toolchain configuration: where a directory, a module, or a command names a load path."""
+    return (path.rsplit("/", 1)[-1] in NAMED_CONFIGS or path.endswith(tuple(CONFIG_SUFFIXES)))
 
 
 def _suffix_index(paths: list[str]) -> dict[str, list[str]]:
-    """Every trailing path segment a reference could use: `x.md`, `legal/x.md`, `docs/legal/x.md`."""
+    """Every trailing path segment a reference could use: `x.md`, `legal/x.md`, `docs/legal/x.md`.
+
+    A segment two files share (`README.md`, two `index.py`) is not evidence about either:
+    `_resolve` drops ambiguous names, so a mention cannot mask a dead file.
+    """
     index: dict[str, list[str]] = {}
     for path in paths:
         parts = path.split("/")
@@ -116,26 +142,61 @@ def _directory_members(paths: list[str]) -> dict[str, list[str]]:
 
 
 def _modules(paths: list[str]) -> dict[str, list[str]]:
-    """Module name -> the Python files an import can reach."""
+    """Module name -> the Python files an import can reach.
+
+    A package's `__init__.py` is reachable under two names, and both matter: `__init__`
+    when something imports the file directly, and the package name (`kit`) because
+    `import kit.checks` or `importlib.import_module("kit.checks")` executes it first.
+    Keying only by stem made every package initialiser look like a dead module.
+    """
     modules: dict[str, list[str]] = {}
     for path in paths:
-        if path.endswith(".py"):
-            modules.setdefault(path.rsplit("/", 1)[-1][:-3], []).append(path)
+        if not path.endswith(".py"):
+            continue
+        stem = path.rsplit("/", 1)[-1][:-3]
+        modules.setdefault(stem, []).append(path)
+        if stem == "__init__":
+            modules.setdefault(str(Path(path).parent.name), []).append(path)
     return modules
 
 
 def _resolve(candidate: str, index: dict[str, list[str]], modules: dict[str, list[str]],
              members: dict[str, list[str]], kind: int) -> tuple[str, ...]:
-    """The files one run of text names. `kind` is 1 for Python sources and 2 for configuration."""
+    """The files one run of text names.
+
+    `kind` is 0 for prose (a document), 1 when the source is code, and 2 when it is toolchain
+    configuration. Code and configuration both name modules — by import, or by
+    `module:callable` in a Dockerfile, compose file, or Procfile — while prose does not,
+    because a word in a sentence is not a reference.
+    """
     candidate = RELATIVE_PREFIX.sub("", candidate.rstrip(".-+").rstrip("/"))  # `../legal/x.md` names `legal/x.md`
     if len(candidate) < 3 or "*" in candidate or "?" in candidate:
         return ()  # a glob: ownership comes from `covers:`, not from a stray pattern
-    hits = list(index.get(candidate, []))
-    if kind & 1:  # a relative or dotted import names the module it resolves to
-        hits += modules.get(candidate.lstrip("."), []) + modules.get(candidate.rsplit(".", 1)[-1], [])
-    if kind & 2 and "/" in candidate:  # configuration names a directory it loads as a unit
-        hits += members.get(candidate, [])
-    return tuple(hits)
+    # `module:callable`, `path:line` and `dotted.module` all name their first part too.
+    names = [candidate] + ([part for part in candidate.split(CALLED) if part] if CALLED in candidate else [])
+    hits: list[str] = []
+    for name in names:
+        hits += _unambiguous(index.get(name, []))
+        if kind:  # code or configuration: an import, or `module:callable`, names the module
+            # `pkg.mod` names `pkg` too: importing a submodule executes every package
+            # initialiser on the way, which is why an `__init__.py` is keyed by its package name.
+            for part in (name, *name.split("."), name.rsplit(".", 1)[-1]):
+                hits += _unambiguous(modules.get(part.lstrip("."), []))
+        if kind & 2:
+            # A load root is named precisely BECAUSE it has several members (`discover -s
+            # tests`, `PYTHONPATH=tools/tests`), so ambiguity is the signal here, not a
+            # guess: a single-segment directory counts too.
+            hits += members.get(name, [])
+    return tuple(dict.fromkeys(hits))
+
+
+def _unambiguous(candidates: list[str]) -> list[str]:
+    """One name several files answer to (`index.py` in two packages) references none of them.
+
+    Otherwise a single stray mention of a common file name would mark every file with
+    that name as used, and a dead one would never be reported again.
+    """
+    return candidates if len(candidates) == 1 else []
 
 
 def referrers(root: Path, files: list[str]) -> dict[str, set[str]]:
@@ -149,7 +210,7 @@ def referrers(root: Path, files: list[str]) -> dict[str, set[str]]:
         text = read_text_file(root, source, limit=SCAN_LIMIT)
         if text is None:
             continue
-        kind = (1 if source.endswith(".py") else 0) | (2 if _is_configuration(source) else 0)
+        kind = (1 if source.endswith(".py") else 0) | (2 if _is_configuration(source) else 0)  # 0 is prose
         for candidate in set(PATH_TOKEN.findall(text)):
             key = (candidate, kind)
             targets = resolved.get(key)
@@ -181,8 +242,12 @@ def _conventional(path: str) -> bool:
     return parts[0] in CONVENTION_DIRECTORIES and len(parts) == 2
 
 
-def orphans(context) -> tuple[list[str], list[str]]:
-    """(blocking, advisory) tracked files nothing references, each naming its fix."""
+def advisories(context) -> tuple[list[str], list[str]]:
+    """(unreferenced, host-read) findings: every tracked file nothing names, and why each may be fine.
+
+    Both lists are advice. The split only routes each finding to the check that explains
+    it: host-read configuration has its own report, everything else the general one.
+    """
     files = [path for path in context.files if not _scratch(path)]
     owned = declared_owners(files, context.bindings, context.derived)
     repository = context.project.get("repository", {})
@@ -190,20 +255,24 @@ def orphans(context) -> tuple[list[str], list[str]]:
     infrastructure = {path for pattern in declared if isinstance(pattern, str)
                       for path in files if path_matches(path, pattern)}
     referenced = referrers(context.root, files)
-    blocking, advisory = [], []
+    unreferenced, host_read = [], []
     for path in files:
         if path in owned or path in infrastructure or referenced[path] - {path}:
             continue
         if _conventional(path):
-            advisory.append(f"{path}: no file in the tree references this host-read configuration; reference it, "
-                            "or list it in [repository].infrastructure_paths in project.toml to stop seeing it")
+            host_read.append(f"{path}: nothing names this unambiguously and a host reads it by fixed path, so it is "
+                             "advice rather than a judgement; reference it, or list it in "
+                             "[repository].infrastructure_paths in project.toml to stop seeing it")
         elif path.split("/")[0] in DISCOVERED_ROOTS:
-            advisory.append(f"{path}: a test, example, or build tree nothing names; import it where it is used, "
-                            "or list its directory in [repository].infrastructure_paths in project.toml")
+            unreferenced.append(f"{path}: nothing names this unambiguously and a test or build runner discovers it, "
+                                "so it is worth a look, not a judgement; import it where it is used, or list its "
+                                "directory in [repository].infrastructure_paths in project.toml")
+        elif FRAMEWORK_TREES.intersection(path.split("/")[:-1]):
+            unreferenced.append(f"{path}: a framework tree a tool walks by convention (a migration runner, a management "
+                                "command), so no file is named and that is expected; delete it only if the framework "
+                                "stopped using it")
         else:
-            blocking.append(
-                f"{path}: nothing references it; import or call it, add `<!-- covers: {path} -->` to the document "
-                "that explains it, or delete it (a file a tool loads by convention belongs in "
-                "[repository].infrastructure_paths in project.toml)"
-            )
-    return blocking, advisory
+            unreferenced.append(f"{path}: nothing in the tree names it unambiguously; import or call it, add "
+                                f"`<!-- covers: {path} -->` to the document that explains it, or delete it if it is "
+                                "dead (confirm first: a framework, manifest, or runner may load it by convention)")
+    return unreferenced, host_read

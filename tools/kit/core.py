@@ -5,45 +5,41 @@ from __future__ import annotations
 import os
 import re
 import stat
-import subprocess
-try:
-    import tomllib
-except ModuleNotFoundError as error:  # pragma: no cover - exercised on Python 3.10
-    raise SystemExit("repoctl requires Python 3.11 or newer") from error
-from datetime import datetime, timedelta, timezone
+import tomllib  # repoctl.py already fails fast with a clear message on Python < 3.11
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path, PureWindowsPath
+
+from .gitinfo import git, is_repository
 
 
 PROJECT_NAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
-PROJECT_KIND_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+KEBAB = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")  # use .fullmatch
+PROJECT_KIND_PATTERN = KEBAB  # previous-release name; cross-release init tests import it
+FENCED_CODE = re.compile(r"```.*?```", re.DOTALL)
+INLINE_CODE = re.compile(r"`[^`\n]*`")
 CONTAINER_DIRECTORIES = {"apps", "frontends", "packages", "services", "workers"}
 FILE_SURFACE_KINDS = {"file", "script", "document", "asset"}
-# Test and example folders support a surface rather than being one: every build
-# trial (five runs) was blocked into declaring tests/, e2e/, test-results/, or
-# examples/ as products. Ambiguous names such as config/ and scripts/ still need
-# a declaration or an explicit [repository].infrastructure_paths entry.
-REPOSITORY_INFRASTRUCTURE_DIRECTORIES = {
-    "tests",
-    "test",
-    "e2e",
-    "__tests__",
-    "spec",
-    "fixtures",
-    "examples",
-    "test-results",
-    "playwright-report",
-    "docs",
-    "tools",
-    "incidents",
-    "cache",
-    "coverage",
-    "tmp",
-    "temp",
-    "vendor",
-    "node_modules",
-    "build",
-    "dist",
+# One table for every directory the kit treats specially. "infrastructure": test
+# and example folders support a surface rather than being one (build trials were
+# blocked into declaring tests/, e2e/, test-results/, or examples/ as products;
+# ambiguous names such as config/ and scripts/ still need a declaration or an
+# explicit [repository].infrastructure_paths entry). "ignored": never walked for
+# files. "both": vendored or generated output.
+DIRECTORY_ROLES = {
+    **dict.fromkeys(
+        ("tests", "test", "e2e", "__tests__", "spec", "fixtures", "examples", "test-results",
+         "playwright-report", "docs", "tools", "incidents", "cache", "coverage", "tmp", "temp"),
+        "infrastructure",
+    ),
+    **dict.fromkeys(
+        (".git", ".hg", ".svn", ".agent", ".claude", ".codex", ".cursor", ".gemini",
+         ".mypy_cache", ".pytest_cache", ".ruff_cache", ".venv", "__pycache__"),
+        "ignored",
+    ),
+    **dict.fromkeys(("node_modules", "vendor", "build", "dist"), "both"),
 }
+REPOSITORY_INFRASTRUCTURE_DIRECTORIES = {name for name, role in DIRECTORY_ROLES.items() if role != "ignored"}
+IGNORED_WALK_DIRECTORIES = {name for name, role in DIRECTORY_ROLES.items() if role != "infrastructure"}
 
 
 class RepoctlError(Exception):
@@ -84,6 +80,11 @@ def governance_profile(project: dict[str, object]) -> str:
     if profile not in {"agent-first", "regulated", "minimal"}:
         raise RepoctlError("governance.profile must be agent-first, regulated, or minimal")
     return profile
+
+
+def default_branch(project: dict[str, object]) -> str:
+    repository = project.get("repository", {})
+    return str(repository.get("default_branch", "main")) if isinstance(repository, dict) else "main"
 
 
 def declared_surfaces(project: dict[str, object]) -> list[dict[str, object]]:
@@ -170,7 +171,7 @@ def normalized_relative_path(value: object, field: str) -> str:
 
 
 def markdown_without_fenced_code(markdown: str) -> str:
-    return re.sub(r"```.*?```", "", markdown, flags=re.DOTALL)
+    return FENCED_CODE.sub("", markdown)
 
 
 def markdown_link_target(raw_target: str) -> str:
@@ -181,25 +182,6 @@ def markdown_link_target(raw_target: str) -> str:
     return parts[0] if parts else ""
 
 
-IGNORED_WALK_DIRECTORIES = {
-    ".git",
-    ".hg",
-    ".svn",
-    ".agent",
-    ".claude",
-    ".codex",
-    ".cursor",
-    ".gemini",
-    "node_modules",
-    "vendor",
-    ".mypy_cache",
-    ".pytest_cache",
-    ".ruff_cache",
-    ".venv",
-    "__pycache__",
-    "build",
-    "dist",
-}
 SENSITIVE_CONTENT_PATTERNS = {
     "private key": re.compile(r"-----BEGIN (?:[A-Z0-9 ]*PRIVATE KEY|PGP PRIVATE KEY BLOCK)-----.*?-----END (?:[A-Z0-9 ]*PRIVATE KEY|PGP PRIVATE KEY BLOCK)-----", re.DOTALL),
     "GitHub token": re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b"),
@@ -209,32 +191,18 @@ SENSITIVE_CONTENT_PATTERNS = {
 }
 
 
-def worktree_files(root: Path) -> list[Path]:
-    try:
-        git_root_result = subprocess.run(
-            ["git", "-C", str(root), "rev-parse", "--show-toplevel"],
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-    except FileNotFoundError:
-        git_root_result = None
+def worktree_files(root: Path, *, walk: bool = True) -> list[Path]:
+    """Tracked plus untracked-not-ignored paths when `root` is a repository's top level.
 
-    if git_root_result is not None and git_root_result.returncode == 0:
-        git_root = Path(git_root_result.stdout.strip()).resolve()
-        if git_root == root:
-            listed = subprocess.run(
-                ["git", "-C", str(root), "ls-files", "--cached", "--others", "--exclude-standard", "-z"],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            # Tracked files deleted in the working tree are gone, not hygiene subjects.
-            return [
-                root / relative
-                for relative in listed.stdout.split("\0")
-                if relative and os.path.lexists(root / relative)
-            ]
+    Otherwise (or with `walk=False`, which yields nothing) the directory is walked,
+    skipping `IGNORED_WALK_DIRECTORIES`. Symlinks are listed, not followed.
+    """
+    listed = git(root, "ls-files", "--cached", "--others", "--exclude-standard", "-z") if is_repository(root) else None
+    if listed is not None:
+        # Tracked files deleted in the working tree are gone, not hygiene subjects.
+        return [root / relative for relative in listed.split("\0") if relative and os.path.lexists(root / relative)]
+    if not walk:
+        return []
 
     files: list[Path] = []
     for current, directory_names, file_names in os.walk(
@@ -282,13 +250,17 @@ def parse_iso_date(text: str | None) -> "datetime.date | None":
         return None
 
 
-def date_is_future(value: "datetime.date") -> bool:
-    return value > datetime.now(timezone.utc).date()
+def today() -> date:
+    """The one calendar day every kit freshness rule uses: UTC, so machines agree."""
+    return datetime.now(timezone.utc).date()
 
 
-def date_is_stale(value: datetime.date) -> bool:
-    today = datetime.now(timezone.utc).date()
-    return value > today or value < today - timedelta(days=365)
+def date_is_future(value: "date") -> bool:
+    return value > today()
+
+
+def date_is_stale(value: "date") -> bool:
+    return value > today() or value < today() - timedelta(days=365)
 
 
 def is_placeholder(value: object) -> bool:
@@ -343,6 +315,11 @@ def safe_markdown_text(value: str) -> str:
     return re.sub(r"([\\`*_{}\[\]()#+.!|>-])", r"\\\1", " ".join(value.split()))
 
 
+def package_skill(package: object) -> str:
+    """The skill name of a `owner/repo@skill` provenance package (the whole text when it has no `@`)."""
+    return str(package).rpartition("@")[2]
+
+
 def slugify(value: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
     if not slug:
@@ -350,11 +327,14 @@ def slugify(value: str) -> str:
     return slug[:80].rstrip("-")
 
 
-def repository_files(root: Path) -> list[str]:
-    """Tracked and untracked-but-not-ignored regular files, repository-relative and sorted."""
+def repository_files(root: Path, *, walk: bool = True) -> list[str]:
+    """Tracked and untracked-but-not-ignored regular files, repository-relative and sorted.
+
+    `walk=False` lists only what git knows (a kit checkout is never walked).
+    """
     return sorted(
         path.relative_to(root).as_posix()
-        for path in worktree_files(root)
+        for path in worktree_files(root, walk=walk)
         if path.is_file() and not is_link_like(path)
     )
 

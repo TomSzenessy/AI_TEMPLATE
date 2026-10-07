@@ -1,4 +1,4 @@
-"""Structural signal: which areas of a repository keep changing together (issue #18).
+"""Structural signal: which areas of a repository keep changing together (issue #24).
 
 A wrong seam shows up in history before it shows up in review: two areas that
 should be independent keep landing in the same commit. This reads recent

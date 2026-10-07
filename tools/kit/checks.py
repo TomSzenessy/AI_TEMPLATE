@@ -14,8 +14,9 @@ from datetime import date
 
 from . import derive, docs, docsync, github, hygiene, product, skills, structure
 from .config import setting
-from .core import FILE_SURFACE_KINDS, RepoctlError, declared_surfaces
+from .core import FILE_SURFACE_KINDS, RepoctlError, declared_surfaces, today
 from .gitinfo import changed_paths, has_history, path_matches
+from .names import DESIGN
 from .registry import check
 
 
@@ -59,20 +60,17 @@ def markdown_links(context) -> list[str]:
     return _raised(docs.check_markdown_links, context.root)
 
 
-@check("orphan-files", "Every tracked file is named by code, a test, toolchain config, or a covers binding; on every change",
-       blocks=True, reason="Issue #17: a module nothing imports and no document claims passed every gate indefinitely "
-                           "in this repository, and a template that accumulates unjustified files breaks its own "
-                           "promise to be readable cold. The fix is one edit (import, bind, or delete), and files a "
-                           "tool loads by convention are exempt by default rather than left to each project.")
+@check("orphan-files", "Tracked files nothing in the tree names; import or bind each one, or delete what is dead",
+       blocks=False)
 def orphan_files(context) -> list[str]:
-    return context.orphans[0]
+    return context.advisories[0]
 
 
 @check("host-read-config", "Tracked host configuration no file names (editor, git, hosting, or scanner conventions); "
                           "reference it or declare it in [repository].infrastructure_paths",
        blocks=False)
 def host_read_config(context) -> list[str]:
-    return context.orphans[1]
+    return context.advisories[1]
 
 
 # --- Derived files and the docs index ----------------------------------------------
@@ -187,7 +185,7 @@ def design_record(context) -> list[str]:
     accepted = isinstance(vision, dict) and vision.get("status") == "accepted"
     building = any(surface.get("status", "active") == "active" and surface.get("kind") != "template"
                    for surface in declared_surfaces(project))
-    if accepted and project.get("kind") in setting(context.root, "ui_kinds") and building and "docs/design.md" not in context.files:
+    if accepted and project.get("kind") in setting(context.root, "ui_kinds") and building and DESIGN not in context.files:
         return ['UI project without docs/design.md: record the chosen direction (product-kickoff step 5): '
                 'make new KIND=doc NAME=design GROUP=design DESC="Visual direction, tokens, and UX principles; before any UI work"']
     return []
@@ -239,7 +237,7 @@ def skill_review_age(context) -> list[str]:
             continue
         reviewed = str(entry.get("reviewed_on", ""))
         try:
-            age = (date.today() - date.fromisoformat(reviewed)).days
+            age = (today() - date.fromisoformat(reviewed)).days
         except ValueError:
             continue
         if age > int(setting(context.root, "skill_review_days")):

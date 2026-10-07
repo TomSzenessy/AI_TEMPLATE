@@ -60,7 +60,10 @@ the wording). Afterwards `make check` lists your code as unregistered surfaces:
 declare each one in `project.toml` (or list support folders such as tests in
 `[repository].infrastructure_paths`), then follow `make next`. A document's
 `make <target>` references resolve to the nearest Makefile above it, so
-subprojects keep their own targets.
+subprojects keep their own targets. What changed in `bootstrap.py`/`adopt.py`
+last: the kit's file list now comes from `core.repository_files` (git-known
+files only, links excluded) and `KIND=` validation shares `core`'s kebab-case
+pattern — internal consolidation, same behavior.
 
 ## Adaptation loop
 

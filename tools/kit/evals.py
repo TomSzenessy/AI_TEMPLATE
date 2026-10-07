@@ -18,10 +18,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-try:
-    import tomllib
-except ModuleNotFoundError as error:  # pragma: no cover - exercised on Python 3.10
-    raise SystemExit("repoctl requires Python 3.11 or newer") from error
+import tomllib  # repoctl.py fails fast on Python < 3.11
 
 from .config import setting
 from .core import RepoctlError

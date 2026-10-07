@@ -21,8 +21,12 @@ except ModuleNotFoundError as error:  # pragma: no cover - exercised on Python 3
 from kit.core import RepoctlError
 from kit.registry import Registry
 
-HOOK_EVENTS = ("session-start", "pre-compact", "after-edit", "stop", "commit-msg")
 DEFAULT_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _is_hook_event(name: str) -> bool:
+    from kit.session import HOOK_EVENTS  # session owns the handler table the events derive from
+    return name in HOOK_EVENTS
 
 
 def build_parser(registry: Registry) -> argparse.ArgumentParser:
@@ -45,7 +49,7 @@ def main(argv: list[str] | None = None) -> int:
     known, remaining = root_parser.parse_known_args(argv)
     root = known.root.resolve()
     try:
-        if remaining[:1] == ["hook"] and len(remaining) >= 2 and remaining[1] in HOOK_EVENTS:
+        if remaining[:1] == ["hook"] and len(remaining) >= 2 and _is_hook_event(remaining[1]):
             # Hooks need no argparse tree, so a broken plugin cannot take them down (issue #28).
             from kit.session import run_hook
             return run_hook(root, remaining[1], remaining[2] if len(remaining) > 2 else None)

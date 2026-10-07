@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import re
-import subprocess
-from datetime import datetime, timezone
 from pathlib import Path
 
 try:
@@ -28,8 +26,10 @@ from .core import (
     safe_markdown_text,
     secret_matches,
     slugify,
+    today,
 )
 from .docs import docs_index_link_content
+from .gitinfo import git, run_git
 from .github import (
     check_github_duplicates,
     create_github_issue,
@@ -81,17 +81,8 @@ def validate_review_evidence(
             raise RepoctlError("regulated review evidence is not bound to the exact issue body")
         commit = re.search(r"(?im)^Commit:\s*([0-9a-f]{40})\s*$", content)
         if commit:
-            try:
-                head = subprocess.run(
-                    ["git", "-C", str(root), "rev-parse", "HEAD"],
-                    check=False,
-                    capture_output=True,
-                    text=True,
-                    timeout=10,
-                )
-            except (FileNotFoundError, subprocess.TimeoutExpired):
-                head = None
-            if head is not None and head.returncode == 0 and head.stdout.strip() != commit.group(1):
+            head = git(root, "rev-parse", "HEAD", timeout=10)
+            if head is not None and head.strip() != commit.group(1):
                 raise RepoctlError("regulated review evidence is not bound to current HEAD")
     artifact = re.search(r"(?im)^Artifact:\s*(\S+)", content)
     if artifact:
@@ -448,38 +439,21 @@ def validate_review_issue(issue: str, profile: str = "regulated") -> None:
 
 def git_review_context(root: Path) -> str:
     commands = {
-        "Commit": ["git", "rev-parse", "HEAD"],
-        "Diff stat": ["git", "diff", "HEAD", "--stat", "--", "."],
-        "Status": ["git", "status", "--short", "--", "."],
-        "Untracked files": ["git", "ls-files", "--others", "--exclude-standard", "--", "."],
+        "Commit": ["rev-parse", "HEAD"],
+        "Diff stat": ["diff", "HEAD", "--stat", "--", "."],
+        "Status": ["status", "--short", "--", "."],
+        "Untracked files": ["ls-files", "--others", "--exclude-standard", "--", "."],
     }
     lines: list[str] = []
     for label, command in commands.items():
-        try:
-            result = subprocess.run(
-                command,
-                cwd=root,
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=20,
-            )
-        except (FileNotFoundError, subprocess.TimeoutExpired):
+        result = run_git(root, *command, timeout=20)
+        if result is None:
             lines.append(f"{label}: unavailable")
             continue
         output = (result.stdout or result.stderr).strip()
         lines.append(f"{label}: {output or 'clean/unavailable'}")
-    try:
-        patch = subprocess.run(
-            ["git", "diff", "HEAD", "--no-ext-diff", "--unified=3", "--", "."],
-            cwd=root,
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=30,
-        ).stdout
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        patch = "unavailable"
+    patch_result = run_git(root, "diff", "HEAD", "--no-ext-diff", "--unified=3", "--", ".", timeout=30)
+    patch = patch_result.stdout if patch_result is not None else "unavailable"
     if len(patch) > 200_000:
         patch = patch[:200_000] + "\n[patch truncated; inspect the shared working tree]"
     for pattern in SENSITIVE_CONTENT_PATTERNS.values():
@@ -540,7 +514,7 @@ def create_incident(root: Path, title: str, summary: str, public_safe: bool = Fa
         raise RepoctlError("sensitive incidents require the private incident draft; omit --public-safe")
     if public_safe:
         validate_review_evidence(root, review_evidence, body=summary, strict=True)
-    opened = datetime.now(timezone.utc).date().isoformat()
+    opened = today().isoformat()
     filename = f"{opened}-{slugify(title)}.md"
     incident_subpath = (Path("docs") / "incidents") if public_safe else (Path(".agent") / "incidents")
     incident_directory = ensure_inside_root(

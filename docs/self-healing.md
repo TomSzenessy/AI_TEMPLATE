@@ -8,6 +8,10 @@ after compaction, which is when cleanup and documentation get skipped. So the
 maintenance rules here are **executed**, not remembered: lifecycle hooks,
 checks in `make check`, and a scheduled gardener. Every mechanism is a
 standard-library command in `tools/kit/`, so it works with any agent host.
+Internally the kit now runs git through one wrapper (`gitinfo.run_git`, with
+unquoted paths and a timeout), derives every hook event from one table
+(`session.HOOK_EVENTS`), and computes the current day once (`core.today`, UTC),
+so every freshness rule agrees across machines.
 
 ## When a check may block
 
@@ -132,17 +136,23 @@ Markers are plain comments and work in any language:
 A compact repository is the one property that every reader pays for, so it is
 checked rather than hoped for.
 
-- `orphan-files` **blocks** on a tracked file that nothing reaches: no document's
-  `covers:` glob claims it, `make sync` does not generate it, no code imports or
-  names it, and it is not in `[repository].infrastructure_paths`. The fix is one
-  edit — import it, bind it, or delete it.
+- `orphan-files` **advises** on a tracked file that nothing reaches: no
+  document's `covers:` glob claims it, `make sync` does not generate it, and no
+  code imports or names it. Every message says why the file may still be
+  legitimate (a test tree a runner discovers, a `migrations/` or `management/`
+  tree a framework walks, a `module:callable` or `path:line` reference) and
+  names the fix for the rest — import it, bind it, or delete it. Advice, not a
+  block: the honest claim is only "nothing in this tree names this file", the
+  former blocking class proved wrong in each new ecosystem it met (a bare
+  `src/`, `module:callable`, an adopted project's own `tools/`), and a wrong
+  block is permanent in a project that has no upgrade path. A name two files
+  share resolves to neither, so one stray mention of `index.py` cannot mask a
+  dead file.
 - Kit artifacts are exempt by default, from a list built out of the kit's own
   constants (`tools/kit/reachability.py`), so a project never has to justify a
   file the kit itself wrote.
 - `host-read-config` **advises** on files only a host convention reads (editor,
-  git, hosting, scanner config). Advice, not a block: the kit cannot model every
-  host's conventions, and a wrong block is permanent in a project that has no
-  upgrade path.
+  git, hosting, scanner config), for the same reason.
 
 ## Structure you can see
 
@@ -156,7 +166,11 @@ Every entry in `docs/ERROR_LOG.md` carries a key (`EL-001`…). When a blocking
 check produces a finding matching a recorded signature, `make check` prints the
 key and its permanent fix. A known failure is recognised in one step instead of
 re-derived — the difference between debugging and pattern-matching. Fresh
-failures add no line, so the ledger cannot manufacture a match.
+failures add no line, so the ledger cannot manufacture a match. A backticked
+span counts as a matchable literal only when it is at least 12 characters and
+shaped like a message, path, or command; shared vocabulary (`make check`) or a
+bare filename matches nothing, so a new failure stays a new failure and a row
+without a distinctive literal is simply never matched.
 
 ## Product guardrails
 
@@ -322,7 +336,7 @@ intended behavior, scope, risks, and evidence-producing acceptance criteria
 
 `make garden` aggregates every finding above plus advisory items (upcoming
 deprecations, paragraphs repeated across documents, unbound docs, skill
-reviews older than a year, GitHub metadata drift, npm pins behind their latest release) and runs each
+reviews older than `[kit].skill_review_days`, GitHub metadata drift, npm pins behind their latest release) and runs each
 surface's own `garden` commands, for example a dead-code finder:
 
 ```toml

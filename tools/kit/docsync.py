@@ -15,15 +15,13 @@ from __future__ import annotations
 import json
 import os
 import re
-import subprocess
 from pathlib import Path
 
-from .core import markdown_without_fenced_code, read_text_file
+from .core import FENCED_CODE, INLINE_CODE, markdown_without_fenced_code, read_text_file
 from .gitinfo import git, has_history, path_matches
 
 COVERS_PATTERN = re.compile(r"<!--\s*covers:\s*(.*?)\s*-->", re.DOTALL)
 INDEX_PATTERN = re.compile(r"<!--\s*index:\s*(.*?)\s*-->", re.DOTALL)
-INLINE_CODE = re.compile(r"`[^`\n]*`")  # examples in code spans are not bindings
 UNAFFECTED_TRAILER = "Docs-Unaffected"
 HISTORY_LIMIT = 2000
 META_CACHE = ".agent/cache/doc-meta.json"
@@ -166,15 +164,8 @@ def exemption_scope(values: list[str]) -> set[str] | None:
 
 def message_trailers(root: Path, message: str) -> list[str]:
     """Docs-Unaffected values exactly as git parses commit trailers."""
-    try:
-        result = subprocess.run(
-            ["git", "-C", str(root), "interpret-trailers", "--parse"],
-            input=message, capture_output=True, text=True, timeout=30, check=False,
-        )
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        return []
     values = []
-    for line in result.stdout.splitlines():
+    for line in (git(root, "interpret-trailers", "--parse", input=message) or "").splitlines():
         key, _, value = line.partition(":")
         if key.strip().lower() == UNAFFECTED_TRAILER.lower():
             values.append(value.strip())
@@ -321,7 +312,6 @@ def pending_documents(doc_bindings: dict[str, list[str]], changed: list[str]) ->
 MAKE_REFERENCE = re.compile(r"`make ([a-z][a-z0-9_-]*)")
 FENCED_MAKE = re.compile(r"(?m)^\s*(?:\$\s*)?make ([a-z][a-z0-9_-]*)")
 REPOCTL_REFERENCE = re.compile(r"`(?:python3 )?(?:tools/)?repoctl(?:\.py)? ([a-z][a-z-]*)")
-FENCE = re.compile(r"```.*?```", re.DOTALL)
 
 
 def makefile_targets(root: Path, directory: str = "") -> set[str]:
@@ -365,7 +355,7 @@ def command_reference_errors(root: Path, files: list[str]) -> list[str]:
         if not text:
             continue
         references = set(MAKE_REFERENCE.findall(text))
-        for fence in FENCE.findall(text):
+        for fence in FENCED_CODE.findall(text):
             references |= set(FENCED_MAKE.findall(fence))
         directory = nearest_makefile_dir(file_set, relative)
         local = targets if not directory else nested.setdefault(directory, makefile_targets(root, directory))
