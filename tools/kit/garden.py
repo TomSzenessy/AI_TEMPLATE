@@ -8,12 +8,13 @@ renders Markdown suitable for a CI job summary or a gardener agent's brief.
 
 from __future__ import annotations
 
+import re
 import subprocess
 from datetime import date
 from pathlib import Path
 
 from . import derive, docsync, github, hygiene
-from .core import declared_surfaces, ensure_inside_root, load_project, repository_files
+from .core import FILE_SURFACE_KINDS, declared_surfaces, ensure_inside_root, load_project, repository_files
 from .config import setting
 from .gitinfo import changed_paths, has_history, path_matches
 
@@ -31,6 +32,59 @@ def self_heal_errors(root: Path, project: dict[str, object] | None = None) -> li
     errors += hygiene.scan_markers(root, files).errors
     errors += hygiene.budget_errors(root, project, files)
     errors += hygiene.workflow_errors(root, files)
+    errors += project_errors(root, project, files, doc_bindings)
+    return errors
+
+
+BACKLOG_NAMES = re.compile(r"(?i)(?:^|/)(?:backlog|todo|tasks|roadmap)\.md$|(?:^|/)docs/[^/]*wal[^/]*\.md$")
+EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+")
+
+
+def project_errors(root: Path, project: dict[str, object], files: list[str], doc_bindings: dict[str, list[str]]) -> list[str]:
+    """Guardrails a fresh agent skipped in the build trial; each names its fix."""
+    errors = [
+        f"{path}: live work belongs in issues (or ignored .agent/wal/ via `make issue` without a remote), not a tracked backlog"
+        for path in files
+        if BACKLOG_NAMES.search(path) and not path.startswith((".agents/", ".claude/"))
+    ]
+    for surface in declared_surfaces(project):
+        path = str(surface.get("path", "."))
+        # Directory surfaces only: a single file or document surface is its own owner.
+        if (surface.get("status", "active") != "active" or surface.get("kind") == "template"
+                or surface.get("kind") in FILE_SURFACE_KINDS or path in {".", ""}):
+            continue
+        inside = [file for file in files if file == path or file.startswith(path.rstrip("/") + "/")]
+        if inside and not any(path_matches(file, pattern) for file in inside for patterns in doc_bindings.values() for pattern in patterns):
+            errors.append(
+                f"surface {surface.get('id')} ({path}) has no owning doc: add `<!-- covers: {path}/** -->` to the doc that "
+                f'explains it, or `make new KIND=doc NAME={surface.get("id")} GROUP=design COVERS="{path}/**" DESC="...; ..."`'
+            )
+    vision = project.get("vision", {})
+    accepted = isinstance(vision, dict) and vision.get("status") == "accepted"
+    ui_project = project.get("kind") in setting(root, "ui_kinds")
+    if ui_project:
+        errors += [
+            f"surface {surface.get('id')}: a UI project's quality_oracle must include the ux-quality screenshot review "
+            "(for example \"... plus ux-quality screenshot review at phone and desktop sizes\")"
+            for surface in declared_surfaces(project)
+            if surface.get("status", "active") == "active" and surface.get("kind") != "template"
+            and "ux-quality" not in str(surface.get("quality_oracle", ""))
+        ]
+    building = any(
+        surface.get("status", "active") == "active" and surface.get("kind") != "template"
+        for surface in declared_surfaces(project)
+    )
+    if accepted and ui_project and building and "docs/design.md" not in files:
+        errors.append(
+            'UI project without docs/design.md: record the chosen direction (product-kickoff step 5): '
+            'make new KIND=doc NAME=design GROUP=design DESC="Visual direction, tokens, and UX principles; before any UI work"'
+        )
+    owners = [*project.get("owners", []), *(surface.get("owner", "") for surface in declared_surfaces(project))]
+    errors += [
+        f"project.toml owner {owner!r} looks like an email; manifests are public, use a handle or team name"
+        for owner in sorted(set(owners))
+        if isinstance(owner, str) and EMAIL.fullmatch(owner.strip())
+    ]
     return errors
 
 

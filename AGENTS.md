@@ -17,8 +17,7 @@ the linked owner documents. **Golden path:** `make start`, then
 3. **Before editing:** `git status`, the current issue/PR, and `make risk`
    (ceremony for this change: low, normal, or high).
 4. **Finish:** update every doc covering what you changed, run `make done`,
-   and observe the real artifact. When pausing, run `make handover` and update
-   `HANDOVER.md` with the `agent-handover` skill.
+   and observe the real artifact. When pausing, run `make handover`.
 
 Code, tests, and runtime observations are evidence; a plausible explanation
 is not a diagnosis.
@@ -52,8 +51,8 @@ Before a behavior, schema, contract, security, privacy, or operational change:
    and topic. Update the matching issue when root cause and acceptance match.
 2. Otherwise create one from [`docs/ISSUE_TEMPLATE.md`](./docs/ISSUE_TEMPLATE.md)
    with `make issue`: intended behavior, scope, risks, and evidence-producing
-   acceptance criteria **before** implementation. A `Local-WAL` draft stages
-   this but does not authorize work. `regulated` filing needs
+   acceptance criteria **before** implementation. Without a GitHub remote,
+   `make issue` writes a `Local-WAL` draft to ignored `.agent/wal/`. `regulated` filing needs
    `PUBLIC_REVIEWED=1` plus `REVIEW_EVIDENCE`. Active vulnerabilities and
    sensitive personal data go to the private route in [`SECURITY.md`](./SECURITY.md);
    the disclosure class is an owner decision, and uncertain content stays private.

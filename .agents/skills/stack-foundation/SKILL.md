@@ -43,8 +43,11 @@ Scale the setup to the kickoff tier: a `prototype` needs steps 1 to 4; a
 
 ## Done when
 
-The walking skeleton is deployed to a preview, `make done` runs every gate
-above and passes, and a fresh agent can find the surface with `make where`.
+The walking skeleton is deployed to a preview (or runs locally when the owner
+has no host yet), `make done` runs every gate above and passes, and a fresh
+agent can find the surface with `make where`. `make check` enforces the owning
+doc and, in UI projects, the `ux-quality` review in the quality oracle; lint and
+the end-to-end smoke test are on you, so list them in `verification`.
 
 ## Never
 

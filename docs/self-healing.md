@@ -70,6 +70,20 @@ Markers are plain comments and work in any language:
 - A workflow `run:` block longer than 10 lines fails: CI logic belongs in
   `tools/` where it is unit-tested and runs locally (`repoctl ci <check>`).
 
+## Product guardrails
+
+Steps a fresh agent skipped in a real build trial are checks, each naming its fix:
+
+- A tracked backlog (`docs/*WAL*.md`, `TODO.md`, `BACKLOG.md`, `TASKS.md`,
+  `ROADMAP.md`) fails: live work goes to issues, or to ignored `.agent/wal/`
+  (`make issue` writes it there when the repository has no GitHub remote).
+- Every active product surface needs an owning doc: some `<!-- covers: -->`
+  binding must match files under its path.
+- In a UI project (`[kit].ui_kinds`, by `project.toml` kind) an accepted vision
+  requires `docs/design.md`, and each surface's `quality_oracle` must name the
+  `ux-quality` screenshot review.
+- Owners in `project.toml` must be handles or team names, not emails.
+
 ## Context budgets
 
 `project.toml [budgets]` maps globs to byte limits for files agents load often
@@ -113,7 +127,8 @@ the after-edit hook regenerates what depends on it. Agent-instruction paths are
 
 Policy a project may change lives in `project.toml`, with built-in defaults
 when a key is absent: `[kit]` (docs index groups, unbound-doc exemptions,
-overlap limit, deprecation warning window, skill review age), `[adapters.claude]`
+overlap limit, deprecation warning window, skill review age, UI project kinds,
+eval model), `[adapters.claude]`
 (tier-to-model and access-to-tools maps, pre-approved commands), `[risk]`
 (tier globs and optional ceremony text), and `[budgets]` (byte limits for any
 glob, including product code).

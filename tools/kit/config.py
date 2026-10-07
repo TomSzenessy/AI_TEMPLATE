@@ -27,6 +27,8 @@ DEFAULTS: dict[str, object] = {
     "overlap_limit": 0.30,
     "deprecation_warning_days": 30,
     "skill_review_days": 365,
+    # Project kinds whose product has a user interface (they need docs/design.md).
+    "ui_kinds": ["web", "app", "site", "pwa", "mobile", "ios", "android", "desktop", "game"],
     # Model for headless eval runs on hosts that accept one; cheap by default.
     "eval_model": "haiku",
 }

@@ -32,6 +32,7 @@ from .github import (
     check_github_duplicates,
     create_github_issue,
     duplicate_result_matches,
+    github_target_configured,
     load_label_registry,
     resolve_github_repo,
 )
@@ -344,7 +345,14 @@ def check_issue_for_duplicates(
         raise RepoctlError("regulated public issue filing requires --review-evidence")
     if not title.strip() or len(title) > 256:
         raise RepoctlError("issue title must contain 1-256 characters")
-    repository = resolve_github_repo(root)
+    try:
+        repository = resolve_github_repo(root)
+    except RepoctlError as error:
+        if github_target_configured(root, project):
+            raise  # a configured target that fails is a real error, not "no remote yet"
+        print(write_local_wal(root, title, body, labels))
+        print(f"(GitHub target unavailable: {error})")
+        return
     where = issue_section(body, "Where")
     search_terms = tuple(term for term in (topic, where) if term.strip())
     duplicate_results = check_github_duplicates(root, title, repository, search_terms)
@@ -358,6 +366,28 @@ def check_issue_for_duplicates(
         raise RepoctlError(f"possible duplicate {numbers}; update the existing issue instead")
     print(f"Filing in {repository}.")
     print(create_github_issue(root, repository, title, body, labels))
+
+
+LOCAL_WAL_DIR = ".agent/wal"
+
+
+def write_local_wal(root: Path, title: str, body: str, labels: list[str]) -> str:
+    """No GitHub target yet: keep the validated record in ignored .agent/wal/.
+
+    It is a pre-filing draft (Local-WAL), never a tracked backlog; file it as a
+    real issue with `make issue` once the repository has a GitHub remote.
+    """
+    directory = root / LOCAL_WAL_DIR
+    directory.mkdir(parents=True, exist_ok=True)
+    number = 1 + max((int(path.name.split("-", 1)[0]) for path in directory.glob("[0-9]*-*.md")), default=0)
+    target = directory / f"{number:03d}-{slugify(title)[:48] or 'record'}.md"
+    target.write_text(
+        f"# Local-WAL-{number:03d}: {title}\n\nLabels: {', '.join(labels)}\n\n{body.rstrip()}\n", encoding="utf-8"
+    )
+    return (
+        f"No GitHub target configured: wrote Local-WAL-{number:03d} to {target.relative_to(root).as_posix()} "
+        "(ignored; cite it as Local-WAL-NNN in commits and file it with make issue once a remote exists)"
+    )
 
 
 def validate_issue_file(root: Path, body_file: Path, status: str) -> None:

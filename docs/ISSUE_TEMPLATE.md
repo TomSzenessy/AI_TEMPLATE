@@ -8,6 +8,14 @@ the minimum shape for a new or materially updated issue. Search open and closed
 issues by title, symptom, path, and topic before filing; update the existing
 record when the root cause and acceptance boundary match.
 
+## No GitHub remote yet
+
+`make issue` validates the body exactly as for GitHub, then, when the
+repository has no GitHub target, writes it as `Local-WAL-NNN` to ignored
+`.agent/wal/`. Cite that id in commits and file it for real once a remote
+exists. Never keep live work in a tracked Markdown file; `make check` rejects
+tracked backlogs.
+
 ## Duplicate check
 
 Record one line in the issue:

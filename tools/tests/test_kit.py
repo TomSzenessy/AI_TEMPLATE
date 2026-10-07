@@ -424,6 +424,53 @@ class CriticRegressionTests(KitRepository):
         self.assertIn("too similar to skill:demo-skill", result.stderr)
 
 
+class ProjectGuardrailTests(KitRepository):
+    """Steps a fresh agent skipped in the build trial are now checked."""
+
+    def ui_project(self, oracle: str = "typecheck and tests") -> None:
+        text = (self.root / "project.toml").read_text().replace('kind = "web"', 'kind = "web"\nowners = ["me@example.com"]')
+        text += f'''[vision]
+status = "accepted"
+[[surfaces]]
+id = "app"
+path = "src"
+kind = "code"
+owner = "me@example.com"
+quality_oracle = "{oracle}"
+verification = [["true"]]
+'''
+        self.write("project.toml", text)
+
+    def test_guardrails_name_each_skipped_step(self) -> None:
+        self.ui_project()
+        self.write("docs/LOCAL-WAL.md", "# WAL\n")
+        findings = self.self_heal()
+        self.assertIn("docs/LOCAL-WAL.md: live work belongs in issues", findings)
+        self.assertIn("UI project without docs/design.md", findings)
+        self.assertIn("quality_oracle must include the ux-quality", findings)
+        self.assertEqual(findings.count("looks like an email"), 1)
+        self.assertNotIn("has no owning doc", findings, "docs/billing.md covers src/billing/**")
+
+    def test_surface_without_owning_doc(self) -> None:
+        self.ui_project("tests plus ux-quality screenshot review")
+        self.write("docs/billing.md", "# Billing\n\nNo binding any more.\n")
+        self.assertIn('surface app (src) has no owning doc', self.self_heal())
+
+    def test_issue_without_github_target_becomes_local_wal(self) -> None:
+        self.write("project.toml", (self.root / "project.toml").read_text() + '[governance]\nprofile = "agent-first"\n')
+        self.write(".github/issue-labels.json", (TOOLS.parent / ".github/issue-labels.json").read_text())
+        self.write("issue.md", DUPLICATE_LINE + "### Summary\nAdd a habit and check in today.\n"
+                   "### Acceptance criteria\n- [ ] The add test passes.\n- [ ] An empty name does not pass.\n"
+                   "### Evidence\nTest: unit output\n### Disclosure classification\n- **Disclosure class:** ordinary\n"
+                   "- **Public-safe:** yes\n- **Security/privacy review:** not applicable\n- **Reviewer/date:** tester 2026-10-01\n"
+                   "### Dependencies and handoff\n- **Owner / next action:** maintainer\n")
+        result = self.cli("issue", "--title", "First slice", "--body-file", "issue.md", "--type", "task",
+                          "--priority", "P2", "--area", "web", "--topic", "first-slice", "--status", "ready")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Local-WAL-001", result.stdout)
+        self.assertTrue((self.root / ".agent/wal/001-first-slice.md").is_file())
+
+
 class DerivedContentTests(KitRepository):
     def test_index_is_generated_from_declarations(self) -> None:
         self.write("docs/README.md", "# Index\n\n<!-- repoctl:index -->\n<!-- /repoctl:index -->\n")
