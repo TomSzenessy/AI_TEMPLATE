@@ -436,7 +436,7 @@ rollback = "none"
         self.write(".agents/skills/attacker/SKILL.md", "# Unregistered\n")
         result = self.cli("check")
         self.assertEqual(result.returncode, 1)
-        self.assertIn("not allowlisted", result.stderr)
+        self.assertIn("neither first-party", result.stderr)
 
     def test_review_packet_redacts_private_key_blocks_from_patch(self) -> None:
         subprocess.run(["git", "init", "-q"], cwd=self.root, check=True)
@@ -461,7 +461,7 @@ rollback = "none"
             self.assertIn("Disclosure classification", content)
             self.assertIn("public-safe", content)
         self.assertIn("[enhancement/P2]", (root / ".github/ISSUE_TEMPLATE/feature.yml").read_text(encoding="utf-8"))
-        workflow = (root / ".github/workflows/require-issue-reference.yml").read_text(encoding="utf-8")
+        workflow = (root / ".github/workflows/require-issue-reference.yml").read_text(encoding="utf-8") + (root / "tools/kit/ci.py").read_text(encoding="utf-8")
         self.assertIn("Fixes", workflow)
         self.assertIn("Security-Reference", workflow)
 
@@ -490,7 +490,7 @@ stack_decision = "docs/STACK-DECISION.md"
             self.assertIn("Disclosure classification", content)
             self.assertIn("public-safe", content)
         self.assertIn("[enhancement/P2]", (root / ".github/ISSUE_TEMPLATE/feature.yml").read_text(encoding="utf-8"))
-        workflow = (root / ".github/workflows/require-issue-reference.yml").read_text(encoding="utf-8")
+        workflow = (root / ".github/workflows/require-issue-reference.yml").read_text(encoding="utf-8") + (root / "tools/kit/ci.py").read_text(encoding="utf-8")
         self.assertIn("Fixes", workflow)
         self.assertIn("Security-Reference", workflow)
 
@@ -523,6 +523,38 @@ Test evidence: integration output; Artifact: review.md
         self.assertEqual(result.returncode, 0, result.stderr)
         ready = self.cli("validate-issue", "--body-file", "form-body.md", "--status", "ready")
         self.assertEqual(ready.returncode, 0, ready.stderr)
+
+    def test_checkbox_marker_is_not_a_placeholder(self) -> None:
+        self.write("project.toml", """schema = 1
+name = "Demo"
+kind = "web"
+phase = "development"
+[governance]
+profile = "agent-first"
+""")
+        body = """Duplicate check: searched title, symptom, and path for adapters; no duplicate found
+### Summary
+Add a manifest-driven adapter generator for one host.
+### Acceptance criteria
+- [ ] Adapters render from the canonical manifest without drift.
+- [ ] A drifted adapter does not pass silently; the gate rejects it.
+### Evidence
+Test evidence: unit test output.
+### Disclosure classification
+- **Disclosure class:** ordinary
+- **Public-safe:** yes
+- **Security/privacy review:** not applicable
+- **Reviewer/date:** tester 2026-08-25
+### Dependencies and handoff
+- **Owner / next action:** maintainer; review the branch
+"""
+        self.write("checkbox.md", body)
+        result = self.cli("validate-issue", "--body-file", "checkbox.md")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.write("placeholder.md", body.replace("Adapters render from the canonical manifest without drift.", "[criterion]"))
+        rejected = self.cli("validate-issue", "--body-file", "placeholder.md")
+        self.assertEqual(rejected.returncode, 1)
+        self.assertIn("evidence-bearing", rejected.stderr)
 
     def test_disclosure_class_and_security_terms_fail_closed(self) -> None:
         self.write("project.toml", """schema = 1
@@ -690,14 +722,14 @@ quality_oracle = "human review"
 
     def test_workflow_has_checkout_permissions_and_label_families(self) -> None:
         root = Path(__file__).resolve().parents[2]
-        issue_workflow = (root / ".github/workflows/issue-contract.yml").read_text(encoding="utf-8")
+        issue_workflow = (root / ".github/workflows/issue-contract.yml").read_text(encoding="utf-8") + (root / "tools/kit/ci.py").read_text(encoding="utf-8")
         self.assertIn("contents: read", issue_workflow)
         self.assertIn("actions/checkout@", issue_workflow)
         self.assertIn("topic", issue_workflow)
         self.assertIn("labeled", issue_workflow)
         self.assertIn("registry_path", issue_workflow)
         self.assertIn("Disclosure class", issue_workflow)
-        reference_workflow = (root / ".github/workflows/require-issue-reference.yml").read_text(encoding="utf-8")
+        reference_workflow = (root / ".github/workflows/require-issue-reference.yml").read_text(encoding="utf-8") + (root / "tools/kit/ci.py").read_text(encoding="utf-8")
         self.assertNotIn("security-events: read", reference_workflow)
         self.assertNotIn("security-advisories/", reference_workflow)
         self.assertIn("maintainer-attested", reference_workflow)
@@ -708,6 +740,11 @@ quality_oracle = "human review"
         self.assertIn("canonical issue contract", reference_workflow)
         self.assertIn("PR_AUTHOR_ASSOCIATION", reference_workflow)
         self.assertIn("private security prs require", reference_workflow.casefold())
+        for workflow_name, check in (("require-issue-reference.yml", "pr-reference"), ("issue-contract.yml", "issue-contract")):
+            text = (root / ".github/workflows" / workflow_name).read_text(encoding="utf-8")
+            # Logic lives in tested repository code; the workflow checks out, then calls it.
+            self.assertLess(text.index("actions/checkout@"), text.index(f"ci {check}"))
+            self.assertNotIn("python3 - <<", text)
         ci_workflow = (root / ".github/workflows/ci.yml").read_text(encoding="utf-8")
         self.assertNotIn("GH_TOKEN", ci_workflow)
         self.assertIn("permissions: {}", ci_workflow)
@@ -757,7 +794,7 @@ verification = [["python3", "-c", "print('ok')"]]
         self.assertIn("legal document", result.stderr)
         self.assertIn("security_reviewer", result.stderr)
     def test_readiness_output_does_not_claim_full_production_acceptance(self) -> None:
-        source = (Path(__file__).resolve().parents[1] / "repoctl.py").read_text(encoding="utf-8")
+        source = (Path(__file__).resolve().parents[1] / "kit" / "launch.py").read_text(encoding="utf-8")
         self.assertIn("not a full production-readiness", source)
         self.assertIn("docs/production.md", source)
 
@@ -790,10 +827,10 @@ verification = [["python3", "-c", "print('ok')"]]
             self.assertIn("Disclosure class", content)
             self.assertIn("public-safe", content)
         self.assertIn("[enhancement/P2]", (root / ".github/ISSUE_TEMPLATE/feature.yml").read_text(encoding="utf-8"))
-        issue_workflow = (root / ".github/workflows/issue-contract.yml").read_text(encoding="utf-8")
+        issue_workflow = (root / ".github/workflows/issue-contract.yml").read_text(encoding="utf-8") + (root / "tools/kit/ci.py").read_text(encoding="utf-8")
         self.assertIn("Regulated profile uses the CLI/private issue route", issue_workflow)
         self.assertIn("Minimal profile delegates issue intake", issue_workflow)
-        workflow = (root / ".github/workflows/require-issue-reference.yml").read_text(encoding="utf-8")
+        workflow = (root / ".github/workflows/require-issue-reference.yml").read_text(encoding="utf-8") + (root / "tools/kit/ci.py").read_text(encoding="utf-8")
         self.assertIn("Fixes", workflow)
         self.assertIn("private security prs require", workflow.casefold())
     def test_incident_updates_empty_docs_marker_and_passes_check(self) -> None:

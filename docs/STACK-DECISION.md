@@ -1,5 +1,7 @@
 # Stack decision record
 
+<!-- index: operate | Framework/toolchain decision and rationale | Choosing a project stack or replacing an assumed tool. -->
+
 Status: accepted for AI_TEMPLATE (no product framework)
 Project: AI_TEMPLATE
 
@@ -19,8 +21,10 @@ future project. A copied project must make its own decision after vision intake.
 
 ## Options considered
 
-For a website, compare the actual needs before choosing among static/Astro,
-React/Next, and other options; do not select from popularity alone. For games,
+Projects decide through the `product-kickoff` skill, which recommends from
+platforms, team, and constraints and verifies current versions before
+scaffolding. For a website, compare the actual needs before choosing among
+static/Astro, React/Next, and other options; do not select from popularity alone. For games,
 native, media, and data, compare the domain toolchain and artifact oracle rather
 than forcing the website matrix.
 

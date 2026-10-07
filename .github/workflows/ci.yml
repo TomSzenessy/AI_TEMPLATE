@@ -1,7 +1,10 @@
 name: ci
 
 on:
+  # Pull requests run the full path; pushes only on the default branch, so a
+  # pull request's commits are not verified twice.
   push:
+    branches: [main]
   pull_request:
 
 permissions: {}
@@ -21,6 +24,8 @@ jobs:
       - name: Check out pinned revision
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
+          # Full history lets make verify detect stale documents (docs/self-healing.md).
+          fetch-depth: 0
           persist-credentials: false
       - name: Run the declared verification path
         run: make verify

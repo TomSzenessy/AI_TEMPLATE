@@ -1,209 +1,111 @@
 # AI_TEMPLATE
-A portable GitHub repository for building a website, game, backend, native app,
-Blender/3D scene, video, data product, document, or something new. It gives any
-coding agent a small map, an issue-backed write-ahead record, safe defaults, and
-a verification loop that keeps the repository lean as the product changes.
 
-This is a **technical starting point**, not a promise of GDPR, legal, security,
-accessibility, or performance compliance. Those claims require project-specific
-facts, runtime evidence, and qualified review.
+<!-- repoctl:description -->
+Self-healing starting point for AI-agent-built projects of any size: docs bound to code, generated host adapters, delegation roles, and deterministic gates for any agent or model.
+<!-- /repoctl:description -->
 
-## Requirements
+A starting point for any project built mostly by AI coding agents: website,
+game, backend, native app, 3D or video pipeline, data product, documents, or
+something new. It works with any agent host (Claude Code, Codex, Copilot,
+Cursor, Gemini) and any model, because the rules that matter are **executed by
+tools**, not remembered by the agent.
 
-The governance CLI uses only the Python standard library but requires
-**Python 3.11+** (`tomllib`). Node, language toolchains, Blender, FFmpeg, or
-other project tools are declared by the individual project surface.
+This is a technical starting point, not a promise of legal, security, privacy,
+accessibility, or performance compliance. Those claims need project facts,
+runtime evidence, and qualified review.
 
-## Governance profile
+## Why
 
-The default `agent-first` profile is intentionally lean: `repoctl` owns
-manifest/path safety, issue-backed intent, declared verification, and the local
-review packet. Public-launch and regulated projects can set
-`[governance].profile = "regulated"` to require the full issue and disclosure
-record. Use native GitHub forms for human intake, Gitleaks/TruffleHog and
-lychee for specialist CI, and pre-commit where the team wants local hooks.
+Agents are fast at the start of a project and sloppy at the end of a long
+session: docs stop matching the code, replaced code is never deleted,
+navigation goes stale, and the next session starts blind. In a large codebase
+that compounds until every bug fix is archaeology. This template turns the
+upkeep into deterministic checks and hooks, so the repository heals itself and
+any agent can pick it up cold.
 
-## Which document answers which question?
-
-| Question | Read |
-|---|---|
-| Why does this repository exist and how do I start? | This `README.md` |
-| What should an agent do in its first session? | [`docs/START-HERE.md`](./docs/START-HERE.md) |
-| What rules always apply to agents? | [`AGENTS.md`](./AGENTS.md) |
-| Where is the durable documentation owner? | [`docs/README.md`](./docs/README.md) |
-| Where do I find official examples, licenses, and platform guidance? | [`docs/resources.md`](./docs/resources.md) |
-| How does the small kernel become a product? | [`docs/ADAPTATION.md`](./docs/ADAPTATION.md) |
-| Is a real project ready for production? | [`docs/production.md`](./docs/production.md) |
-| What is this project trying to become? | [`VISION.md`](./VISION.md) |
-| Why this stack/toolchain? | [`docs/STACK-DECISION.md`](./docs/STACK-DECISION.md) |
-| What work is active right now? | GitHub Issues, not a Markdown backlog |
-
-These documents intentionally overlap only at their entry points. The README
-is the public landing page, START-HERE is a short first-session checklist, and
-`AGENTS.md` is the always-loaded trigger router.
-
-## Start in five minutes
+## Start a project
 
 <!-- repoctl:quickstart -->
 ```bash
-# In a copy of this repository:
-git init
-make init NAME=my-project KIND=web
-# Then complete VISION.md and docs/STACK-DECISION.md, replace the license,
-# owners, surfaces, and project-specific checks.
-make inventory
-make check
+# Click "Use this template" on GitHub (or clone), then in the new repository:
+make init NAME=my-project KIND=web   # identity, pending vision, prunes template-only files
+make start                            # session brief; installs the git commit gate
+make check                            # everything green before the first change
 ```
 <!-- /repoctl:quickstart -->
 
-`make init` sets identity and phase, clears the configured GitHub target,
-replaces template-owned owner/surface state, marks the vision and stack records
-pending, and rewrites the README quick start. It does not invent application
-folders or choose a framework. The published `AI_TEMPLATE` can be reinitialized
-in a copy; other already-initialized projects require an explicit manifest
-edit. `make doctor` intentionally reports the license, owner, surface, and
-launch gates that a real project must decide. Replace those gates in
-`project.toml`, complete `VISION.md` and `docs/STACK-DECISION.md`, declare each
-real surface and its verification, then rerun the doctor.
+Then tell your agent what to build. It runs the `product-kickoff` skill first:
+one round of questions with recommendations (users, platforms, stack such as
+Next.js + Tailwind, Expo, Flutter, or SwiftUI, visual style), two or three
+mockup directions to choose from, and the decisions recorded in `VISION.md`,
+`docs/STACK-DECISION.md`, and `docs/design.md`, plus an epic of vertical-slice
+issues. The `stack-foundation` skill then builds a deployed walking skeleton with
+strict types, lint, tests, CI, previews, and error tracking; UI work follows the
+`ux-quality` skill and gets screenshot reviews. `make init` itself never invents
+folders or picks a framework for you.
 
 <!-- repoctl:project-readme -->
 > Project initialized: **AI_TEMPLATE** (`template`). Keep this identity,
 > launch state, and project-specific quick start current.
 
-## The operating loop
+## How it stays healthy
 
-```text
-brief → issue-backed intent → inspect/reproduce → design seam
-      → smallest implementation → declared checks → real artifact
-      → fresh critic → reconcile issue/docs/manifest → close or link residual
-```
-
-`AGENTS.md` is the canonical agent contract. `CLAUDE.md`, `GEMINI.md`, and
-`.github/copilot-instructions.md` are deliberately tiny host adapters that point
-to it; they do not become competing instruction sources.
-
-## Repository map
-
-| Path | Owns |
+| What goes wrong in agent-built codebases | What this template does about it |
 |---|---|
-| `AGENTS.md` | The short operating contract and trigger router. |
-| `docs/START-HERE.md` | The shortest first-session checklist for a new agent or maintainer. |
-| `project.toml` | Machine-readable surfaces, quality oracles, checks, launch state, and reviewed skills. |
-| `VISION.md` | Accepted product direction, constraints, success evidence, and intake questions. |
-| `docs/STACK-DECISION.md` | Framework/toolchain decision and confirmation boundary. |
-| `docs/README.md` | Human navigation index; every durable document is one hop away. |
-| `docs/ISSUE_TEMPLATE.md` | Canonical GitHub Issue record. |
-| `docs/audit.md` | Whole-repository audit and issue-filing protocol. |
-| `docs/operations.md` | Reproduce → diagnose → repair → verify loop and error ledger. |
-| `docs/verification.md` | Evidence ladder and independent quality loop. |
-| `docs/production.md` | Production evidence, release sequence, and external-gate boundary. |
-| `docs/security.md` / `SECURITY.md` | Engineering threat model and private vulnerability reporting. |
-| `docs/privacy.md` / `docs/legal/` | Data inventory, rights workflow, and jurisdiction/counsel gate. |
-| `resources.toml` / `docs/resources.md` | Machine-readable and human-readable primary resource/MCP routes. |
-| `docs/skills.md` | Safe skill discovery, inspection, pinning, and provenance. |
-| `HANDOVER.template.md` | Concise local session-continuation record; copied to ignored `HANDOVER.md` when needed. |
-| `docs/handoffs/` | Deliberate committed cross-session continuation records. |
-| `.agents/skills/` | Small project-local handover, quality-loop, and audit workflows, plus the reviewed reference-product capability pack (see `docs/skills.md` and `THIRD_PARTY_NOTICES.md`). |
-| `tools/repoctl.py` | Zero-dependency structure checks, issue guard, incident creation, and review packets. |
-| `.github/ISSUE_TEMPLATE/` | GitHub-native bug and improvement forms. |
-| `.github/workflows/` | Least-privilege CI that runs the same verification path. |
+| Docs drift from the code | Docs declare `<!-- covers: -->` paths; stale or dead bindings fail `make check`, and the git commit gate and agent stop hook refuse changes that skip the owning doc. |
+| Replaced code lingers as duplicates | `DEPRECATED(remove-by=YYYY-MM-DD)` markers fail after their date; task markers need an issue; `make garden` reports duplicated prose and every rot finding weekly. |
+| Context is lost between sessions | Session hooks (or `make start`) print a brief; a checkpoint is written before compaction; `make handover` pre-fills the next session's record. |
+| Too much to read, too many places | `AGENTS.md` is a budgeted router loaded into every session; the docs index and host files are generated; `make where` finds code, owners, and past failures in one call. |
+| One agent tries to hold everything | Six roles (scout, implementer, critic, researcher, doc-gardener, skill-scout) with a fixed brief and short reports keep the orchestrator's context for decisions. |
+| Every agent host wants its own files | Skills, roles, and MCP routes have one canonical copy in `.agents/` and `resources.toml`; `make sync` generates content-free host adapters. |
+| "Done" means "it compiled" | Risk tiers set the ceremony; an independent critic and the real artifact decide; `make eval` measures whether a fresh agent can still navigate. |
 
-## What “self-structuring” means here
+The mechanics are in [`docs/self-healing.md`](./docs/self-healing.md) and
+[`docs/delegation.md`](./docs/delegation.md).
 
-The agent first discovers the real repository, declares only independently
-owned and verifiable surfaces, and adds scoped instructions only where rules
-actually differ. It keeps one owner for each changing fact, routes durable
-knowledge through `docs/README.md`, and moves live tasks/status to GitHub
-Issues. It can create a durable incident record when a failure needs a
-regression artifact.
-
-It does not blindly generate a framework, split a small product into
-microservices, install an unverified skill, delete apparently unused code, or
-publish legal text. Those are decisions with evidence and owner boundaries.
-
-## What “self-healing” means here
-
-The template cannot repair every unknown production problem autonomously. It
-makes the repair loop observable and repeatable:
-
-- `make check` detects manifest drift, missing docs/index entries, broken local
-  links, and obvious tracked-secret hygiene failures.
-- `make verify` runs the declared verification for every active surface.
-- `make incident TITLE="..." SUMMARY="..."` creates a private incident draft;
-  use `PUBLIC_SAFE=1` only after redaction/review to promote it to tracked docs.
-- `make issue ...` validates an issue and refuses exact GitHub duplicates.
-- `make review-packet ISSUE_FILE=...` gives a fresh critic an independent,
-  bounded quality/spec review.
-- CI repeats the checks with least privilege and pinned action revisions.
-
-A green check never substitutes for observing the real rendered artifact,
-persisted state, deployed provider, hardware, or counsel evidence.
-
-## Independent quality loop
-
-For substantial work, the agent may fan out bounded builder tasks by surface,
-then give a fresh critic the original acceptance criteria and the real output.
-This generalizes the useful Matt Shumer “fan out, harsh critic, iterate” pattern
-without pretending that “perfect” is measurable. Visual work uses rendered
-comparisons; games use play/performance traces; backends use real state and
-failure paths; video/3D use reproducible renders and playback/frame checks.
-After three focused iterations, unresolved trade-offs become an issue.
-
-## Issues instead of documentation sprawl
-
-GitHub Issues are the live task register, write-ahead record, priority queue,
-and evidence log. Use [`docs/ISSUE_TEMPLATE.md`](./docs/ISSUE_TEMPLATE.md), and
-file/update one issue per independent root cause. Durable docs explain the
-product, architecture, runbook, legal/privacy facts, and decisions; they do not
-become a second status board.
-
-Before filing an issue, authenticate the GitHub CLI on the host and run
-`make labels` once to create/update the repository taxonomy. If the checkout has
-no trusted remote, set `repository.github = "owner/name"` in `project.toml`.
-Search open/closed issues and the error ledger. The `repoctl issue` command then
-searches exact-title and bounded topical/path duplicates and files a classified
-issue with the canonical body. In `regulated` profile, public filing requires an explicit disclosure
-review and a repository-relative `REVIEW_EVIDENCE` record; in `agent-first`, the
-record is optional for ordinary public-safe work but recommended for sensitive
-or release work. For example:
+## Everyday commands
 
 ```bash
-make issue BODY=.agent/issue.md TITLE="..." TYPE=bug PRIORITY=P1 \
-  AREA=web TOPIC=example-topic STATUS=triage SURFACE=web \
-  PUBLIC_REVIEWED=1 REVIEW_EVIDENCE=.agent/review.md
+make start        # session brief (hosted agents get it automatically)
+make where Q="checkout flow"   # paths, symbols, owning docs, past failures
+make risk         # how much ceremony this branch's change needs
+make done         # before saying "done": heal derived files, gates, all tests
+make similar Q="release notes"                      # is there already a skill/role for this?
+make new KIND=skill NAME=release-notes DESC="..."   # add a skill, agent role, or doc, wired in
+make garden       # full rot report
+make sync         # regenerate derived files after editing their sources
+make help         # everything else
 ```
 
-It is a guardrail, not a replacement for human judgment. The disclosure class is
-an explicit owner/reviewer decision, and the keyword blocklist is only a
-conservative secondary signal; uncertain security/privacy content belongs in
-the private route.
+## Layout
 
-## Non-code projects
+| Path | Role |
+|---|---|
+| `AGENTS.md` | The operating contract and trigger router (imported by `CLAUDE.md` and `GEMINI.md`). |
+| `project.toml`, `resources.toml` | Machine-readable truth: surfaces, checks, budgets, risk tiers, provenance, resource and MCP routes. |
+| `.agents/` | Canonical skills, subagent roles, and the fresh-agent benchmark. |
+| `.claude/`, `.mcp.json` | Generated host adapters; never edited by hand. |
+| `docs/` | One owner document per concern; [`docs/README.md`](./docs/README.md) is the generated index. |
+| `tools/` | `repoctl` (standard-library Python 3.11+) and its focused `kit/` modules. |
+| `.githooks/`, `.github/` | The commit gate, CI, the weekly gardener, and issue forms. |
 
-The same structure supports creative work. Declare surfaces such as `scenes`,
-`renders`, `footage`, `audio`, `assets`, or `documents`, give each a reproducible
-quality oracle, and keep large source media in appropriate storage rather than
-accidentally committing caches or temporary exports. The agent can discover a
-missing skill for Blender, video, frontend, game, or another specialty, but it
-must inspect and pin the source before use.
+Live work, status, and acceptance evidence belong in GitHub Issues, never in a
+Markdown backlog. See [`docs/ISSUE_TEMPLATE.md`](./docs/ISSUE_TEMPLATE.md) and
+[`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
-## Research and provenance
+## Requirements
 
-Primary-source findings and their boundaries are recorded in
-[`docs/research/agentic-repository-baselines.md`](./docs/research/agentic-repository-baselines.md)
-and the fresh
-[`docs/research/primary-source-hardening-2026-09-25.md`](./docs/research/primary-source-hardening-2026-09-25.md).
-The template incorporates current guidance from OpenAI, Anthropic, GitHub,
-NIST, SLSA, OpenSSF, OWASP, W3C, OpenTelemetry, the European Commission/EDPB,
-EUR-Lex, and ICO where applicable. Those sources inform defaults; they do not
-certify this repository or a future project.
+Python 3.11+ and git. Optional: the GitHub CLI (`gh`) for issues and
+`make github-sync`, and Node for the Playwright MCP route. Project toolchains
+are declared per surface in `project.toml`.
 
-## Before publishing
+## Before publishing a real project
 
-Select and add the project license, name accountable owners, configure GitHub
-branch protection/review/secret scanning/Dependabot, replace legal placeholders
-with verified facts, obtain counsel review where applicable, and attach runtime,
-provider, deployment, hardware, or counsel evidence to the launch issue. See
-[`docs/production.md`](./docs/production.md),
-[`docs/legal/README.md`](./docs/legal/README.md), and
-[`docs/verification.md`](./docs/verification.md).
+Select a license, name accountable owners, configure branch protection and
+secret scanning, replace legal placeholders with verified facts, and attach
+runtime, provider, and counsel evidence to the launch issue. Start at
+[`docs/production.md`](./docs/production.md).
+
+The research behind these defaults is in the template repository
+([baselines](./docs/research/agentic-repository-baselines.md)); `make init`
+removes it from new projects and points this link at the template.

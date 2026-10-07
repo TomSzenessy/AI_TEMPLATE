@@ -1,5 +1,7 @@
 # Privacy engineering
 
+<!-- index: launch | Privacy-by-design engineering and rights workflow | Personal data, telemetry, cookies, retention, or user rights exist. -->
+
 Privacy is a data-lifecycle property. This document starts the engineering
 process; it is not legal advice or a GDPR conformity certificate.
 

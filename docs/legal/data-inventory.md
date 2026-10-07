@@ -1,5 +1,7 @@
 # Data inventory and processing register
 
+<!-- index: launch | Factual data-flow inventory | A data field, vendor, retention period, or transfer is added. -->
+
 Project: `[REPLACE_WITH_PROJECT_NAME]`
 Date: `[YYYY-MM-DD]`
 Reviewer: `[name/team]`

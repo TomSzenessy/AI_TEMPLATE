@@ -17,6 +17,17 @@ github = "TomSzenessy/AI_TEMPLATE"
 # Add project-specific generated/infrastructure paths here when the defaults
 # are not enough. Product surfaces still belong in [[surfaces]].
 infrastructure_paths = []
+# Single source for the README description block and the GitHub repository
+# metadata (`make sync` renders the README; `make github-sync` applies GitHub).
+description = "Self-healing starting point for AI-agent-built projects of any size: docs bound to code, generated host adapters, delegation roles, and deterministic gates for any agent or model."
+topics = ["ai-agents", "agents-md", "claude-code", "codex", "mcp", "template", "self-healing", "developer-tools"]
+is_template = true
+
+[template]
+# Template-only material that `make init` removes from new projects; relative
+# links to removed files are rewritten to `source` so nothing breaks.
+source = "https://github.com/TomSzenessy/AI_TEMPLATE"
+prune = ["docs/research/**"]
 
 [vision]
 status = "accepted"
@@ -31,6 +42,50 @@ label_registry = ".github/issue-labels.json"
 [resources]
 # Read-only resource/MCP starting points; never an automatic install manifest.
 registry = "resources.toml"
+
+[adapters]
+# Hosts that get generated adapter files (docs/self-healing.md#host-adapters).
+# Codex, Copilot, and Cursor read AGENTS.md and .agents/ without adapters.
+hosts = ["claude"]
+
+# Optional per-host overrides; omitted keys keep the kit defaults.
+# [adapters.claude]
+# models = { fast = "haiku", balanced = "sonnet", deep = "opus" }   # role tier -> model
+# tools = { "read-only" = "Read, Grep, Glob, Bash" }               # role access -> tools
+# allow = ["make start", "make done", "make where:*"]               # pre-approved commands
+
+[kit]
+# Optional tunables (docs/self-healing.md); omitted keys keep the defaults.
+# doc_groups = { operate = "Start and operate", design = "Design and engineering", launch = "Product, privacy, and launch", extend = "Extensibility and evidence" }
+# unbound_docs_ok = ["docs/legal/**", "docs/research/**"]
+# overlap_limit = 0.30
+# deprecation_warning_days = 30
+# skill_review_days = 365
+# eval_model = "haiku"   # model for `make eval` on Claude (cheap by default)
+
+[capabilities]
+# First-party skills written in this repository (`make new KIND=skill` adds
+# them here). Third-party skills instead need [[skills]] provenance below.
+local_skills = ["product-kickoff", "stack-foundation", "ux-quality"]
+
+[budgets]
+# Byte limits (~4 bytes/token) for files agents load often; make check enforces.
+"AGENTS.md" = 7000
+"docs/README.md" = 9500
+"tools/kit/*.py" = 32000  # keep kit modules agent-sized; add budgets for product code too
+".agents/agents/*.md" = 3000
+".agents/skills/*/SKILL.md" = 8000
+
+[risk]
+# Ceremony tiers for `make risk` (first match wins, high before low; the rest
+# is normal). Tune per project; never widen low to dodge a gate.
+high = [
+  "tools/**", ".github/**", ".security/**", "project.toml", "resources.toml",
+  "AGENTS.md", "CLAUDE.md", "GEMINI.md", ".agents/**", ".claude/**", ".mcp.json",
+  "**/auth/**", "**/migrations/**", "**/*.sql", "**/secrets/**", "**/infra/**",
+]
+low = ["docs/**", "**/*.md"]
+# ceremony = { normal = "issue, focused test, make done, observed artifact" }   # optional per-tier text
 
 [security]
 contact = ""
@@ -58,6 +113,7 @@ legal_document_paths = []
 # quality_oracle = "Playwright smoke test plus a fresh visual review"
 # critic_evidence = ["artifacts/reviews/app-123.md"]
 # verification = [["npm", "ci"], ["npm", "test"]]
+# garden = [["npx", "knip"]]   # optional rot finders run by `make garden`
 #
 # Reviewed third-party skills are recorded as provenance, not installed globally.
 # Retain a verified capability while it remains trusted and useful; update the
@@ -82,7 +138,7 @@ kind = "template"
 owner = "TomSzenessy"
 status = "active"
 quality_oracle = "Fresh-agent navigation, contract checks, and bounded review packet inspection"
-verification = [["python3", "tools/repoctl.py", "check"]]
+verification = [["tools/repoctl", "check"]]
 
 # Reviewed capability pack adapted from Jakeschincariol/replica-skill (MIT).
 # `purpose` names the upstream skill each local skill adapts, because adapted

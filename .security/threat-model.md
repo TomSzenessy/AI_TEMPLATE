@@ -1,5 +1,7 @@
 # Threat Model — Agent Template
 
+<!-- index: design | STRIDE threat model and accepted trust boundaries | A security-sensitive tool, CI path, or agent permission is reviewed. -->
+
 **Last Updated:** 2026-09-25
 **Version:** 1.2.0
 **Methodology:** STRIDE + natural-language analysis

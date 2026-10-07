@@ -115,3 +115,86 @@ access = "read-only"
 mcp = "find-skills"
 scope = "agent"
 summary = "Skill discovery directory; inspect source, license, permissions, and revision before use."
+
+[[resources]]
+id = "apple-hig"
+kind = "design"
+source = "https://developer.apple.com/design/human-interface-guidelines"
+trust = "official"
+access = "read-only"
+scope = "apple"
+summary = "Apple Human Interface Guidelines: platform conventions, components, typography, accessibility."
+
+[[resources]]
+id = "material-design"
+kind = "design"
+source = "https://m3.material.io/"
+trust = "official"
+access = "read-only"
+scope = "android"
+summary = "Material Design 3: Android and cross-platform components, color, type, and motion system."
+
+[[resources]]
+id = "flutter-docs"
+kind = "library-docs"
+source = "https://docs.flutter.dev/"
+trust = "official"
+access = "read-only"
+mcp = "context7"
+scope = "mobile"
+summary = "Official Flutter framework, widget, tooling, and platform-integration documentation."
+
+[[resources]]
+id = "nngroup-heuristics"
+kind = "design"
+source = "https://www.nngroup.com/articles/ten-usability-heuristics/"
+trust = "reviewed"
+access = "read-only"
+scope = "ux"
+summary = "Nielsen Norman Group's ten usability heuristics; the baseline for UX reviews."
+
+[[resources]]
+id = "laws-of-ux"
+kind = "design"
+source = "https://lawsofux.com/"
+trust = "reviewed"
+access = "read-only"
+scope = "ux"
+summary = "Psychology principles behind interface design (Hick, Fitts, Jakob, peak-end, and more)."
+
+[[resources]]
+id = "deceptive-patterns"
+kind = "design"
+source = "https://www.deceptive.design/types"
+trust = "reviewed"
+access = "read-only"
+scope = "ux"
+summary = "Catalogue of deceptive (dark) patterns to avoid in onboarding, pricing, and consent."
+
+# MCP routes: the single source for agent tool servers. `make sync` renders
+# enabled routes into host configs (for Claude Code: .mcp.json plus an explicit
+# approval list). Keys never live here: `env_headers` maps an HTTP header to the
+# environment variable that supplies it; unset variables send an empty value,
+# which these services treat as anonymous/free tier. Pin stdio packages exactly.
+[[mcp]]
+id = "context7"
+transport = "http"
+url = "https://mcp.context7.com/mcp"
+env_headers = { CONTEXT7_API_KEY = "CONTEXT7_API_KEY" }
+enabled = true
+purpose = "Current, version-specific library documentation for the libraries in resources and the stack."
+
+[[mcp]]
+id = "exa"
+transport = "http"
+url = "https://mcp.exa.ai/mcp"
+env_headers = { "x-api-key" = "EXA_API_KEY" }
+enabled = true
+purpose = "Web search and page fetching for research beyond the host's built-in search."
+
+[[mcp]]
+id = "playwright"
+transport = "stdio"
+command = ["npx", "-y", "@playwright/mcp@0.0.83"]
+enabled = true
+purpose = "Real browser for UI verification, screenshots, accessibility snapshots, and pages that need JavaScript."

@@ -1,5 +1,7 @@
 # Architecture decision records
 
+<!-- index: extend | Architecture decision record rules | A hard-to-reverse, surprising trade-off is made. -->
+
 Create an ADR only when a decision is hard to reverse, surprising without
 context, and based on a real trade-off. Use sequential names such as
 `0001-choose-event-store.md`.

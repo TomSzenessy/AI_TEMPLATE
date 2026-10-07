@@ -10,7 +10,9 @@ For a short self-contained change, use the normal issue and verification loop.
 
 ## Start or resume
 
-1. Check directly for root `HANDOVER.md`; read it completely if present.
+1. Check directly for root `HANDOVER.md`; read it completely if present. A
+   hooked host already printed it in the session brief (`make start` otherwise),
+   and `.agent/checkpoint.md` holds the last pre-compaction snapshot.
 2. Compare it with the current branch, working tree, manifest, and linked issue.
    Treat the working tree and current repository state as authoritative when
    they disagree.
@@ -24,8 +26,9 @@ Reference issues, commits, specs, and ADRs instead of copying them.
 
 ## Conclude or pause
 
-1. Copy [`../../../HANDOVER.template.md`](../../../HANDOVER.template.md) to root
-   `HANDOVER.md` when a local continuation record is useful.
+1. Run `make handover` to create root `HANDOVER.md` from
+   [`../../../docs/handoffs/TEMPLATE.md`](../../../docs/handoffs/TEMPLATE.md)
+   with the git facts pre-filled (it never overwrites an existing one).
 2. Update every section concisely and remove stale claims.
 3. Use [`../../../docs/handoffs/TEMPLATE.md`](../../../docs/handoffs/TEMPLATE.md)
    for a committed cross-machine handoff, then add it to the docs index.

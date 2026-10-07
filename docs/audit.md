@@ -1,5 +1,7 @@
 # Whole-repository audit protocol
 
+<!-- index: operate | Whole-repository audit protocol | Finding, prioritizing, and filing improvements without implementing them. -->
+
 Use this when the user asks for a broad health, quality, dead-code, scalability,
 or improvement audit. The default deliverable is an **ephemeral,
 evidence-backed report**; file/update GitHub Issues only when the user

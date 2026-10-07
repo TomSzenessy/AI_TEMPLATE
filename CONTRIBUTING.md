@@ -1,5 +1,7 @@
 # Contributing
 
+<!-- index: design | Human contribution and review flow | A person or agent prepares a branch or pull request. -->
+
 ## Before changing code
 
 1. Read [`AGENTS.md`](./AGENTS.md), [`docs/README.md`](./docs/README.md), and the
@@ -18,7 +20,7 @@
 - Keep the change scoped to the issue; separate unrelated cleanup into issues.
 - Add or update a regression/contract test and durable documentation in the
   same change.
-- Run focused checks, `make verify`, and the real artifact check.
+- Run focused checks, `make done`, and the real artifact check.
 - Use a fresh reviewer for broad, subjective, security-sensitive, or release
   work. Address blockers; record residual uncertainty honestly.
 - Link the issue (`Fixes #N` or `Refs #N`) and include commands, observed
@@ -30,7 +32,10 @@
 
 ## Commits and issues
 
-Small, reviewable commits with a clear intent are preferred. GitHub Issues are
+Small, reviewable commits with a clear intent are preferred. Run `make done`
+before committing; the git commit gate repeats its docs checks. When a commit changes code that a document covers but
+genuinely does not affect it, add the trailer
+`Docs-Unaffected: docs/<file>.md <reason>` so the stale-document check accepts it. GitHub Issues are
 the live task/status register; do not recreate that register in Markdown.
 
 Dependabot's automated PRs are reviewed as dependency changes and skip the

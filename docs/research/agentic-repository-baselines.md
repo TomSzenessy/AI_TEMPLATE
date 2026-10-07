@@ -1,5 +1,7 @@
 # Agentic repository baselines: primary-source research
 
+<!-- index: extend | Primary-source research behind the template | Guidance, legal boundaries, or external references need provenance. -->
+
 **Research cutoff and access date:** 2026-08-25
 **Scope:** portable, agent-first GitHub repository templates; agent instructions; secure delivery; product quality; privacy and launch readiness; Agent Skills discovery and vetting.
 **Method:** first-party specifications, standards, regulator guidance, official product documentation, and first-party engineering reports. Recommendations that are not direct source claims are labelled **[Inference]** or **[Template decision]**.

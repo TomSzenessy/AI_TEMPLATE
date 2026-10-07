@@ -1,5 +1,7 @@
 # Operations and incident loop
 
+<!-- index: operate | Failure loop and error ledger rules | A bug, outage, flaky test, or operational failure occurs. -->
+
 This repository treats an operational failure as evidence, not as an instruction
 to patch the first suspicious line.
 
@@ -8,7 +10,8 @@ to patch the first suspicious line.
 1. **Observe:** capture UTC time, environment/version, exact symptom, affected
    surface, user impact, and redacted logs or traces. Stop secret/personal-data
    spreading.
-2. **Search:** inspect [`ERROR_LOG.md`](./ERROR_LOG.md), open/closed issues, and
+2. **Search:** run `make where Q="<error signature>"` (it searches the error
+   ledger, incidents, symbols, and owning docs), then open/closed issues and
    recent changes for the same signature. Reuse the existing issue when the
    root cause and acceptance boundary match.
 3. **Reproduce:** create the smallest deterministic repro or failing regression
@@ -18,7 +21,7 @@ to patch the first suspicious line.
    Instrument the boundary where the symptom is observable.
 5. **Repair:** change one owner at a time, preserve a rollback, and keep the
    regression test.
-6. **Verify:** run focused checks, `make verify`, and the real user path or
+6. **Verify:** run focused checks, `make done`, and the real user path or
    artifact. Compare state before/after; a successful request is not proof of
    persistence or deletion.
 7. **Reconcile:** add the permanent error-ledger entry, update the issue with

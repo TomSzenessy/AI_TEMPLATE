@@ -1,5 +1,8 @@
 # Production readiness
 
+<!-- index: operate | Production evidence and release boundary | A real project is being prepared for deployment or release. -->
+<!-- covers: tools/kit/launch.py -->
+
 The template is a production **governance kernel**, not a production product.
 A copied project becomes production-ready only when its own facts and evidence
 fill the gates below. No document, scanner, MCP response, or green test proves
@@ -68,6 +71,14 @@ another.
 
 The primary-source rationale for the MCP/resource and evidence boundary is in
 [`research/mcp-production-boundaries-2026-09-25.md`](./research/mcp-production-boundaries-2026-09-25.md).
+
+## Measure and learn
+
+After launch, check the success metric from `VISION.md` with the
+privacy-respecting measurement planned at kickoff, review error tracking and
+performance against budgets, and read real user feedback (run `review-mining`
+on your own product's reviews). Each confirmed problem or opportunity becomes an
+issue; the slice order changes on evidence, not on opinion.
 
 ## Optional MCP and resource use
 

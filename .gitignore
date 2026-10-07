@@ -33,3 +33,8 @@ vendor/
 .security/report.md
 .security/reports/
 *.swp
+
+# Agent host local state (generated adapters under .claude/ are tracked)
+.claude/settings.local.json
+.claude/worktrees/
+.mcp.local.json

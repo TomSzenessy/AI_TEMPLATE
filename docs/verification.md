@@ -1,5 +1,7 @@
 # Verification and independent quality loop
 
+<!-- index: operate | Definition of done, evidence ladder, and quality loop | A change is ready for review or a quality claim is made. -->
+
 “Done” means the issue's acceptance criteria have observable evidence. A build,
 lint run, or green return code is necessary but not sufficient.
 
@@ -32,7 +34,8 @@ Use the smallest sufficient evidence, then escalate:
    local binding check; live API/advisory verification belongs to a separately
    authorized evidence record, not general repository verification.
 
-The pull-request issue-reference workflow requires a closing keyword, an open
+The pull-request issue-reference check (`repoctl ci pr-reference`, run by the
+workflow and testable locally) requires a closing keyword, an open
 issue rather than a pull request, and the profile's canonical issue headings and
 duplicate-search record. GitHub issues are editable, so this is not by itself
 proof that the acceptance contract predated implementation or remained
@@ -62,8 +65,9 @@ or other measurable oracle.
 
 ## Domain oracles
 
-- **Web/app:** functional browser path, responsive screenshots, accessibility,
-  performance budget, and no console/network errors on the critical path.
+- **Web/app:** functional browser path, responsive screenshots reviewed against
+  the `ux-quality` skill, accessibility, performance budget, and no
+  console/network errors on the critical path.
 - **Game:** deterministic gameplay scenario, input/frame/performance trace,
   save/load check, and rendered play session at target settings.
 - **3D/Blender:** deterministic scene/render command, geometry/material sanity,
@@ -75,9 +79,15 @@ or other measurable oracle.
 - **Legal/privacy:** factual source inventory, link/format validation, counsel
   gate where applicable, and a rendered human review.
 
+## Ceremony by risk
+
+`make risk` classifies the change set (see [`self-healing.md`](./self-healing.md#ceremony-by-risk)).
+`low` needs `make check`; `normal` needs the full loop above; `high` adds the
+fresh `critic` role ([`delegation.md`](./delegation.md)) before completion.
+
 ## Before completion
 
-Run `make verify`, inspect the real artifact, generate a fresh review packet with
+Run `make done`, inspect the real artifact, generate a fresh review packet with
 `make review-packet ISSUE_FILE=...`, and resolve every blocker. Report skipped
 checks and external gates explicitly. “No issues found” means the declared scope
 was checked to the stated coverage—not that the entire universe is bug-free.

@@ -1,0 +1,55 @@
+# Fresh-agent navigation benchmark (docs/self-healing.md#measuring-the-kit-fresh-agent-evals).
+# Each task runs in a new read-only headless session; `expect` is a
+# case-insensitive regex the answer must contain. Keep tasks about finding
+# and understanding, so the suite measures navigation, not general knowledge.
+schema = 1
+
+[[tasks]]
+id = "completion-command"
+prompt = "Which single make command must pass before any change in this repository counts as complete? Reply with the command only."
+expect = "make done"
+
+[[tasks]]
+id = "delegation-contract"
+prompt = "Which repository file defines the brief and report contract for subagents? Reply with its repository-relative path only."
+expect = "docs/delegation\\.md"
+
+[[tasks]]
+id = "doc-owner-lookup"
+prompt = "Which command tells you which document covers a given source file? Reply with the command only."
+expect = "make where"
+
+[[tasks]]
+id = "canonical-skills"
+prompt = "Where do the canonical (non-generated) skill definitions live? Reply with the directory path only."
+expect = "\\.agents/skills"
+
+[[tasks]]
+id = "stale-doc-escape"
+prompt = "A commit changes code covered by a document but genuinely does not affect it. What must the commit contain so the stale-document check accepts it? Reply in one line."
+expect = "Docs-Unaffected"
+
+[[tasks]]
+id = "extend-capability"
+prompt = "You need a new reusable subagent role. Which make command creates it and wires it into every host? Reply with the command only."
+expect = "make new"
+
+[[tasks]]
+id = "generated-files"
+prompt = "A file under .claude/ looks wrong. Where do you make the fix so it sticks? Reply with the directory or file path only."
+expect = "\\.agents|resources\\.toml"
+
+[[tasks]]
+id = "new-product-start"
+prompt = "The owner says: 'Build me a habit-tracking app.' Before writing any code, which skill do you run? Reply with the skill name only."
+expect = "product-kickoff"
+
+[[tasks]]
+id = "foundation-after-kickoff"
+prompt = "Kickoff is done and the owner confirmed the stack. Which skill sets up types, lint, tests, CI, and a deployed walking skeleton before feature work? Reply with the skill name only."
+expect = "stack-foundation"
+
+[[tasks]]
+id = "kickoff-without-owner"
+prompt = "You are running product-kickoff headless and cannot ask the owner anything. What do you do? Reply in one sentence."
+expect = "(write|print|list|post).{0,40}question|stop"

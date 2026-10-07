@@ -15,7 +15,7 @@ advisory data; it does not verify exploit details.
 ## Evidence
 
 - [ ] Focused check:
-- [ ] `make verify`
+- [ ] `make done`
 - [ ] Real artifact/state observed:
 - [ ] Regression/negative case:
 

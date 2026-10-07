@@ -1,5 +1,7 @@
 # Privacy notice — DRAFT TEMPLATE
 
+<!-- index: launch | Draft privacy-notice scaffold | A public privacy notice is prepared for factual completion and review. -->
+
 > **Do not publish this file unchanged.** It is a factual drafting scaffold,
 > not legal advice or a compliance claim. Replace every `[REQUIRED]` placeholder
 > from the data inventory and obtain qualified counsel review.

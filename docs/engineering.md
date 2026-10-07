@@ -1,5 +1,7 @@
 # Engineering standard
 
+<!-- index: design | Modular design, single source of truth, dependency, and cleanup rules | Code is being changed, refactored, or reviewed. -->
+
 The goal is compact, legible software with high leverage: a small interface
 over a meaningful implementation, one owner for each changing fact, and tests
 that cross the same seams as callers.
@@ -51,6 +53,29 @@ A new dependency needs a recorded reason, license/provenance check, pinned
 lockfile, update path, and a verification that proves the dependency's boundary
 is actually needed. Prefer platform capabilities for small utilities. A new
 tool or skill follows [`skills.md`](./skills.md).
+
+## Built to scale
+
+Design for the scale in `VISION.md`, not for imagined scale, but never close
+the path to growth. Apply these when a surface serves real traffic:
+
+- **Stateless services** behind a load balancer; state lives in the database,
+  cache, or object storage, never in process memory.
+- **Data:** index every query path, paginate every list, avoid N+1 queries,
+  migrate with expand-then-contract so old and new code run side by side.
+- **Work off the request path:** queues or background jobs for slow, retried,
+  or scheduled work; make handlers idempotent with idempotency keys.
+- **Protect the system:** rate limits, timeouts, retries with backoff and
+  jitter, and circuit breakers on every external call.
+- **Cache deliberately:** CDN for static assets, explicit TTLs and
+  invalidation for data; measure before adding a cache layer.
+- **Release safely:** feature flags for risky changes, gradual rollouts, and
+  a rehearsed rollback ([`production.md`](./production.md)).
+- **See it:** structured logs, metrics, and traces with request IDs; alerts on
+  user-visible symptoms; a load test against the budget before a launch that
+  expects real traffic.
+- **Cost is a requirement:** know the cost per active user and the most
+  expensive call path.
 
 ## Review questions
 

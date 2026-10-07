@@ -1,5 +1,7 @@
 # Legal and launch gate
 
+<!-- index: launch | Jurisdiction and counsel gate | Public terms, privacy notice, Impressum, cookies, or launch copy is drafted. -->
+
 This directory is a factual drafting workspace, not legal advice and not a
 “GDPR compliant” badge. The applicable law depends on the operator, product,
 users, providers, jurisdictions, and actual production configuration.
