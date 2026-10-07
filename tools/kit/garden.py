@@ -15,7 +15,7 @@ import subprocess
 from pathlib import Path
 
 from .config import setting
-from .core import declared_surfaces, ensure_inside_root, load_project
+from .core import declared_surfaces, ensure_inside_root, load_project, verification_environment
 from .registry import Registry, run_checks
 
 
@@ -79,7 +79,8 @@ def garden_report(root: Path) -> tuple[str, int]:
     for identifier, command, path in surface_garden_commands(project):
         cwd = ensure_inside_root(root, root / path, f"surface {identifier} path")
         try:
-            result = subprocess.run(command, cwd=cwd if cwd.is_dir() else cwd.parent, capture_output=True, text=True, timeout=900, check=False)
+            result = subprocess.run(command, cwd=cwd if cwd.is_dir() else cwd.parent, capture_output=True, text=True, timeout=900, check=False,
+                                    env=verification_environment())
             output = (result.stdout + result.stderr).strip().splitlines()[-15:]
             status = "ok" if result.returncode == 0 else f"exit {result.returncode}"
         except (FileNotFoundError, subprocess.TimeoutExpired) as error:

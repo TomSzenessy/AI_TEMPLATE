@@ -367,3 +367,24 @@ def read_text_file(root: Path, relative: str, limit: int = 1_000_000) -> str | N
         return path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
         return None
+
+
+def verification_environment() -> dict[str, str]:
+    environment = os.environ.copy()
+    for variable in (
+        "GH_TOKEN",
+        "GITHUB_TOKEN",
+        "GITHUB_ENTERPRISE_TOKEN",
+        "GH_ENTERPRISE_TOKEN",
+        "ACTIONS_RUNTIME_TOKEN",
+        "ACTIONS_ID_TOKEN_REQUEST_TOKEN",
+        "AWS_ACCESS_KEY_ID",
+        "AWS_SECRET_ACCESS_KEY",
+        "AWS_SESSION_TOKEN",
+        "GOOGLE_APPLICATION_CREDENTIALS",
+        "AZURE_CLIENT_SECRET",
+        "VERCEL_TOKEN",
+        "NETLIFY_AUTH_TOKEN",
+    ):
+        environment.pop(variable, None)
+    return environment

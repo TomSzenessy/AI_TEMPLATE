@@ -9,6 +9,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 
 from .core import (
+    verification_environment,
     CONTAINER_DIRECTORIES,
     FILE_SURFACE_KINDS,
     PROJECT_KIND_PATTERN,
@@ -385,27 +386,6 @@ def check_readme_identity(root: Path, project: dict[str, object]) -> None:
     if project.get("name") != "AI_TEMPLATE" and re.search(
             r"(?m)^# Agent Template$|^cp -R AGENT_TEMPLATE my-project|^make init NAME=my-project", content):
         raise RepoctlError("initialized project README.md still contains template bootstrap text")
-
-
-def verification_environment() -> dict[str, str]:
-    environment = os.environ.copy()
-    for variable in (
-        "GH_TOKEN",
-        "GITHUB_TOKEN",
-        "GITHUB_ENTERPRISE_TOKEN",
-        "GH_ENTERPRISE_TOKEN",
-        "ACTIONS_RUNTIME_TOKEN",
-        "ACTIONS_ID_TOKEN_REQUEST_TOKEN",
-        "AWS_ACCESS_KEY_ID",
-        "AWS_SECRET_ACCESS_KEY",
-        "AWS_SESSION_TOKEN",
-        "GOOGLE_APPLICATION_CREDENTIALS",
-        "AZURE_CLIENT_SECRET",
-        "VERCEL_TOKEN",
-        "NETLIFY_AUTH_TOKEN",
-    ):
-        environment.pop(variable, None)
-    return environment
 
 
 def run_verification(root: Path) -> None:

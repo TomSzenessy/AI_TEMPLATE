@@ -148,8 +148,8 @@ def analyze_transcript(transcript: Path) -> dict[str, object]:
             elif part.get("type") == "tool_result":
                 command = commands.get(str(part.get("tool_use_id")), "")
                 text = _text(part.get("content"))
-                if BLOCK.search(text):
-                    match = BLOCK.search(text)
+                match = BLOCK.search(text)
+                if match:
                     blocks.append({"command": " ".join(command.split())[:120], "message": " ".join(text[match.start():].split())[:400]})
                 elif part.get("is_error") and MAKE.search(command):
                     failed_make.append({"command": " ".join(command.split())[:120], "message": " ".join(text.split())[-300:]})
@@ -225,7 +225,7 @@ def run_trial(root: Path, identifier: str, model: str = "sonnet", budget: float 
     print(f"Trial {identifier}: project at {project}; transcript in {report_dir.relative_to(root)}/ (up to ${budget:g})")
     transcript = report_dir / "transcript.jsonl"
     started = time.monotonic()
-    print(f"If this runner is interrupted, report later with: python3 tools/repoctl.py trial {identifier} "
+    print(f"If this runner is interrupted, report later with: tools/repoctl trial {identifier} "
           f"--analyze {transcript.relative_to(root)} --project {project}")
     with transcript.open("w", encoding="utf-8") as output:
         try:
@@ -238,7 +238,11 @@ def run_trial(root: Path, identifier: str, model: str = "sonnet", budget: float 
 
 def write_report(root: Path, spec: dict[str, object], model: str, transcript: Path, project: Path, report_dir: Path) -> int:
     analysis = analyze_transcript(transcript)
-    state = project_state(project)
+    try:
+        state = project_state(project)
+    except subprocess.TimeoutExpired as error:
+        state = {"commits": 0, "next": f"(project state timed out after {error.timeout:g}s)", "finish_passed": False,
+                 "finish": ["project state timed out: re-run the report with --analyze"], "trailers": []}
     (report_dir / "report.json").write_text(json.dumps({"spec": spec, "model": model, "project": str(project),
                                                         "analysis": analysis, "state": state}, indent=2) + "\n")
     report = render(spec, model, analysis, state, project)

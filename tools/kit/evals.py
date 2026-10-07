@@ -40,6 +40,7 @@ HOST_COMMANDS = {
 # A fresh agent must not inherit the launching session: host session variables
 # would route a nested CLI through the parent's (short-lived) session auth.
 INHERITED_SESSION = ("CLAUDECODE", "CLAUDE_CODE_", "CLAUDE_PID", "CLAUDE_AGENT_SDK", "CLAUDE_EFFORT", "CLAUDE_PREVIEW", "ANTHROPIC_BASE_URL")
+HOST_BINARIES = {"claude": "claude", "codex": "codex", "gemini": "gemini"}
 PREFIX = "You are a fresh agent in this repository. Do not edit files. Answer briefly. Task: "
 
 
@@ -48,21 +49,39 @@ def run_headless(command: list[str], cwd: Path, timeout: int, stdout=None) -> su
 
     It drops the launching session's host variables (so the CLI uses its own login,
     as a truly fresh agent would), allows bypassed permissions when running as root
-    in a sandbox, and ignores SIGTERM while the agent runs: agents clean up with
+    in a sandbox, and shields itself from SIGTERM while the agent runs: agents clean up with
     `pkill -f <name>`, which also matches the runner's command line (a trial killed
-    its own runner that way). Raises subprocess.TimeoutExpired like subprocess.run.
+    its own runner that way). On timeout (or interrupt) it SIGKILLs the whole process group, then raises
+    subprocess.TimeoutExpired like subprocess.run.
     """
     environment = {key: value for key, value in os.environ.items() if not key.startswith(INHERITED_SESSION)}
     if hasattr(os, "geteuid") and os.geteuid() == 0:
         environment.setdefault("IS_SANDBOX", "1")  # the CLI refuses bypassed permissions as root outside a sandbox
-    previous = signal.signal(signal.SIGTERM, signal.SIG_IGN) if hasattr(signal, "SIGTERM") else None
+    # A no-op handler (not SIG_IGN): exec resets handlers to default, so the agent's own
+    # children keep default SIGTERM handling, while this runner still survives `pkill -f`.
+    previous = signal.signal(signal.SIGTERM, lambda *_: None) if hasattr(signal, "SIGTERM") else None
+    streams = {"stdout": stdout, "stderr": subprocess.STDOUT} if stdout else {"stdout": subprocess.PIPE, "stderr": subprocess.PIPE}
     try:
-        return subprocess.run(command, cwd=cwd, env=environment, text=True, timeout=timeout, check=False,
-                              start_new_session=True, **({"stdout": stdout, "stderr": subprocess.STDOUT} if stdout
-                                                         else {"capture_output": True}))
+        process = subprocess.Popen(command, cwd=cwd, env=environment, text=True, start_new_session=True, **streams)
+        try:
+            out, err = process.communicate(timeout=timeout)
+        except BaseException:
+            kill_group(process)
+            process.communicate()
+            raise
+        kill_group(process)  # nothing the agent backgrounded outlives the run
+        return subprocess.CompletedProcess(command, process.returncode, out, err)
     finally:
         if previous is not None:
             signal.signal(signal.SIGTERM, previous)
+
+
+def kill_group(process: subprocess.Popen) -> None:
+    """SIGKILL the run's whole process group (it leads its own session)."""
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except (ProcessLookupError, PermissionError, AttributeError):
+        pass
 
 
 def load_tasks(root: Path, only: str | None = None) -> list[dict[str, str]]:
@@ -76,6 +95,10 @@ def load_tasks(root: Path, only: str | None = None) -> list[dict[str, str]]:
             re.compile(task["expect"])
             if only is None or task["id"] in only.split(","):
                 tasks.append(task)
+    if only is not None:
+        unknown = [name for name in only.split(",") if name not in {task["id"] for task in tasks}]
+        if unknown:
+            raise RepoctlError(f"unknown eval task id(s): {', '.join(unknown)}")
     return tasks
 
 
@@ -110,7 +133,7 @@ def run_evals(root: Path, host: str, only: str | None = None, timeout: int = 300
         raise RepoctlError(f"unsupported eval host {host}; choose {', '.join(HOST_COMMANDS)}")
     if model is None:
         model = str(setting(root, "eval_model")) if host == "claude" else ""
-    if shutil.which(HOST_COMMANDS[host]("x", "")[0]) is None:
+    if shutil.which(HOST_BINARIES[host]) is None:
         raise RepoctlError(f"{host} CLI is not installed")
     tasks = load_tasks(root, only)
     if not tasks:
