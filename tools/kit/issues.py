@@ -350,9 +350,6 @@ def file_issue(
     return created
 
 
-# DEPRECATED(remove-by=2026-11-07, use=file_issue): kept only until tools/kit/commands.py calls file_issue.
-check_issue_for_duplicates = file_issue
-
 LOCAL_WAL_DIR = ".agent/wal"
 
 

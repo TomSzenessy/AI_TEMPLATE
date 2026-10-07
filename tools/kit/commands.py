@@ -188,13 +188,13 @@ def sync(root: Path, args) -> None:
     arg("--review-evidence", var="REVIEW_EVIDENCE", help="repository-relative reviewed disclosure record"),
 ))
 def issue(root: Path, args) -> int | None:
-    from .issues import check_issue_for_duplicates, file_local_wal
+    from .issues import file_issue, file_local_wal
     if args.wal:
         return file_local_wal(root, args.wal, args.public_reviewed, args.review_evidence)
     missing = [flag for flag in ("title", "body_file", "type", "priority", "area", "topic") if not getattr(args, flag)]
     if missing:
         raise RepoctlError("issue needs " + ", ".join("--" + flag.replace("_", "-") for flag in missing) + " (or --wal)")
-    check_issue_for_duplicates(root, args.title, args.body_file, args.type, args.priority, args.area, args.topic,
+    file_issue(root, args.title, args.body_file, args.type, args.priority, args.area, args.topic,
                                args.status, args.surface, args.gate, args.public_reviewed, args.review_evidence)
     return None
 
