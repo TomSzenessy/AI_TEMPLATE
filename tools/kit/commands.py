@@ -37,7 +37,7 @@ def _require_self_heal(root: Path) -> None:
         from .registry import Registry, blocking_reasons
         reasons = blocking_reasons(Registry(root), errors)
         raise RepoctlError("self-healing check failed:\n- " + "\n- ".join(errors)
-                           + ("\nWhy these block:\n- " + "\n- ".join(reasons) if reasons else ""))
+                           + ("\nWhy these block:\n  " + "\n  ".join(reasons) if reasons else ""))
 
 
 # --- Every session ---------------------------------------------------------------

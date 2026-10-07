@@ -4,8 +4,9 @@ PYTHON ?= $(shell for p in python3.14 python3.13 python3.12 python3.11 python3 p
 REPOCTL := $(PYTHON) tools/repoctl.py
 # This kit's directory, also when run from another repository with make -f (make adopt).
 # Read from the single MAKEFILE_LIST entry through the shell so a path with spaces survives;
-# override with KIT_DIR=<kit> (adopt fails fast, naming KIT_DIR, when this is not a kit).
-ifndef KIT_DIR
+# override with KIT_DIR=<kit> on the command line (adopt fails fast, naming KIT_DIR, when this is not a kit).
+# An inherited KIT_DIR (exported by an outer make) is ignored, so nested makes find their own kit.
+ifneq ($(origin KIT_DIR),command line)
 KIT_DIR := $(shell cd "$$(dirname "$(strip $(MAKEFILE_LIST))")" 2>/dev/null && pwd)
 endif
 export KIT_DIR
