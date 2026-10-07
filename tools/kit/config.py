@@ -29,6 +29,8 @@ DEFAULTS: dict[str, object] = {
     "skill_review_days": 365,
     # Project kinds whose product has a user interface (they need docs/design.md).
     "ui_kinds": ["web", "app", "site", "pwa", "mobile", "ios", "android", "desktop", "game"],
+    # Pinned Playwright for make ui-review (1.57 still supports Node 18).
+    "playwright_version": "1.57.0",
     # Model for headless eval runs on hosts that accept one; cheap by default.
     "eval_model": "haiku",
 }

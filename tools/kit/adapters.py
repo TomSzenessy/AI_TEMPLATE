@@ -156,7 +156,7 @@ CLAUDE_TOOLS = {
 }
 HOOK = '"$CLAUDE_PROJECT_DIR/tools/repoctl" hook {event}'  # launcher picks Python 3.11+
 CLAUDE_ALLOWED_COMMANDS = [
-    "make start", "make done", "make check", "make test", "make verify", "make map",
+    "make start", "make next", "make ui-review", "make done", "make check", "make test", "make verify", "make map",
     "make where:*", "make garden", "make risk", "make capabilities", "make sync", "make handover",
     "make inventory", "make resources", "make similar:*", "make new:*",
 ]

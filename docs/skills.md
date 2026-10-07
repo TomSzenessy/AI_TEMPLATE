@@ -73,11 +73,12 @@ rather than a large prompt collection:
 - [`../.agents/skills/repository-audit/SKILL.md`](../.agents/skills/repository-audit/SKILL.md)
   turns broad reviews into evidence-backed issues;
 - [`../.agents/skills/product-kickoff/SKILL.md`](../.agents/skills/product-kickoff/SKILL.md)
-  turns "build me an app" into confirmed platform, stack, and visual-direction
-  decisions with mockups before code;
+  turns "build me an app" into researched, confirmed decisions (research
+  record, feature list with production rows, platform, stack, mockups) before
+  code, then hands over to `make next`;
 - [`../.agents/skills/ux-quality/SKILL.md`](../.agents/skills/ux-quality/SKILL.md)
-  sets the UI/UX bar (platform conventions, states, accessibility, ethical
-  onboarding) and the screenshot review loop;
+  sets the UI/UX bar (visual polish against references, platform conventions,
+  states, accessibility, ethical onboarding) and the `make ui-review` loop;
 - [`../.agents/skills/stack-foundation/SKILL.md`](../.agents/skills/stack-foundation/SKILL.md)
   sets up a walking skeleton with strict types, lint, tests, CI, preview
   deploys, configuration, and error tracking before feature work.

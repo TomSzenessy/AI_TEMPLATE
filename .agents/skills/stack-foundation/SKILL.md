@@ -27,7 +27,9 @@ Scale the setup to the kickoff tier: a `prototype` needs steps 1 to 4; a
 4. **Declare the surface** in `project.toml`: `verification` runs typecheck,
    lint, and tests; `garden` runs a dead-code finder (knip for JS/TS, vulture for
    Python, or the stack's analyzer); add a `[budgets]` glob so files stay agent-sized.
-   Bind the surface's architecture doc with `<!-- covers: -->`.
+   Bind the surface's architecture doc with `<!-- covers: -->`. For a UI,
+   add a `[surfaces.preview]` table (`command`, `url`, `routes`, optional
+   seeded `states`) so `make ui-review` can screenshot it.
 5. **Configuration and secrets:** commit `.env.example` with every variable and
    a comment, never real values; validate configuration at startup and fail fast.
 6. **Observability:** structured logs with request IDs, error tracking (for

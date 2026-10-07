@@ -6,8 +6,9 @@ description: "Turns 'build me an app/site/game' into confirmed decisions before 
 # Product kickoff
 
 Outcome: before any product code, the owner has confirmed who it is for, the
-platforms, the stack, and a visual direction they have actually seen; the
-decisions are recorded where every later agent finds them.
+platforms, the stack, and a visual direction they have seen; research, a
+feature list with acceptance criteria, and the decisions are recorded where
+every later agent finds them. Then `make next` drives the build to launch.
 
 ## 1. Understand before asking
 
@@ -19,11 +20,22 @@ decisions are recorded where every later agent finds them.
   real users), or `platform` (many users, teams, or services). The tier sets
   how much `stack-foundation` and `docs/engineering.md` "Built to scale"
   apply; never build platform machinery for a prototype.
-- If the owner names a reference product, run `product-recon` (and
-  `review-mining` for what its users hate); delegate market or reference
-  research to the `researcher` role. Bring findings into the questions.
+## 2. Research the space (always)
 
-## 2. Ask one round of questions
+Delegate to the `researcher` role (web search and browser) and write
+`docs/product/research.md` with cited URLs (`make check` needs at least three):
+
+- **Comparable products:** the three to five best, what each does well, and
+  what to borrow. For a named reference, run `product-recon`.
+- **What users hate:** `review-mining` on their reviews; each complaint is a
+  feature or a differentiator.
+- **Design references:** apps or sites whose look and feel fit the brief
+  (screenshots in ignored `.agent/references/`), and what to borrow from each.
+- **Our angle:** the one thing this product will do better.
+
+Bring the findings into the questions as recommendations.
+
+## 3. Ask one round of questions
 
 Ask everything in one message (use the host's question tool when it has one).
 Give each question options and your recommendation, so "go with your picks"
@@ -61,7 +73,7 @@ has not answered, write the questions with your recommendations in your reply
 (and the kickoff issue when one exists), then stop. That is a correct, finished
 outcome. Only an explicit "use your picks" counts as approval.
 
-## 3. Show mockups before building
+## 4. Show mockups before building
 
 - Produce two or three clearly different directions for the one or two most
   important screens (usually first-run and the main screen), with the same
@@ -74,7 +86,13 @@ outcome. Only an explicit "use your picks" counts as approval.
 - Iterate on the chosen direction once or twice. Keep mockups in ignored
   `.agent/mockups/` unless the owner wants them in the repository.
 
-## 4. Plan the delivery
+## 5. Define the product and plan delivery
+
+- **Feature list:** write `docs/product/features.csv` (feature, area, priority,
+  status, evidence, acceptance, source) from the owner's goal, the research,
+  and the competitor complaints, then append the rows of
+  `production-features.csv` (this folder) that apply. "Complete" means every
+  must row is `yes` with evidence; a demo-sized list is a defect.
 
 - **Architecture sketch:** data model, main API or screen contracts, auth,
   hosting, and how it grows (the "Built to scale" section of
@@ -87,7 +105,7 @@ outcome. Only an explicit "use your picks" counts as approval.
 - **Success metric:** how the metric from question 1 will be measured after
   launch, with privacy-respecting analytics only where it is needed.
 
-## 5. Record and hand off
+## 6. Record and hand off
 
 - `VISION.md` (status accepted), `docs/STACK-DECISION.md` (decision, rejected
   alternatives, and why).
@@ -96,11 +114,15 @@ outcome. Only an explicit "use your picks" counts as approval.
   `design-tokens` conventions and contrast checker apply).
 - File the epic and slice issues, then run the `stack-foundation` skill for
   the walking skeleton; its surface's quality oracle includes the `ux-quality`
-  review. Finish with `make done`.
+  review. Then follow `make next` slice by slice until it reports the launch
+  phase; never stop at a green `make done` while must features are open.
 
 ## Done when
 
 - The owner explicitly confirmed platforms, stack, and one mockup direction.
+- `docs/product/research.md` cites the comparable products, complaints, and
+  design references; `docs/product/features.csv` covers them plus the
+  production rows, each must row with an acceptance criterion.
 - An epic with ordered slice issues exists, starting with the walking skeleton.
 - `VISION.md`, `docs/STACK-DECISION.md`, and `docs/design.md` record them and
   `make check` passes.

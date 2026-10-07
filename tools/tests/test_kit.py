@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
 import textwrap
+import time
 import unittest
 from datetime import date
 from pathlib import Path
@@ -15,7 +17,7 @@ TOOLS = Path(__file__).resolve().parents[1]
 REPOCTL = TOOLS / "repoctl.py"
 sys.path.insert(0, str(TOOLS))
 
-from kit import adapters, ci, derive, docsync, evals, garden, hygiene, navigate, risk  # noqa: E402
+from kit import adapters, ci, derive, docsync, evals, garden, hygiene, navigate, product, risk, uireview  # noqa: E402
 from kit.gitinfo import path_matches  # noqa: E402
 
 # Built by concatenation so this test file never trips the marker scanner itself.
@@ -469,6 +471,137 @@ verification = [["true"]]
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("Local-WAL-001", result.stdout)
         self.assertTrue((self.root / ".agent/wal/001-first-slice.md").is_file())
+
+
+class ProductDriverTests(KitRepository):
+    """make next walks a UI product from intake to launch; done means features evidenced."""
+
+    def phase(self) -> str:
+        return product.next_step(self.root)["phase"]
+
+    def accept_vision(self) -> None:
+        self.write("project.toml", (self.root / "project.toml").read_text() + '[vision]\nstatus = "accepted"\n')
+
+    def features(self, *rows: str) -> None:
+        self.write(product.FEATURES, "feature,area,priority,status,evidence,acceptance,source\n" + "\n".join(rows) + "\n")
+
+    def test_phases_in_order(self) -> None:
+        self.assertEqual(self.phase(), "intake")
+        self.accept_vision()
+        self.assertEqual(self.phase(), "research")
+        self.write(product.RESEARCH, "# Research\nhttps://a.example https://b.example https://c.example\n")
+        self.assertEqual(self.phase(), "features")
+        self.features("Add a habit,core,must,no,,Adding takes one tap,owner")
+        self.assertEqual(self.phase(), "design")
+        self.write("docs/design.md", "# Design\n")
+        self.assertEqual(self.phase(), "stack")
+        self.write("docs/STACK-DECISION.md", "# Stack\n\nStatus: accepted\n")
+        self.assertEqual(self.phase(), "skeleton")
+        surface = '[[surfaces]]\nid = "app"\npath = "src"\nkind = "code"\nquality_oracle = "tests plus ux-quality review"\nverification = [["true"]]\n'
+        self.write("project.toml", (self.root / "project.toml").read_text() + surface)
+        self.assertEqual(self.phase(), "preview")
+        self.write("project.toml", (self.root / "project.toml").read_text()
+                   + '[surfaces.preview]\ncommand = ["true"]\nurl = "http://localhost:4999"\n')
+        step = product.next_step(self.root)
+        self.assertEqual(step["phase"], "build")
+        self.assertIn("Add a habit", step["action"])
+        self.features("Add a habit,core,must,yes,src/billing/invoice.py,Adding takes one tap,owner")
+        self.assertEqual(self.phase(), "review")
+        self.assertIn("never had a UI review", product.next_step(self.root)["action"])
+
+    def test_score_and_evidence(self) -> None:
+        self.features(
+            "A,core,must,yes,src/billing/invoice.py,works,owner",
+            "B,core,must,partial,missing/file.py,works,owner",
+            "C,core,should,no,,,owner",
+            "D,core,could,skip,,,owner",
+        )
+        percent, open_must = product.score(product.load_features(self.root))
+        self.assertAlmostEqual(percent, 100 * (3 + 1.5) / 8)
+        self.assertEqual([row["feature"] for row in open_must], ["B"])
+        errors = product.feature_errors(self.root)
+        self.assertEqual(len(errors), 1)
+        self.assertIn("'B' is marked partial without existing evidence", errors[0])
+
+    def test_must_needs_acceptance_and_valid_values(self) -> None:
+        self.features("A,core,must,no,,,owner")
+        self.assertIn("needs an acceptance criterion", product.feature_errors(self.root)[0])
+        self.features("A,core,urgent,no,,x,owner")
+        self.assertIn("priority must be", product.feature_errors(self.root)[0])
+
+    def test_research_required_for_ui_product_surface(self) -> None:
+        self.accept_vision()
+        self.write("project.toml", (self.root / "project.toml").read_text()
+                   + '[[surfaces]]\nid = "app"\npath = "src"\nkind = "code"\nquality_oracle = "ux-quality"\n')
+        project = garden.load_project(self.root)
+        self.assertIn("at least three cited sources", product.research_errors(self.root, project)[0])
+        self.write(product.RESEARCH, "https://a.example https://b.example https://c.example\n")
+        self.assertEqual(product.research_errors(self.root, project), [])
+
+    def test_done_prints_product_summary(self) -> None:
+        self.features("A,core,must,no,,works,owner")
+        self.assertIn("NOT done: 1 must feature(s) open (A)", product.product_summary(self.root))
+
+
+class UiReviewTests(KitRepository):
+    def setUp(self) -> None:
+        super().setUp()
+        import socket
+        with socket.socket() as probe:
+            probe.bind(("127.0.0.1", 0))
+            self.port = probe.getsockname()[1]
+        self.write("project.toml", (self.root / "project.toml").read_text()
+                   + '[[surfaces]]\nid = "app"\npath = "src"\nkind = "code"\nquality_oracle = "ux-quality"\n'
+                   + f'[surfaces.preview]\ncommand = ["{sys.executable}", "-m", "http.server", "{{port}}", "--bind", "127.0.0.1"]\n'
+                   + 'url = "http://localhost:{port}"\nroutes = ["/"]\n')
+        bin_dir = self.root / "fakebin"
+        bin_dir.mkdir()
+        fake = bin_dir / "npx"  # stands in for Playwright: writes the screenshot file it was asked for
+        fake.write_text("#!/bin/sh\nfor last; do :; done\nprintf png > \"$last\"\n")
+        fake.chmod(0o755)
+        self.environment = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}"}
+
+    def review(self) -> subprocess.CompletedProcess[str]:
+        return subprocess.run([sys.executable, str(REPOCTL), "--root", str(self.root), "ui-review"],
+                              capture_output=True, text=True, env=self.environment, check=False)
+
+    def test_refuses_a_server_it_did_not_start(self) -> None:
+        foreign = subprocess.Popen([sys.executable, "-m", "http.server", str(self.port), "--bind", "127.0.0.1"],
+                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try:
+            time.sleep(1)
+            text = (self.root / "project.toml").read_text().replace("{port}", str(self.port))
+            self.write("project.toml", text)
+            result = self.review()
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("something already answers", result.stderr)
+        finally:
+            foreign.terminate()
+            foreign.wait()
+
+    def test_dead_preview_fails_fast(self) -> None:
+        text = (self.root / "project.toml").read_text()
+        text = text.replace(f'command = ["{sys.executable}", "-m", "http.server", "{{port}}", "--bind", "127.0.0.1"]',
+                            f'command = ["{sys.executable}", "-c", "raise SystemExit(7)"]')
+        self.write("project.toml", text)
+        result = self.review()
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("exited with code 7", result.stderr)
+
+    def test_review_captures_sizes_and_schemes_then_needs_verdict_and_freshness(self) -> None:
+        self.assertIn("never had a UI review", " ".join(uireview.review_status(self.root)))
+        result = self.review()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        run = json.loads((self.root / uireview.LATEST).read_text())["app"]["run"]
+        shots = sorted(path.name for path in (self.root / run).glob("*.png"))
+        self.assertEqual(len(shots), 4)
+        self.assertIn("app-home-default-phone-dark.png", shots)
+        self.assertIn("has no verdict yet", " ".join(uireview.review_status(self.root)))
+        review = self.root / run / "REVIEW.md"
+        review.write_text(review.read_text().replace(uireview.VERDICT_PENDING, "Verdict: pass"))
+        self.assertEqual(uireview.review_status(self.root), [])
+        self.write("src/billing/invoice.py", "def render_invoice():\n    return 42\n")
+        self.assertIn("changed since its last UI review", " ".join(uireview.review_status(self.root)))
 
 
 class DerivedContentTests(KitRepository):

@@ -13,7 +13,7 @@ import subprocess
 from datetime import date
 from pathlib import Path
 
-from . import derive, docsync, github, hygiene
+from . import derive, docsync, github, hygiene, product
 from .core import FILE_SURFACE_KINDS, declared_surfaces, ensure_inside_root, load_project, repository_files
 from .config import setting
 from .gitinfo import changed_paths, has_history, path_matches
@@ -33,6 +33,7 @@ def self_heal_errors(root: Path, project: dict[str, object] | None = None) -> li
     errors += hygiene.budget_errors(root, project, files)
     errors += hygiene.workflow_errors(root, files)
     errors += project_errors(root, project, files, doc_bindings)
+    errors += product.feature_errors(root) + product.research_errors(root, project)
     return errors
 
 

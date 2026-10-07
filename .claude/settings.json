@@ -46,6 +46,8 @@
   "permissions": {
     "allow": [
       "Bash(make start)",
+      "Bash(make next)",
+      "Bash(make ui-review)",
       "Bash(make done)",
       "Bash(make check)",
       "Bash(make test)",

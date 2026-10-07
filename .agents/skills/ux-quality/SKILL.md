@@ -22,6 +22,22 @@ silently: record deliberate deviations there.
 - **Hierarchy:** one primary action per screen, a consistent spacing scale,
   readable body text (16 px on the web, Dynamic Type on Apple platforms).
 
+## Visual bar: designed, not assembled
+
+- **Build on proven parts:** a component library and one icon set that fit the
+  stack (for example shadcn/ui or Radix with Lucide on the web; native controls
+  and SF Symbols or Material Symbols on mobile), styled by the tokens.
+- **Rhythm:** a 4 or 8 point spacing scale, three or four type sizes with a
+  clear hierarchy, one accent colour used sparingly, consistent radius and
+  elevation.
+- **Real content:** real copy, names, and data shapes; never lorem ipsum or
+  framework defaults (favicon, titles, starter pages).
+- **Life:** subtle motion (150-250 ms) on state changes, immediate feedback on
+  every tap, empty states with a helpful next action.
+- **Benchmark:** put your screenshots next to the design references in
+  `docs/product/research.md`. If yours would look out of place among them,
+  iterate before moving on.
+
 ## Every screen has every state
 
 Empty, loading (skeletons over spinners), error (what happened and how to
@@ -53,13 +69,15 @@ what to do next; no blame, no jargon.
 
 ## Review loop (vision-capable reviewer)
 
-1. Run the real build and screenshot it at 375x812, 768x1024, and 1440x900,
-   in light and dark mode when both exist (browser tool or Playwright MCP;
-   simulator or emulator for native). If `make capabilities` shows no browser,
-   say so and ask the owner for screenshots; never claim a visual review you
-   did not do.
-2. The reviewer compares the screenshots with this list, `docs/design.md`, and
-   the approved mockup, and reports each issue with the screenshot and region.
+1. Run `make ui-review`: it starts the surface's declared preview and
+   captures every route (and seeded data states) at phone and desktop sizes in
+   light and dark mode into `.agent/reviews/<run>/`. For native apps use the
+   simulator or emulator. Without a browser, say so and ask the owner for
+   screenshots; never claim a visual review you did not do.
+2. Open every screenshot (you or the `critic` role, vision-capable) and compare
+   it with this list, `docs/design.md`, the approved mockup, and the design
+   references. Write findings and the `Verdict:` line in the run's `REVIEW.md`;
+   the change gate stays red until a verdict exists for the current code.
 3. Fix, re-screenshot, and use `parity-check`'s image diff to catch unintended
    layout changes.
 4. For key flows, walk through as a first-time user: count steps and time to
