@@ -1,6 +1,7 @@
 ---
 name: ux-quality
 description: "The UI/UX bar for building and reviewing interfaces: platform conventions (Apple HIG, Material), design tokens, every screen state, accessibility, ethical onboarding and persuasion, and screenshot review at real device sizes. Use whenever a change touches what users see or tap."
+pack: product
 ---
 
 # UX quality

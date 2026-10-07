@@ -53,3 +53,18 @@ expect = "stack-foundation"
 id = "kickoff-without-owner"
 prompt = "You are running product-kickoff headless and cannot ask the owner anything. What do you do? Reply in one sentence."
 expect = "(write|print|list|post).{0,40}question|stop"
+
+[[tasks]]
+id = "add-a-check"
+prompt = "A project wants its own check that fails the gate when a source file calls print(). Which single make command creates that check with valid metadata? Reply with the command only (with KIND set)."
+expect = "make new KIND=check"
+
+[[tasks]]
+id = "add-an-mcp-server"
+prompt = "Where does a new MCP server route go in this repository? Reply with the repository-relative directory only."
+expect = "\\.agents/mcp/?"
+
+[[tasks]]
+id = "switch-off-a-pack"
+prompt = "A repository is not a product. Which file and table switch off the product pack? Reply as file [table]."
+expect = "project\\.toml.*\\[packs\\]"

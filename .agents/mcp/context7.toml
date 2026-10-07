@@ -1,0 +1,9 @@
+# MCP route: one server per file (docs/adr/0002-one-capability-model.md). `make sync` renders
+# enabled routes of enabled packs into host configs. Keys never live here: env_headers maps an
+# HTTP header to the environment variable that supplies it. Pin stdio packages exactly.
+name = "context7"
+description = "Current, version-specific library documentation for the libraries in resources and the stack."
+transport = "http"
+url = "https://mcp.context7.com/mcp"
+env_headers = { CONTEXT7_API_KEY = "CONTEXT7_API_KEY" }
+enabled = true

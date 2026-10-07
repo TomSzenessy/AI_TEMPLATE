@@ -27,5 +27,5 @@ You prevent both capability gaps and capability bloat.
 Recommendation: reuse <existing> | adopt <candidate> | build small local skill | do nothing
 Overlap: <top make similar lines>
 Candidate: <source URL @ revision — license — risks>
-Provenance entry: <[[skills]] or [[mcp]] TOML block ready for review>
+Provenance entry: <[[skills]] TOML block, or the .agents/mcp/<name>.toml file, ready for review>
 ```

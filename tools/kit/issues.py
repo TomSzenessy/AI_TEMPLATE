@@ -16,7 +16,6 @@ except ImportError:  # pragma: no cover - module import from a package context
 from .core import (
     RepoctlError,
     SENSITIVE_CONTENT_PATTERNS,
-    date_is_future,
     date_is_stale,
     parse_iso_date,
     ensure_inside_root,
@@ -25,6 +24,7 @@ from .core import (
     load_project,
     markdown_without_fenced_code,
     reject_secret_text,
+    reviewer_problem,
     safe_markdown_text,
     secret_matches,
     slugify,
@@ -187,25 +187,9 @@ def validate_issue_body(body: str, profile: str = "regulated") -> None:
     )
     if not re.search(public_safe_pattern, disclosure):
         raise RepoctlError("issue body must explicitly declare Public-safe: yes before public filing")
-    reviewer = re.search(
-        r"(?im)^\s*(?:-\s*)?(?:\*\*)?Reviewer/date:(?:\*\*)?\s*(.+?)\s*$"
-        if profile == "regulated"
-        else r"(?im)^\s*(?:-\s*)?(?:\*\*)?Reviewer/date:(?:\*\*)?\s*(.+?)\s*$",
-        disclosure,
-    )
-    if not reviewer or re.search(r"\[|\b(?:required|tbd|never|pending)\b", reviewer.group(1), re.I):
-        raise RepoctlError("issue body requires a real reviewer/date for public filing")
-    reviewer_name = re.split(r"\s+\d{4}-\d{2}-\d{2}\b", reviewer.group(1).strip(), maxsplit=1)[0].strip(" *_`")
-    if is_placeholder(reviewer_name) or len(reviewer_name) < 3:
-        raise RepoctlError("issue reviewer/date must name a real reviewer, e.g. '- **Reviewer/date:** octocat 2026-10-07'")
-    reviewer_date = re.search(r"\b(\d{4}-\d{2}-\d{2})\b", reviewer.group(1))
-    if not reviewer_date:
-        raise RepoctlError("issue reviewer/date must include an ISO date, e.g. '- **Reviewer/date:** octocat 2026-10-07'")
-    parsed_reviewer_date = parse_iso_date(reviewer_date.group(1))
-    if parsed_reviewer_date is None:
-        raise RepoctlError("issue reviewer/date is invalid")
-    if date_is_future(parsed_reviewer_date):  # the review belongs to this text; it does not age out
-        raise RepoctlError("issue reviewer/date is in the future")
+    problem = reviewer_problem(disclosure)
+    if problem:
+        raise RepoctlError(f"issue body cannot be filed publicly: {problem}")
     classification = disclosure_class(disclosure)
     if classification not in {"ordinary", "public-reviewed"}:
         raise RepoctlError(

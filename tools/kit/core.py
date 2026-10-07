@@ -304,6 +304,30 @@ def is_placeholder(value: object) -> bool:
     )
 
 
+REVIEWER_LINE = re.compile(r"(?im)^\s*(?:-\s*)?(?:\*\*)?Reviewer/date:(?:\*\*)?\s*(.+?)\s*$")
+REVIEWER_EXAMPLE = "e.g. '- **Reviewer/date:** octocat 2026-10-07'"
+
+
+def reviewer_problem(text: str) -> str | None:
+    """The one rule for an issue's Reviewer/date line, shared by `make issue` and CI.
+
+    It needs a real name and an ISO date that is not in the future. The date belongs
+    to the text it reviewed, so it never ages out (no calendar rot).
+    """
+    match = REVIEWER_LINE.search(text)
+    value = match.group(1).strip() if match else ""
+    name = re.split(r"\s+\d{4}-\d{2}-\d{2}\b", value, maxsplit=1)[0].strip(" *_`")
+    if not match or re.search(r"\[|\b(?:required|tbd|never|pending)\b", value, re.I) or is_placeholder(name) or len(name) < 3:
+        return f"Reviewer/date must name a real reviewer, {REVIEWER_EXAMPLE}"
+    found = re.search(r"\b(\d{4}-\d{2}-\d{2})\b", value)
+    reviewed = parse_iso_date(found.group(1)) if found else None
+    if reviewed is None:
+        return f"Reviewer/date needs a valid ISO date, {REVIEWER_EXAMPLE}"
+    if date_is_future(reviewed):
+        return "Reviewer/date is in the future (a typo?)"
+    return None
+
+
 def secret_matches(content: str) -> list[str]:
     return [label for label, pattern in SENSITIVE_CONTENT_PATTERNS.items() if pattern.search(content)]
 

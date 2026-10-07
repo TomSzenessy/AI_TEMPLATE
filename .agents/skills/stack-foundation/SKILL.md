@@ -1,6 +1,7 @@
 ---
 name: stack-foundation
 description: "Sets up a new surface so it is clean, observable, and shippable from day one: official generator, strict types, lint and format, unit and end-to-end tests, CI wiring, environment config, preview deploys, error tracking, and rot finders. Use right after product-kickoff confirms the stack, or when adding a new surface."
+pack: product
 ---
 
 # Stack foundation

@@ -1,7 +1,7 @@
 # Resource routing for agents
 
 <!-- index: extend | Primary docs, MCP routes, licenses, and resource intake | A task needs a capability, example, current documentation, or external gate. -->
-<!-- covers: resources.toml -->
+<!-- covers: resources.toml .agents/mcp/** -->
 
 This is a **routing catalog**, not a bundled code library. Use it to find the
 smallest set of primary documentation, examples, and specialist capabilities
@@ -10,17 +10,19 @@ component catalog, snippet collection, or skill merely because it appears here.
 
 The machine-readable source of truth is [`../resources.toml`](../resources.toml).
 Run `make resources` to validate and display it. The registry contains
-read-only starting points plus the reviewed `[[mcp]]` tool routes; it never
-stores credentials or authorizes external actions. The protocol and Context7 boundary
+read-only starting points; it never stores credentials or authorizes external
+actions. Agent tool servers are separate capabilities, one file each in
+[`../.agents/mcp/`](../.agents/mcp/). The protocol and Context7 boundary
 sources are recorded in [`research/mcp-production-boundaries-2026-09-25.md`](./research/mcp-production-boundaries-2026-09-25.md).
 
 ## MCP routes
 
-`[[mcp]]` entries in `resources.toml` are the single source for agent tool
-servers. The template enables three reviewed defaults so any agent can read
+Each file in `.agents/mcp/` (`name`, `description`, `transport`, `url` or a
+pinned `command`, `env_headers`, `enabled`, optional `pack`) is the single
+source for one agent tool server; `make new KIND=mcp` writes a disabled stub. The template enables three reviewed defaults so any agent can read
 current docs, search the web, and drive a browser: **Context7** (remote, library
 docs), **Exa** (remote, search and fetch), and **Playwright** (local, pinned
-`@playwright/mcp`). `make sync` renders enabled routes into host
+`@playwright/mcp`). `make sync` renders the enabled routes of enabled packs into host
 configuration (`.mcp.json` for Claude Code). The generated settings do not
 pre-approve servers, so each person approves each project server once. `make capabilities` shows which routes can actually run here.
 
@@ -88,8 +90,8 @@ owner per fact.
    or its source is unmaintained or untrusted: drop it with one line of reason
    in the issue or conversation. Exclusions leave no files behind.
 
-A pasted MCP server becomes a disabled `[[mcp]]` route (pinned, keys via
-`env_headers`) until it is reviewed under the MCP routes rules above; ask the
+A pasted MCP server becomes a disabled route (`make new KIND=mcp`, pinned, keys
+via `env_headers`) until it is reviewed under the MCP routes rules above; ask the
 `skill-scout` role to vet it.
 
 Decide in this order: does a real task's trigger match it? Is it the primary

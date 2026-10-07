@@ -12,6 +12,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import time
 from datetime import datetime, timezone
@@ -42,6 +43,28 @@ INHERITED_SESSION = ("CLAUDECODE", "CLAUDE_CODE_", "CLAUDE_PID", "CLAUDE_AGENT_S
 PREFIX = "You are a fresh agent in this repository. Do not edit files. Answer briefly. Task: "
 
 
+def run_headless(command: list[str], cwd: Path, timeout: int, stdout=None) -> subprocess.CompletedProcess[str]:
+    """Run a fresh headless agent: the one launcher behind make eval and make trial.
+
+    It drops the launching session's host variables (so the CLI uses its own login,
+    as a truly fresh agent would), allows bypassed permissions when running as root
+    in a sandbox, and ignores SIGTERM while the agent runs: agents clean up with
+    `pkill -f <name>`, which also matches the runner's command line (a trial killed
+    its own runner that way). Raises subprocess.TimeoutExpired like subprocess.run.
+    """
+    environment = {key: value for key, value in os.environ.items() if not key.startswith(INHERITED_SESSION)}
+    if hasattr(os, "geteuid") and os.geteuid() == 0:
+        environment.setdefault("IS_SANDBOX", "1")  # the CLI refuses bypassed permissions as root outside a sandbox
+    previous = signal.signal(signal.SIGTERM, signal.SIG_IGN) if hasattr(signal, "SIGTERM") else None
+    try:
+        return subprocess.run(command, cwd=cwd, env=environment, text=True, timeout=timeout, check=False,
+                              start_new_session=True, **({"stdout": stdout, "stderr": subprocess.STDOUT} if stdout
+                                                         else {"capture_output": True}))
+    finally:
+        if previous is not None:
+            signal.signal(signal.SIGTERM, previous)
+
+
 def load_tasks(root: Path, only: str | None = None) -> list[dict[str, str]]:
     tasks = []
     for suite in sorted((root / ".agents" / "evals").glob("*.toml")):
@@ -60,8 +83,7 @@ def run_task(root: Path, host: str, task: dict[str, str], timeout: int, model: s
     command = HOST_COMMANDS[host](PREFIX + task["prompt"], model)
     started = time.monotonic()
     try:
-        environment = {key: value for key, value in os.environ.items() if not key.startswith(INHERITED_SESSION)}
-        result = subprocess.run(command, cwd=root, env=environment, capture_output=True, text=True, timeout=timeout, check=False)
+        result = run_headless(command, root, timeout)
         output = result.stdout
     except subprocess.TimeoutExpired:
         return {"id": task["id"], "passed": False, "error": f"timeout after {timeout}s"}

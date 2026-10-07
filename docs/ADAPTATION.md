@@ -1,10 +1,11 @@
 # Project adaptation
 
-<!-- index: operate | Lean core, artifact lifecycle, and capability-pack selection | Turning the template into a project without generating unnecessary structure. -->
+<!-- index: operate | Lean core, artifact lifecycle, packs, and capability patterns | Turning the template into a project without generating unnecessary structure. -->
 <!-- covers: tools/kit/bootstrap.py tools/kit/adopt.py -->
 
-The template is a small kernel plus capability packs, not a universal
-application scaffold. The kernel stays responsible for navigation, the project
+The template is a small kernel plus switchable packs (`.agents/packs/`,
+`project.toml [packs]`), not a universal application scaffold. `make init`
+starts a project with each pack's default: `product` on, `measure` off. The kernel stays responsible for navigation, the project
 manifest, issue-backed intent, path safety, declared verification, and bounded
 review. Project-specific policy and code are added only after the vision intake
 identifies a real need.
@@ -45,7 +46,7 @@ owns:
 
 | Collision | What adopt does |
 |---|---|
-| `Makefile` | Kit targets go to `kit.mk`, included at the end of your Makefile so your default goal stays; a kit target you already define is renamed `kit-<name>` (for example `kit-test`) everywhere in `kit.mk`. |
+| `Makefile` | Kit targets go to `kit.mk`, included at the end of your Makefile so your default goal stays; a kit target you already define is renamed `kit-<name>` (for example `kit-test`) everywhere in `kit.mk`, and `make sync` keeps the same renames when it regenerates the command block. |
 | `.gitignore` | Missing kit lines are appended under `# Agent kit`. |
 | `README.md` | Your README stays; the project identity block is appended. |
 | `docs/README.md` | Your page stays; the generated documentation index is appended. |
@@ -86,7 +87,7 @@ subprojects keep their own targets.
 7. Re-run inventory and the declared checks; remove or deprecate anything with
    no owner, oracle, or caller.
 
-## Optional capability packs
+## Capability patterns by product type
 
 These are discoverable patterns, not files copied into every project:
 
@@ -105,6 +106,9 @@ These are discoverable patterns, not files copied into every project:
 - **Reference-product work:** the reviewed `.agents/skills/` recon/parity/
   design-token/review-mining/brand-sweep pack owned by [`skills.md`](./skills.md).
 
-A pack is activated by adding its project-specific surface, commands, and
-records to `project.toml` and the documentation index. The kernel does not
-generate framework folders or install a skill before a trigger exists.
+A pattern is activated by adding its project-specific surface, commands, and
+records to `project.toml` and the documentation index. When it earns reusable
+capabilities, group them as a pack (`make new KIND=pack`, then `PACK=<name>` on
+each `make new`) so another project can switch them on or off in one line. The
+kernel does not generate framework folders or install a skill before a trigger
+exists.

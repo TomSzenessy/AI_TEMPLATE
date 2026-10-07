@@ -1,0 +1,9 @@
+# MCP route: one server per file (docs/adr/0002-one-capability-model.md). `make sync` renders
+# enabled routes of enabled packs into host configs. Keys never live here: env_headers maps an
+# HTTP header to the environment variable that supplies it. Pin stdio packages exactly.
+name = "exa"
+description = "Web search and page fetching for research beyond the host's built-in search."
+transport = "http"
+url = "https://mcp.exa.ai/mcp"
+env_headers = { "x-api-key" = "EXA_API_KEY" }
+enabled = true

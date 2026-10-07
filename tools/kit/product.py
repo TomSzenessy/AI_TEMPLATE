@@ -20,7 +20,7 @@ import re
 from pathlib import Path
 
 from .config import setting
-from .core import RepoctlError, declared_surfaces, load_project, read_text_file, repository_files
+from .core import RepoctlError, declared_surfaces, load_project, read_text_file
 
 FEATURES = "docs/product/features.csv"
 RESEARCH = "docs/product/research.md"
@@ -154,7 +154,6 @@ def next_step(root: Path) -> dict[str, str]:
     from .uireview import review_status  # local import: uireview depends on this module
 
     project = load_project(root)
-    files = set(repository_files(root))
     if not is_product(project):
         return {"phase": "template", "action": "Maintain the template: fix `make garden` findings, keep evals green.",
                 "guide": "docs/self-healing.md", "verify": "make done"}

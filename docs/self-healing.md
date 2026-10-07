@@ -1,7 +1,7 @@
 # Self-healing mechanics
 
 <!-- index: operate | When a check may block, hooks, doc-code bindings, deprecation expiry, budgets, generated files, gardener, evals | A check fails, docs drift, a host is added, or the kit itself changes. -->
-<!-- covers: tools/kit/docsync.py tools/kit/hygiene.py tools/kit/adapters.py tools/kit/session.py tools/kit/garden.py tools/kit/navigate.py tools/kit/risk.py tools/kit/capabilities.py tools/kit/evals.py tools/kit/trial.py tools/kit/kitupdate.py .agents/trials/** tools/kit/gitinfo.py tools/kit/derive.py tools/kit/scaffold.py tools/kit/config.py .githooks/** .github/workflows/garden.yml .agents/evals/** -->
+<!-- covers: tools/kit/checks.py tools/kit/docsync.py tools/kit/hygiene.py tools/kit/adapters.py tools/kit/session.py tools/kit/garden.py tools/kit/navigate.py tools/kit/risk.py tools/kit/capabilities.py tools/kit/evals.py tools/kit/trial.py tools/kit/kitupdate.py .agents/trials/** tools/kit/gitinfo.py tools/kit/derive.py tools/kit/scaffold.py tools/kit/config.py .githooks/** .github/workflows/garden.yml .agents/evals/** -->
 
 Agents follow written rules well at the start of a session and worst at the end,
 after compaction, which is when cleanup and documentation get skipped. So the
@@ -139,34 +139,66 @@ Nothing that can be generated is maintained by hand. `make sync` (also run by
 |---|---|
 | `.claude/skills/*`, `.claude/agents/*` (redirect stubs) | `.agents/skills/*/SKILL.md`, `.agents/agents/*.md` frontmatter |
 | `.claude/settings.json` (hooks, pre-approved kit commands) | the kit, plus optional `project.toml [adapters.claude]` |
-| `.mcp.json` | `resources.toml` `[[mcp]]` routes (servers are still approved per person) |
+| `.mcp.json` | `.agents/mcp/*.toml` routes of enabled packs (servers are still approved per person) |
+| The command block in the `Makefile` (`kit.mk` after `make adopt`) and `make help` | each `@command` declaration in `tools/kit/commands.py` and `.agents/commands/` |
+| The project rules block in `AGENTS.md` | `.agents/rules/*.md` without a `scope` |
 | The tables in [`README.md`](./README.md) | each document's `<!-- index: group \| owns \| read when -->` line |
 | The role table in [`delegation.md`](./delegation.md) | role frontmatter (`description`, `access`, `tier`) |
 | The description block in the root `README.md` | `project.toml [repository].description` |
 | GitHub description, topics, template flag (`make github-sync`) | `project.toml [repository]`; `make garden` reports drift |
 
+Generated host stubs cover only capabilities of enabled packs.
 `make check` fails on any drift and on hand-written files in a generated host
 directory. Add a host by adding a renderer in `tools/kit/adapters.py` and
 listing it in `project.toml [adapters].hosts`. Codex, Copilot, and Cursor read
 `AGENTS.md` and `.agents/skills/` directly.
 
-## Extending: skills, roles, docs
+## Extending: one model for every capability
 
-`make similar Q="<need>"` answers first: reuse (score at or above
-`[kit].overlap_limit`), read the closest match first (at or above half of it),
-or create. `make new KIND=skill|agent|doc NAME=<kebab> DESC="<what>; <when>"` is
-the one way to add a capability. It refuses a near-duplicate by description
-and name (`FORCE=1` overrides), writes valid frontmatter or
-index metadata, registers a first-party skill in `[capabilities].local_skills`,
-regenerates every derived file, and leaves `FILL-IN:` lines for the content.
-Refining an existing capability is an ordinary edit of its canonical file;
-the after-edit hook regenerates what depends on it. Agent-instruction paths are
-`high` risk, so changes to them get a critic.
+Skills, agent roles, docs, rules, checks, commands, MCP routes, and packs are
+all capabilities: one file each, declaring `name`, `description`
+(`<what>; <when>`), and an optional `pack`, read by one loader
+(`tools/kit/registry.py`; the decision is
+[ADR 0002](./adr/0002-one-capability-model.md)). Adding the file adds the
+capability; nothing is registered by hand.
+
+`make similar Q="<need>"` answers first, across every kind and pack: reuse
+(score at or above `[kit].overlap_limit`), read the closest match first (at or
+above half of it), or create.
+`make new KIND=skill|agent|doc|rule|check|command|mcp|pack NAME=<kebab> DESC="<what>; <when>" [PACK=<pack>]`
+is the one way to add one. It refuses a near-duplicate of the same kind
+(`FORCE=1` overrides), writes valid metadata, registers a first-party skill in
+`[capabilities].local_skills`, regenerates every derived file, and leaves
+`FILL-IN:` lines for the content. Refining a capability is an ordinary edit of
+its file; the after-edit hook regenerates what depends on it.
+Agent-instruction paths are `high` risk, so changes to them get a critic.
+
+| Kind | File | What the kit does with it |
+|---|---|---|
+| rule | `.agents/rules/<name>.md` (`scope:` globs optional) | no scope: one line in `AGENTS.md`; scoped: the after-edit hook delivers it once per session when a matching path is edited, and `make where <path>` lists it |
+| check | `.agents/checks/<name>.py` with `@check(name, description, blocks=..., reason=...)` | runs in `make check` and the gates when it blocks, in `make garden` otherwise; a blocking check without a reason fails to load (the blocking rule above) |
+| command | `.agents/commands/<name>.py` with `@command(name, description, args=(arg("--x", var="X"),))` | becomes `repoctl <name>` and, after `make sync`, `make <name> X=...`; make variables reach it as quoted data |
+| mcp | `.agents/mcp/<name>.toml` | rendered into host config when enabled (see [`resources.md`](./resources.md)) |
+| pack | `.agents/packs/<name>.md` (`default: on` or `off`) | groups capabilities; `project.toml [packs]` overrides the default |
+
+A check is a function of a context (`root`, `project`, `files`, `bindings`)
+that returns findings, each naming its fix. Kit checks live in
+`tools/kit/checks.py` and kit commands in `tools/kit/commands.py`; a project's
+own go in `.agents/`, so `make kit-update` never conflicts with them.
+
+**Packs** keep rarely needed capabilities out of every session. A pack that is
+off contributes no host stubs, no `AGENTS.md` rule lines, no running checks,
+and no `make help` lines, and its commands refuse with the line that switches
+it on; it still appears in `make capabilities`, `make where`, and
+`make similar`. The kit ships `product` (on: the product driver in
+[`building.md`](./building.md)) and `measure` (off: `make eval`, `make trial`;
+the template switches it on). A third-party skill, whose files are pinned by
+digest, records its pack in its `[[skills]]` provenance entry.
 
 ## Configuration
 
 Policy a project may change lives in `project.toml`, with built-in defaults
-when a key is absent: `[kit]` (docs index groups, unbound-doc exemptions,
+when a key is absent: `[packs]` (switch packs on or off), `[kit]` (docs index groups, unbound-doc exemptions,
 overlap limit, deprecation warning window, skill review age, UI project kinds,
 eval model, Playwright version and previewable kinds for `make ui-review`), `[adapters.claude]`
 (tier-to-model and access-to-tools maps, pre-approved commands), `[risk]`
@@ -235,14 +267,18 @@ fresh clone of `[template].source`) then, per kit file:
 | your own file that `make adopt` kept at a kit path | never touched; listed only when the kit's version changes |
 
 A conflict is reported once per kit change: the lock then remembers the version
-offered, so the next update is quiet until the kit changes that file again. The
+offered, so the next update is quiet until the kit changes that file again. It
+also remembers the version the project had from the kit before its edit
+(`bases`): if the project later reverts the file to that version, the next
+update applies the kit's version again instead of treating it as an edit. The
 staged version stays in `.agent/kit-update/` and `make garden` lists it on every
 run until you merge it and delete the staged file, so an ignored kit fix is never
 silently lost. A
 project made before the lock existed gets every differing kit file listed once
 on its first update (nothing is overwritten); after that, updates apply
 automatically. A kit checkout without git history keeps the recorded
-`kit_version`.
+`kit_version`, and an update from a lock that never recorded one says so
+instead of printing a placeholder.
 
 Project-owned files are never kit files: `project.toml`, `VISION.md`,
 `README.md`, `LICENSE`, `CONTEXT.md`, the stack decision, design, architecture,
@@ -310,6 +346,9 @@ stopped with a stale UI review after its final fix, which `make next` reports
 and `make readiness` enforces before release.
 
 A host-side failure, such as an expired login, is recorded as an error rather
-than as a wrong answer. Runs drop the launching session's host variables, so a
-benchmark started from inside an agent session uses the CLI's own login, as a
-truly fresh agent would.
+than as a wrong answer. Evals and trials start agents through one launcher
+(`run_headless` in `tools/kit/evals.py`): it drops the launching session's host
+variables, so a benchmark started from inside an agent session uses the CLI's
+own login, as a truly fresh agent would, and it ignores `SIGTERM` while the
+agent runs, because agents clean up with `pkill -f <name>`, which once killed
+a trial's runner. Both commands belong to the `measure` pack.

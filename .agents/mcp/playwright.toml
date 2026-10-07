@@ -1,0 +1,8 @@
+# MCP route: one server per file (docs/adr/0002-one-capability-model.md). `make sync` renders
+# enabled routes of enabled packs into host configs. Keys never live here: env_headers maps an
+# HTTP header to the environment variable that supplies it. Pin stdio packages exactly.
+name = "playwright"
+description = "Real browser for UI verification, screenshots, accessibility snapshots, and pages that need JavaScript."
+transport = "stdio"
+command = ["npx", "-y", "@playwright/mcp@0.0.83"]
+enabled = true

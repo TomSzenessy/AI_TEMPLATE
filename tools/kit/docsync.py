@@ -296,8 +296,10 @@ def nearest_makefile_dir(files: set[str], relative: str) -> str:
 
 
 def repoctl_commands(root: Path) -> set[str]:
-    text = read_text_file(root, "tools/repoctl.py") or ""
-    return set(re.findall(r'add_parser\(\s*"([a-z-]+)"', text))
+    if not (root / "tools" / "repoctl.py").is_file():
+        return set()
+    from .registry import Registry
+    return {item.name for item in Registry(root).of("command", enabled_only=False)}
 
 
 def command_reference_errors(root: Path, files: list[str]) -> list[str]:

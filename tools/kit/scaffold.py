@@ -1,10 +1,11 @@
-"""`make new`: add a skill, subagent role, or document that is wired in from birth.
+"""`make new`: add any capability, wired in from birth (docs/adr/0002-one-capability-model.md).
 
 Creating a capability should be one low-risk command, not a checklist an agent
-might half-follow. The scaffolder refuses near-duplicates (overlap check),
-writes valid metadata, registers first-party skills, regenerates every derived
-file (host adapters, docs index, role table), and leaves `FILL-IN:` markers
-that `make check` reports until the content is real.
+might half-follow. The scaffolder refuses near-duplicates of any kind (overlap
+check), writes valid metadata, registers first-party skills, regenerates every
+derived file (host adapters, docs index, role table, rules block, Makefile
+commands), and leaves `FILL-IN:` markers that `make check` reports until the
+content is real.
 """
 
 from __future__ import annotations
@@ -13,13 +14,13 @@ import re
 from pathlib import Path
 
 from . import derive
-from .adapters import ROLE_ACCESS, ROLE_TIERS, yaml_string
 from .core import RepoctlError, ensure_inside_root
 from .config import setting
 from .docsync import doc_groups
 from .navigate import skill_overlap
+from .registry import CORE, ROLE_ACCESS, ROLE_TIERS, Registry, yaml_string
 
-KINDS = ("skill", "agent", "doc")
+KINDS = ("skill", "agent", "doc", "rule", "check", "command", "mcp", "pack")
 NAME = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 FILL = "FILL" + "-IN:"  # split so the marker scanner never flags this module
 
@@ -45,6 +46,7 @@ def create(
     name: str,
     description: str,
     *,
+    pack: str = "",
     group: str = "operate",
     covers: str = "",
     access: str = "read-only",
@@ -60,21 +62,27 @@ def create(
         raise RepoctlError(
             'DESC must say what it does and when to use it (20+ characters), e.g. DESC="Drafts release notes from merged PRs; use before tagging a release."'
         )
+    pack = pack.strip() or CORE
+    if kind != "pack" and pack != CORE and not Registry(root).get("pack", pack):
+        raise RepoctlError(f"PACK={pack} does not exist; create it first with make new KIND=pack NAME={pack} DESC=\"...; ...\"")
+    pack_line = f"pack: {pack}\n" if pack != CORE else ""
     messages: list[str] = []
-    if kind in {"skill", "agent"}:
+    if kind != "doc":
         overlap = skill_overlap(root, description, name)
         if overlap:
             messages += [f"overlap {score:.2f} with {label}" for score, label, _ in overlap[:3]]
-        if overlap and overlap[0][0] >= float(setting(root, "overlap_limit")) and not force:
+        # Refuse only a near-duplicate of the same kind; a similar capability of another kind is reported above.
+        same = [item for item in overlap if item[1].startswith(f"{kind}:")]
+        if same and same[0][0] >= float(setting(root, "overlap_limit")) and not force:
             raise RepoctlError(
-                f"too similar to {overlap[0][1]} (overlap {overlap[0][0]:.2f}); extend that one instead, "
+                f"too similar to {same[0][1]} (overlap {same[0][0]:.2f}); extend that one instead, "
                 "or re-run with FORCE=1 if it is genuinely different"
             )
 
     if kind == "skill":
         target = root / ".agents" / "skills" / name / "SKILL.md"
         body = (
-            f"---\nname: {name}\ndescription: {yaml_string(description)}\n---\n\n# {_title(name)}\n\n"
+            f"---\nname: {name}\ndescription: {yaml_string(description)}\n{pack_line}---\n\n# {_title(name)}\n\n"
             f"{FILL} one paragraph on the outcome and the trigger that should load this skill.\n\n"
             f"## Steps\n\n1. {FILL} concrete, checkable steps; link owner docs instead of copying them.\n\n"
             f"## Done when\n\n- {FILL} the observable check or artifact that proves success.\n"
@@ -86,13 +94,13 @@ def create(
             )
         target = root / ".agents" / "agents" / f"{name}.md"
         body = (
-            f"---\nname: {name}\ndescription: {yaml_string(description)}\naccess: {access}\ntier: {tier}\n---\n\n"
+            f"---\nname: {name}\ndescription: {yaml_string(description)}\naccess: {access}\ntier: {tier}\n{pack_line}---\n\n"
             f"# {_title(name)}\n\n{FILL} the one job this role owns and why a fresh context does it better.\n\n"
             f"## Method\n\n1. {FILL} steps, starting from `make where` and the owner docs.\n\n"
             f"## Never\n\n{FILL} edits, commands, or scope this role must not touch.\n\n"
             f"## Report (at most 200 words)\n\n```text\nAnswer: {FILL} answer format\nEvidence: <path:line or command output>\n```\n"
         )
-    else:
+    elif kind == "doc":
         if group not in doc_groups(root):
             raise RepoctlError(f"GROUP must be one of: {', '.join(doc_groups(root))} (project.toml [kit].doc_groups)")
         owns, _, when = description.partition(";")
@@ -104,6 +112,54 @@ def create(
             f"# {_title(name)}\n\n<!-- index: {group} | {owns.strip()} | {when.strip()} -->\n{covers_line}\n"
             f"{FILL} the durable facts this document owns. Describe what the code does now,\n"
             "link related owners instead of copying them, and keep live status in issues.\n"
+        )
+    elif kind == "rule":
+        target = root / ".agents" / "rules" / f"{name}.md"
+        scope_line = f"scope: {covers.strip()}\n" if covers.strip() else ""
+        body = (
+            f"---\nname: {name}\ndescription: {yaml_string(description)}\n{scope_line}{pack_line}---\n\n# {_title(name)}\n\n"
+            f"{FILL} why this rule exists (the incident, trial, or decision behind it) and what to do instead.\n"
+            "A rule without a scope is one line in AGENTS.md; a scoped rule reaches the agent when it edits a matching path.\n"
+        )
+    elif kind in {"check", "command"}:
+        target = root / ".agents" / f"{kind}s" / f"{name}.py"
+        pack_argument = f", pack={pack!r}" if pack != CORE else ""
+        if kind == "check":
+            body = (
+                f'"""{FILL} what this check protects and the evidence behind it (docs/self-healing.md#when-a-check-may-block)."""\n\n'
+                "from kit.registry import check\n\n\n"
+                f"@check({name!r}, {description!r}, blocks=False{pack_argument})\n"
+                "def run(context) -> list[str]:\n"
+                f'    """Return findings that each name their fix. context.root, .project, .files, .bindings are available."""\n'
+                f"    findings: list[str] = []  # {FILL} the check; switch to blocks=True with a reason once a trial proves it\n"
+                "    return findings\n"
+            )
+        else:
+            body = (
+                f'"""{FILL} what this command does for the project; make sync adds `make {name}`."""\n\n'
+                "from kit.registry import arg, command\n\n\n"
+                f"@command({name!r}, {description!r}, group=\"when-needed\", usage=\"make {name}\"{pack_argument},\n"
+                f"         args=())  # e.g. arg(\"--title\", var=\"TITLE\") passes `make {name} TITLE=...`\n"
+                "def run(root, args) -> int:\n"
+                f"    print(\"{FILL} implement {name}\")\n"
+                "    return 0\n"
+            )
+    elif kind == "mcp":
+        target = root / ".agents" / "mcp" / f"{name}.toml"
+        body = (
+            f"# {FILL} source, license, and review of this server (docs/resources.md); keep it disabled until reviewed.\n"
+            f"name = \"{name}\"\ndescription = {yaml_string(description)}\n"
+            "transport = \"http\"  # or stdio with command = [\"npx\", \"-y\", \"@scope/server@1.2.3\"] (pin exactly)\n"
+            f"url = \"https://mcp.example.com/{name}\"\n"
+            "env_headers = {}  # header name -> UPPER_CASE environment variable; keys never live here\n"
+            "enabled = false\n" + (f"pack = \"{pack}\"\n" if pack != CORE else "")
+        )
+    else:  # pack
+        target = root / ".agents" / "packs" / f"{name}.md"
+        body = (
+            f"---\nname: {name}\ndescription: {yaml_string(description)}\ndefault: off\n---\n\n# {_title(name)} pack\n\n"
+            f"{FILL} what the pack is for and who switches it on. Add capabilities to it with PACK={name};\n"
+            f"switch it on with `{name} = true` under [packs] in project.toml.\n"
         )
 
     target = ensure_inside_root(root, target, f"new {kind}")

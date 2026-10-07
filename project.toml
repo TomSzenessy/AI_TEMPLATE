@@ -63,6 +63,11 @@ hosts = ["claude"]
 # skill_review_days = 365
 # eval_model = "haiku"   # model for `make eval` on Claude (cheap by default)
 
+[packs]
+# Capability packs (.agents/packs/): omitted packs keep their default. The
+# template measures its own changes with fresh agents (make eval, make trial).
+measure = true
+
 [capabilities]
 # First-party skills written in this repository (`make new KIND=skill` adds
 # them here). Third-party skills instead need [[skills]] provenance below.
@@ -145,6 +150,7 @@ verification = [["tools/repoctl", "check"]]
 # skills may be renamed; THIRD_PARTY_NOTICES.md holds the full mapping.
 [[skills]]
 package = "Jakeschincariol/replica-skill@product-recon"
+pack = "product"
 source = "https://github.com/Jakeschincariol/replica-skill"
 revision = "77c9436fb3d18c3d58169efb8caf4fe906b0dc51"
 content_digest = "sha256:80bfbb95202612855aba132a383281db8a50341fcbd14568751684dbbe75422e"
@@ -155,6 +161,7 @@ rollback = "remove the .agents/skills/product-recon directory and its [[skills]]
 
 [[skills]]
 package = "Jakeschincariol/replica-skill@parity-check"
+pack = "product"
 source = "https://github.com/Jakeschincariol/replica-skill"
 revision = "77c9436fb3d18c3d58169efb8caf4fe906b0dc51"
 content_digest = "sha256:2e2bfdf71f59f1ea091a6a9730b2f47f807bc48670ac896c7a3d9f8a1076d803"
@@ -165,6 +172,7 @@ rollback = "remove the .agents/skills/parity-check directory and its [[skills]] 
 
 [[skills]]
 package = "Jakeschincariol/replica-skill@design-tokens"
+pack = "product"
 source = "https://github.com/Jakeschincariol/replica-skill"
 revision = "77c9436fb3d18c3d58169efb8caf4fe906b0dc51"
 content_digest = "sha256:1a5eca5a514c9a01d467dcb9c7f96cb4e7926b1eef498e6f133e3879d1e1327a"
@@ -175,6 +183,7 @@ rollback = "remove the .agents/skills/design-tokens directory and its [[skills]]
 
 [[skills]]
 package = "Jakeschincariol/replica-skill@review-mining"
+pack = "product"
 source = "https://github.com/Jakeschincariol/replica-skill"
 revision = "77c9436fb3d18c3d58169efb8caf4fe906b0dc51"
 content_digest = "sha256:b46fad33bdf857e5e725fcaa4e3b32ab055aca054b31cedf721aa6403f609302"
@@ -185,6 +194,7 @@ rollback = "remove the .agents/skills/review-mining directory and its [[skills]]
 
 [[skills]]
 package = "Jakeschincariol/replica-skill@brand-sweep"
+pack = "product"
 source = "https://github.com/Jakeschincariol/replica-skill"
 revision = "77c9436fb3d18c3d58169efb8caf4fe906b0dc51"
 content_digest = "sha256:a3cf62ae146a31fd4094c633b3310cff1e4a673a69e637b1648043ebce15d8f8"

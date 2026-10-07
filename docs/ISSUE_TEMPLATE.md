@@ -22,6 +22,11 @@ issue URL, and marks the draft `Filed:` so it is never filed twice; a draft
 that does not meet the contract yet is listed with the reason and left as is. Never keep live work in a tracked Markdown file; `make check` rejects
 tracked backlogs.
 
+Under the `regulated` profile, public filing also needs `PUBLIC_REVIEWED=1`
+and `REVIEW_EVIDENCE=<reviewed record>` (see [`../CONTRIBUTING.md`](../CONTRIBUTING.md)).
+`make issue` and the CI issue check apply one shared rule to the
+`Reviewer/date` line: a real name and an ISO date that is not in the future.
+
 ## Duplicate check
 
 Record one line in the issue:

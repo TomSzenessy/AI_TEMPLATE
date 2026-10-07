@@ -18,17 +18,25 @@ from pathlib import Path
 from . import derive, docsync, hygiene
 from .core import RepoctlError, governance_profile, load_project, read_text_file, repository_files
 from .garden import self_heal_errors
-from .gitinfo import branch, branch_paths, changed_paths, git, head
+from .gitinfo import branch, branch_paths, changed_paths, git, head, path_matches
 from .navigate import print_map
 from .product import next_step, product_summary
+from .registry import Registry
 from .risk import assess
 from .uireview import review_status
+
+
+def _product_on(root: Path) -> bool:
+    try:
+        return Registry(root).pack_state.get("product", False)
+    except RepoctlError:
+        return True  # a broken manifest is reported by the checks; keep the product guidance
 
 HANDOVER_LIMIT = 4000
 CHECKPOINT = ".agent/checkpoint.md"
 MAP_LIMIT = 15
 STATE = ".agent/hook-state.json"
-CANONICAL_INPUTS = (".agents/skills/", ".agents/agents/", "resources.toml", "project.toml")
+CANONICAL_INPUTS = (".agents/", "tools/kit/commands.py", "project.toml")
 
 
 def read_event() -> dict[str, object]:
@@ -88,8 +96,9 @@ def session_start(root: Path) -> None:
     if hooks_note:
         findings.insert(0, hooks_note)
     try:
-        step = next_step(root)
-        print(f"\n## Next step ({step['phase']})\n{step['action']}\nHow: {step['guide']}. Done when: {step['verify']}.")
+        if _product_on(root):
+            step = next_step(root)
+            print(f"\n## Next step ({step['phase']})\n{step['action']}\nHow: {step['guide']}. Done when: {step['verify']}.")
     except Exception as error:  # noqa: BLE001 - the brief must survive a malformed feature list
         print(f"\n## Next step\nmake next failed: {error}")
     print("\n## Needs attention")
@@ -100,7 +109,8 @@ def session_start(root: Path) -> None:
         "  in .agents/agents/ using the brief in docs/delegation.md. Subagent reports must stay short and cite file:line.\n"
         "- Navigate with `make where Q=\"...\"` before broad searching; `make risk` sets the ceremony for your change.\n"
         "- Before declaring done: update the docs that cover what you changed, then `make done`."
-        "\n- Missing a capability? `make similar Q=\"...\"`, then `make new` (skill, agent role, or doc) wires it in."
+        "\n- Missing a capability? `make similar Q=\"...\"`, then `make new KIND=...` (skill, agent, doc, rule, check,"
+        "\n  command, mcp, or pack) wires it in; outside tools go through the skill-scout role first."
     )
 
 
@@ -168,7 +178,7 @@ def after_edit(root: Path, event: dict[str, object]) -> None:
         return
     notes = []
     if relative.startswith(".claude/") or relative == ".mcp.json":
-        notes.append(f"{relative} is generated. Put the change in .agents/ or resources.toml; `make sync` regenerates it.")
+        notes.append(f"{relative} is generated. Put the change in .agents/; `make sync` regenerates it.")
     elif relative.startswith(CANONICAL_INPUTS) or relative.endswith(".md"):
         healed = _heal_derived(root)
         if healed:
@@ -178,7 +188,13 @@ def after_edit(root: Path, event: dict[str, object]) -> None:
     owned = [doc for doc in docsync.owners(docsync.bindings(root, repository_files(root)), relative) if doc not in state["noted"]]
     if owned:
         notes.append(f"{relative} is documented by {', '.join(owned)}; keep it true in this change (the stop gate checks).")
-        state["noted"] = sorted(set(state["noted"]) | set(owned))
+    # Scoped rules arrive when they apply, once per session, instead of living in the router.
+    rules = [rule for rule in Registry(root).of("rule")
+             if rule.path not in state["noted"] and any(path_matches(relative, pattern) for pattern in rule.fields["scope"])]
+    for rule in rules:
+        notes.append(f"Rule for {relative}: {rule.description} ({rule.path}).")
+    if owned or rules:
+        state["noted"] = sorted(set(state["noted"]) | set(owned) | {rule.path for rule in rules})
         (root / STATE).parent.mkdir(parents=True, exist_ok=True)
         (root / STATE).write_text(json.dumps(state), encoding="utf-8")
     if notes:
@@ -299,6 +315,8 @@ def finish(root: Path) -> int:
         print("Not finished:\n" + "\n".join(f"- {item}" for item in findings))
         return 1
     print("Self-healing gate passed for this branch's change set.")
+    if not _product_on(root):
+        return 0
     summary = product_summary(root)
     if summary:
         print(summary)

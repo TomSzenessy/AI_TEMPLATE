@@ -71,7 +71,8 @@ merged in beside them ([`docs/ADAPTATION.md`](./docs/ADAPTATION.md#adopting-an-e
 | Context is lost between sessions | Session hooks (or `make start`) print a brief; a checkpoint is written before compaction; `make handover` pre-fills the next session's record. |
 | Too much to read, too many places | `AGENTS.md` is a budgeted router loaded into every session; the docs index and host files are generated; `make where` finds code, owners, and past failures in one call. |
 | One agent tries to hold everything | Six roles (scout, implementer, critic, researcher, doc-gardener, skill-scout) with a fixed brief and short reports keep the orchestrator's context for decisions. |
-| Every agent host wants its own files | Skills, roles, and MCP routes have one canonical copy in `.agents/` and `resources.toml`; `make sync` generates content-free host adapters. |
+| Every agent host wants its own files | Skills, roles, rules, and MCP routes have one canonical copy in `.agents/`; `make sync` generates content-free host adapters. |
+| The system cannot grow without losing its shape | Every capability (skill, role, doc, rule, check, command, MCP route, pack) is one file added by `make new`, found by `make where` and `make similar`; packs keep rarely needed ones out of context until switched on. |
 | "Done" means "it compiled" | Risk tiers set the ceremony; an independent critic and the real artifact decide; `make eval` measures whether a fresh agent can still navigate. |
 
 The mechanics are in [`docs/self-healing.md`](./docs/self-healing.md) and
@@ -96,8 +97,8 @@ make help         # everything else
 | Path | Role |
 |---|---|
 | `AGENTS.md` | The operating contract and trigger router (imported by `CLAUDE.md` and `GEMINI.md`). |
-| `project.toml`, `resources.toml` | Machine-readable truth: surfaces, checks, budgets, risk tiers, provenance, resource and MCP routes. |
-| `.agents/` | Canonical skills, subagent roles, and the fresh-agent benchmark. |
+| `project.toml`, `resources.toml` | Machine-readable truth: surfaces, budgets, risk tiers, packs, provenance, and read-only resource routes. |
+| `.agents/` | Every capability: skills, subagent roles, rules, checks, commands, MCP routes, packs, and the fresh-agent benchmark. |
 | `.claude/`, `.mcp.json` | Generated host adapters; never edited by hand. |
 | `docs/` | One owner document per concern; [`docs/README.md`](./docs/README.md) is the generated index. |
 | `tools/` | `repoctl` (standard-library Python 3.11+) and its focused `kit/` modules. |

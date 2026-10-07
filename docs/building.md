@@ -4,7 +4,9 @@
 <!-- covers: tools/kit/product.py tools/kit/uireview.py .agents/skills/product-kickoff/production-features.csv -->
 
 Repository hygiene checks prove the code is tidy; they cannot prove the product
-is complete or good. This document owns the mechanics that do: a researched
+is complete or good. Everything on this page is the `product` pack
+(`.agents/packs/product.md`, on by default): switch it off with
+`product = false` under `[packs]` for a repository that ships no product. This document owns the mechanics that do: a researched
 feature list with evidence, a deterministic next step, a product-level done
 score, and screenshot reviews. Skills say *how*; these checks make sure the
 steps happen.

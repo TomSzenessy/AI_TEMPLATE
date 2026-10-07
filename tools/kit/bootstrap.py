@@ -249,6 +249,17 @@ COVERS = re.compile(r"<!--\s*covers:([^>]*?)-->")
 
 
 
+PACKS_TABLE = re.compile(r"(?ms)^\[packs\]\n.*?(?=^\[)")
+
+
+def reset_packs(manifest: str) -> str:
+    """A new project starts with each pack's default; the template's own overrides (measure) stay behind."""
+    return PACKS_TABLE.sub(
+        "[packs]\n# Capability packs (.agents/packs/, make capabilities): omitted packs keep their default.\n"
+        "# Example: switch off the product pack for a repository that is not a product.\n# product = false\n\n",
+        manifest, count=1)
+
+
 def reset_repository_metadata(manifest: str) -> str:
     manifest = re.sub(r'(?m)^description\s*=\s*".*"$', 'description = ""', manifest, count=1)
     manifest = re.sub(r"(?m)^topics\s*=\s*\[[^\]]*\]", "topics = []", manifest, count=1)
@@ -291,6 +302,7 @@ def initialize_project(root: Path, name: str, kind: str, owner: str | None = Non
     manifest = reset_vision_for_project(root, manifest, name)
     removed = prune_template_material(root, load_project(root))
     manifest = reset_repository_metadata(manifest)
+    manifest = reset_packs(manifest)
     if owner:
         # Name the accountable owner once here instead of failing later checks on a placeholder.
         manifest = manifest.replace('"project-owner"', f'"{owner}"')

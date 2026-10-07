@@ -170,31 +170,3 @@ trust = "reviewed"
 access = "read-only"
 scope = "ux"
 summary = "Catalogue of deceptive (dark) patterns to avoid in onboarding, pricing, and consent."
-
-# MCP routes: the single source for agent tool servers. `make sync` renders
-# enabled routes into host configs (for Claude Code: .mcp.json plus an explicit
-# approval list). Keys never live here: `env_headers` maps an HTTP header to the
-# environment variable that supplies it; unset variables send an empty value,
-# which these services treat as anonymous/free tier. Pin stdio packages exactly.
-[[mcp]]
-id = "context7"
-transport = "http"
-url = "https://mcp.context7.com/mcp"
-env_headers = { CONTEXT7_API_KEY = "CONTEXT7_API_KEY" }
-enabled = true
-purpose = "Current, version-specific library documentation for the libraries in resources and the stack."
-
-[[mcp]]
-id = "exa"
-transport = "http"
-url = "https://mcp.exa.ai/mcp"
-env_headers = { "x-api-key" = "EXA_API_KEY" }
-enabled = true
-purpose = "Web search and page fetching for research beyond the host's built-in search."
-
-[[mcp]]
-id = "playwright"
-transport = "stdio"
-command = ["npx", "-y", "@playwright/mcp@0.0.83"]
-enabled = true
-purpose = "Real browser for UI verification, screenshots, accessibility snapshots, and pages that need JavaScript."

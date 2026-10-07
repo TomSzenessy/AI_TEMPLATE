@@ -20,7 +20,7 @@ TOOLS = Path(__file__).resolve().parents[1]
 REPOCTL = TOOLS / "repoctl.py"
 sys.path.insert(0, str(TOOLS))
 
-from kit import adapters, ci, derive, docsync, evals, garden, hygiene, navigate, product, risk, uireview  # noqa: E402
+from kit import ci, derive, docsync, evals, garden, hygiene, navigate, product, registry, risk, uireview  # noqa: E402
 from kit.gitinfo import path_matches  # noqa: E402
 
 # Built by concatenation so this test file never trips the marker scanner itself.
@@ -65,12 +65,13 @@ class KitRepository(unittest.TestCase):
             access = "read-only"
             scope = "web"
             summary = "Example docs."
-            [[mcp]]
-            id = "browser"
+            """)
+        self.write(".agents/mcp/browser.toml", """\
+            name = "browser"
+            description = "Drive a browser for UI checks."
             transport = "stdio"
             command = ["npx", "-y", "@example/mcp@1.2.3"]
             enabled = true
-            purpose = "Drive a browser."
             """)
         self.write("Makefile", "check:\n\t@true\nverify:\n\t@true\n")
         self.write("AGENTS.md", "# Agents\n")
@@ -107,9 +108,13 @@ class KitRepository(unittest.TestCase):
             input=stdin, capture_output=True, text=True, check=False,
         )
 
+    # The fixture is a bare repository, not an initialized project: skip the repository-contract checks.
+    CONTRACT = frozenset({"manifest-structure", "skill-provenance", "file-hygiene", "markdown-links", "docs-index"})
+
     def self_heal(self) -> str:
-        """The self-healing findings `make check` adds on top of the structure checks."""
-        return "\n".join(garden.self_heal_errors(self.root))
+        """The self-healing findings `make check` adds on top of the repository-contract checks."""
+        hard, _ = registry.run_checks(self.root, blocking_only=True, skip=self.CONTRACT)
+        return "\n".join(hard + docsync.index_errors(self.root, self.files()))
 
     def files(self) -> list[str]:
         return [line for line in self.git("ls-files").splitlines() if line]
@@ -232,7 +237,7 @@ class AdapterTests(KitRepository):
         self.assertEqual(navigate.skill_overlap(self.root, "render invoices billing")[0][1], "skill:demo-skill")
 
     def test_disabling_every_route_clears_host_mcp_config(self) -> None:
-        self.write("resources.toml", (self.root / "resources.toml").read_text().replace("enabled = true", "enabled = false"))
+        self.write(".agents/mcp/browser.toml", (self.root / ".agents/mcp/browser.toml").read_text().replace("enabled = true", "enabled = false"))
         derive.sync(self.root)
         self.assertEqual(json.loads((self.root / ".mcp.json").read_text()), {"mcpServers": {}})
 
@@ -251,15 +256,15 @@ class AdapterTests(KitRepository):
         self.assertFalse((self.root / ".claude/skills/demo-skill").exists())
 
     def test_unpinned_stdio_route_is_rejected(self) -> None:
-        text = (self.root / "resources.toml").read_text().replace("@example/mcp@1.2.3", "@example/mcp@latest")
-        self.write("resources.toml", text)
+        text = (self.root / ".agents/mcp/browser.toml").read_text().replace("@example/mcp@1.2.3", "@example/mcp@latest")
+        self.write(".agents/mcp/browser.toml", text)
         with self.assertRaisesRegex(Exception, "must pin its package"):
-            adapters.mcp_routes(self.root)
+            registry.Registry(self.root).of("mcp")
 
     def test_frontmatter_colon_must_be_quoted(self) -> None:
         self.write(".agents/agents/scout.md", "---\nname: scout\ndescription: Locator: finds files.\naccess: read-only\ntier: fast\n---\n")
         with self.assertRaisesRegex(Exception, "quote it"):
-            adapters.canonical_roles(self.root)
+            registry.Registry(self.root).of("agent")
 
 
 class HookTests(KitRepository):
@@ -919,6 +924,50 @@ class KitUpdateTests(unittest.TestCase):
             self.assertIn("Our team rule.", (project / "docs/delegation.md").read_text())
 
 
+    def test_reverted_conflict_updates_again_and_first_update_names_its_origin(self) -> None:
+        # Issue #15: a conflicted file the project reverted to its shipped version gets later kit fixes;
+        # a genuinely edited file is still left alone; a lock without a version says so plainly.
+        from kit import trial
+        with tempfile.TemporaryDirectory() as temp:
+            kit, project = Path(temp) / "kit", Path(temp) / "project"
+            trial._copy(TOOLS.parent, trial.listed_files(TOOLS.parent), kit)
+            self.git(kit, "init", "-q", "-b", "main")
+            self.snapshot(kit)
+            trial.prepare(kit, {"id": "demo", "kind": "cli", "mode": "new", "prompt": "x"}, project)
+            lock_path = project / "tools/kit-lock.json"
+            lock = json.loads(lock_path.read_text())
+            lock["kit_version"] = "unknown"
+            lock_path.write_text(json.dumps(lock))
+            shipped = (project / "docs/delegation.md").read_text()
+            (project / "docs/delegation.md").write_text(shipped + "\nOur team rule.\n")
+            (project / "docs/operations.md").write_text((project / "docs/operations.md").read_text() + "\nOur runbook.\n")
+            self.snapshot(project)
+            for doc in ("docs/delegation.md", "docs/operations.md"):
+                (kit / doc).write_text((kit / doc).read_text() + "\nKit B note.\n")
+            self.snapshot(kit)
+            update = lambda: subprocess.run([sys.executable, "tools/repoctl.py", "kit-update", "--kit", str(kit)],
+                                            cwd=project, capture_output=True, text=True)
+            first = update()
+            self.assertIn("no version recorded before", first.stdout, first.stdout + first.stderr)
+            self.assertNotIn("was unknown", first.stdout)
+            self.assertIn("merge: docs/delegation.md", first.stdout)
+            (project / "docs/delegation.md").write_text(shipped)  # the project gives up its edit
+            for staged in (project / ".agent/kit-update").rglob("*"):
+                if staged.is_file():
+                    staged.unlink()
+            self.snapshot(project)
+            for doc in ("docs/delegation.md", "docs/operations.md"):
+                (kit / doc).write_text((kit / doc).read_text() + "\nKit C note.\n")
+            self.snapshot(kit)
+            second = update()
+            self.assertIn("Kit C note.", (project / "docs/delegation.md").read_text(), second.stdout)
+            self.assertIn("Our runbook.", (project / "docs/operations.md").read_text(), "a real edit stays")
+            self.assertNotIn("Kit C note.", (project / "docs/operations.md").read_text())
+            self.assertIn("merge: docs/operations.md", second.stdout)
+            head = self.git(kit, "rev-parse", "HEAD").strip()
+            self.assertEqual(json.loads(lock_path.read_text())["kit_version"], head, "a known version is recorded")
+
+
 @template_only
 class InitOwnerTests(unittest.TestCase):
     def test_init_names_the_owner_everywhere_and_refuses_emails(self) -> None:
@@ -1010,12 +1059,12 @@ class AdoptTests(unittest.TestCase):
 
 class PinDriftTests(KitRepository):
     def test_behind_pins_are_advisory_findings(self) -> None:
-        self.write("resources.toml", '[[mcp]]\nid = "pw"\ncommand = ["npx", "-y", "@playwright/mcp@0.0.83"]\n')
+        self.write(".agents/mcp/browser.toml", 'name = "browser"\ndescription = "Real browser for UI checks."\ntransport = "stdio"\ncommand = ["npx", "-y", "@playwright/mcp@0.0.83"]\n')
         from kit.config import setting
         latest = {"playwright": str(setting(self.root, "playwright_version")), "@playwright/mcp": "0.0.90"}
         findings = garden.pin_drift(self.root, view=latest.get)
         self.assertEqual(len(findings), 1)
-        self.assertIn("@playwright/mcp@0.0.83 (resources.toml) is behind 0.0.90", findings[0])
+        self.assertIn("@playwright/mcp@0.0.83 (.agents/mcp/browser.toml) is behind 0.0.90", findings[0])
         self.assertEqual(garden.pin_drift(self.root, view=lambda package: None), [], "offline: no finding")
 
 
@@ -1123,6 +1172,121 @@ class ScaffoldTests(KitRepository):
         index = (self.root / "docs/README.md").read_text()
         self.assertIn("### Miscellany", index)
         self.assertIn("| [`pricing.md`](./pricing.md) | Pricing rules | when prices change |", index)
+
+
+class CapabilityModelTests(KitRepository):
+    """docs/adr/0002-one-capability-model.md: every kind is added by one command and found the same way."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.write("project.toml", (self.root / "project.toml").read_text() + "[capabilities]\nlocal_skills = []\n")
+        self.write("docs/README.md", "# Index\n\n<!-- repoctl:index -->\n<!-- /repoctl:index -->\n")
+        self.write("AGENTS.md", "# Agents\n\n<!-- repoctl:rules -->\n<!-- /repoctl:rules -->\n")
+        self.write("Makefile", "check:\n\t@true\n\n# <repoctl:commands>\n# </repoctl:commands>\n")
+        derive.sync(self.root)
+
+    def new(self, kind: str, name: str, description: str, *extra: str) -> subprocess.CompletedProcess[str]:
+        return self.cli("new", "--kind", kind, "--name", name, "--description", description, *extra)
+
+    def test_every_kind_is_created_by_make_new_and_found_by_where_and_capabilities(self) -> None:
+        cases = [
+            ("skill", "release-notes", "Drafts release notes from merged pull requests; before tagging a release."),
+            ("agent", "test-writer", "Writes missing regression tests for one module; when seam coverage is thin."),
+            ("doc", "pricing", "Pricing rules and discounts; when prices change"),
+            ("rule", "money-in-cents", "Store money as integer cents, never floats; when touching amounts."),
+            ("check", "license-headers", "Source files carry the license header; before publishing source."),
+            ("command", "seed-data", "Loads demo data into the local database; before a demo or a UI review."),
+            ("mcp", "issue-tracker", "Reads tickets from the team's tracker; when an issue links a ticket."),
+            ("pack", "payments", "Payment flows, refunds, and receipts; for products that take money."),
+        ]
+        for kind, name, description in cases:
+            result = self.new(kind, name, description)
+            self.assertEqual(result.returncode, 0, f"{kind}: {result.stderr}")
+            expected = r"docs/pricing\.md  \[path\]" if kind == "doc" else rf"\[{kind}[^\]]*\] {name}"
+            self.assertRegex("\n".join(navigate.where(self.root, name.replace("-", " "))), expected, f"make where finds the {kind}")
+        report = self.cli("capabilities").stdout
+        for kind, name, _ in cases:
+            if kind != "doc":
+                self.assertIn(name, report, f"make capabilities lists the {kind}")
+        self.assertIn("pricing.md", (self.root / "docs/README.md").read_text())
+        self.assertIn("seed-data:", (self.root / "Makefile").read_text(), "a project command gets a make target")
+        self.assertIn("unfinished scaffold", self.self_heal(), "stubs fail until their FILL-IN lines are replaced")
+        self.assertEqual(self.cli("seed-data").returncode, 0, "the project command runs through repoctl")
+
+    def test_blocking_check_must_give_its_reason(self) -> None:
+        self.write(".agents/checks/loud.py", "from kit.registry import check\n\n"
+                   "@check('loud', 'A check that blocks without saying why it may', blocks=True)\n"
+                   "def run(context):\n    return []\n")
+        result = self.cli("check")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("must give its reason", result.stderr)
+
+    def test_project_check_runs_in_the_gate_and_names_its_fix(self) -> None:
+        self.write(".agents/checks/no-print.py", "from kit.registry import check\n\n"
+                   "@check('no-print', 'Source files never call print; logging is configured centrally', blocks=True,\n"
+                   "       reason='A stray print leaked a token in an incident; the fix is one line.')\n"
+                   "def run(context):\n"
+                   "    return [f'{path}: replace print with the logger' for path in context.files\n"
+                   "            if path.endswith('.py') and path.startswith('src/') and 'print(' in (context.root / path).read_text()]\n")
+        self.write("src/billing/report.py", "print('x')\n")
+        self.assertIn("src/billing/report.py: replace print with the logger", self.self_heal())
+
+    def test_a_disabled_pack_costs_no_context_but_stays_findable(self) -> None:
+        self.assertEqual(self.new("pack", "billing-extras", "Billing exports and dunning flows; for finance teams.").returncode, 0)
+        self.assertEqual(self.new("skill", "dunning-emails", "Writes dunning email sequences for overdue invoices; for finance.",
+                                  "--pack", "billing-extras").returncode, 0)
+        self.write(".agents/checks/dunning.py", "from kit.registry import check\n\n"
+                   "@check('dunning', 'Dunning templates exist for every overdue stage', blocks=True, pack='billing-extras',\n"
+                   "       reason='Finance shipped a stage with no template in an incident.')\n"
+                   "def run(context):\n    return ['dunning templates missing: add them']\n")
+        self.write(".agents/commands/export-ledger.py", "from kit.registry import command\n\n"
+                   "@command('export-ledger', 'Exports the ledger as CSV for the finance team', pack='billing-extras')\n"
+                   "def run(root, args):\n    print('exported')\n")
+        derive.sync(self.root)
+        self.assertFalse((self.root / ".claude/skills/dunning-emails").exists(), "a pack that is off is not rendered for hosts")
+        self.assertNotIn("dunning templates missing", self.self_heal(), "its checks do not run")
+        refused = self.cli("export-ledger")
+        self.assertEqual(refused.returncode, 1)
+        self.assertIn("billing-extras = true", refused.stderr, "the refusal names the switch")
+        self.assertIn("dunning-emails (off: billing-extras)", self.cli("capabilities").stdout)
+        self.assertIn("pack billing-extras off", "\n".join(navigate.where(self.root, "dunning email")))
+        self.write("project.toml", (self.root / "project.toml").read_text() + "[packs]\nbilling-extras = true\n")
+        derive.sync(self.root)
+        self.assertTrue((self.root / ".claude/skills/dunning-emails/SKILL.md").is_file())
+        self.assertIn("dunning templates missing", self.self_heal())
+        self.assertEqual(self.cli("export-ledger").stdout.strip(), "exported")
+        self.write("project.toml", (self.root / "project.toml").read_text() + "typo-pack = true\n")
+        self.assertIn("unknown packs: typo-pack", self.cli("capabilities").stderr)
+
+    def test_global_rules_live_in_agents_md_and_scoped_rules_arrive_on_edit(self) -> None:
+        self.assertEqual(self.new("rule", "small-commits", "Keep each commit to one root cause; always.").returncode, 0)
+        self.assertEqual(self.new("rule", "money-in-cents", "Store money as integer cents; in billing code.",
+                                  "--covers", "src/billing/**").returncode, 0)
+        agents = (self.root / "AGENTS.md").read_text()
+        self.assertIn("Keep each commit to one root cause", agents)
+        self.assertNotIn("money as integer cents", agents, "a scoped rule stays out of the router")
+        event = json.dumps({"session_id": "s1", "tool_input": {"file_path": str(self.root / "src/billing/invoice.py")}})
+        first = self.cli("hook", "after-edit", stdin=event).stdout
+        self.assertIn("Store money as integer cents", first)
+        self.assertNotIn("integer cents", self.cli("hook", "after-edit", stdin=event).stdout, "once per session")
+        self.assertIn("[rule] money-in-cents", "\n".join(navigate.where(self.root, "src/billing/invoice.py")))
+
+    def test_makefile_commands_are_generated_and_drift_fails(self) -> None:
+        makefile = (self.root / "Makefile").read_text()
+        self.assertIn('@$(REPOCTL) where "$${Q}"', makefile)
+        self.assertIn("$(error Add what to look for", makefile)
+        self.write("Makefile", makefile.replace("@$(REPOCTL) where", "@$(REPOCTL) wherever"))
+        self.assertIn("derived file out of date: Makefile", self.self_heal())
+
+    def test_a_kit_makefile_without_its_command_block_is_drift(self) -> None:
+        self.write("Makefile", "REPOCTL := python3 tools/repoctl.py\ncheck:\n\t$(REPOCTL) check\n")
+        self.assertIn("lost its generated command block", self.self_heal())
+
+    def test_make_variables_reach_repoctl_as_data(self) -> None:
+        marker = self.root / "pwned"
+        result = subprocess.run(["make", "-s", "where", f"Q=x\"; touch {marker}; echo \""], cwd=self.root,
+                                capture_output=True, text=True)
+        self.assertFalse(marker.exists(), result.stdout + result.stderr)
 
 
 CONTRACT_HEADINGS = "".join(f"### {heading}\nx\n" for heading in ci.CANONICAL["agent-first"])

@@ -17,7 +17,7 @@ from datetime import date
 from pathlib import Path
 from typing import Callable
 
-from .core import RepoctlError, is_placeholder, load_project, parse_iso_date, reject_secret_text
+from .core import RepoctlError, load_project, reject_secret_text, reviewer_problem
 from .issues import validate_issue_body, validate_issue_content, validate_issue_state
 
 try:
@@ -192,13 +192,9 @@ def issue_contract_check(text: str, labels: set[str], profile: str, registry: di
     labels_to_add = [label for label in labels_to_add if label not in labels]
     if sensitive_issue_content(structural):
         reasons.append("possible sensitive content: redact it or use the private route in SECURITY.md")
-    reviewer = re.search(r"(?im)^\s*(?:-\s*)?(?:\*\*)?Reviewer/date:(?:\*\*)?\s*(.+?)\s*$", structural)
-    reviewed = parse_iso_date(re.search(r"\b(\d{4}-\d{2}-\d{2})\b", reviewer.group(1)).group(1)) \
-        if reviewer and re.search(r"\b\d{4}-\d{2}-\d{2}\b", reviewer.group(1)) else None
-    name = re.split(r"\s+\d{4}-\d{2}-\d{2}\b", reviewer.group(1).strip(), maxsplit=1)[0].strip(" *_`") if reviewer else ""
-    # The review date belongs to the text it reviewed, so it never ages out (no calendar rot); a future date is a typo.
-    if not reviewer or is_placeholder(name) or len(name) < 3 or reviewed is None or reviewed > today:
-        reasons.append("Reviewer/date needs a real name and an ISO date that is not in the future, e.g. octocat 2026-10-07")
+    problem = reviewer_problem(structural)
+    if problem:
+        reasons.append(problem)
     reasons = list(dict.fromkeys(reasons))
     return not reasons, labels_to_add, reasons
 

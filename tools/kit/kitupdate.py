@@ -42,11 +42,12 @@ PROJECT_OWNED = (
 
 
 DERIVED_BLOCK = re.compile(rb"(?s)(<!-- repoctl:([a-z-]+) -->).*?(<!-- /repoctl:\2 -->)")
+MAKE_BLOCK = re.compile(rb"(?ms)(^# <repoctl:([a-z-]+)>\n).*?(^# </repoctl:\2>)")
 
 
 def normalized(content: bytes) -> bytes:
     """Content without generated blocks (make sync owns those), so regenerated tables are not your edits."""
-    return DERIVED_BLOCK.sub(rb"\1\3", content)
+    return MAKE_BLOCK.sub(rb"\1\3", DERIVED_BLOCK.sub(rb"\1\3", content))
 
 
 def digest_bytes(content: bytes) -> str:
@@ -89,13 +90,16 @@ def write_lock(root: Path, kit: Path, paths: list[str] | None = None, kept: list
     _save_lock(root, _kit_version(kit), files, {path: digest_bytes(_new_content(kit, root, path)) for path in kept})
 
 
-def _save_lock(root: Path, version: str, files: dict[str, str], kept: dict[str, str]) -> None:
+def _save_lock(root: Path, version: str, files: dict[str, str], kept: dict[str, str],
+               bases: dict[str, str] | None = None) -> None:
     previous = read_lock(root) if (root / LOCK).is_file() else {}
-    if version == "unknown" and previous.get("kit_version") not in (None, "none"):
+    if version == "unknown" and previous.get("kit_version") not in (None, "none", "unknown"):
         version = str(previous["kit_version"])  # a non-git kit checkout does not erase a known version
     data: dict[str, object] = {"kit_version": version, "files": dict(sorted(files.items()))}
     if kept:
         data["kept"] = dict(sorted(kept.items()))
+    if bases:  # conflicted files: the version they had from the kit before the project's edit
+        data["bases"] = dict(sorted(bases.items()))
     (root / LOCK).parent.mkdir(parents=True, exist_ok=True)
     (root / LOCK).write_text(json.dumps(data, indent=1) + "\n", encoding="utf-8")
 
@@ -144,6 +148,7 @@ def update(root: Path, kit: Path) -> int:
     lock = read_lock(root)
     locked: dict[str, str] = lock["files"]  # type: ignore[assignment]
     kept: dict[str, str] = dict(lock.get("kept", {}))  # type: ignore[arg-type]
+    bases: dict[str, str] = dict(lock.get("bases", {}))  # type: ignore[arg-type]
     new_paths = kit_paths(kit)
     updated, added, removed, conflicts = [], [], [], []
     files: dict[str, str] = {}
@@ -164,7 +169,12 @@ def update(root: Path, kit: Path) -> int:
             target.write_bytes(content)
             added.append(local)
         elif digest(target) == offered:
-            pass
+            bases.pop(path, None)  # merged by hand, or never differed
+        elif path in bases and digest(target) == bases[path]:
+            # The project reverted a conflicted file to what the kit gave it: its edit is gone, so update it (#15).
+            target.write_bytes(content)
+            updated.append(local)
+            bases.pop(path)
         elif path in locked and digest(target) == locked[path]:
             target.write_bytes(content)
             updated.append(local)
@@ -173,6 +183,8 @@ def update(root: Path, kit: Path) -> int:
             continue
         else:  # changed by the project, or a file of its own where the kit now ships one
             conflicts.append(f"{local} (new version: {_stage(root, local, content)})")
+            if path in locked:
+                bases.setdefault(path, locked[path])
         files[path] = offered
     for path in sorted(set(locked) - set(new_paths)):
         local = project_path(root, path)
@@ -183,9 +195,11 @@ def update(root: Path, kit: Path) -> int:
         elif target.is_file():
             conflicts.append(f"{local} (removed from the kit; yours was changed, so it stays)")
     kept = {path: value for path, value in kept.items() if path in new_paths}
-    _save_lock(root, _kit_version(kit), files, kept)
+    _save_lock(root, _kit_version(kit), files, kept, {path: value for path, value in bases.items() if path in files})
     derive.sync(root)
-    print(f"Kit updated to {read_lock(root)['kit_version'][:12]} (was {str(lock['kit_version'])[:12]}): "
+    before = str(lock["kit_version"])
+    origin = "no version recorded before" if before in ("unknown", "none") else f"was {before[:12]}"
+    print(f"Kit updated to {read_lock(root)['kit_version'][:12]} ({origin}): "
           f"{len(updated)} updated, {len(added)} added, {len(removed)} removed, {len(conflicts)} to merge by hand.")
     for label, items in (("updated", updated), ("added", added), ("removed", removed)):
         if items:

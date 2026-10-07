@@ -9,7 +9,7 @@ step), `make where Q="..."`, and `make done` before you call any work complete.
 ## Session protocol
 
 1. **Start.** Hooked hosts print a session brief; otherwise `make start`.
-   `make capabilities` lists working tools (browser, search, docs, `gh`).
+   `make capabilities` lists capabilities, packs, and working tools.
    Read root `HANDOVER.md` when present; the working tree wins over it.
 2. **Orient.** `project.toml` owns shape, surfaces, checks, and provenance;
    [`docs/README.md`](./docs/README.md) is the index; obey the nearest scoped
@@ -31,18 +31,23 @@ Reports cite `path:line`; keep raw dumps out of your context.
 
 ## Extend the system
 
-When a task recurs, or a role, skill, or doc would make future work safer,
-improve the system instead of working around it:
+When a task recurs or a capability would make work safer, improve the system.
+Every skill, agent role, doc, rule, check, command, MCP route, and pack is one
+file added the same way ([ADR 0002](./docs/adr/0002-one-capability-model.md)):
 
-- `make similar Q="..."` first. Extend or refine the closest existing skill,
-  role, or doc by editing its canonical file in `.agents/` or `docs/`.
-- Otherwise `make new KIND=skill|agent|doc NAME=... DESC="...; ..."` creates it
-  with valid metadata and wires it in (adapters, docs index, role table). Replace
-  its `FILL-IN:` lines before `make done`.
-- External skills, MCP servers, or tools: ask the `skill-scout` role, then follow
-  [`docs/skills.md`](./docs/skills.md). Nothing third-party runs unreviewed.
-- **Kit bug** (in `tools/`, `.agents/`, `.githooks/`, or a kit doc): fix it here, then
-  report it at `[template].source` so `make kit-update` fixes every project.
+- `make similar Q="..."` first; extend the closest match by editing its file.
+- Else `make new KIND=<kind> NAME=... DESC="<what>; <when>"`; replace its
+  `FILL-IN:` lines. Project additions go in `.agents/`, never in kit files.
+- Outside skills, MCP servers, tools: the `skill-scout` role vets them first
+  ([`docs/skills.md`](./docs/skills.md)). Nothing third-party runs unreviewed.
+- **Kit bug** (`tools/`, `.agents/`, `.githooks/`, a kit doc): fix it here and
+  report it at `[template].source`; `make kit-update` carries the fix.
+
+Project rules (scoped rules arrive when you edit a matching path):
+
+<!-- repoctl:rules -->
+- none yet (`make new KIND=rule`)
+<!-- /repoctl:rules -->
 
 ## Issue-backed write-ahead record
 
@@ -52,9 +57,8 @@ Before a behavior, schema, contract, security, privacy, or operational change:
    and topic. Update the matching issue when root cause and acceptance match.
 2. Otherwise create one from [`docs/ISSUE_TEMPLATE.md`](./docs/ISSUE_TEMPLATE.md)
    with `make issue`: intended behavior, scope, risks, and evidence-producing
-   acceptance criteria **before** implementation. Without a GitHub remote,
-   `make issue` writes a `Local-WAL` draft to ignored `.agent/wal/`. `regulated` filing needs
-   `PUBLIC_REVIEWED=1` plus `REVIEW_EVIDENCE`. Active vulnerabilities and
+   acceptance criteria **before** implementation (no remote: a `Local-WAL`
+   draft in ignored `.agent/wal/`). Active vulnerabilities and
    sensitive personal data go to the private route in [`SECURITY.md`](./SECURITY.md);
    the disclosure class is an owner decision, and uncertain content stays private.
 3. One issue per independent root cause; file confirmed residuals before
@@ -93,7 +97,7 @@ issues). Never change it silently; record the reason in the issue.
 - Durable knowledge lives in its owner doc, live work in issues; after a rename, search for stale references.
 - Docs declare `<!-- covers: globs -->`; stale or dead bindings fail, unless a commit's `Docs-Unaffected:` trailer says why.
 - Replace instead of duplicating: mark the old path `DEPRECATED(remove-by=YYYY-MM-DD)`; expired markers fail. Task markers in code reference an issue.
-- `.claude/` and `.mcp.json` are generated: edit `.agents/` or `resources.toml`, then `make sync`.
+- `.claude/`, `.mcp.json`, and marked `repoctl` blocks are generated: edit `.agents/`, then `make sync`.
 - Always-loaded files stay within `project.toml [budgets]`; move detail to an owner doc.
 - A surface needs an owner, quality oracle, and verification; a nested `AGENTS.md` only for rules that differ.
 - Delete dead code once callers are proven gone. Prefer small, boring solutions.
