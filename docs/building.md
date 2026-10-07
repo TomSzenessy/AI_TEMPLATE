@@ -38,7 +38,11 @@ Keep looping (`make next`, build, `make done`) until the launch phase. A green
 
 Columns: `feature, area, priority (must|should|could), status
 (yes|partial|no|skip), evidence, acceptance, source`. Weights match
-`parity-check`: must 3, should 2, could 1; yes counts 1, partial 0.5. Kickoff
+`parity-check`: must 3, should 2, could 1; yes counts 1, partial 0.5. This is
+the one matrix: `product-recon` appends the reference product's features and
+`review-mining` its fix-plan rows (`source` names the skill, `status` starts at
+`no`), and `parity-check` and `make next` read the same file; `reference/` holds
+recon evidence only. Kickoff
 writes it from the owner's goal, the research, and competitor complaints, then
 appends the applicable rows of
 [`production-features.csv`](../.agents/skills/product-kickoff/production-features.csv)

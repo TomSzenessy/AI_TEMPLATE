@@ -9,7 +9,7 @@ prompt = '''
 This repository is our team's notes API. It is in production: our Slack bot posts to POST /notes, so the existing request and response shapes must keep working. We just added the agent kit to it (make adopt).
 
 Please add three things:
-1. Tags on notes: a note can have several tags; create and update accept them, list can filter by tag.
+1. Tags on notes: a note can have several tags; create accepts them, add a way to edit a note's tags (there is no update endpoint yet, so add PATCH /notes/{id}), and list can filter by tag.
 2. Full-text search over title and body, ranked, with highlighted snippets.
 3. A small read-only web page at / where the team can browse, filter by tag, and search notes. It should look tidy on a laptop and a phone; nothing fancy.
 

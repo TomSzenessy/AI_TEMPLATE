@@ -70,7 +70,7 @@ theirs is blue, yours is not a nearby blue). Then:
 python3 .agents/skills/design-tokens/contrast.py reference/design/tokens.json
 ```
 
-Zero AA failures. Add the reference product's brand colours to
+Zero failures. Add the reference product's brand colours to
 `reference/brand.json` so the sweep catches any that survive.
 
 ## Step 4: logo brief
@@ -127,9 +127,7 @@ email templates, the OG image, the app icon.
 `reference/brand.md` (name with checks, palette, logo brief, voice),
 `reference/brand.json`, updated tokens, rewritten strings, and a clean sweep.
 That clean sweep is the pre-launch gate: nothing ships while it exits 1.
-Remember: `reference/` must be registered in `project.toml` (see
-product-recon).
 
 ## Source
 
-Adapted from the upstream skill in https://github.com/Jakeschincariol/replica-skill (MIT, © 2026 Jake Schincariol), revision 77c9436fb3d18c3d58169efb8caf4fe906b0dc51.
+Adapted from the upstream skill in https://github.com/Jakeschincariol/replica-skill (MIT, © 2026 Jake Schincariol); revision: see `project.toml` `[[skills]]`.

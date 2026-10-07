@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Jake Schincariol. Adapted from https://github.com/Jakeschincariol/replica-skill @ 77c9436fb3d18c3d58169efb8caf4fe906b0dc51.
+# Copyright (c) 2026 Jake Schincariol. Adapted from https://github.com/Jakeschincariol/replica-skill (revision: see project.toml [[skills]]).
 
 import io
 import json
@@ -19,6 +19,15 @@ def put(root, rel, text, binary=False):
     with open(path, "wb" if binary else "w") as fh:
         fh.write(text)
     return path
+
+
+# The same table lives in design-tokens/tests/test_contrast.py: each skill stays
+# self-contained, so the accepted forms are pinned in both places.
+HEX_FORMS = {
+    "#006bff": "#006bff", "006bff": "#006bff", "#06f": "#0066ff", "06f": "#0066ff",
+    "#006bffaa": "#006bff", "006bff80": "#006bff", "#06fa": "#0066ff", "#0066FF": "#0066ff",
+}
+BAD_HEX = ("rgb(0,107,255)", "#12345", "zzzzzz", "#12", "")
 
 
 class Sweep(unittest.TestCase):
@@ -101,6 +110,14 @@ class Sweep(unittest.TestCase):
             with redirect_stdout(io.StringIO()), redirect_stderr(err):
                 self.assertEqual(sweep.main([self.root, "--colors", bad]), 2)
             self.assertIn("colour", err.getvalue())
+
+    def test_hex_forms_match_design_tokens(self):
+        for form, want in HEX_FORMS.items():
+            self.assertEqual(sweep.norm_hex(form), want, form)
+            self.assertEqual(sweep.parse_colors([form]), {want}, form)
+        for bad in BAD_HEX:
+            with self.assertRaises(ValueError):
+                sweep.parse_colors([bad])
 
     def test_cli_bare_hex_finds_colour(self):
         buf = io.StringIO()

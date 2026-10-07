@@ -1,33 +1,43 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Jake Schincariol. Adapted from https://github.com/Jakeschincariol/replica-skill @ 77c9436fb3d18c3d58169efb8caf4fe906b0dc51.
+# Copyright (c) 2026 Jake Schincariol. Adapted from https://github.com/Jakeschincariol/replica-skill (revision: see project.toml [[skills]]).
 """Feature parity score for parity-check. Standard library only.
 
-Reads the feature matrix that product-recon wrote and you have been filling in
-while you build, and tells you how much of the original your clone does, what
-is missing, and in what order to build it.
+Reads the project's feature matrix and tells you how much of the reference
+product this build does, what is missing, and in what order to build it.
 
-    python3 parity.py reference/features.csv
-    python3 parity.py reference/features.csv --visual reference/diffs/*.json
-    python3 parity.py reference/features.csv --markdown > reference/parity.md
-    python3 parity.py reference/features.csv --fail-under 80
+    python3 parity.py docs/product/features.csv
+    python3 parity.py docs/product/features.csv --visual reference/diffs/*.json
+    python3 parity.py docs/product/features.csv --markdown > reference/parity.md
+    python3 parity.py docs/product/features.csv --fail-under 80
 
-The CSV has these columns (extra columns are ignored):
+`docs/product/features.csv` owns the matrix; product-kickoff, product-recon
+and review-mining all write to it, and `make next` reads it. Columns (extra
+columns are ignored):
 
     feature    what it does, in plain words ("reschedule a booking")
     area       the screen or flow it belongs to ("booking page")
     priority   must | should | could   (P0 | P1 | P2 also work)
-    original   yes | no     does the original app have it
-    clone      yes | partial | no | skip
-    notes      anything. For skip, say why ("licensed content, out of scope")
+    status     yes | partial | no | skip   (does this build have it)
+    source     where the row came from (kickoff, production, product-recon,
+               review-mining). Rows from review-mining are improvements the
+               reference product lacks: listed, not scored.
+    original   optional. "no" marks a feature you added; it is not scored.
+    notes      optional; evidence and acceptance are shown as notes when
+               there is no notes column
 
-Weights: must 3, should 2, could 1. yes counts 1, partial 0.5, no 0.
-skip and rows where original is "no" (features you added) are left out of the
-score and listed separately, so the number only ever measures parity.
+DEPRECATED: a `clone` column is read as `status` so existing
+reference/features.csv files still score; rename it to `status`.
+
+Weights: must 3, should 2, could 1. yes counts 1, partial 0.5, no 0. skip,
+rows where original is "no" and review-mining rows are left out of the score
+and listed separately, so the number only ever measures parity.
 
 With --visual, the layout scores from imgdiff.py --json are averaged and
 reported next to the feature score, and the overall score is
-80% features + 20% layout. Features are what users pay for.
+80% features + 20% layout. Features are what users pay for. Only layout-mode
+scores are used; pixel-mode scores measure regressions, not parity, and are
+listed as ignored.
 """
 
 import argparse
@@ -50,11 +60,16 @@ def load(path):
         if reader.fieldnames is None:
             raise MatrixError("%s is empty" % path)
         fields = [f.strip().lower() for f in reader.fieldnames]
-        for need in ("feature", "priority", "clone"):
+        for need in ("feature", "priority"):
             if need not in fields:
                 raise MatrixError("%s has no '%s' column. Columns needed: "
-                                  "feature, area, priority, original, clone, notes"
-                                  % (path, need))
+                                  "feature, area, priority, status, evidence, "
+                                  "acceptance, source" % (path, need))
+        if "status" not in fields and "clone" not in fields:
+            raise MatrixError("%s has no 'status' column. Columns needed: "
+                              "feature, area, priority, status, evidence, "
+                              "acceptance, source" % path)
+        legacy = "status" not in fields
         rows = []
         for i, raw in enumerate(reader, start=2):
             # Ragged rows put the extra values under the None key; extra
@@ -63,6 +78,9 @@ def load(path):
                    for k, v in raw.items() if v is None or isinstance(v, str)}
             if not row.get("feature"):
                 continue
+            if legacy:
+                row["status"] = row.get("clone", "")
+                row["legacy_clone"] = True
             row["line"] = i
             rows.append(row)
     return rows
@@ -73,11 +91,13 @@ def score(rows):
     skipped = []
     extras = []
     problems = []
+    if any(r.get("legacy_clone") for r in rows):
+        problems.append("the 'clone' column is DEPRECATED; rename it to 'status'")
     for row in rows:
         original = row.get("original", "yes").lower() or "yes"
-        clone = row.get("clone", "").lower()
+        clone = row.get("status", "").lower()
         prio = row.get("priority", "").lower()
-        if original in ("no", "n", "false"):
+        if original in ("no", "n", "false") or row.get("source", "").lower() == "review-mining":
             extras.append(row)
             continue
         if clone == "skip":
@@ -87,8 +107,8 @@ def score(rows):
             problems.append("line %d: priority '%s' is not must/should/could, counted as could"
                             % (row["line"], row.get("priority", "")))
         if clone not in CREDIT:
-            problems.append("line %d: clone '%s' is not yes/partial/no/skip, counted as no"
-                            % (row["line"], row.get("clone", "")))
+            problems.append("line %d: status '%s' is not yes/partial/no/skip, counted as no"
+                            % (row["line"], row.get("status", "")))
         w = WEIGHT.get(prio, 1)
         c = CREDIT.get(clone, 0.0)
         counted.append(dict(row, weight=w, credit=c))
@@ -116,7 +136,8 @@ def score(rows):
         return {"feature": r["feature"], "area": r.get("area", ""),
                 "priority": PRIORITY_NAME.get(r.get("weight", WEIGHT.get(
                     r.get("priority", "").lower(), 1)), "could"),
-                "clone": r.get("clone", "") or "no", "notes": r.get("notes", "")}
+                "status": r.get("status", "") or "no",
+                "notes": r.get("notes") or r.get("acceptance", "")}
 
     musts = [r for r in counted if r["weight"] == 3]
     return {
@@ -140,12 +161,18 @@ def visual_scores(paths):
         if "score" not in data:
             raise MatrixError("%s is not imgdiff.py --json output" % p)
         name = data.get("files", {}).get("clone", p)
-        scores.append({"file": name, "score": float(data["score"]),
-                       "mode": data.get("mode", "layout")})
+        mode = data.get("mode", "layout")
+        if data.get("comparable") is False:
+            mode = "blank"  # nothing to compare: neither a match nor a mismatch
+        scores.append({"file": name, "score": float(data["score"]), "mode": mode})
     return scores
 
 
 def combine(result, visuals):
+    ignored = [v for v in visuals if v["mode"] != "layout"]
+    visuals = [v for v in visuals if v["mode"] == "layout"]
+    if ignored:
+        result["visual_ignored"] = ignored
     if visuals:
         layout = sum(v["score"] for v in visuals) / len(visuals)
         result["visual"] = visuals
@@ -182,7 +209,7 @@ def render(result, markdown=False):
     for m in result["missing"]:
         note = ("  (%s)" % m["notes"]) if m["notes"] else ""
         out.append("- [%s] %s: %s, %s%s" % (m["priority"], m["area"] or "-",
-                                             m["feature"], m["clone"], note))
+                                             m["feature"], m["status"], note))
     if result["skipped"]:
         out.append("")
         out.append("%sLeft out on purpose (not scored)" % h)
@@ -198,6 +225,11 @@ def render(result, markdown=False):
         out.append("%sScreens" % h)
         for v in sorted(result["visual"], key=lambda d: d["score"]):
             out.append("- %-40s %5.1f" % (v["file"], v["score"]))
+    if result.get("visual_ignored"):
+        out.append("")
+        out.append("%sIgnored (pixel mode is for regressions; blank screens have nothing to compare)" % h)
+        for v in result["visual_ignored"]:
+            out.append("- %s" % v["file"])
     if result["problems"]:
         out.append("")
         out.append("%sFix in the matrix" % h)
@@ -208,7 +240,7 @@ def render(result, markdown=False):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("matrix", help="the feature matrix CSV")
+    ap.add_argument("matrix", help="the feature matrix CSV (docs/product/features.csv)")
     ap.add_argument("--visual", nargs="*", default=[],
                     help="imgdiff.py --json outputs to fold in")
     ap.add_argument("--json", action="store_true")

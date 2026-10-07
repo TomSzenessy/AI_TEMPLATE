@@ -59,15 +59,15 @@ changes values. Generate `reference/design/tokens.css` as custom properties
 and map them into the project's theme (Tailwind's theme where that is the
 stack) so components use `bg-surface text-muted`, never raw hex.
 
-Add a `pairs` list for every text and background combination the app uses,
-then:
+Add a `pairs` list for every text and background combination the app uses
+(including `["focus", "bg", "ui"]` for the focus ring), then:
 
 ```bash
 python3 .agents/skills/design-tokens/contrast.py reference/design/tokens.json
 ```
 
-AA is the floor: 4.5:1 for body text, 3:1 for large text and for input
-borders and focus rings. It exits 1 on a failure. Fix it in the tokens, not
+AA is the floor (the checker owns the thresholds). Hex may be bare or `#`,
+3, 4, 6 or 8 digits (alpha ignored). It exits 1 on a failure. Fix it in the tokens, not
 per component.
 
 ## Step 3: component specs
@@ -101,9 +101,8 @@ system check.
 `tokens.json`, `tokens.css`, the theme mapping, `components.md`, the
 primitives built, and a contrast report with zero AA failures. Then the
 project's issue-backed build loop (AGENTS.md) builds screens against the
-primitives. Remember: `reference/` must be registered in `project.toml` (see
-product-recon).
+primitives.
 
 ## Source
 
-Adapted from the upstream skill in https://github.com/Jakeschincariol/replica-skill (MIT, © 2026 Jake Schincariol), revision 77c9436fb3d18c3d58169efb8caf4fe906b0dc51.
+Adapted from the upstream skill in https://github.com/Jakeschincariol/replica-skill (MIT, © 2026 Jake Schincariol); revision: see `project.toml` `[[skills]]`.

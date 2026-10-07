@@ -1,5 +1,4 @@
 # Ambitious web product: real-time collaboration, offline, money, drag and drop.
-# First run 2026-10-07 (Sonnet): 36 min, $22.81, make done green; see docs/self-healing.md.
 id = "waypoint"
 kind = "web"
 mode = "new"

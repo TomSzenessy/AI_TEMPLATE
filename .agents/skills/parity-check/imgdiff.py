@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Jake Schincariol. Adapted from https://github.com/Jakeschincariol/replica-skill @ 77c9436fb3d18c3d58169efb8caf4fe906b0dc51.
+# Copyright (c) 2026 Jake Schincariol. Adapted from https://github.com/Jakeschincariol/replica-skill (revision: see project.toml [[skills]]).
 """Screenshot diff for parity-check. Standard library only.
 
 Compares a screenshot of the original app with the same screen in your clone
@@ -364,7 +364,10 @@ def compare(img_a, img_b, mode="layout", width=480, cols=12, tolerance=24,
                         for x in range(x0, x1):
                             g0 = dim[y][x][0]
                             dim[y][x] = (min(255, g0 + 30), g0 // 3, g0 // 3)
-        score = 100.0 * sum(sims) / len(sims) if sims else 100.0
+        # Two screens with nothing in them share no layout: that is not a match.
+        score = 100.0 * sum(sims) / len(sims) if sims else 0.0
+        if not sims:
+            report["comparable"] = False
 
     regions = []
     for r0, c0, r1, c1, n in _regions(flags, len(flags), cols):
@@ -378,7 +381,7 @@ def compare(img_a, img_b, mode="layout", width=480, cols=12, tolerance=24,
             "where": _where(r0, c0, r1, c1, len(flags), cols),
         })
     report["score"] = round(score, 1)
-    report["verdict"] = verdict(score)
+    report["verdict"] = "nothing to compare" if report.get("comparable") is False else verdict(score)
     report["regions"] = regions
     return report, dim
 

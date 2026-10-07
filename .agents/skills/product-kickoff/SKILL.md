@@ -94,7 +94,8 @@ Only an explicit "use your picks" counts as approval.
 - **Feature list:** write `docs/product/features.csv` (feature, area, priority,
   status, evidence, acceptance, source) from the owner's goal, the research,
   and the competitor complaints, then append the rows of
-  `production-features.csv` (this folder) that apply. "Complete" means every
+  `production-features.csv` (this folder) that apply. It is the one matrix:
+  product-recon and review-mining append rows here too (`source` says who). "Complete" means every
   must row is `yes` with evidence; a demo-sized list is a defect.
 
 - **Architecture sketch:** data model, main API or screen contracts, auth,

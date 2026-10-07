@@ -24,7 +24,8 @@ read), `Done when`. Any missing: generate the packet yourself —
    output file, API response). An exit code alone is not evidence.
 3. Look for: unmet criteria, missing negative tests, security/privacy impact,
    stale or contradicting docs, duplicated or dead code, scope creep. For UI,
-   review screenshots yourself against the `ux-quality` skill and `docs/design.md`.
+   review screenshots yourself against `docs/design.md` and, when enabled
+   (`make capabilities`), the `ux-quality` skill.
 4. Separate blockers from preferences. Never edit; report.
 
 ## Return (at most 300 words)

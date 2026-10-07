@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Jake Schincariol. Adapted from https://github.com/Jakeschincariol/replica-skill @ 77c9436fb3d18c3d58169efb8caf4fe906b0dc51.
+# Copyright (c) 2026 Jake Schincariol. Adapted from https://github.com/Jakeschincariol/replica-skill (revision: see project.toml [[skills]]).
 
+import csv
 import io
 import json
 import os
@@ -12,15 +13,21 @@ from _load import load, ROOT
 
 parity = load("parity")
 
-MATRIX = """feature,area,priority,original,clone,notes
+MATRIX = """feature,area,priority,status,evidence,acceptance,source
+Pick a time slot,booking page,must,yes,tests/a.py,,product-recon
+Confirmation email,booking page,must,partial,,no calendar file yet,product-recon
+Reschedule link,booking page,must,no,,,product-recon
+Round-robin across a team,team,should,no,,,product-recon
+Custom booking questions,booking page,should,yes,,,product-recon
+Embed on a website,sharing,could,no,,,product-recon
+Their partner marketplace,integrations,could,skip,,their network not ours,product-recon
+SMS reminders,notifications,should,no,,the top request in reviews,review-mining
+"""
+
+LEGACY = """feature,area,priority,original,clone,notes
 Pick a time slot,booking page,must,yes,yes,
-Confirmation email,booking page,must,yes,partial,no calendar file yet
 Reschedule link,booking page,must,yes,no,
-Round-robin across a team,team,should,yes,no,
-Custom booking questions,booking page,should,yes,yes,
-Embed on a website,sharing,could,yes,no,
-Their partner marketplace,integrations,could,yes,skip,their network not ours
-SMS reminders,notifications,should,no,yes,ours: the top request in reviews
+SMS reminders,notifications,should,no,yes,ours
 """
 
 
@@ -83,7 +90,7 @@ class Score(unittest.TestCase):
 
     def test_bad_values_are_reported_not_fatal(self):
         p = write(self.tmp.name, "bad.csv",
-                  "feature,priority,clone\nThing,urgent,maybe\n")
+                  "feature,priority,status\nThing,urgent,maybe\n")
         r = parity.score(parity.load(p))
         self.assertEqual(len(r["problems"]), 2)
         self.assertEqual(r["feature_score"], 0.0)
@@ -105,15 +112,59 @@ class Score(unittest.TestCase):
         self.assertGreater(r["counted"], 0)
         self.assertEqual(r["problems"], [])
 
+    def test_shipped_templates_have_one_field_count_per_row(self):
+        for name in (("product-recon", "features.csv"),
+                     ("product-kickoff", "production-features.csv")):
+            with open(os.path.join(ROOT, os.pardir, *name), newline="") as fh:
+                rows = list(csv.reader(fh))
+            self.assertEqual({len(r) for r in rows}, {len(rows[0])}, name)
+            self.assertEqual(rows[0], ["feature", "area", "priority", "status",
+                                       "evidence", "acceptance", "source"])
+
+    def test_kickoff_schema_scores_without_error(self):
+        # Regression: the kickoff/make next schema has no 'clone' column and
+        # used to exit 2.
+        path = os.path.join(ROOT, os.pardir, "product-kickoff", "production-features.csv")
+        with redirect_stdout(io.StringIO()):
+            self.assertEqual(parity.main([path]), 0)
+        r = parity.score(parity.load(path))
+        self.assertEqual(r["problems"], [])
+        self.assertEqual(r["feature_score"], 0.0)
+        self.assertGreater(r["must_have_total"], 0)
+
+    def test_legacy_clone_column_still_scores_with_a_deprecation_note(self):
+        p = write(self.tmp.name, "legacy.csv", LEGACY)
+        r = parity.score(parity.load(p))
+        self.assertEqual(r["feature_score"], 50.0)
+        self.assertEqual([m["feature"] for m in r["extras"]], ["SMS reminders"])
+        self.assertTrue(any("DEPRECATED" in x for x in r["problems"]))
+
+    def test_pixel_mode_scores_are_not_averaged_into_layout(self):
+        d = self.tmp.name
+        a = write(d, "a.json", json.dumps({"score": 80.0, "mode": "layout"}))
+        b = write(d, "b.json", json.dumps({"score": 10.0, "mode": "pixel",
+                                           "files": {"clone": "px.png"}}))
+        blank = write(d, "c.json", json.dumps({"score": 0.0, "mode": "layout",
+                                               "comparable": False}))
+        r = parity.combine(parity.score(parity.load(self.path)),
+                           parity.visual_scores([a, b, blank]))
+        self.assertEqual(r["layout_score"], 80.0)
+        self.assertEqual([v["file"] for v in r["visual_ignored"]], ["px.png", blank])
+        self.assertIn("Ignored", parity.render(r))
+        only_pixel = parity.combine(parity.score(parity.load(self.path)),
+                                    parity.visual_scores([b]))
+        self.assertNotIn("layout_score", only_pixel)
+        self.assertEqual(only_pixel["overall"], only_pixel["feature_score"])
+
     def test_ragged_row_extra_columns_are_ignored(self):
         # Regression: a row with more values than the header used to crash
         # load() with AttributeError on the DictReader None key.
         p = write(self.tmp.name, "ragged.csv",
-                  MATRIX + "Extra bits,sharing,could,yes,no,surprise,extra1,extra2\n")
+                  MATRIX + "Extra bits,sharing,could,no,,surprise,kickoff,extra1,extra2\n")
         rows = parity.load(p)
         self.assertEqual(len(rows), 9)
         self.assertEqual(rows[-1]["feature"], "Extra bits")
-        self.assertEqual(rows[-1]["notes"], "surprise")
+        self.assertEqual(rows[-1]["acceptance"], "surprise")
         self.assertNotIn("", rows[-1])          # extras land in no '' key
         r = parity.score(rows)
         self.assertEqual(r["problems"], [])

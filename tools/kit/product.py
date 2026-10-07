@@ -55,7 +55,7 @@ def load_features(root: Path) -> list[dict[str, str]]:
         if not feature:
             continue
         priority = (row.get("priority") or "").strip().lower()
-        status = (row.get("status") or row.get("clone") or "no").strip().lower()
+        status = (row.get("status") or "no").strip().lower()
         if priority not in WEIGHT:
             raise RepoctlError(f"{FEATURES}:{number}: priority must be must, should, or could")
         if status not in STATUSES:

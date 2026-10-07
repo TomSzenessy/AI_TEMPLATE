@@ -70,18 +70,17 @@ what to do next; no blame, no jargon.
 
 ## Review loop (vision-capable reviewer)
 
-1. Run `make ui-review`: it starts the surface's declared preview and
-   captures every route (and seeded data states) at phone and desktop sizes in
-   light and dark mode into `.agent/reviews/<run>/`. For native apps use the
-   simulator or emulator. Without a browser, say so and ask the owner for
+1. Run `make ui-review` (mechanics in `docs/building.md`). For native apps
+   use the simulator or emulator. Without a browser, say so and ask the owner for
    screenshots; never claim a visual review you did not do.
 2. Open every screenshot (you or the `critic` role, vision-capable) and compare
    it with this list, `docs/design.md`, the approved mockup, and the design
    references. In the run's entry in `docs/product/ui-reviews.md`, write
    findings and set `Verdict: pass` only when nothing blocks. A passing review
    of the current code closes a UI feature and is required before release.
-3. Fix, re-screenshot, and use `parity-check`'s image diff to catch unintended
-   layout changes.
+3. Fix, re-screenshot, and use `parity-check`'s `imgdiff.py --mode pixel` at the
+   same viewport and state to catch unintended changes (layout mode ignores
+   colour and text).
 4. For key flows, walk through as a first-time user: count steps and time to
    the first moment of value.
 

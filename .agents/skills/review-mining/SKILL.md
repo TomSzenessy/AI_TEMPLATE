@@ -65,6 +65,8 @@ the best fixes hide.
 python3 .agents/skills/review-mining/reviews.py reference/reviews.csv --out reference/feedback.md
 ```
 
+A quote cut for length is marked `[excerpt]`, a rating outside 1 to 5 is
+reported, and the same words under different links count as different users.
 It sorts reviews into themes (`themes.json` in this folder, edit it for the
 product's category), weights low ratings and recent reviews higher, marks
 themes with fewer than 3 reviews or only one source as thin, lists every
@@ -88,8 +90,10 @@ a trend.
 
 Pick the top 5 to 8 by evidence times how cheaply you can fix them. For each:
 what to build or change, size (S, M, L), which step of the build loop takes
-it, and the evidence. Add each one to `reference/features.csv` as a row with
-`original` set to `no`. Pricing and billing complaints feed the angle as much
+it, and the evidence. Append each one to `docs/product/features.csv` with
+`status` `no` and `source` `review-mining` (evidence in `acceptance`);
+parity-check lists these as improvements, not parity, and `make next` queues
+them. Pricing and billing complaints feed the angle as much
 as the fix plan.
 
 ## Step 5: the angle
@@ -109,10 +113,9 @@ comparison page is a legal question for a lawyer in your country.
 ## Output
 
 `reference/reviews.csv`, `reference/feedback.md`, `reference/fixes.md` (three
-lists, fix plan, angle), new rows in `reference/features.csv`, and a summary
-that states the sample size. Then brand-sweep. Remember: `reference/` must be
-registered in `project.toml` (see product-recon).
+lists, fix plan, angle), new rows in `docs/product/features.csv`, and a summary
+that states the sample size. Then brand-sweep.
 
 ## Source
 
-Adapted from the upstream skill in https://github.com/Jakeschincariol/replica-skill (MIT, © 2026 Jake Schincariol), revision 77c9436fb3d18c3d58169efb8caf4fe906b0dc51.
+Adapted from the upstream skill in https://github.com/Jakeschincariol/replica-skill (MIT, © 2026 Jake Schincariol); revision: see `project.toml` `[[skills]]`.
