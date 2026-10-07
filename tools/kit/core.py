@@ -269,12 +269,21 @@ def today() -> date:
     return datetime.now(timezone.utc).date()
 
 
-def date_is_future(value: "date") -> bool:
-    return value > today()
+def latest_today() -> date:
+    """The latest calendar day anywhere on Earth (UTC+14).
+
+    People write their local date. East of UTC, after local midnight, that date is
+    already ahead of `today()`; a "not in the future" rule must still accept it.
+    """
+    return (datetime.now(timezone.utc) + timedelta(hours=14)).date()
 
 
-def date_is_stale(value: "date") -> bool:
-    return value > today() or value < today() - timedelta(days=365)
+def date_is_future(value: date) -> bool:
+    return value > latest_today()
+
+
+def date_is_stale(value: date) -> bool:
+    return date_is_future(value) or value < today() - timedelta(days=365)
 
 
 def date_problem(value: str | None, stale: str, invalid: str) -> str | None:
