@@ -903,6 +903,8 @@ class KitUpdateTests(unittest.TestCase):
             self.assertIn("Our team rule.", (project / "docs/delegation.md").read_text(), "the project's change stays")
             self.assertIn("merge: docs/delegation.md", result.stdout)
             self.assertIn("Kit B note.", (project / ".agent/kit-update/docs/delegation.md").read_text())
+            from kit import kitupdate
+            self.assertIn("docs/delegation.md", " ".join(kitupdate.pending_merges(project)), "garden keeps listing it")
             self.assertEqual((project / "project.mk").read_text(), "hello:\n\techo hi\n")
             head = self.git(kit, "rev-parse", "HEAD").strip()
             self.assertEqual(json.loads((project / "tools/kit-lock.json").read_text())["kit_version"], head)

@@ -22,7 +22,6 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-import shutil
 import subprocess
 import tempfile
 from pathlib import Path
@@ -148,8 +147,6 @@ def update(root: Path, kit: Path) -> int:
     new_paths = kit_paths(kit)
     updated, added, removed, conflicts = [], [], [], []
     files: dict[str, str] = {}
-    if (root / STAGING).exists():
-        shutil.rmtree(root / STAGING)
     # A conflict is reported once per kit change: the lock then remembers the version offered, so an
     # unchanged kit stays quiet about a file the project chose to keep its way.
     for path in new_paths:
@@ -195,7 +192,8 @@ def update(root: Path, kit: Path) -> int:
             print(f"  {label}: {', '.join(items[:10])}{' …' if len(items) > 10 else ''}")
     for item in conflicts:
         print(f"  merge: {item}")
-    print("Next: review the diff, merge anything listed, run make done, and commit.")
+    print("Next: review the diff, merge anything listed (then delete its staged copy; make garden lists what is left), "
+          "run make done, and commit.")
     return 0
 
 
@@ -212,6 +210,16 @@ def update_from_source(root: Path, kit: str | None) -> int:
         if result.returncode != 0:
             raise RepoctlError(f"could not clone {source}: {result.stderr.strip()[-300:]} (or pass KIT=<checkout>)")
         return update(root, Path(folder))
+
+
+def pending_merges(root: Path) -> list[str]:
+    """Advisory for make garden: kit versions staged by kit-update that nobody has merged yet.
+    Delete a staged file once you have merged (or deliberately declined) it."""
+    staging = root / STAGING
+    if not staging.is_dir():
+        return []
+    return [f"kit change waiting to merge: {path.relative_to(staging).as_posix()} (staged at {path.relative_to(root).as_posix()}; "
+            "merge it, then delete the staged file)" for path in sorted(staging.rglob("*")) if path.is_file()]
 
 
 def behind_template(root: Path) -> str | None:

@@ -235,7 +235,10 @@ fresh clone of `[template].source`) then, per kit file:
 | your own file that `make adopt` kept at a kit path | never touched; listed only when the kit's version changes |
 
 A conflict is reported once per kit change: the lock then remembers the version
-offered, so the next update is quiet until the kit changes that file again. A
+offered, so the next update is quiet until the kit changes that file again. The
+staged version stays in `.agent/kit-update/` and `make garden` lists it on every
+run until you merge it and delete the staged file, so an ignored kit fix is never
+silently lost. A
 project made before the lock existed gets every differing kit file listed once
 on its first update (nothing is overwritten); after that, updates apply
 automatically. A kit checkout without git history keeps the recorded

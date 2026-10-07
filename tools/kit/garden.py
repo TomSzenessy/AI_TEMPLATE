@@ -156,7 +156,8 @@ def garden_report(root: Path) -> tuple[str, int]:
     except Exception as error:  # noqa: BLE001 - metadata drift is advisory only
         advisory.append(f"GitHub metadata check skipped: {error}")
     advisory += pin_drift(root)
-    from .kitupdate import behind_template
+    from .kitupdate import behind_template, pending_merges
+    advisory += pending_merges(root)
     behind = behind_template(root)
     if behind:
         advisory.append(behind)
