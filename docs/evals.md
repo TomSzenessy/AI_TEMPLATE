@@ -6,7 +6,8 @@
 `.agents/evals/*.toml` holds navigation tasks with an expected-answer regex.
 `make eval AGENT=claude` (or `codex`, `gemini`; `MODEL=` overrides, and Claude
 defaults to the cheap `[kit].eval_model`, Haiku) runs each task in a fresh,
-read-only headless session that cannot read `.agents/evals/` (its own answer key;
+read-only headless session in a throwaway worktree of `HEAD` (so uncommitted
+edits and their hook findings never reach the agent under test) that cannot read `.agents/evals/` (its own answer key;
 expectations are anchored regexes that reject negated answers) and has no MCP
 servers, so runs stay fast and deterministic and records pass rate, turns, time, and cost under
 `.agent/evals/`. Re-run it after changing `AGENTS.md`, the map, or the docs.

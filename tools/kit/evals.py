@@ -14,7 +14,9 @@ import re
 import shutil
 import signal
 import subprocess
+import tempfile
 import time
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -22,6 +24,7 @@ import tomllib  # repoctl.py fails fast on Python < 3.11
 
 from .config import setting
 from .core import RepoctlError
+from .gitinfo import run_git
 
 READ_ONLY_TOOLS = "Read Grep Glob Bash(make where:*) Bash(make map) Bash(git log:*) Bash(git status)"
 # The agent under test must not read its own answer key (.agents/evals/**), so the
@@ -140,6 +143,27 @@ def run_task(root: Path, host: str, task: dict[str, str], timeout: int, model: s
     return record
 
 
+@contextmanager
+def committed_checkout(root: Path):
+    """A clean, detached worktree of HEAD for the agents under test, removed afterwards.
+
+    A cold agent must meet the committed repository, not this checkout's uncommitted
+    edits, its hook state, or the stop-gate findings they raise: a live run once
+    answered a stop-hook finding about an unrelated uncommitted file instead of the
+    question. Outside a git repository, the checkout itself is used.
+    """
+    with tempfile.TemporaryDirectory(prefix="kit-eval-") as temp:
+        target = Path(temp) / "repo"
+        added = run_git(root, "worktree", "add", "--detach", "--quiet", str(target), "HEAD", timeout=120)
+        if added is None or added.returncode != 0:
+            yield root
+            return
+        try:
+            yield target
+        finally:
+            run_git(root, "worktree", "remove", "--force", str(target), timeout=120)
+
+
 def run_evals(root: Path, host: str, only: str | None = None, timeout: int = 300, model: str | None = None) -> int:
     if host not in HOST_COMMANDS:
         raise RepoctlError(f"unsupported eval host {host}; choose {', '.join(HOST_COMMANDS)}")
@@ -151,12 +175,13 @@ def run_evals(root: Path, host: str, only: str | None = None, timeout: int = 300
     if not tasks:
         raise RepoctlError("no eval tasks selected")
     records = []
-    for task in tasks:
-        record = run_task(root, host, task, timeout, model)
-        records.append(record)
-        mark = "PASS" if record["passed"] else "FAIL"
-        extras = " ".join(f"{key}={record[key]}" for key in ("seconds", "turns", "cost_usd") if record.get(key) is not None)
-        print(f"{mark} {task['id']} {extras}\n     {record.get('answer') or record.get('error', '')}")
+    with committed_checkout(root) as checkout:
+        for task in tasks:
+            record = run_task(checkout, host, task, timeout, model)
+            records.append(record)
+            mark = "PASS" if record["passed"] else "FAIL"
+            extras = " ".join(f"{key}={record[key]}" for key in ("seconds", "turns", "cost_usd") if record.get(key) is not None)
+            print(f"{mark} {task['id']} {extras}\n     {record.get('answer') or record.get('error', '')}", flush=True)
     passed = sum(1 for record in records if record["passed"])
     cost = sum(float(record.get("cost_usd") or 0) for record in records)
     print(f"\n{passed}/{len(records)} passed" + (f" with {model}" if model else "") + (f", total cost ${cost:.4f}" if cost else ""))

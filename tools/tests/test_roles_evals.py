@@ -65,8 +65,10 @@ class EvalTests(unittest.TestCase):
         tasks = self.tasks()
         cases = {
             "canonical-skills": (["`.agents/skills/`", ".agents/skills"], ["Not .agents/skills; it is .claude/skills", ".claude/skills"]),
-            "generated-files": ([".agents/", "`.agents/skills/x/SKILL.md`", "resources.toml"],
-                                ["Edit .claude directly, never .agents", ".claude/"]),
+            "generated-files": ([".agents/", "`.agents/skills/x/SKILL.md`", "resources.toml",
+                                 "`.agents/` (`.claude/` files are generated; edit their source in `.agents/`, then run `make sync`.)"],
+                                ["Edit .claude directly, never .agents", ".claude/",
+                                 "`.agents/` (no, edit `.claude/` directly instead)"]),
             "kickoff-without-owner": (
                 ["Write the questions with my recommended picks, then stop."],
                 ["I would not stop", "I would not write the questions; I would guess", "Stop and do nothing"]),
