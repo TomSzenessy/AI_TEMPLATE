@@ -306,7 +306,10 @@ def check_vision(root: Path, project: dict[str, object], enforce: bool = True, r
     record = vision.get("record")
     if status != "accepted":
         if enforce:
-            raise RepoctlError("project vision must be accepted before scaffolding")
+            raise RepoctlError(
+                "project vision must be accepted before scaffolding: run the product-kickoff intake (make next), "
+                'then set Status: accepted with Owner and Date in VISION.md and [vision].status = "accepted" in project.toml'
+            )
         return
     if record != "VISION.md":
         raise RepoctlError("vision.record must be exactly VISION.md")

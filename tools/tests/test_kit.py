@@ -10,6 +10,7 @@ import sys
 import tempfile
 import textwrap
 import time
+import tomllib
 import unittest
 from datetime import date, timedelta
 from pathlib import Path
@@ -22,6 +23,11 @@ from kit import adapters, ci, derive, docsync, evals, garden, hygiene, navigate,
 from kit.gitinfo import path_matches  # noqa: E402
 
 # Built by concatenation so this test file never trips the marker scanner itself.
+# Template-maintenance tests need the uninitialized template (its seeds and trial requests);
+# in a project made from it they skip, so a fresh project's make done stays green.
+IN_TEMPLATE = tomllib.loads((TOOLS.parent / "project.toml").read_text(encoding="utf-8")).get("kind") == "template"
+template_only = unittest.skipUnless(IN_TEMPLATE, "template maintenance: runs in the template checkout only")
+
 # Fixture dates follow the calendar so the suite never expires (#10).
 RECENT = (date.today() - timedelta(days=30)).isoformat()
 TASK = "TO" + "DO"
@@ -788,6 +794,7 @@ class TrialTests(unittest.TestCase):
         for path in sorted((TOOLS.parent / trial.TRIALS).glob("*.toml")):
             self.assertEqual(trial.load_trial(TOOLS.parent, path.stem)["id"], path.stem)
 
+    @template_only
     def test_new_mode_prepares_an_initialized_copy(self) -> None:
         from kit import trial
         with tempfile.TemporaryDirectory() as folder:
@@ -803,6 +810,7 @@ class TrialTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
 
+@template_only
 class InitOwnerTests(unittest.TestCase):
     def test_init_names_the_owner_everywhere_and_refuses_emails(self) -> None:
         from kit import trial
@@ -819,6 +827,7 @@ class InitOwnerTests(unittest.TestCase):
             self.assertIn("Owner: octocat", (project / "VISION.md").read_text())
 
 
+@template_only
 class AdoptTests(unittest.TestCase):
     """make adopt brings the kit into an existing repository without overwriting it."""
 
@@ -854,6 +863,9 @@ class AdoptTests(unittest.TestCase):
         problems = [line for line in check.stderr.splitlines() if line.startswith("- ")]
         self.assertTrue(problems and all("unregistered product surface" in line for line in problems), check.stderr)
         self.assertIn("infrastructure_paths", check.stderr, "the message names the fix")
+        from kit import docs
+        docs.check_markdown_links(self.root)  # links to pruned template material point at the template source
+        self.assertNotIn(".agents/trials", (self.root / "docs/self-healing.md").read_text().split("-->")[1])
         finish = subprocess.run([sys.executable, "tools/repoctl.py", "finish"], cwd=self.root, capture_output=True, text=True)
         self.assertEqual(finish.returncode, 0, finish.stdout)
         self.assertEqual(self.adopt().returncode, 1, "adopting twice is refused")

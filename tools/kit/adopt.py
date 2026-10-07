@@ -25,24 +25,19 @@ from pathlib import Path
 
 from . import derive
 from .bootstrap import initialize_project
-from .core import RepoctlError, load_project
-from .gitinfo import git, path_matches
+from .core import RepoctlError
+from .gitinfo import git
 
 MAKE_TARGET = re.compile(r"(?m)^([A-Za-z0-9][A-Za-z0-9_.-]*)\s*:(?!=)")
 H1 = re.compile(r"(?m)^# (.+)$")
 INDEX_LINE = re.compile(r"<!--\s*index:")
-ALWAYS_SKIP = (".agents/trials/**",)  # kit-maintenance material, never a project's
 
 
 def kit_files(kit: Path) -> list[str]:
+    """Every kit file. Template-only material is copied too, so init prunes it the same way it does for
+    `make init`: links to it are rewritten to the template source and bindings to it are dropped."""
     listed = git(kit, "ls-files", "-z", "--cached", "--others", "--exclude-standard") or ""
-    project = load_project(kit)
-    template = project.get("template", {}) if isinstance(project.get("template"), dict) else {}
-    skip = [*template.get("prune", []), *ALWAYS_SKIP]
-    return sorted(
-        path for path in listed.split("\0")
-        if path and (kit / path).is_file() and not any(path_matches(path, pattern) for pattern in skip)
-    )
+    return sorted(path for path in listed.split("\0") if path and (kit / path).is_file())
 
 
 def merge_makefile(target: Path, kit_makefile: str) -> list[str]:

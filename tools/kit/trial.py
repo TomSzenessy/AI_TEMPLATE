@@ -100,14 +100,15 @@ def prepare(root: Path, spec: dict[str, object], project: Path) -> None:
     _run(["git", "config", "user.email", "trial@example.invalid"], project)
     if spec["mode"] == "new":
         _copy(root, _kit_files(root), project)
-        _run([sys.executable, "tools/repoctl.py", "init", "--name", str(spec["id"]), "--kind", str(spec["kind"])], project)
+        _run([sys.executable, "tools/repoctl.py", "init", "--name", str(spec["id"]), "--kind", str(spec["kind"]),
+              "--owner", "trial-owner"], project)  # as the README tells a real owner to
         _commit(project, f"chore: start {spec['id']} from the template")
     else:
         seed = root / TRIALS / str(spec["seed"])
         shutil.copytree(seed, project, dirs_exist_ok=True)
         _commit(project, "existing project before the kit")
         _run([sys.executable, str(root / "tools/repoctl.py"), "--root", str(project), "adopt",
-              "--from", str(root), "--name", str(spec["id"]), "--kind", str(spec["kind"])], project)
+              "--from", str(root), "--name", str(spec["id"]), "--kind", str(spec["kind"]), "--owner", "trial-owner"], project)
         _commit(project, "chore: adopt the agent kit")
 
 

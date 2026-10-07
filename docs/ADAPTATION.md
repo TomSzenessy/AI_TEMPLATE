@@ -50,7 +50,9 @@ owns:
 | `.github/workflows/<name>` | The kit's workflow is written beside yours as `kit-<name>`. |
 | `LICENSE` and anything else | Yours is kept; the manifest's `license` label follows your LICENSE. |
 
-Your existing `docs/*.md` get an `<!-- index: -->` line from their title (edit
+Template-only material is pruned exactly as `make init` prunes it: links to
+it point at the template source and doc bindings to it are dropped. Your
+existing `docs/*.md` get an `<!-- index: -->` line from their title (edit
 the wording). Afterwards `make check` lists your code as unregistered surfaces:
 declare each one in `project.toml` (or list support folders such as tests in
 `[repository].infrastructure_paths`), then follow `make next`. A document's
