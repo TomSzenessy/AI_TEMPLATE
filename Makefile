@@ -43,7 +43,7 @@ help:
 	  '  make validate BODY=path | skill-digest SKILL_PATH=.agents/skills/name'
 
 python-check:
-	@test -n "$(PYTHON)" || { echo "Needs Python 3.11+ on PATH (python3.11 or newer); or run: make PYTHON=/path/to/python3.11 ..." >&2; exit 1; }
+	@test -n "$(PYTHON)" && $(PYTHON) -c 'import sys; sys.exit(sys.version_info < (3, 11))' 2>/dev/null || { echo "Needs Python 3.11+ (found: '$(PYTHON)'); install python3.11 or newer, or run: make PYTHON=/path/to/python3.11 ..." >&2; exit 1; }
 
 init: python-check
 	$(REPOCTL) init --name "$${NAME}" --kind "$${KIND}"

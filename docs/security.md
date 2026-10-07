@@ -59,7 +59,7 @@ organization license is not exposed to fork PRs) and credential-free Lychee for
 Markdown links: pull requests scan only the Markdown they add or change (file
 names filtered to a safe character set, since they are untrusted input), and a
 weekly schedule or manual run scans everything, so third-party outages and link
-rot surface as gardener findings instead of failing unrelated changes;
+rot surface as a failed scheduled run instead of failing unrelated changes;
 organization-owned repositories must provide the trusted `GITLEAKS_LICENSE`
 secret for the pinned action. Enable the provider's fork-PR secret scanning as
 well. The link job accepts only successful response classes and excludes the

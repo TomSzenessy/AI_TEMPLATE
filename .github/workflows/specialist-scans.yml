@@ -4,8 +4,8 @@ on:
   push:
   pull_request:
   workflow_dispatch:
-  # Weekly full link scan: external link rot is found here and filed as an
-  # issue; pull requests only scan the Markdown they change.
+  # Weekly full link scan: external link rot shows up as a failed scheduled
+  # run; pull requests only scan the Markdown they change.
   schedule:
     - cron: "23 6 * * 1"
 
@@ -56,7 +56,7 @@ jobs:
         # file names are untrusted input. Schedule and manual runs: everything.
         run: |
           if [ "$EVENT" = pull_request ]; then
-            files=$(git diff --name-only --diff-filter=AM "origin/$BASE...HEAD" -- '*.md' | { grep -E '^[A-Za-z0-9._/-]+$' || true; } | tr '\n' ' ')
+            files=$(git diff --name-only --diff-filter=ACMR "origin/$BASE...HEAD" -- '*.md' | { grep -E '^[A-Za-z0-9_.][A-Za-z0-9._/-]*$' || true; } | tr '\n' ' ')
           else
             files="./**/*.md"
           fi
