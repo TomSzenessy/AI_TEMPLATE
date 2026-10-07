@@ -43,7 +43,7 @@ test-future: python-check
 verify: python-check
 	$(MAKE) --no-print-directory test
 	$(REPOCTL) verify
-	$(REPOCTL) doctor
+	$(REPOCTL) doctor --checks-done
 
 # The one completion command: heal derived files, run the change gate, then
 # everything CI runs. Prints the risk tier so the right review follows.

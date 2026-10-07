@@ -76,6 +76,13 @@ measure = true
 # them here). Third-party skills instead need [[skills]] provenance below.
 local_skills = ["product-kickoff", "stack-foundation", "ux-quality"]
 
+# [checks.<name>]  A project may downgrade one blocking check it disagrees with; it still runs.
+# severity = "advisory"  (the only value) and reason = "..." (required). Deleting the entry restores blocking.
+# Example:
+#   [checks.markdown-links]
+#   severity = "advisory"
+#   reason = "generated docs link to build output that exists only in CI"
+
 [budgets]
 # Byte limits (~4 bytes/token) for files agents load often; make check enforces.
 "AGENTS.md" = 7500

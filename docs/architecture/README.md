@@ -34,7 +34,7 @@ The seams tightened last: `core` owns the shared primitives (one
 `today`, `default_branch`, `package_skill`), `gitinfo.run_git` is the one git
 entry point (unquoted paths, a timeout) and `core.today` computes one UTC day
 so every freshness rule agrees across machines (a "not in the future" rule
-compares with `core.latest_today`, UTC+14, so a local date always passes), `registry.KINDS` and
+compares with `core.latest_today`, UTC+14, so a local date always passes; `core.date_out_of_policy` is the one staleness policy), `registry.run_checks` is the one place a finding becomes blocking (gates name checks; a project may downgrade one in `[checks]`), `registry.KINDS` and
 `session.HOOK_EVENTS` are the single lists their users derive from, and
 `structure` validates the vision and stack-decision records through one
 `_check_record`. Behavior lives in standard-library modules under `tools/kit/`

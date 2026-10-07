@@ -94,7 +94,7 @@ A project is ready to call itself production-ready only when its accountable
 owner can show the evidence matrix, all applicable external gates are closed or
 explicitly accepted, and residual risks are visible in the issue register. The
 `repoctl readiness`/`make readiness` command now runs every blocking check the
-registry knows (`run_checks(blocking_only=True)`), the release-gated skill
+registry knows (`run_checks(blocking_only=True)`, skipped under `doctor --checks-done` when `make verify` already ran them), the release-gated skill
 provenance check, and the public-launch prerequisites (split into one helper per
 artifact — routes, `SECURITY.md`, threat model, security config, launch
 evidence, data inventory — with the same rules as before); it deliberately does

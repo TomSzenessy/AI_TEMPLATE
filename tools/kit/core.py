@@ -291,6 +291,16 @@ def date_is_stale(value: date) -> bool:
     return date_is_future(value) or value < today() - timedelta(days=365)
 
 
+def date_out_of_policy(value: "date", release_gate: bool) -> bool:
+    """A future date is always a typo; age only matters at the release gate (make readiness).
+
+    A vision accepted 13 months ago is not wrong, so `make check` and `make done` never fail on age alone
+    during development; from private-preview on, `make readiness` asks for a fresh confirmation:
+    re-dating a file to satisfy a clock is ritual, not evidence.
+    """
+    return date_is_stale(value) if release_gate else date_is_future(value)
+
+
 def date_problem(value: str | None, stale: str, invalid: str) -> str | None:
     """The problem with an ISO date that must be recent and not in the future, or None.
 

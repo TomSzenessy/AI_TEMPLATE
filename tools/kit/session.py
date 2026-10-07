@@ -16,7 +16,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import derive, docsync, hygiene
+from . import derive, docsync
 from .core import (
     GATE_COMMIT_BLOCKED, GATE_NOT_FINISHED, GATE_STOP_BLOCKED,
     RepoctlError, default_branch, governance_profile, load_project, read_text_file, repository_files,
@@ -26,7 +26,7 @@ from .gitinfo import branch, branch_paths, changed_paths, committed_paths, diff_
 from .names import HANDOVER
 from .navigate import print_map
 from .product import next_step, product_summary
-from .registry import KINDS, Registry, project_plugin_files
+from .registry import KINDS, Registry, project_plugin_files, run_checks
 from .risk import assess, classify, tier_rules
 from .uireview import review_status
 
@@ -330,11 +330,10 @@ def finish_findings(root: Path, session_paths: list[str] | None = None, since: s
         " (update it, or record why in the commit with a 'Docs-Unaffected: <doc> <reason>' trailer)"
         for doc, paths in owed.items()
     ]
+    rules = {"dead-bindings", "markers"}
     if not scoped or any(path.startswith(CANONICAL_INPUTS) or path.endswith(".md") for path in changed):
-        findings += derive.drift(root)
-    findings += docsync.dead_bindings(doc_bindings, files)
-    present = [path for path in changed if path in file_set]
-    findings += hygiene.scan_markers(root, present).errors
+        rules.add("derived-drift")
+    findings += registry_findings(root, rules, [path for path in changed if path in file_set])
     findings += critic_findings(root, project, base, session_paths)
     return findings
 
@@ -343,22 +342,25 @@ SCISSORS = re.compile(r"(?m)^# -+ >8 -+$")
 GATE_BLOCKED = 3  # the hook blocks on any non-zero status except 126/127 (no interpreter or launcher)
 
 
-def _plugin_findings(root: Path) -> list[str]:
-    """A project plugin that cannot load, or a registry that cannot load, blocks the commit: the gate
-    must never be skipped because the kit it runs on is broken (issue #28)."""
+def registry_findings(root: Path, names: set[str], scope: list[str] | None) -> list[str]:
+    """Blocking findings of the named registry checks over `scope`: the gates' one route to a block.
+
+    A gate decides which rules apply to its change set; the registry decides whether each blocks
+    (declaration, then the project's `[checks]` downgrade). A registry that cannot load is itself
+    a blocking finding: a gate must never be skipped because the kit it runs on is broken (issue #28).
+    """
     try:
-        errors = Registry(root).plugin_errors
+        return run_checks(root, blocking_only=True, only=frozenset(names), scope=scope)[0]
     except Exception as error:  # noqa: BLE001 - an unloadable registry is itself a blocking finding
         return [f"[registry] the capability registry cannot load: {type(error).__name__}: {error} "
                 "(fix it, then recommit; `git commit --no-verify` bypasses the gate, say why in the PR)"]
-    return [f"[plugin-load] {path}: {error} (fix or delete the plugin file; make check shows it)" for path, error in errors]
 
 
-def commit_gate(root: Path, message_file: str | None) -> int:
-    """git commit-msg gate over the staged change set; returns the exit code."""
+def commit_findings(root: Path, message_file: str | None) -> list[str]:
+    """What blocks the staged change set (git commit-msg gate); empty means the commit may proceed."""
     staged = diff_paths(root, "--cached")
     if not staged:
-        return 0
+        return []
     try:
         message = Path(message_file).read_text(encoding="utf-8") if message_file else ""
     except OSError:
@@ -376,15 +378,21 @@ def commit_gate(root: Path, message_file: str | None) -> int:
     merged_in: set[str] = set()
     if git(root, "rev-parse", "-q", "--verify", "MERGE_HEAD") is not None:
         merged_in = set(diff_paths(root, "HEAD...MERGE_HEAD"))
-    findings = _plugin_findings(root) + [
+    rules = {"plugin-load", "markers"}
+    # Derived drift only matters when this commit touches a source of derived files.
+    if any(path.startswith(CANONICAL_INPUTS) or path.endswith(".md") for path in staged):
+        rules.add("derived-drift")
+    findings = registry_findings(root, rules, [path for path in staged if path in file_set]) + [
         f"{doc} covers staged {', '.join(paths[:4])} but is not staged"
         for doc, paths in docsync.pending_documents(doc_bindings, [p for p in staged if p not in merged_in]).items()
         if "*" not in exempt and doc not in exempt
     ]
-    # Derived drift only matters when this commit touches a source of derived files.
-    if any(path.startswith(CANONICAL_INPUTS) or path.endswith(".md") for path in staged):
-        findings += derive.drift(root)
-    findings += hygiene.scan_markers(root, [path for path in staged if path in file_set]).errors
+    return findings
+
+
+def commit_gate(root: Path, message_file: str | None) -> int:
+    """The commit-msg hook's exit status: GATE_BLOCKED when `commit_findings` is not empty."""
+    findings = commit_findings(root, message_file)
     if not findings:
         return 0
     print(f"{GATE_COMMIT_BLOCKED} by the self-healing gate (docs/self-healing.md):", file=sys.stderr)
