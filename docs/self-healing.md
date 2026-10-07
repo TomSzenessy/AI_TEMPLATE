@@ -1,6 +1,6 @@
 # Self-healing mechanics
 
-<!-- index: operate | Hooks, doc-code bindings, deprecation expiry, budgets, generated files, gardener, evals | A check fails, docs drift, a host is added, or the kit itself changes. -->
+<!-- index: operate | When a check may block, hooks, doc-code bindings, deprecation expiry, budgets, generated files, gardener, evals | A check fails, docs drift, a host is added, or the kit itself changes. -->
 <!-- covers: tools/kit/docsync.py tools/kit/hygiene.py tools/kit/adapters.py tools/kit/session.py tools/kit/garden.py tools/kit/navigate.py tools/kit/risk.py tools/kit/capabilities.py tools/kit/evals.py tools/kit/gitinfo.py tools/kit/derive.py tools/kit/scaffold.py tools/kit/config.py .githooks/** .github/workflows/garden.yml .agents/evals/** -->
 
 Agents follow written rules well at the start of a session and worst at the end,
@@ -8,6 +8,33 @@ after compaction, which is when cleanup and documentation get skipped. So the
 maintenance rules here are **executed**, not remembered: lifecycle hooks,
 checks in `make check`, and a scheduled gardener. Every mechanism is a
 standard-library command in `tools/kit/`, so it works with any agent host.
+
+## When a check may block
+
+Every gate costs every future change some friction, so blocking is earned, not
+assumed. A new or changed check **blocks** only when all three hold:
+
+1. **Evidence:** skipping the step produced a worse product or codebase in a
+   build trial, eval, or incident (not "an agent might forget").
+2. **Cheap, named fix:** the message names the command or edit that clears
+   it, and that fix costs minutes, not a review cycle.
+3. **Deterministic and hard to game:** it checks the artifact itself (a file,
+   a binding, a digest), not a ticked box or a keyword in prose.
+
+Otherwise it is **advisory** (`make garden`, the session brief) or an
+**automatic fix** (`make sync`). Further rules:
+
+- **One blocking point per concern.** Each later gate fires only on what the
+  earlier one let through (`--no-verify`, uncommitted work), never on a
+  decision already recorded, such as a `Docs-Unaffected` trailer.
+- **Gate the outcome, not every step.** Require evidence once per feature or
+  release (one UI review per feature and one before launch), not per commit
+  or per screenshot.
+- **Ceremony scales with risk.** `make risk` decides; a `low` change never
+  inherits `high` ceremony.
+- **Retire what never fires usefully.** A check that only ever produces
+  bypasses, trailers, or ritual compliance is demoted to advisory or deleted
+  in the next trial review.
 
 ## Lifecycle (any host)
 

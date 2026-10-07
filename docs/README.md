@@ -32,7 +32,7 @@ itself and this table cannot drift. Edit the line in the document, not here.
 | [`delegation.md`](./delegation.md) | Orchestrator/subagent roles, brief and report contract | Work is bounded enough to hand to a scout, implementer, critic, researcher, doc-gardener, or skill-scout. |
 | [`operations.md`](./operations.md) | Failure loop and error ledger rules | A bug, outage, flaky test, or operational failure occurs. |
 | [`production.md`](./production.md) | Production evidence and release boundary | A real project is being prepared for deployment or release. |
-| [`self-healing.md`](./self-healing.md) | Hooks, doc-code bindings, deprecation expiry, budgets, generated files, gardener, evals | A check fails, docs drift, a host is added, or the kit itself changes. |
+| [`self-healing.md`](./self-healing.md) | When a check may block, hooks, doc-code bindings, deprecation expiry, budgets, generated files, gardener, evals | A check fails, docs drift, a host is added, or the kit itself changes. |
 | [`verification.md`](./verification.md) | Definition of done, evidence ladder, and quality loop | A change is ready for review or a quality claim is made. |
 | [`handoffs/README.md`](./handoffs/README.md) | Cross-session continuity rules | Work must be transferred or resumed. |
 | [`handoffs/TEMPLATE.md`](./handoffs/TEMPLATE.md) | Handover record scaffold (local HANDOVER.md or committed handoff) | A fresh actor needs a focused continuation record. |
