@@ -1,0 +1,39 @@
+# Creative product with state, audio, and offline data: a shape between the
+# pure-canvas poster-press and the collaborative waypoint. Measures whether an
+# agent can carry a playful vision to a green `make done` on a cheap model.
+id = "tidepool"
+kind = "web"
+mode = "new"
+budget_usd = 25
+prompt = '''
+I want "Tidepool", a calm browser toy for building little ambient soundscapes.
+
+I won't be available during this run. Answer my kickoff questions with your own
+recommendations and write down what you chose; for anything else, use your best
+judgement and record the decision.
+
+- Users: people who want a few minutes of focus or wind-down sound and enjoy
+  fiddling with something pretty. Not musicians. Success = someone opens the
+  page, makes a soundscape they like in under two minutes, and comes back to it
+  the next day.
+- The screen is a pool. You drop "creatures" into it (a few kinds: drone,
+  chime, pulse, rain, bird); each one is a sound layer whose position sets its
+  pan and depth sets its volume. Drag to move, tap to mute, long-press or a
+  menu to remove. A gentle visual ripple shows each creature playing.
+- A global mood control (calm to bright) shifts the scale and tempo of every
+  creature together, so any combination stays consonant.
+- Save soundscapes locally (named, with a small generated thumbnail), reopen
+  them, and share one as a link that recreates it exactly.
+- Works offline after the first visit; nothing leaves the machine; no
+  accounts, no server, no analytics. Sound synthesised in the browser, no
+  audio files to license.
+- Accessible: everything reachable by keyboard, a visible "sound is off until
+  you press play" state, reduced-motion respected.
+- Visual style: soft, watery, dark by default with a light mode. Your call.
+- Stack: your call.
+- Not now: recording or export to audio files, user-uploaded samples,
+  collaboration, a gallery.
+
+Build it in this repository as far as you can toward something I could show
+someone tomorrow.
+'''
