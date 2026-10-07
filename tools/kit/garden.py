@@ -63,14 +63,6 @@ def project_errors(root: Path, project: dict[str, object], files: list[str], doc
     vision = project.get("vision", {})
     accepted = isinstance(vision, dict) and vision.get("status") == "accepted"
     ui_project = project.get("kind") in setting(root, "ui_kinds")
-    if ui_project:
-        errors += [
-            f"surface {surface.get('id')}: a UI project's quality_oracle must include the ux-quality screenshot review "
-            "(for example \"... plus ux-quality screenshot review at phone and desktop sizes\")"
-            for surface in declared_surfaces(project)
-            if surface.get("status", "active") == "active" and surface.get("kind") != "template"
-            and "ux-quality" not in str(surface.get("quality_oracle", ""))
-        ]
     building = any(
         surface.get("status", "active") == "active" and surface.get("kind") != "template"
         for surface in declared_surfaces(project)

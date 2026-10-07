@@ -462,7 +462,7 @@ verification = [["true"]]
         findings = self.self_heal()
         self.assertIn("docs/LOCAL-WAL.md: live work belongs in issues", findings)
         self.assertIn("UI project without docs/design.md", findings)
-        self.assertIn("quality_oracle must include the ux-quality", findings)
+        self.assertNotIn("quality_oracle", findings, "retired: a keyword in prose is not a review")
         self.assertEqual(findings.count("looks like an email"), 1)
         self.assertNotIn("has no owning doc", findings, "docs/billing.md covers src/billing/**")
 
@@ -629,8 +629,6 @@ class UiReviewTests(KitRepository):
         self.assertEqual(len(shots), 4)
         self.assertIn("app-home-default-phone-dark.png", shots)
         log = self.root / uireview.LOG
-        self.assertIn("tick every screenshot", " ".join(uireview.review_status(self.root)))
-        log.write_text(log.read_text().replace("- [ ] ", "- [x] "))
         self.assertIn("is not `Verdict: pass`", " ".join(uireview.review_status(self.root)))
         log.write_text(log.read_text().replace("Verdict: pending", "Verdict: fix - contrast"))
         self.assertIn("is not `Verdict: pass`", " ".join(uireview.review_status(self.root)), "fix must not pass")
@@ -639,6 +637,16 @@ class UiReviewTests(KitRepository):
         self.assertIn("<!-- index:", log.read_text(), "the tracked log indexes itself")
         self.write("src/billing/invoice.py", "def render_invoice():\n    return 42\n")
         self.assertIn("changed since UI review", " ".join(uireview.review_status(self.root)))
+
+    def test_review_gates_feature_and_release_not_every_change(self) -> None:
+        from kit import launch, session
+        self.assertIn("never had a UI review", " ".join(uireview.review_status(self.root)))
+        self.assertFalse(any("UI review" in item for item in session.finish_findings(self.root)), "advisory per change")
+        text = (self.root / "project.toml").read_text().replace('phase = "development"', 'phase = "private-preview"')
+        self.write("project.toml", text)
+        with self.assertRaises(Exception) as raised:
+            launch.check_readiness(self.root)
+        self.assertIn("never had a UI review", str(raised.exception))
 
 
 class DerivedContentTests(KitRepository):

@@ -25,7 +25,7 @@ order:
 | skeleton | a product surface is declared (`stack-foundation`) |
 | preview (web UI) | the surface has a `[surfaces.preview]` table (native apps use simulator screenshots) |
 | build | every must feature is `yes` with evidence |
-| review (UI) | the latest entry in `docs/product/ui-reviews.md` matches the code, every screenshot is ticked, and the verdict is `pass` |
+| review (UI) | the latest entry in `docs/product/ui-reviews.md` matches the code and the verdict is `pass` |
 | polish | every should feature is done or skipped |
 | launch | release sequence in [`production.md`](./production.md) |
 
@@ -77,10 +77,19 @@ different project's dev server that held the port.
 
 Screenshots stay local in `.agent/reviews/<run>/`; the review record is
 appended to the tracked `docs/product/ui-reviews.md`: the reviewed code digest
-per surface, one checkbox per screenshot, findings, and `Verdict: pending`.
-Whoever looked at the images (you or the `critic` role) ticks each screenshot,
-records findings, and sets `Verdict: pass` or `Verdict: fix`. The change gate
-(`make done`, the stop hook) reports a web UI surface that was never reviewed,
-changed since its latest review, has unticked screenshots, or is not `pass`;
-`fix` never clears it. Because the record is tracked, every clone and CI sees
-the same review state, and feature rows cite `docs/product/ui-reviews.md`.
+per surface, the screenshot list, findings, and `Verdict: pending`. Whoever
+looked at the images (you or the `critic` role) records findings and sets
+`Verdict: pass` or `Verdict: fix`; `fix` never clears anything.
+
+The review gates outcomes, not commits ([when a check may block](./self-healing.md#when-a-check-may-block)):
+
+- **Per feature:** a must UI feature is `yes` only when its evidence cites
+  `docs/product/ui-reviews.md` (or a test), and `make next` holds the `review`
+  phase until the latest review matches the code and passes.
+- **Per release:** `make readiness` (from `phase = "private-preview"` on)
+  fails while any web UI surface was never reviewed, changed since its latest
+  review, or is not `pass`.
+- **Per change:** `make done` only *mentions* a stale review, so a one-line CSS
+  fix does not need a screenshot run.
+
+Because the record is tracked, every clone and CI sees the same review state.

@@ -24,6 +24,7 @@ from .core import (
 from .docs import check_docs_index, check_file_hygiene, check_markdown_links
 from .github import github_target_configured
 from .skills import check_skill_provenance
+from .uireview import review_status
 from .structure import (
     check_readme_identity,
     check_structure,
@@ -341,6 +342,8 @@ def check_readiness(root: Path) -> None:
                 validate_critic_evidence(root, surface)
             except RepoctlError as error:
                 errors.append(str(error))
+    if project.get("phase") in {"private-preview", "public-launch"}:
+        errors.extend(review_status(root))  # one fresh, passing UI review before anyone outside uses it
 
     launch = project.get("launch", {})
     if not isinstance(launch, dict):

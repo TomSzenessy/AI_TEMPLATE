@@ -13,10 +13,10 @@ review a server it did not start, captures each route and storage state at
 phone and desktop sizes in light and dark mode with a pinned Playwright, and
 stops the server. Screenshots stay local in `.agent/reviews/<run>/`; the review
 record is appended to the tracked `docs/product/ui-reviews.md` (surface
-digests, one checkbox per screenshot, findings, verdict), so every clone sees
-the same review history. A surface counts as reviewed only when its latest
-record matches the current code, every screenshot is ticked, and the verdict
-is `pass`.
+digests, the screenshot list, findings, verdict), so every clone sees the same
+review history. A surface counts as reviewed when its latest record matches
+the current code and the verdict is `pass`. That is a feature and launch gate
+(`make next`, `make readiness` from private-preview on), not a per-commit one.
 """
 
 from __future__ import annotations
@@ -46,7 +46,7 @@ LOG_HEADER = (
     "<!-- index: launch | Screenshot review history: verdicts, findings, reviewed code digests | "
     "judging UI quality or citing review evidence -->\n\n"
     "Appended by `make ui-review` (docs/building.md). Screenshots are local in `.agent/reviews/<run>/`; "
-    "tick each one after looking at it, record findings, then set the verdict to pass or fix.\n"
+    "look at each one, record findings, then set the verdict to pass or fix.\n"
 )
 VIEWPORTS = {"phone": "390,844", "desktop": "1440,900"}
 SCHEMES = ("light", "dark")
@@ -91,7 +91,7 @@ def latest_records(root: Path) -> dict[str, tuple[str, str, str]]:
 
 
 def review_status(root: Path) -> list[str]:
-    """Findings for previewable UI surfaces without a fresh, fully judged, passing review."""
+    """Findings for previewable UI surfaces without a fresh, passing review."""
     project = load_project(root)
     if not (is_product(project) and is_ui(root, project)):
         return []
@@ -105,8 +105,6 @@ def review_status(root: Path) -> list[str]:
         run, digest, body = records[identifier]
         if digest != surface_digest(root, str(surface.get("path", "."))):
             findings.append(f"surface {identifier} changed since UI review {run} (make ui-review)")
-        elif re.search(r"(?m)^- \[ \]", body):
-            findings.append(f"UI review {run} in {LOG}: tick every screenshot after looking at it")
         elif not re.search(r"(?m)^Verdict:\s*pass\b", body):
             findings.append(f"UI review {run} in {LOG} is not `Verdict: pass`: fix the findings and run make ui-review again")
     return findings
@@ -226,8 +224,8 @@ def run_review(root: Path) -> int:
     digests = " ".join(f"{s.get('id')}={surface_digest(root, str(s.get('path', '.')))}" for s in surfaces)
     entry = (
         f"\n## Review {stamp}\n\n<!-- review: {digests} -->\n\n"
-        f"Screenshots in `{SHOTS}/{stamp}/` (local). Tick each after looking at it:\n\n"
-        + "".join(f"- [ ] {shot}\n" for shot in shots)
+        f"Screenshots in `{SHOTS}/{stamp}/` (local); look at every one:\n\n"
+        + "".join(f"- {shot}\n" for shot in shots)
         + "\nFindings (screenshot, region, problem, fix):\n\n- none yet\n\n"
         "Bar: hierarchy, spacing rhythm, type scale, and contrast hold up next to the references; every\n"
         "state looks designed; touch targets at least 44 pt; nothing clipped at phone width; light and dark\n"
@@ -237,6 +235,6 @@ def run_review(root: Path) -> int:
     log.parent.mkdir(parents=True, exist_ok=True)
     log.write_text((read_text_file(root, LOG) or LOG_HEADER) + entry, encoding="utf-8")
     print(f"{len(shots)} screenshot(s) in {SHOTS}/{stamp}/; review entry appended to {LOG}.")
-    print("Open each image, tick it, record findings, and set `Verdict: pass` or `Verdict: fix`; fix and re-run until pass.")
+    print("Open each image, record findings, and set `Verdict: pass` or `Verdict: fix`; fix and re-run until pass.")
     print(f"Cite `{LOG}` as evidence in docs/product/features.csv once the verdict is pass.")
     return 0

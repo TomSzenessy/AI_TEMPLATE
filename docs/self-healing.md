@@ -43,7 +43,7 @@ Otherwise it is **advisory** (`make garden`, the session brief) or an
 | Session start or resume | `repoctl hook session-start` | `make start` | Brief: branch, recent commits, `HANDOVER.md`, map, the `make next` step, open self-healing findings. Derived files are regenerated and the git commit gate is installed. |
 | Before context compaction | `repoctl hook pre-compact` | — | Writes `.agent/checkpoint.md` (uncommitted paths, docs still owed). |
 | After a file edit | `repoctl hook after-edit` | — | Names the docs covering the edited path (once per session); regenerates derived files when a source changed; warns on edits to generated files. |
-| Before declaring done | `repoctl hook stop` | `make done` | Gate over this branch's change set: owed docs, derived-file drift, dead bindings, expired, undated, or unfinished markers, and UI surfaces without a fresh, judged `make ui-review` ([`building.md`](./building.md)); `make done` also prints product completeness. The hook blocks once; `make done` also runs every test. |
+| Before declaring done | `repoctl hook stop` | `make done` | Gate over this branch's change set: owed docs, derived-file drift, dead bindings, expired, undated, or unfinished markers; `make done` also prints product completeness and, as advice, a stale UI review ([`building.md`](./building.md)). The hook blocks once; `make done` also runs every test. |
 | Every commit | `.githooks/commit-msg` (any agent or human) | same | Refuses a commit whose staged covered code skips its doc (unless the message carries a `Docs-Unaffected:` trailer), plus marker checks, and derived-file drift when the commit touches a source. A merge commit skips the owed-doc check: its commits already passed it or recorded a trailer. Exit 3 means blocked; a crashed kit never blocks a commit. Bypass deliberately with `--no-verify`. |
 
 The commit gate is installed (`core.hooksPath=.githooks`) only when the
@@ -107,8 +107,9 @@ Steps a fresh agent skipped in a real build trial are checks, each naming its fi
 - Every active product surface needs an owning doc: some `<!-- covers: -->`
   binding must match files under its path.
 - In a UI project (`[kit].ui_kinds`, by `project.toml` kind) an accepted vision
-  requires `docs/design.md`, and each surface's `quality_oracle` must name the
-  `ux-quality` screenshot review.
+  requires `docs/design.md`. (A rule that `quality_oracle` must mention
+  `ux-quality` was retired: a keyword in prose is not a review; the real
+  `make ui-review` gate in [`building.md`](./building.md) replaced it.)
 - Owners in `project.toml` must be handles or team names, not emails.
 
 ## Context budgets

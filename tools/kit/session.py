@@ -204,7 +204,6 @@ def finish_findings(root: Path) -> list[str]:
     findings += docsync.dead_bindings(doc_bindings, files)
     present = [path for path in changed if path in set(files)]
     findings += hygiene.scan_markers(root, present).errors
-    findings += review_status(root)
     return findings
 
 
@@ -295,6 +294,9 @@ def finish(root: Path) -> int:
     summary = product_summary(root)
     if summary:
         print(summary)
+    # Advisory per change; the review gates the feature (make next) and the release (make readiness).
+    for item in review_status(root):
+        print(f"UI review (before the feature is done and before release): {item}")
     return 0
 
 

@@ -106,3 +106,5 @@ explicitly accepted, and residual risks are visible in the issue register. The
 `repoctl readiness`/`make readiness` command checks the configured structural
 and public-launch prerequisites; it deliberately does **not** validate the
 whole matrix above. The template leaves those facts to the instantiated project.
+From `phase = "private-preview"` on it also requires a fresh, passing UI
+review for every web UI surface ([`building.md`](./building.md#ui-review)).
