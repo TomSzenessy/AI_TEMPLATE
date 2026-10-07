@@ -300,3 +300,11 @@ def final_newline(context) -> list[str]:
 def host_twins(context) -> list[str]:
     return hygiene.host_twin_errors(context.root)
 
+
+
+@check("plugin-load", "A project plugin under .agents/commands or .agents/checks failed to import; fix or delete the file",
+       blocks=True, reason="Issue #28: one plugin that failed to import used to disable every command and let "
+                           "commits skip the gate; it is now isolated, so this finding is the only place its "
+                           "capability's absence is visible.")
+def plugin_load(context) -> list[str]:
+    return [f"{path}: {error}" for path, error in context.registry.plugin_errors]

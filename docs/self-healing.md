@@ -52,7 +52,7 @@ Otherwise it is **advisory** (`make garden`, the session brief) or an
 | Before context compaction | `repoctl hook pre-compact` | — | Writes `.agent/checkpoint.md` (uncommitted paths, docs still owed). |
 | After a file edit | `repoctl hook after-edit` | — | Names the docs covering the edited path (once per session); regenerates derived files when a source changed; warns on edits to generated files. |
 | Before declaring done | `repoctl hook stop` | `make done` | Gate over this branch's change set: owed docs, derived-file drift, dead bindings, expired, undated, or unfinished markers, plus critic evidence when committed `high`-risk paths changed (see [Ceremony by risk](#ceremony-by-risk)); `make done` also prints product completeness and, as advice, a stale UI review ([`building.md`](./building.md)). The hook blocks once; `make done` also runs every test and predicts the commit gate for uncommitted work, so the two never disagree. |
-| Every commit | `.githooks/commit-msg` (any agent or human) | same | Refuses a commit whose staged covered code skips its doc (unless the message carries a `Docs-Unaffected:` trailer), plus marker checks, and derived-file drift when the commit touches a source. In a merge commit, paths the merged branch brought in skip the owed-doc check (its commits already passed it or recorded a trailer); anything else staged is checked as usual. Exit 3 means blocked; a crashed kit never blocks a commit. Bypass deliberately with `--no-verify`. |
+| Every commit | `.githooks/commit-msg` (any agent or human) | same | Refuses a commit whose staged covered code skips its doc (unless the message carries a `Docs-Unaffected:` trailer), plus marker checks, and derived-file drift when the commit touches a source. In a merge commit, paths the merged branch brought in skip the owed-doc check (its commits already passed it or recorded a trailer); anything else staged is checked as usual. Exit 3 means blocked; a broken plugin or kit also blocks (see [A broken check](#a-broken-check-is-a-finding-not-a-traceback)). Bypass deliberately with `--no-verify`. |
 
 The commit gate is installed (`core.hooksPath=.githooks`) only when the
 repository has no hooks path and no active hooks in `.git/hooks`; otherwise
@@ -103,6 +103,13 @@ blocks) while the others still run; a malformed doc, invalid UTF-8 file, eval,
 trial, or manifest value yields one named line, and `REPOCTL_DEBUG=1` restores
 the traceback for an internal error. A closed pipe (`repoctl map | head`) exits
 quietly with status 0.
+
+A project plugin (`.agents/commands/*.py`, `.agents/checks/*.py`) that fails to
+import is isolated: the kit's commands and every other plugin still run, `make
+check` reports a blocking `[plugin-load] <file>: <error>`, and the commit gate
+blocks until the file is fixed or deleted. `hook ...` is dispatched before the
+argparse tree is built, the session brief lists the plugin files, and the hook
+skips only (with a loud warning) when no launcher or Python 3.11+ exists.
 
 ## Code that cannot rot silently
 

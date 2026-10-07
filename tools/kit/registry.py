@@ -15,6 +15,7 @@ import importlib
 import importlib.util
 import json
 import re
+import sys
 from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
@@ -220,29 +221,14 @@ def _module_capabilities(module: object, relative: str) -> list[Capability]:
     found = []
     for value in vars(module).values():
         capability = getattr(value, "__capability__", None)
-        if isinstance(capability, Capability):
+        # Only what this module defines: a plugin that imports a kit check must not re-register it.
+        if isinstance(capability, Capability) and getattr(value, "__module__", None) == module.__name__:
             found.append(Capability(capability.kind, capability.name, capability.description, relative,
                                     capability.pack, capability.fields))
     return found
 
 
-def _plugins(root: Path) -> list[Capability]:
-    found = []
-    for module_name, relative in (("kit.checks", "tools/kit/checks.py"), ("kit.commands", "tools/kit/commands.py")):
-        found += _module_capabilities(importlib.import_module(module_name), relative)
-    for kind, directory in PLUGIN_DIRS.items():
-        for path in sorted((root / directory).glob("*.py")):
-            relative = path.relative_to(root).as_posix()
-            spec = importlib.util.spec_from_file_location(f"project_{kind}_{path.stem.replace('-', '_')}", path)
-            module = importlib.util.module_from_spec(spec)
-            try:
-                spec.loader.exec_module(module)
-            except Exception as error:  # noqa: BLE001 - a broken project plugin is a finding, not a crash
-                raise RepoctlError(f"{relative} failed to load: {type(error).__name__}: {error}") from error
-            declared = _module_capabilities(module, relative)
-            if not any(item.kind == kind for item in declared):
-                raise RepoctlError(f"{relative} declares no @{kind}; see docs/adr/0002-one-capability-model.md")
-            found += declared
+def _validate(found: list[Capability]) -> None:
     for item in found:
         if not NAME.fullmatch(item.name):
             raise RepoctlError(f"{item.path}: {item.kind} name {item.name!r} must be kebab-case")
@@ -253,7 +239,66 @@ def _plugins(root: Path) -> list[Capability]:
                 f"{item.path}: blocking {item.label} must give its reason (the evidence that skipping it hurt; "
                 "docs/self-healing.md#when-a-check-may-block), or declare blocks=False"
             )
-    return found
+
+
+def _load_plugin(kind: str, path: Path, relative: str) -> list[Capability]:
+    """Execute one project plugin; any failure raises RepoctlError naming the file."""
+    name = f"project_{kind}_{path.stem.replace('-', '_')}"
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module  # @dataclass under `from __future__ import annotations` reads it
+    try:
+        spec.loader.exec_module(module)
+    except BaseException as error:  # noqa: BLE001 - a plugin's SystemExit or bug is a finding, not a crash
+        sys.modules.pop(spec.name, None)
+        if isinstance(error, KeyboardInterrupt):
+            raise
+        detail = " ".join(f"{type(error).__name__}: {error}".split())
+        raise RepoctlError(f"failed to load: {detail}") from error
+    declared = _module_capabilities(module, relative)
+    try:
+        if not any(item.kind == kind for item in declared):
+            raise RepoctlError(f"declares no @{kind}; see docs/adr/0002-one-capability-model.md")
+        _validate(declared)
+    except RepoctlError:
+        sys.modules.pop(spec.name, None)
+        raise
+    return declared
+
+
+_PLUGIN_CACHE: dict[tuple, tuple[list[Capability], list[tuple[str, str]]]] = {}
+
+
+def project_plugin_files(root: Path) -> list[str]:
+    """Repository-relative paths of the project's own check and command plugins."""
+    return [path.relative_to(root).as_posix() for directory in PLUGIN_DIRS.values()
+            for path in sorted((root / directory).glob("*.py"))]
+
+
+def _plugins(root: Path) -> tuple[list[Capability], list[tuple[str, str]]]:
+    """(capabilities, plugin load errors as (file, one-line error)). Kit capabilities load first and a
+    failure there raises; each project plugin loads on its own, so one bad file costs only itself."""
+    found = []
+    for module_name, relative in ((".checks", "tools/kit/checks.py"), (".commands", "tools/kit/commands.py")):
+        found += _module_capabilities(importlib.import_module(module_name, __package__), relative)
+    _validate(found)
+    signature = []
+    for relative in project_plugin_files(root):
+        stat = (root / relative).stat()
+        signature.append((relative, stat.st_mtime_ns, stat.st_size))
+    key = (str(root), tuple(signature))
+    if key not in _PLUGIN_CACHE:  # one load per process while the files are unchanged
+        loaded, errors = [], []
+        for kind, directory in PLUGIN_DIRS.items():
+            for path in sorted((root / directory).glob("*.py")):
+                relative = path.relative_to(root).as_posix()
+                try:
+                    loaded += _load_plugin(kind, path, relative)
+                except RepoctlError as error:
+                    errors.append((relative, str(error)))
+        _PLUGIN_CACHE[key] = (loaded, errors)
+    loaded, errors = _PLUGIN_CACHE[key]
+    return found + loaded, errors
 
 
 # --- Docs ----------------------------------------------------------------------
@@ -318,8 +363,17 @@ class Registry:
                 for item in skills]
 
     @cached_property
-    def _plugins(self) -> list[Capability]:
+    def _plugin_load(self) -> tuple[list[Capability], list[tuple[str, str]]]:
         return _plugins(self.root)
+
+    @property
+    def _plugins(self) -> list[Capability]:
+        return self._plugin_load[0]
+
+    @property
+    def plugin_errors(self) -> list[tuple[str, str]]:
+        """(file, one-line error) for each project plugin that failed to load; those plugins are skipped."""
+        return self._plugin_load[1]
 
     @cached_property
     def _kinds(self) -> dict[str, list[Capability]]:

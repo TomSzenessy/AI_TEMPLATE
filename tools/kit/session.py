@@ -22,7 +22,7 @@ from .garden import self_heal_errors
 from .gitinfo import branch, branch_paths, changed_paths, git, head, path_matches
 from .navigate import print_map
 from .product import next_step, product_summary
-from .registry import Registry
+from .registry import Registry, project_plugin_files
 from .risk import assess, classify, tier_rules
 from .uireview import review_status
 
@@ -146,6 +146,12 @@ def session_start(root: Path, event: dict[str, object] | None = None) -> None:
             print(f"\n## Next step ({step['phase']})\n{step['action']}\nHow: {step['guide']}. Done when: {step['verify']}.")
     except Exception as error:  # noqa: BLE001 - the brief must survive a malformed feature list
         print(f"\n## Next step\nmake next failed: {error}")
+    try:
+        plugins = project_plugin_files(root)
+    except OSError:
+        plugins = []
+    if plugins:  # plugins run on every repoctl command and hook: say which ones exist
+        print("\n## Project plugins (executed by every repoctl command)\n" + "\n".join(f"- {path}" for path in plugins))
     print("\n## Needs attention")
     print("\n".join(f"- {item}" for item in findings[:15]) or "- nothing: the self-healing checks are green")
     print(
@@ -332,7 +338,18 @@ def finish_findings(root: Path, session_paths: list[str] | None = None) -> list[
 
 
 SCISSORS = re.compile(r"(?m)^# -+ >8 -+$")
-GATE_BLOCKED = 3  # distinct from crashes, which .githooks/commit-msg lets through
+GATE_BLOCKED = 3  # the hook blocks on any non-zero status except 126/127 (no interpreter or launcher)
+
+
+def _plugin_findings(root: Path) -> list[str]:
+    """A project plugin that cannot load, or a registry that cannot load, blocks the commit: the gate
+    must never be skipped because the kit it runs on is broken (issue #28)."""
+    try:
+        errors = Registry(root).plugin_errors
+    except Exception as error:  # noqa: BLE001 - an unloadable registry is itself a blocking finding
+        return [f"[registry] the capability registry cannot load: {type(error).__name__}: {error} "
+                "(fix it, then recommit; `git commit --no-verify` bypasses the gate, say why in the PR)"]
+    return [f"[plugin-load] {path}: {error} (fix or delete the plugin file; make check shows it)" for path, error in errors]
 
 
 def commit_gate(root: Path, message_file: str | None) -> int:
@@ -357,7 +374,7 @@ def commit_gate(root: Path, message_file: str | None) -> int:
     merged_in: set[str] = set()
     if git(root, "rev-parse", "-q", "--verify", "MERGE_HEAD") is not None:
         merged_in = set((git(root, "diff", "--name-only", "HEAD...MERGE_HEAD") or "").split())
-    findings = [
+    findings = _plugin_findings(root) + [
         f"{doc} covers staged {', '.join(paths[:4])} but is not staged"
         for doc, paths in docsync.pending_documents(doc_bindings, [p for p in staged if p not in merged_in]).items()
         if "*" not in exempt and doc not in exempt
@@ -434,9 +451,10 @@ def run_hook(root: Path, event_name: str, message_file: str | None = None) -> in
     if event_name == "commit-msg":
         try:
             return commit_gate(root, message_file)
-        except Exception as error:  # noqa: BLE001 - a broken kit must not wedge git
-            print(f"repoctl hook commit-msg skipped: {type(error).__name__}: {error}", file=sys.stderr)
-            return 0
+        except Exception as error:  # noqa: BLE001 - a gate that crashed has not approved the commit
+            print(f"commit blocked: the gate itself failed: {type(error).__name__}: {error} "
+                  "(`git commit --no-verify` bypasses it; say why in the PR)", file=sys.stderr)
+            return GATE_BLOCKED
     event = read_event()
     handlers = {
         "session-start": lambda: session_start(root, event),
