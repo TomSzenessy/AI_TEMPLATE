@@ -21,7 +21,8 @@ is the human navigation view, not a second command catalog.
 
 `tools/repoctl.py` is only the command router; the `tools/repoctl` launcher
 picks Python 3.11+ for hooks and the git gate, and the `Makefile` exposes the
-commands as `make` targets. Behavior lives in standard-library modules under `tools/kit/`
+commands as `make` targets (plus `make test-future`, the suite run with a
+shifted clock from `tools/tests/clockshift/`). Behavior lives in standard-library modules under `tools/kit/`
 whose imports point toward `core`:
 
 | Concern | Modules | Owner doc |

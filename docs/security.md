@@ -4,7 +4,7 @@
 <!-- covers: .github/workflows/ci.yml .github/workflows/specialist-scans.yml .github/dependabot.yml .security/config.json tools/kit/docs.py -->
 
 CI logic lives in tested repository code, not in workflow YAML: workflows
-check out the repository and call `make verify` or `repoctl ci <check>`
+check out the repository and call `make verify`, `make test-future`, or `repoctl ci <check>`
 (`tools/kit/ci.py`), and `make check` rejects long inline `run:` blocks. Pushes
 run CI on the default branch; pull requests run it for their commits.
 

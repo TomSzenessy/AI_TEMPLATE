@@ -10,7 +10,7 @@ import tempfile
 import textwrap
 import time
 import unittest
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 TOOLS = Path(__file__).resolve().parents[1]
@@ -21,6 +21,8 @@ from kit import adapters, ci, derive, docsync, evals, garden, hygiene, navigate,
 from kit.gitinfo import path_matches  # noqa: E402
 
 # Built by concatenation so this test file never trips the marker scanner itself.
+# Fixture dates follow the calendar so the suite never expires (#10).
+RECENT = (date.today() - timedelta(days=30)).isoformat()
 TASK = "TO" + "DO"
 DEPRECATED = "DEPRE" + "CATED"
 ANNOTATION = "@" + "deprecated"
@@ -269,6 +271,17 @@ class HookTests(KitRepository):
         decision = json.loads(self.cli("hook", "stop", stdin="{}").stdout)
         self.assertIn("docs/billing.md", decision["reason"])
 
+    def test_finish_predicts_the_commit_gate(self) -> None:
+        # The doc changed earlier on the branch, but the next commit gate asks again.
+        self.git("checkout", "-q", "-b", "feature")
+        self.write("src/billing/invoice.py", "def render_invoice():\n    return 4\n")
+        self.write("docs/billing.md", "# Billing\n\n<!-- covers: src/billing/** -->\n\nReturns 4. `make check`.\n")
+        self.commit("feature change with doc")
+        self.write("src/billing/invoice.py", "def render_invoice():\n    return 5\n")
+        self.assertEqual(self.cli("finish").returncode, 1)
+        self.git("add", "-A")
+        self.assertEqual(self.cli("hook", "commit-msg", str(self.write(".git/MSG", "more\n"))).returncode, 3)
+
     def test_docs_unaffected_trailer_satisfies_stop_gate(self) -> None:
         self.git("checkout", "-q", "-b", "feature")
         self.write("src/billing/invoice.py", "def render_invoice():\n    return 1  # comment only\n")
@@ -490,7 +503,7 @@ verification = [["true"]]
         self.write("issue.md", DUPLICATE_LINE + "### Summary\nAdd a habit and check in today.\n"
                    "### Acceptance criteria\n- [ ] The add test passes.\n- [ ] An empty name does not pass.\n"
                    "### Evidence\nTest: unit output\n### Disclosure classification\n- **Disclosure class:** ordinary\n"
-                   "- **Public-safe:** yes\n- **Security/privacy review:** not applicable\n- **Reviewer/date:** tester 2026-10-01\n"
+                   "- **Public-safe:** yes\n- **Security/privacy review:** not applicable\n- **Reviewer/date:** tester " + RECENT + "\n"
                    "### Dependencies and handoff\n- **Owner / next action:** maintainer\n")
         result = self.cli("issue", "--title", "First slice", "--body-file", "issue.md", "--type", "task",
                           "--priority", "P2", "--area", "web", "--topic", "first-slice", "--status", "ready")
@@ -809,20 +822,20 @@ class CiCheckTests(unittest.TestCase):
             + "### Acceptance criteria\n- The positive test passes.\n- A negative test does not pass.\n"
             + "### Evidence\nTest evidence: unit output\n"
             + "### Disclosure classification\n- **Disclosure class:** ordinary\n- **Public-safe:** yes\n"
-            + "- **Security/privacy review:** not applicable\n- **Reviewer/date:** tester 2026-10-01\n"
+            + "- **Security/privacy review:** not applicable\n- **Reviewer/date:** tester " + RECENT + "\n"
             + "### Dependencies and handoff\n- **Owner / next action:** maintainer\n"
             + "### Type\nbug\n### Priority\nP2\n### Area\nrepo\n### Topic\nci-checks\n### Status\ntriage\n"
         )
-        valid, labels = ci.issue_contract_check(body, set(), "agent-first", registry, today=date(2026, 10, 7))
+        valid, labels = ci.issue_contract_check(body, set(), "agent-first", registry, today=date.today())
         self.assertTrue(valid)
         self.assertIn("topic:ci-checks", labels)
         def rejected(text: str) -> bool:
             try:
-                return not ci.issue_contract_check(text, set(), "agent-first", registry, today=date(2026, 10, 7))[0]
+                return not ci.issue_contract_check(text, set(), "agent-first", registry, today=date.today())[0]
             except Exception:  # noqa: BLE001 - an early validator raising is also a rejection
                 return True
 
-        self.assertTrue(rejected(body.replace("2026-10-01", "2024-01-01")))
+        self.assertTrue(rejected(body.replace(RECENT, (date.today() - timedelta(days=500)).isoformat())))
         self.assertTrue(rejected(body.replace("ordinary", "unclassified")))
         self.assertTrue(rejected(body.replace("### Topic\nci-checks", "### Topic\nNot Kebab")))
         with self.assertRaisesRegex(Exception, "Regulated profile uses the CLI"):

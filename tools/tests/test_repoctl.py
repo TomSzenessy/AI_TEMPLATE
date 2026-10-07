@@ -9,9 +9,13 @@ import sys
 import tempfile
 import textwrap
 import unittest
+from datetime import date, timedelta
 from pathlib import Path
 
 REPOCTL = Path(__file__).resolve().parents[1] / "repoctl.py"
+
+# Fixture dates follow the calendar so the suite never expires (#10).
+RECENT = (date.today() - timedelta(days=30)).isoformat()
 
 
 class RepoctlCliTests(unittest.TestCase):
@@ -28,7 +32,7 @@ owners = []
 profile = "regulated"
 """)
         self.write("docs/README.md", "# Docs\n")
-        self.write("review.md", "Issue: #42\nCommit: " + "a" * 40 + "\nArtifact: review.md\nReviewer: test reviewer\nDate: 2026-08-25\nResult: pass\n")
+        self.write("review.md", "Issue: #42\nCommit: " + "a" * 40 + "\nArtifact: review.md\nReviewer: test reviewer\nDate: " + RECENT + "\nResult: pass\n")
 
     def tearDown(self) -> None:
         self.temp.cleanup()
@@ -41,12 +45,12 @@ profile = "regulated"
             project_kind = kind_match.group(1) if kind_match else "web"
             content += f'''\n[vision]\nstatus = "accepted"\nrecord = "VISION.md"\nstack_decision = "docs/STACK-DECISION.md"\n'''
             (self.root / "VISION.md").write_text(
-                f"# Project vision\n\nStatus: accepted\nProject: {project_name}\nOwner: test owner\nDate: 2026-08-25\n",
+                f"# Project vision\n\nStatus: accepted\nProject: {project_name}\nOwner: test owner\nDate: " + RECENT + "\n",
                 encoding="utf-8",
             )
             (self.root / "docs" / "STACK-DECISION.md").parent.mkdir(parents=True, exist_ok=True)
             (self.root / "docs" / "STACK-DECISION.md").write_text(
-                f"# Stack\n\nStatus: accepted\nProject: {project_name}\nOwner: test owner\nDate: 2026-08-25\n",
+                f"# Stack\n\nStatus: accepted\nProject: {project_name}\nOwner: test owner\nDate: " + RECENT + "\n",
                 encoding="utf-8",
             )
         if name == "docs/README.md" and isinstance(content, str) and "STACK-DECISION.md" not in content:
@@ -100,7 +104,7 @@ profile = "regulated"
             - **Disclosure class:** ordinary
             - **Public-safe:** yes
             - **Security/privacy review:** {review}
-            - **Reviewer/date:** 2026-08-25 test reviewer
+            - **Reviewer/date:** {RECENT} test reviewer
             ### Dependencies and handoff
             - **Owner / next action:** test owner; implement and verify the refresh path
             """)
@@ -112,7 +116,7 @@ profile = "regulated"
             self.write(
                 "review.md",
                 "Issue: #42\nCommit: " + "a" * 40 + "\nArtifact: review.md\n"
-                "Reviewer: test reviewer\nDate: 2026-08-25\nResult: pass\n"
+                "Reviewer: test reviewer\nDate: " + RECENT + "\nResult: pass\n"
                 f"Body-SHA256: {body_hash}\n",
             )
         return [
@@ -200,7 +204,7 @@ purpose = "bounded test capability"
 reviewed_on = "2026-08-25"
 permissions = "read-only / project-local"
 rollback = "remove the project-local skill and restore the previous lockfile"
-""")
+""".replace("2026-08-25", RECENT))
         result = self.cli("init", "--name", "Demo", "--kind", "game")
         self.assertEqual(result.returncode, 0, result.stderr)
         manifest = (self.root / "project.toml").read_text(encoding="utf-8")
@@ -284,7 +288,7 @@ quality_oracle = "Independent rendered-image comparison"
         self.assertEqual(missing.returncode, 1)
         self.assertIn("critic_evidence", missing.stderr)
         self.write("renders/scene.png", b"png")
-        self.write("review.md", "Issue: #42\nCommit: " + "a" * 40 + "\nArtifact: renders/scene.png\nReviewer: artist\nDate: 2026-08-25\nResult: pass\n")
+        self.write("review.md", "Issue: #42\nCommit: " + "a" * 40 + "\nArtifact: renders/scene.png\nReviewer: artist\nDate: " + RECENT + "\nResult: pass\n")
         self.write("project.toml", """schema = 1
 name = "Demo"
 kind = "design"
@@ -479,7 +483,7 @@ status = "accepted"
 record = "docs/other.md"
 stack_decision = "docs/STACK-DECISION.md"
 """)
-        self.write("docs/other.md", "Status: accepted\nProject: Demo\nOwner: test\nDate: 2026-08-25\n")
+        self.write("docs/other.md", "Status: accepted\nProject: Demo\nOwner: test\nDate: " + RECENT + "\n")
         result = self.cli("check")
         self.assertEqual(result.returncode, 1)
         self.assertIn("exactly VISION.md", result.stderr)
@@ -515,7 +519,7 @@ Test evidence: integration output; Artifact: review.md
 - **Disclosure class:** ordinary
 - **Public-safe:** yes
 - **Security/privacy review:** not applicable
-- **Reviewer/date:** tester 2026-08-25
+- **Reviewer/date:** tester """ + RECENT + """
 ### Dependencies and handoff
 - **Owner / next action:** auth team; run the declared test
 """)
@@ -544,7 +548,7 @@ Test evidence: unit test output.
 - **Disclosure class:** ordinary
 - **Public-safe:** yes
 - **Security/privacy review:** not applicable
-- **Reviewer/date:** tester 2026-08-25
+- **Reviewer/date:** tester """ + RECENT + """
 ### Dependencies and handoff
 - **Owner / next action:** maintainer; review the branch
 """
@@ -576,7 +580,7 @@ Test evidence: the regression is reproducible.
 - **Disclosure class:** ordinary
 - **Public-safe:** yes
 - **Security/privacy review:** not applicable
-- **Reviewer/date:** tester 2026-08-25
+- **Reviewer/date:** tester """ + RECENT + """
 ### Dependencies and handoff
 - **Owner / next action:** security owner; use the private route
 """
@@ -784,9 +788,9 @@ verification = [["python3", "-c", "print('ok')"]]
 """)
         self.write("LICENSE", "MIT")
         self.write("README.md", "# Demo\n<!-- repoctl:project-readme -->\n> Project initialized: **Demo** (`web`).\n")
-        self.write("docs/legal/privacy-notice.template.md", "# Draft\nProject: Demo\nLegal owner: [name/team]\nReviewer: Alice [to be confirmed]\nDate: 2026-08-25\n")
+        self.write("docs/legal/privacy-notice.template.md", "# Draft\nProject: Demo\nLegal owner: [name/team]\nReviewer: Alice [to be confirmed]\nDate: " + RECENT + "\n")
         self.write("docs/legal/data-inventory.md", "# Inventory\n")
-        self.write(".security/config.json", '{"security_team_contacts": [], "security_reviewed_on": "2026-08-25", "security_reviewer": "Alice [pending]"}')
+        self.write(".security/config.json", '{"security_team_contacts": [], "security_reviewed_on": "' + RECENT + '", "security_reviewer": "Alice [pending]"}')
         result = self.cli("readiness")
         self.assertEqual(result.returncode, 1)
         self.assertIn("security.contact", result.stderr)
@@ -840,7 +844,7 @@ verification = [["python3", "-c", "print('ok')"]]
 
     def test_public_incident_requires_reviewed_safe_flag(self) -> None:
         body_hash = hashlib.sha256(b"A redacted failure").hexdigest()
-        self.write("incident-review.md", "Issue: #42\nCommit: " + "a" * 40 + "\nArtifact: incident-review.md\nReviewer: reviewer\nDate: 2026-08-25\nResult: public-safe\n" + f"Body-SHA256: {body_hash}\n")
+        self.write("incident-review.md", "Issue: #42\nCommit: " + "a" * 40 + "\nArtifact: incident-review.md\nReviewer: reviewer\nDate: " + RECENT + "\nResult: public-safe\n" + f"Body-SHA256: {body_hash}\n")
         result = self.cli("incident", "--title", "Public failure", "--summary", "A redacted failure", "--public-safe", "--review-evidence", "incident-review.md")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.cli("check").returncode, 0)
@@ -853,7 +857,7 @@ verification = [["python3", "-c", "print('ok')"]]
             summary = f"A redacted failure {index}"
             body_hash = hashlib.sha256(summary.encode()).hexdigest()
             evidence = f"incident-review-{index}.md"
-            self.write(evidence, "Issue: #42\nCommit: " + "a" * 40 + "\nArtifact: " + evidence + "\nReviewer: reviewer\nDate: 2026-08-25\nResult: public-safe\n" + f"Body-SHA256: {body_hash}\n")
+            self.write(evidence, "Issue: #42\nCommit: " + "a" * 40 + "\nArtifact: " + evidence + "\nReviewer: reviewer\nDate: " + RECENT + "\nResult: public-safe\n" + f"Body-SHA256: {body_hash}\n")
             result = self.cli("incident", "--title", title, "--summary", summary, "--public-safe", "--review-evidence", evidence)
             self.assertEqual(result.returncode, 0, result.stderr)
         index = (self.root / "docs" / "README.md").read_text(encoding="utf-8")
@@ -882,7 +886,7 @@ purpose = "bounded test capability"
 reviewed_on = "2026-08-25"
 permissions = "read-only / project-local"
 rollback = "remove the project-local skill and restore the previous lockfile"
-""".replace("DIGEST", digest))
+""".replace("DIGEST", digest).replace("2026-08-25", RECENT))
         self.write("README.md", "# Demo\n<!-- repoctl:project-readme -->\n> Project initialized: **Demo** (`web`).\n")
         self.assertEqual(self.cli("check").returncode, 0)
         skill_path = self.root / ".agents" / "skills" / "example" / "SKILL.md"
@@ -909,7 +913,7 @@ rollback = "remove the project-local skill and restore the previous lockfile"
     def test_public_incident_index_failure_leaves_no_orphan(self) -> None:
         summary = "A redacted failure"
         body_hash = hashlib.sha256(summary.encode()).hexdigest()
-        self.write("incident-review.md", "Issue: #42\nCommit: " + "a" * 40 + "\nArtifact: incident-review.md\nReviewer: reviewer\nDate: 2026-08-25\nResult: public-safe\n" + f"Body-SHA256: {body_hash}\n")
+        self.write("incident-review.md", "Issue: #42\nCommit: " + "a" * 40 + "\nArtifact: incident-review.md\nReviewer: reviewer\nDate: " + RECENT + "\nResult: public-safe\n" + f"Body-SHA256: {body_hash}\n")
         index = self.root / "docs" / "README.md"
         index.unlink()
         index.mkdir()

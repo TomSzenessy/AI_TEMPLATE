@@ -6,7 +6,7 @@ SKILL_TEST_SUITES := $(wildcard .agents/skills/*/tests)
 
 .DEFAULT_GOAL := help
 
-.PHONY: help python-check init inventory resources skill-digest check doctor readiness test verify validate incident issue labels review-packet \
+.PHONY: help python-check init inventory resources skill-digest check doctor readiness test test-future verify validate incident issue labels review-packet \
 	start next ui-review done new handover map where risk garden capabilities sync github-sync similar eval
 
 # Export user-supplied values so recipes pass them as data, not as shell source.
@@ -74,6 +74,10 @@ test: python-check
 	  echo "-- $$suite"; \
 	  $(PYTHON) -m unittest discover -s "$$suite" -p 'test_*.py' || exit 1; \
 	done
+
+# The same suite 800 days ahead: fails when a fixture or check rots with the calendar (#10).
+test-future: python-check
+	PYTHONPATH="$(CURDIR)/tools/tests/clockshift" SHIFT_DAYS=800 $(MAKE) test
 
 verify: python-check
 	$(MAKE) test

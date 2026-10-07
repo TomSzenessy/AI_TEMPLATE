@@ -35,6 +35,8 @@ Otherwise it is **advisory** (`make garden`, the session brief) or an
 - **No calendar rot.** A check must not start failing on an unchanged
   repository because time passed. Record age (vision, stack decision) is
   checked only by `make readiness`; `make check` fails only on a future date.
+  `make test-future` (also in CI) runs the whole suite 800 days ahead, so a
+  fixture or check pinned to a date fails now instead of in two years.
 - **Retire what never fires usefully.** A check that only ever produces
   bypasses, trailers, or ritual compliance is demoted to advisory or deleted
   in the next trial review.
@@ -46,7 +48,7 @@ Otherwise it is **advisory** (`make garden`, the session brief) or an
 | Session start or resume | `repoctl hook session-start` | `make start` | Brief: branch, recent commits, `HANDOVER.md`, map, the `make next` step, open self-healing findings. Derived files are regenerated and the git commit gate is installed. |
 | Before context compaction | `repoctl hook pre-compact` | — | Writes `.agent/checkpoint.md` (uncommitted paths, docs still owed). |
 | After a file edit | `repoctl hook after-edit` | — | Names the docs covering the edited path (once per session); regenerates derived files when a source changed; warns on edits to generated files. |
-| Before declaring done | `repoctl hook stop` | `make done` | Gate over this branch's change set: owed docs, derived-file drift, dead bindings, expired, undated, or unfinished markers; `make done` also prints product completeness and, as advice, a stale UI review ([`building.md`](./building.md)). The hook blocks once; `make done` also runs every test. |
+| Before declaring done | `repoctl hook stop` | `make done` | Gate over this branch's change set: owed docs, derived-file drift, dead bindings, expired, undated, or unfinished markers; `make done` also prints product completeness and, as advice, a stale UI review ([`building.md`](./building.md)). The hook blocks once; `make done` also runs every test and predicts the commit gate for uncommitted work, so the two never disagree. |
 | Every commit | `.githooks/commit-msg` (any agent or human) | same | Refuses a commit whose staged covered code skips its doc (unless the message carries a `Docs-Unaffected:` trailer), plus marker checks, and derived-file drift when the commit touches a source. In a merge commit, paths the merged branch brought in skip the owed-doc check (its commits already passed it or recorded a trailer); anything else staged is checked as usual. Exit 3 means blocked; a crashed kit never blocks a commit. Bypass deliberately with `--no-verify`. |
 
 The commit gate is installed (`core.hooksPath=.githooks`) only when the

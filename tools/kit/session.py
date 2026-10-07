@@ -194,7 +194,12 @@ def finish_findings(root: Path) -> list[str]:
         return []
     files = repository_files(root)
     doc_bindings = docsync.bindings(root, files)
-    owed = docsync.owed_documents(root, doc_bindings, base, changed_paths(root))
+    uncommitted = changed_paths(root)
+    owed = docsync.owed_documents(root, doc_bindings, base, uncommitted)
+    # Predict the commit gate too: it asks per commit, so a doc touched earlier on the
+    # branch does not cover uncommitted code. Two gates that disagree cost a round trip.
+    for doc, paths in docsync.pending_documents(doc_bindings, uncommitted).items():
+        owed.setdefault(doc, paths)
     findings = [
         f"{doc} covers changed {', '.join(paths[:4])}{' …' if len(paths) > 4 else ''} but was not updated"
         " (update it, or record why in the commit with a 'Docs-Unaffected: <doc> <reason>' trailer)"

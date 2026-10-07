@@ -29,3 +29,5 @@ jobs:
           persist-credentials: false
       - name: Run the declared verification path
         run: make verify
+      - name: Run the tests 800 days ahead (no calendar rot)
+        run: make test-future
