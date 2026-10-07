@@ -281,7 +281,14 @@ def owed_documents(
     Branch commits carrying a matching Docs-Unaffected trailer do not create debt.
     """
     merge_base = (git(root, "merge-base", "HEAD", base) or "").strip()
-    branch_commits = _history(root, f"{merge_base}..HEAD") if merge_base else []
+    return owed_since(root, doc_bindings, f"{merge_base}..HEAD" if merge_base else None, uncommitted)
+
+
+def owed_since(
+    root: Path, doc_bindings: dict[str, list[str]], revisions: str | None, uncommitted: list[str]
+) -> dict[str, list[str]]:
+    """Covered paths changed in `revisions` or uncommitted, per untouched doc (trailers honoured)."""
+    branch_commits = _history(root, revisions) if revisions else []
     touched_docs = set(uncommitted) | {path for _, _, paths in branch_commits for path in paths}
     owed: dict[str, list[str]] = {}
     for doc, patterns in sorted(doc_bindings.items()):
