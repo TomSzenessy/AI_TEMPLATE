@@ -95,7 +95,10 @@ def check_docs_index(root: Path) -> None:
         relative = document.relative_to(docs).as_posix()
         link = re.compile(rf"\]\((?:\./)?{re.escape(relative)}(?:#[^)]+)?\)")
         if not link.search(index_content):
-            errors.append(f"document is not linked from docs/README.md: {relative}")
+            errors.append(
+                f"document is not linked from docs/README.md: {relative} (add `<!-- index: group | owns | read when -->` "
+                "under its title, then run make sync)"
+            )
     if errors:
         raise RepoctlError("documentation index check failed:\n- " + "\n- ".join(errors))
 

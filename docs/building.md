@@ -1,0 +1,86 @@
+# Building a product
+
+<!-- index: operate | Product driver: feature list, research record, make next phases, product done, UI review | building or judging a product -->
+<!-- covers: tools/kit/product.py tools/kit/uireview.py .agents/skills/product-kickoff/production-features.csv -->
+
+Repository hygiene checks prove the code is tidy; they cannot prove the product
+is complete or good. This document owns the mechanics that do: a researched
+feature list with evidence, a deterministic next step, a product-level done
+score, and screenshot reviews. Skills say *how*; these checks make sure the
+steps happen.
+
+## The path: `make next`
+
+`make next` reads repository state and prints one step, the skill or role to
+use, and how to verify it. The session brief shows the same step. Phases, in
+order:
+
+| Phase | Done when |
+|---|---|
+| intake | `VISION.md` is accepted after the `product-kickoff` questions |
+| research | `docs/product/research.md` cites at least three sources |
+| features | `docs/product/features.csv` exists with must rows |
+| design (UI) | `docs/design.md` records the chosen mockup direction |
+| stack | `docs/STACK-DECISION.md` says `Status: accepted` |
+| skeleton | a product surface is declared (`stack-foundation`) |
+| preview (web UI) | the surface has a `[surfaces.preview]` table (native apps use simulator screenshots) |
+| build | every must feature is `yes` with evidence |
+| review (UI) | the latest entry in `docs/product/ui-reviews.md` matches the code, every screenshot is ticked, and the verdict is `pass` |
+| polish | every should feature is done or skipped |
+| launch | release sequence in [`production.md`](./production.md) |
+
+Keep looping (`make next`, build, `make done`) until the launch phase. A green
+`make done` with open must features means the slice is done, not the product.
+
+## Feature list: `docs/product/features.csv`
+
+Columns: `feature, area, priority (must|should|could), status
+(yes|partial|no|skip), evidence, acceptance, source`. Weights match
+`parity-check`: must 3, should 2, could 1; yes counts 1, partial 0.5. Kickoff
+writes it from the owner's goal, the research, and competitor complaints, then
+appends the applicable rows of
+[`production-features.csv`](../.agents/skills/product-kickoff/production-features.csv)
+(onboarding, every screen state, accessibility, identity, undo, backup, error
+handling, deployment, performance, and more), which is what turns a demo into a
+product. `make check` fails when the list has no must row, a must row has no
+acceptance criterion, or a `yes`/`partial` row cites anything that is not an
+existing file; a must row marked `yes` also needs a test file or
+`docs/product/ui-reviews.md` among its evidence, so citing `README.md` cannot
+close a feature. `make done` prints the completeness score and
+the open must features.
+
+## Research: `docs/product/research.md`
+
+Comparable products, real user complaints (`review-mining`), design references,
+and the product's angle, each with a URL, under an `<!-- index: -->` line.
+`make next` asks for it in every product; `make check` enforces at least three
+cited sources once a UI product has a surface.
+
+## UI review
+
+`make ui-review` starts each UI surface's preview, captures every route at phone
+(390x844) and desktop (1440x900) sizes in light and dark mode, plus any seeded
+storage states, with a pinned Playwright (`[kit].playwright_version`; the
+installed Chrome when present, otherwise `npx playwright install chromium`):
+
+```toml
+[surfaces.preview]
+command = ["npm", "run", "dev", "--", "--port", "{port}", "--strictPort"]
+url = "http://localhost:{port}"
+routes = ["/", "/settings"]
+states = { "with-data" = "app/review-states/with-data.json" }
+```
+
+`{port}` is replaced by a free port on every run, and the review refuses to
+start if something already answers at the URL: a first trial screenshotted a
+different project's dev server that held the port.
+
+Screenshots stay local in `.agent/reviews/<run>/`; the review record is
+appended to the tracked `docs/product/ui-reviews.md`: the reviewed code digest
+per surface, one checkbox per screenshot, findings, and `Verdict: pending`.
+Whoever looked at the images (you or the `critic` role) ticks each screenshot,
+records findings, and sets `Verdict: pass` or `Verdict: fix`. The change gate
+(`make done`, the stop hook) reports a web UI surface that was never reviewed,
+changed since its latest review, has unticked screenshots, or is not `pass`;
+`fix` never clears it. Because the record is tracked, every clone and CI sees
+the same review state, and feature rows cite `docs/product/ui-reviews.md`.

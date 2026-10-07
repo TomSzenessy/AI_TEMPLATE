@@ -40,10 +40,10 @@ Otherwise it is **advisory** (`make garden`, the session brief) or an
 
 | Moment | Host with hooks | Host without hooks | What happens |
 |---|---|---|---|
-| Session start or resume | `repoctl hook session-start` | `make start` | Brief: branch, recent commits, `HANDOVER.md`, map, open self-healing findings. Derived files are regenerated and the git commit gate is installed. |
+| Session start or resume | `repoctl hook session-start` | `make start` | Brief: branch, recent commits, `HANDOVER.md`, map, the `make next` step, open self-healing findings. Derived files are regenerated and the git commit gate is installed. |
 | Before context compaction | `repoctl hook pre-compact` | — | Writes `.agent/checkpoint.md` (uncommitted paths, docs still owed). |
 | After a file edit | `repoctl hook after-edit` | — | Names the docs covering the edited path (once per session); regenerates derived files when a source changed; warns on edits to generated files. |
-| Before declaring done | `repoctl hook stop` | `make done` | Gate over this branch's change set: owed docs, derived-file drift, dead bindings, expired, undated, or unfinished markers. The hook blocks once; `make done` also runs every test. |
+| Before declaring done | `repoctl hook stop` | `make done` | Gate over this branch's change set: owed docs, derived-file drift, dead bindings, expired, undated, or unfinished markers, and UI surfaces without a fresh, judged `make ui-review` ([`building.md`](./building.md)); `make done` also prints product completeness. The hook blocks once; `make done` also runs every test. |
 | Every commit | `.githooks/commit-msg` (any agent or human) | same | Refuses a commit whose staged covered code skips its doc (unless the message carries a `Docs-Unaffected:` trailer), plus marker checks, and derived-file drift when the commit touches a source. A merge commit skips the owed-doc check: its commits already passed it or recorded a trailer. Exit 3 means blocked; a crashed kit never blocks a commit. Bypass deliberately with `--no-verify`. |
 
 The commit gate is installed (`core.hooksPath=.githooks`) only when the
@@ -155,7 +155,7 @@ the after-edit hook regenerates what depends on it. Agent-instruction paths are
 Policy a project may change lives in `project.toml`, with built-in defaults
 when a key is absent: `[kit]` (docs index groups, unbound-doc exemptions,
 overlap limit, deprecation warning window, skill review age, UI project kinds,
-eval model), `[adapters.claude]`
+eval model, Playwright version and previewable kinds for `make ui-review`), `[adapters.claude]`
 (tier-to-model and access-to-tools maps, pre-approved commands), `[risk]`
 (tier globs and optional ceremony text), and `[budgets]` (byte limits for any
 glob, including product code).

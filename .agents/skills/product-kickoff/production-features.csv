@@ -1,0 +1,16 @@
+feature,area,priority,status,evidence,acceptance,source
+First run reaches the core value fast,onboarding,must,no,,A new user completes the core action in under a minute without reading instructions; sample content or templates where it helps,production
+Every screen has designed empty / loading / error / offline states,states,must,no,,Each state is reachable in a test or storage-state fixture and appears in make ui-review screenshots,production
+Responsive from phone to desktop with 44 pt touch targets,layout,must,no,,No clipping or horizontal scroll at 390 px; every tappable control at least 44 pt; reviewed at phone and desktop sizes,production
+Accessibility at WCAG 2.2 AA,accessibility,must,no,,Contrast checked; labels for every control; full keyboard path; reduced motion respected; text usable at 200%,production
+App identity: name / icon / favicon / social preview / page titles,identity,must,no,,Real name and icon set (all required sizes); meaningful titles and meta; no framework defaults left,production
+Destructive actions are undoable or confirmed,safety,must,no,,Delete and reset offer undo (preferred) or confirmation; covered by a test,production
+Data survives: backup / export / import (or server sync),data,must,no,,Users can export and restore their data; local-only data warns before it can be lost,production
+Errors are caught / shown kindly / and reported,reliability,must,no,,Error boundary with a recovery action; errors reach error tracking or the console with context,production
+Deployed and reachable,delivery,must,no,,A preview or production URL (or store build) exists and is recorded in docs/production.md,production
+Light and dark themes are both intentional,visual,should,no,,Both schemes reviewed; tokens drive every color,production
+Feels fast,performance,should,no,,Meets the performance budget on a mid-range phone (web: LCP under 2.5 s / INP under 200 ms),production
+Settings for the choices users expect,settings,should,no,,Theme / data reset / and product-specific preferences in one place,production
+Installable (PWA) or store-ready build when used on phones,delivery,should,no,,Manifest and icons pass install checks / or a signed store build exists,production
+Privacy notice when personal data is stored or sent,privacy,should,no,,docs/legal templates completed for the data actually collected; analytics only with consent,production
+Polished motion and feedback,visual,could,no,,Subtle transitions (150-250 ms) on state changes; immediate feedback on every tap,production

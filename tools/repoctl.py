@@ -33,6 +33,8 @@ from kit.issues import (
 )
 from kit.launch import check_readiness, check_readiness_gate
 from kit.navigate import print_map, skill_overlap, where
+from kit.product import print_next
+from kit.uireview import run_review
 from kit.risk import print_risk
 from kit.skills import check_skill_provenance, directory_digest, print_resources
 from kit.structure import check_readme_identity, check_structure, print_inventory, run_verification
@@ -122,6 +124,8 @@ def build_parser() -> argparse.ArgumentParser:
     new_parser.add_argument("--force", action="store_true")
     subparsers.add_parser("handover", help="create HANDOVER.md from the template with git facts filled in")
     subparsers.add_parser("map", help="print the one-screen repository map")
+    subparsers.add_parser("next", help="the single next step toward a complete product")
+    subparsers.add_parser("ui-review", help="screenshot UI surfaces (phone/desktop, light/dark) for review")
     where_parser = subparsers.add_parser("where", help="find paths, symbols, headings, owners, and past failures")
     where_parser.add_argument("query", nargs="+")
     risk_parser = subparsers.add_parser("risk", help="classify this branch's changes into a ceremony tier")
@@ -236,6 +240,10 @@ def main(argv: list[str] | None = None) -> int:
             print(session.write_handover(arguments.root.resolve()))
         elif arguments.command == "finish":
             return session.finish(arguments.root.resolve())
+        elif arguments.command == "next":
+            print_next(arguments.root.resolve())
+        elif arguments.command == "ui-review":
+            return run_review(arguments.root.resolve())
         elif arguments.command == "map":
             print_map(arguments.root.resolve())
         elif arguments.command == "where":

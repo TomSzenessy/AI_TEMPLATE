@@ -7,7 +7,7 @@ SKILL_TEST_SUITES := $(wildcard .agents/skills/*/tests)
 .DEFAULT_GOAL := help
 
 .PHONY: help python-check init inventory resources skill-digest check doctor readiness test verify validate incident issue labels review-packet \
-	start done new handover map where risk garden capabilities sync github-sync similar eval
+	start next ui-review done new handover map where risk garden capabilities sync github-sync similar eval
 
 # Export user-supplied values so recipes pass them as data, not as shell source.
 export Q AGENT MODEL TASKS DESC GROUP COVERS ACCESS TIER FORCE NAME KIND TITLE SUMMARY BODY TYPE PRIORITY AREA TOPIC STATUS SURFACE GATE PUBLIC_REVIEWED REVIEW_EVIDENCE ISSUE_FILE PUBLIC_SAFE
@@ -15,8 +15,10 @@ export Q AGENT MODEL TASKS DESC GROUP COVERS ACCESS TIER FORCE NAME KIND TITLE S
 help:
 	@printf '%s\n' \
 	  'EVERY SESSION (this is all most tasks need)' \
-	  '  make start                       Brief: branch, handover, map, what needs attention' \
+	  '  make start                       Brief: branch, handover, next step, what needs attention' \
+	  '  make next                        The single next step toward a complete product' \
 	  '  make where Q="login form"        Find files, functions, owning docs, past failures' \
+	  '  make ui-review                   Screenshot the UI (phone/desktop, light/dark) and judge it' \
 	  '  make done                        Before saying "done": heal derived files, gates, all tests' \
 	  '' \
 	  'EXTEND THE SYSTEM (searches for overlap first, wires everything in)' \
@@ -129,6 +131,12 @@ handover: python-check
 
 map: python-check
 	@$(REPOCTL) map
+
+next: python-check
+	@$(REPOCTL) next
+
+ui-review: python-check
+	$(REPOCTL) ui-review
 
 where: python-check
 	$(if $(Q),,$(error Add what to look for: make where Q="login form"))

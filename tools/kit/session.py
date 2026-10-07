@@ -20,7 +20,9 @@ from .core import RepoctlError, governance_profile, load_project, read_text_file
 from .garden import self_heal_errors
 from .gitinfo import branch, branch_paths, changed_paths, git, head
 from .navigate import print_map
+from .product import next_step, product_summary
 from .risk import assess
+from .uireview import review_status
 
 HANDOVER_LIMIT = 4000
 CHECKPOINT = ".agent/checkpoint.md"
@@ -85,6 +87,11 @@ def session_start(root: Path) -> None:
         findings.insert(0, "regenerated derived files: " + ", ".join(healed))
     if hooks_note:
         findings.insert(0, hooks_note)
+    try:
+        step = next_step(root)
+        print(f"\n## Next step ({step['phase']})\n{step['action']}\nHow: {step['guide']}. Done when: {step['verify']}.")
+    except Exception as error:  # noqa: BLE001 - the brief must survive a malformed feature list
+        print(f"\n## Next step\nmake next failed: {error}")
     print("\n## Needs attention")
     print("\n".join(f"- {item}" for item in findings[:15]) or "- nothing: the self-healing checks are green")
     print(
@@ -197,6 +204,7 @@ def finish_findings(root: Path) -> list[str]:
     findings += docsync.dead_bindings(doc_bindings, files)
     present = [path for path in changed if path in set(files)]
     findings += hygiene.scan_markers(root, present).errors
+    findings += review_status(root)
     return findings
 
 
@@ -284,6 +292,9 @@ def finish(root: Path) -> int:
         print("Not finished:\n" + "\n".join(f"- {item}" for item in findings))
         return 1
     print("Self-healing gate passed for this branch's change set.")
+    summary = product_summary(root)
+    if summary:
+        print(summary)
     return 0
 
 

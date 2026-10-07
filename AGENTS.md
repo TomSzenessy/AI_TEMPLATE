@@ -3,8 +3,8 @@
 <!-- index: operate | Agent operating contract and trigger router | Any change is requested. -->
 
 The router for every coding agent. These rules always apply; detail lives in
-the linked owner documents. **Golden path:** `make start`, then
-`make where Q="..."`, and `make done` before you call any work complete.
+the linked owner documents. **Golden path:** `make start`, `make next` (the next
+step), `make where Q="..."`, and `make done` before you call any work complete.
 
 ## Session protocol
 
@@ -67,7 +67,7 @@ issues). Never change it silently; record the reason in the issue.
 
 [`docs/README.md`](./docs/README.md) lists every document and when to read it. Never skip:
 
-- **New product:** `product-kickoff` (questions, mockups, decisions), then `stack-foundation`, before feature code. **Anything users see:** `ux-quality`.
+- **New product:** `product-kickoff`, then `stack-foundation`, then `make next` until launch ([`docs/building.md`](./docs/building.md)). **Anything users see:** `ux-quality` and `make ui-review`.
 - **Vocabulary, architecture, seams:** [`CONTEXT.md`](./CONTEXT.md), [`docs/architecture/README.md`](./docs/architecture/README.md).
 - **Bug or incident:** [`docs/operations.md`](./docs/operations.md); reproduce first. **Release or quality claim:** [`docs/verification.md`](./docs/verification.md), [`docs/production.md`](./docs/production.md).
 - **Auth, secrets, dependencies, CI, untrusted input:** [`docs/security.md`](./docs/security.md).
@@ -89,13 +89,13 @@ issues). Never change it silently; record the reason in the issue.
 
 ## Self-organization (checked by `make check`)
 
-- Durable knowledge lives in its closest owner document; live work lives in issues. On a rename or behavior change, search for stale references.
-- Docs declare `<!-- covers: globs -->`. Stale or dead bindings fail; a commit that truly leaves a doc unaffected says so with a `Docs-Unaffected:` trailer.
+- Durable knowledge lives in its owner doc, live work in issues; after a rename, search for stale references.
+- Docs declare `<!-- covers: globs -->`; stale or dead bindings fail, unless a commit's `Docs-Unaffected:` trailer says why.
 - Replace instead of duplicating: mark the old path `DEPRECATED(remove-by=YYYY-MM-DD)`; expired markers fail. Task markers in code reference an issue.
-- Host directories (`.claude/`, `.mcp.json`) are generated. Edit `.agents/` or `resources.toml`, then `make sync`.
+- `.claude/` and `.mcp.json` are generated: edit `.agents/` or `resources.toml`, then `make sync`.
 - Always-loaded files stay within `project.toml [budgets]`; move detail to an owner doc.
-- Add a surface only with an owner, quality oracle, and verification; add a nested `AGENTS.md` only for rules that really differ.
-- Delete dead code only after proving callers and owners are gone. Prefer a small, boring solution.
+- A surface needs an owner, quality oracle, and verification; a nested `AGENTS.md` only for rules that differ.
+- Delete dead code once callers are proven gone. Prefer small, boring solutions.
 
 ## Trust and safety
 
@@ -110,5 +110,6 @@ and privacy templates are starting points, not certification.
 Done means: acceptance criteria have evidence, affected checks pass, the
 independent critic found no blocker (required at `high` risk and for subjective or
 commandless work), the real artifact was
-observed, covering docs are current, and residual risks are linked issues.
+observed (UI: a judged `make ui-review`), product work keeps going while must
+features are open, covering docs are current, and residual risks are linked issues.
 State any external gate (provider, deployment, hardware, counsel) that stays open.

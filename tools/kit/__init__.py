@@ -5,6 +5,7 @@ Module map (dependencies point downward; core imports nothing local):
 - governance: core, github, docs, skills, structure, issues, ci, launch, bootstrap
 - self-healing: config, docsync, hygiene, adapters, derive, scaffold, navigate, risk,
   session, garden, capabilities, evals
+- product driver: product, uireview (docs/building.md)
 
 Each module owns one concern; the CLI in tools/repoctl.py only routes.
 """
