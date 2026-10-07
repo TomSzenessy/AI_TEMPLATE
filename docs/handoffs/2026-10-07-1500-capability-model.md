@@ -54,7 +54,7 @@ The plan is frozen in [`../adr/0002-one-capability-model.md`](../adr/0002-one-ca
 ## Relevant paths and issues
 
 - Code: `tools/kit/registry.py`, `tools/kit/checks.py`, `tools/kit/commands.py`, `tools/repoctl.py`, `Makefile`.
-- Docs: [`../self-healing.md`](../self-healing.md#extending-one-model-for-every-capability), [`../skills.md`](../skills.md), [`../resources.md`](../resources.md), [`../architecture/README.md`](../architecture/README.md).
+- Docs: [`../capabilities.md`](../capabilities.md), [`../skills.md`](../skills.md), [`../resources.md`](../resources.md), [`../architecture/README.md`](../architecture/README.md).
 - Issues: #14 (stays open until the PR merges and the evals pass), #15 (closed by `28950a2` on merge).
 
 ## Verified skill suggestions

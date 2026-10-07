@@ -30,8 +30,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .core import read_text_file
+from .names import ERROR_LOG
 
-LEDGER = "docs/ERROR_LOG.md"
+LEDGER = ERROR_LOG  # the failure ledger this module reads is the error log
 KEY = re.compile(r"EL-\d{3}")
 CODE_SPAN = re.compile(r"`([^`\n]+)`")
 # A literal that identifies one failure rather than sharing vocabulary with many:

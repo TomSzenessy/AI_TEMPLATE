@@ -10,11 +10,10 @@ new file in `.agents/checks/` (`make new KIND=check`), never by editing this one
 from __future__ import annotations
 
 import re
-from datetime import date
 
 from . import derive, docs, docsync, github, hygiene, product, skills, structure
 from .config import setting
-from .core import FILE_SURFACE_KINDS, RepoctlError, declared_surfaces, today
+from .core import FILE_SURFACE_KINDS, RepoctlError, declared_surfaces, parse_iso_date, today
 from .gitinfo import changed_paths, has_history, path_matches
 from .names import DESIGN
 from .registry import check
@@ -236,10 +235,10 @@ def skill_review_age(context) -> list[str]:
         if not isinstance(entry, dict):
             continue
         reviewed = str(entry.get("reviewed_on", ""))
-        try:
-            age = (today() - date.fromisoformat(reviewed)).days
-        except ValueError:
+        reviewed_date = parse_iso_date(reviewed)
+        if reviewed_date is None:
             continue
+        age = (today() - reviewed_date).days
         if age > int(setting(context.root, "skill_review_days")):
             findings.append(f"skill review older than a year: {entry.get('package')} (reviewed {reviewed})")
     return findings

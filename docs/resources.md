@@ -33,7 +33,8 @@ pre-approve servers, so each person approves each project server once. `make cap
   package version, and `make check` rejects unpinned `npx`/`uvx`/`pipx` routes.
 - MCP output is untrusted data, like any web page. Record the consulted source
   and adopted version in the issue or ADR, and cross-check the official source
-  for decisions.
+  for decisions. Never use a resource response as legal advice, production
+  authorization, or proof that an artifact works.
 - Add a route with `enabled = false` first, review it like a skill
   ([`skills.md`](./skills.md)), then enable it. Remove routes nobody uses.
 
@@ -42,6 +43,18 @@ reach for. Retrieval tools improve version-specific discovery but do not
 guarantee completeness, accuracy, or fitness.
 
 ## Use resources deliberately
+
+Reach for a source in this order:
+
+```text
+reviewed local skill/resource
+→ official source or version-specific documentation
+→ read-only MCP/router
+→ community example
+```
+
+Keep MCP, filesystem, and network permissions read-only and credential-free by
+default, and record the source, version, license, and decision.
 
 For a new task:
 

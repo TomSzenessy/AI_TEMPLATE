@@ -13,25 +13,25 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 RECORDS = ("project.toml", "VISION.md", "docs/STACK-DECISION.md", "README.md")
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # `fixtures`, however this file is invoked (#33)
+from fixtures import Scratch, git_in, run_cli  # noqa: E402  shared builders, in-process CLI, isolated git (#43)
+
 
 def run_init(root: Path, *extra: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        [sys.executable, "tools/repoctl.py", "init", "--name", "x", "--kind", "web", *extra],
-        cwd=root, capture_output=True, text=True, timeout=300)
+    return run_cli(root, "init", "--name", "x", "--kind", "web", *extra)
 
 
-class InitIdentityTests(unittest.TestCase):
+class InitIdentityTests(Scratch):
     def copy_working_tree(self) -> Path:
         directory = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, directory, True)
-        files = subprocess.run(["git", "ls-files", "-z"], cwd=ROOT, capture_output=True, text=True,
-                               check=True).stdout.split("\0")
+        files = git_in(ROOT, "ls-files", "-z").stdout.split("\0")
         for relative in filter(None, files):
             source = ROOT / relative
             if source.is_file():
                 (directory / relative).parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(source, directory / relative)
-        subprocess.run(["git", "init", "-q"], cwd=directory, check=True)
+        git_in(directory, "init", "-q")
         return directory
 
     def rename(self, root: Path, name: str, owner: str) -> None:

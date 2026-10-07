@@ -11,6 +11,7 @@ from urllib.parse import unquote, urlsplit
 from .docsync import INDEX_SKIP
 from .core import (
     RepoctlError,
+    check_failed,
     ensure_inside_root,
     has_link_component,
     is_link_like,
@@ -84,7 +85,7 @@ def check_markdown_links(root: Path) -> None:
                     f"broken local Markdown link: {document_label} -> {relative_target}"
                 )
     if errors:
-        raise RepoctlError("Markdown link check failed:\n- " + "\n- ".join(errors))
+        raise check_failed("Markdown link", errors)
 
 
 def check_docs_index(root: Path) -> None:
@@ -109,7 +110,7 @@ def check_docs_index(root: Path) -> None:
                 "under its title, then run make sync)"
             )
     if errors:
-        raise RepoctlError("documentation index check failed:\n- " + "\n- ".join(errors))
+        raise check_failed("documentation index", errors)
 
 
 def check_file_hygiene(root: Path) -> None:
@@ -144,7 +145,7 @@ def check_file_hygiene(root: Path) -> None:
         if not complete:
             notes.append(f"not fully scanned: {relative} (over {SCAN_CAP_BYTES // (1024 * 1024)} MiB)")
     if errors:
-        raise RepoctlError("file hygiene check failed:\n- " + "\n- ".join(errors + notes))
+        raise check_failed("file hygiene", errors + notes)
     for note in notes:  # advisory: the check only raises blocking findings
         print(f"warning: {note}", file=sys.stderr)
 

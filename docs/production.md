@@ -84,19 +84,9 @@ issue; the slice order changes on evidence, not on opinion.
 
 Context7-style documentation adapters, package registries, GitHub, official
 platform documentation, security databases, and skill directories are optional
-tools. Use this order:
-
-```text
-reviewed local skill/resource
-→ official source or version-specific documentation
-→ read-only MCP/router
-→ community example
-```
-
-Keep MCP/filesystem/network permissions read-only and credential-free by
-default. Record the source, version, license, and decision. Never use a
-resource response as legal advice, production authorization, or proof that an
-artifact works.
+tools. The rules for choosing among them and trusting them — source precedence,
+read-only and credential-free defaults, recorded provenance — are owned by
+[`resources.md`](./resources.md).
 
 ## Definition of done
 

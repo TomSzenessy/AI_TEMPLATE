@@ -5,12 +5,15 @@ from __future__ import annotations
 import hashlib
 import re
 import tomllib  # repoctl.py fails fast on Python < 3.11
-from datetime import datetime, timedelta
+from datetime import timedelta
 from pathlib import Path
 from urllib.parse import urlsplit
 
 from .config import project_setting
-from .core import KEBAB, RepoctlError, package_skill, today, ensure_inside_root, is_link_like, is_placeholder, load_project
+from .core import (
+    KEBAB, RepoctlError, check_failed, date_is_future, ensure_inside_root, is_link_like, is_placeholder,
+    load_project, package_repo, package_skill, parse_iso_date, today,
+)
 
 
 BUNDLED_SKILLS = {"agent-handover", "quality-loop", "repository-audit"}
@@ -75,7 +78,7 @@ def load_resource_registry(root: Path, project: dict[str, object] | None = None)
         if mcp and (not isinstance(mcp, str) or not KEBAB.fullmatch(mcp)):
             errors.append(f"resource #{position} mcp must be a kebab-case adapter name")
     if errors:
-        raise RepoctlError("resource registry check failed:\n- " + "\n- ".join(errors))
+        raise check_failed("resource registry", errors)
     return entries
 
 
@@ -102,9 +105,9 @@ def check_skill_provenance(project: dict[str, object], release_gate: bool = Fals
         if not source_match:
             errors.append(f"skill #{position} source must be a GitHub HTTPS repository URL")
         if package_match and source_match:
-            package_repo = package.split("@", 1)[0]
+            repository = package_repo(package)
             source_parts = urlsplit(source).path.strip("/").split("/")
-            if source_parts != package_repo.split("/"):
+            if source_parts != repository.split("/"):
                 errors.append(f"skill #{position} source does not match package")
         if not isinstance(revision, str) or not revision.strip():
             errors.append(f"skill #{position} revision is required")
@@ -125,14 +128,13 @@ def check_skill_provenance(project: dict[str, object], release_gate: bool = Fals
                 errors.append(f"skill #{position} {field} is required and concrete")
         reviewed_on = skill.get("reviewed_on")
         if isinstance(reviewed_on, str) and reviewed_on.strip():
-            try:
-                reviewed_date = datetime.strptime(reviewed_on, "%Y-%m-%d").date()
-                if reviewed_date > today():
-                    errors.append(f"skill #{position} reviewed_on is in the future")
-                elif release_gate and reviewed_date < today() - timedelta(days=int(project_setting(project, "skill_review_days"))):
-                    errors.append(f"skill #{position} reviewed_on is older than a year: re-review it before release")
-            except ValueError:
+            reviewed_date = parse_iso_date(reviewed_on)
+            if reviewed_date is None:
                 errors.append(f"skill #{position} reviewed_on must be YYYY-MM-DD")
+            elif date_is_future(reviewed_date):
+                errors.append(f"skill #{position} reviewed_on is in the future")
+            elif release_gate and reviewed_date < today() - timedelta(days=int(project_setting(project, "skill_review_days"))):
+                errors.append(f"skill #{position} reviewed_on is older than a year: re-review it before release")
         permissions = skill.get("permissions")
         if isinstance(permissions, str):
             tokens = {token.strip().lower() for token in permissions.split("/") if token.strip()}
@@ -146,7 +148,7 @@ def check_skill_provenance(project: dict[str, object], release_gate: bool = Fals
             ):
                 errors.append(f"skill #{position} rollback must name a concrete removal/revocation action")
     if errors:
-        raise RepoctlError("skill provenance check failed:\n- " + "\n- ".join(errors))
+        raise check_failed("skill provenance", errors)
 
 
 def directory_digest(directory: Path) -> str:

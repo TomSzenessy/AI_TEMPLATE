@@ -11,12 +11,11 @@ host invocation adapter, not a second copy of the rules.
 
 ## Profile-aware evidence
 
-`agent-first` requires a critic for commandless/creative surfaces but lets the
-host own ordinary issue/review ceremony; `regulated` requires the full
-disclosure/body record; `minimal` delegates the critic to the host. A local
-pre-filing packet uses `Local-WAL: <id>` and a real commit/diff/artifact. It is
-not a replacement for the GitHub issue register. See `project.toml` and
-`AGENTS.md` for the current profile.
+The filing profile (`agent-first`, `regulated`, `minimal`) and what each one
+requires are defined in [`ISSUE_TEMPLATE.md`](./ISSUE_TEMPLATE.md); see
+`project.toml` and `AGENTS.md` for the current one. A local pre-filing packet
+uses `Local-WAL: <id>` and a real commit/diff/artifact. It is
+not a replacement for the GitHub issue register.
 
 
 Use the smallest sufficient evidence, then escalate:
@@ -81,9 +80,10 @@ or other measurable oracle.
 
 ## Ceremony by risk
 
-`make risk` classifies the change set (see [`self-healing.md`](./self-healing.md#ceremony-by-risk)).
-`low` needs `make check`; `normal` needs the full loop above; `high` adds the
-fresh `critic` role ([`delegation.md`](./delegation.md)) before completion.
+How much of this loop a change needs is set by its risk tier
+([`self-healing.md`](./self-healing.md#ceremony-by-risk)); the independent
+reviewer a tier may require is the `critic` role
+([`delegation.md`](./delegation.md)) before completion.
 
 ## Before completion
 

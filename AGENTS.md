@@ -51,15 +51,11 @@ Project rules (scoped rules arrive when you edit a matching path):
 
 ## Issue-backed write-ahead record
 
-Before a behavior, schema, contract, security, privacy, or operational change:
-search open and closed issues and `docs/ERROR_LOG.md` by symptom, path, and
-topic, then file one with `make issue` — intended behavior, scope, risks, and
-evidence-producing acceptance criteria **before** implementation. One issue per
-independent root cause; file confirmed residuals before completion. Mechanics
-and the private security route: [`docs/self-healing.md`](./docs/self-healing.md).
-
-`[governance].profile` sets friction; change it deliberately and record the
-reason in the issue.
+Before a behavior, schema, contract, security, privacy, or operational change,
+file the write-ahead issue first. The rule, its shape, the `Local-WAL` route,
+and the profile levels are owned by
+[`docs/ISSUE_TEMPLATE.md`](./docs/ISSUE_TEMPLATE.md); the private security
+route is [`SECURITY.md`](./SECURITY.md).
 
 ## Navigate by trigger
 
@@ -81,8 +77,8 @@ reason in the issue.
 3. **Design** behind the smallest deep interface; one owner per changing fact.
 4. **Implement** the smallest coherent change; keep existing conventions.
 5. **Verify**: focused check, then `make done`, then the real artifact.
-6. **Critique**: a fresh critic gets the issue, diff, and artifact; at most
-   three focused loops, then file what remains.
+6. **Critique**: the independent quality loop
+   ([`docs/verification.md`](./docs/verification.md#the-quality-loop)).
 7. **Reconcile** issue, manifest, docs, and navigation in the same change.
 
 ## Self-organization (checked by `make check`)

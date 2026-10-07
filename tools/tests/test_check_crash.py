@@ -13,6 +13,9 @@ from unittest import mock
 TOOLS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(TOOLS))
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # `fixtures`, however this file is invoked (#33)
+from fixtures import Scratch, git_in  # noqa: E402  shared builders, in-process CLI, isolated git (#43)
+
 from kit import docsync  # noqa: E402
 from kit.core import RepoctlError, markdown_link_target  # noqa: E402
 from kit.registry import run_checks  # noqa: E402
@@ -22,24 +25,11 @@ MANIFEST = 'schema = 1\nname = "Demo"\nkind = "template"\nphase = "bootstrap"\nl
            '[governance]\nprofile = "regulated"\n'
 
 
-class CrashTests(unittest.TestCase):
+class CrashTests(Scratch):
     def setUp(self) -> None:
-        self.temp = tempfile.TemporaryDirectory()
-        self.root = Path(self.temp.name).resolve()
+        super().setUp()
         self.write("project.toml", MANIFEST)
         self.write("docs/README.md", "# Docs\n")
-
-    def tearDown(self) -> None:
-        self.temp.cleanup()
-
-    def write(self, name: str, content: str | bytes) -> None:
-        path = self.root / name
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(content if isinstance(content, bytes) else content.encode())
-
-    def cli(self, *args: str, env: dict[str, str] | None = None):
-        return subprocess.run([sys.executable, str(REPOCTL), "--root", str(self.root), *args],
-                              capture_output=True, text=True, check=False, env={**os.environ, **(env or {})})
 
     def checks(self):
         return run_checks(self.root, blocking_only=False)
@@ -156,9 +146,9 @@ class CrashTests(unittest.TestCase):
         self.assertTrue(any(item.startswith("[host-twins]") for item in advisory), advisory)
 
     def test_failed_history_read_is_an_advisory(self) -> None:
-        subprocess.run(["git", "init", "-q"], cwd=self.root, check=True)
-        subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", "add", "-A"], cwd=self.root, check=True)
-        subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "init"], cwd=self.root, check=True)
+        self.git("init", "-q")
+        self.git("add", "-A")
+        self.git("commit", "-qm", "init")
         self.write("docs/b.md", "<!-- covers: project.toml -->\n# B\n")
         with mock.patch.object(docsync, "history_read", return_value=None):
             _, advisory = self.checks()

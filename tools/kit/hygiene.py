@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 from pathlib import Path
 
-from .core import FENCED_CODE, INLINE_CODE, RepoctlError, read_text_file, today as core_today
+from .core import FENCED_CODE, INLINE_CODE, RepoctlError, parse_iso_date, read_text_file, today as core_today
 from .gitinfo import path_matches
 
 # Character classes keep these patterns from matching their own source text.
@@ -63,9 +63,8 @@ def scan_markers(root: Path, files: list[str], today: date | None = None, warnin
             if SCAFFOLD.search(INLINE_CODE.sub("", line)):
                 report.unfinished.append(location)
             for match in DEPRECATION.finditer(line):
-                try:
-                    deadline = date.fromisoformat(match.group(1))
-                except ValueError:
+                deadline = parse_iso_date(match.group(1))
+                if deadline is None:
                     report.undated.append(f"{location} (invalid date {match.group(1)})")
                     continue
                 if deadline < today:

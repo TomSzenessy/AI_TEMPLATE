@@ -25,7 +25,7 @@ deliverable), **separable** (needs no running conversation), and **checkable**
 <!-- repoctl:roles -->
 | Role | Access, tier | Use it when |
 |---|---|---|
-| [`critic`](../.agents/agents/critic.md) | read-only, deep | Fresh, read-only reviewer that tries to falsify a completion claim against the original acceptance criteria, the diff, and the real artifact. Use before declaring high-risk or subjective work done; returns one verdict, blocker or ship-with-residuals. |
+| [`critic`](../.agents/agents/critic.md) | read-only, deep | Fresh, read-only reviewer that tries to falsify a completion claim against the original acceptance criteria, the diff, and the real artifact. Use before declaring high-risk or subjective work done; the verdict vocabulary is owned by docs/delegation.md. |
 | [`doc-gardener`](../.agents/agents/doc-gardener.md) | docs-only, fast | Docs-only maintainer. Fixes stale or dead doc bindings, broken command references, and navigation drift reported by make garden or the stop gate, so documentation keeps matching what the code actually does. |
 | [`implementer`](../.agents/agents/implementer.md) | full, balanced | Builds one bounded deliverable from a brief - smallest coherent change, tests first for bugs, owning docs updated in the same change, verified with the declared commands. Use for disjoint, well-specified work packages. |
 | [`researcher`](../.agents/agents/researcher.md) | web, balanced | Answers an external-knowledge question (current library APIs, platform rules, prior art, error messages) from primary sources using web search, docs MCP servers, and a browser, returning cited, version-specific findings. |
@@ -75,11 +75,11 @@ means the same thing at different strengths and cannot be checked. Save the
 critic's return block verbatim to `.agent/critic.md` (ignored, so it never rides
 along in a commit) with `Commit:` set to the HEAD the critic read.
 
-That record is the evidence the completion gate reads: on committed `high`-risk
-paths, `make done` and the stop hook fail without it, fail when the verdict is
-`blocker` or any word outside the vocabulary, and fail when `Commit:` is not the
-current HEAD — so run the critic **after** the change is committed, then save the
-return, then finish ([`self-healing.md`](./self-healing.md#critic-evidence-the-gate-can-read)).
+That record is the evidence the completion gate reads; what the gate checks and
+how it fails is in
+[`self-healing.md`](./self-healing.md#critic-evidence-the-gate-can-read).
+Because the gate binds the record to the current HEAD, run the critic **after**
+the change is committed, then save the return, then finish.
 
 ## Model tiers and cost
 

@@ -14,8 +14,7 @@ except ImportError:  # pragma: no cover - module import from a package context
 from .core import (
     RepoctlError,
     SENSITIVE_CONTENT_PATTERNS,
-    date_is_stale,
-    parse_iso_date,
+    date_problem,
     ensure_inside_root,
     governance_profile,
     is_placeholder,
@@ -68,11 +67,11 @@ def validate_review_evidence(
     date_match = re.search(r"(?im)^Date:\s*(\d{4}-\d{2}-\d{2})\s*$", content)
     if not date_match:
         raise RepoctlError("review evidence must contain an ISO date")
-    reviewed_date = parse_iso_date(date_match.group(1))
-    if reviewed_date is None:
-        raise RepoctlError("review evidence date is invalid")
-    if date_is_stale(reviewed_date):  # checked when filing: evidence for a new public issue must be current
-        raise RepoctlError("review evidence date is stale or in the future")
+    # Checked when filing: evidence for a new public issue must be current.
+    problem = date_problem(date_match.group(1), "review evidence date is stale or in the future",
+                           "review evidence date is invalid")
+    if problem:
+        raise RepoctlError(problem)
     if not re.search(r"(?im)^Result:\s*(?:pass|approved|public-safe)\b", content):
         raise RepoctlError("review evidence must record a public-safe result")
     if strict and body is not None:

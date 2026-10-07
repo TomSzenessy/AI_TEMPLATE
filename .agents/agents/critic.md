@@ -1,6 +1,6 @@
 ---
 name: critic
-description: Fresh, read-only reviewer that tries to falsify a completion claim against the original acceptance criteria, the diff, and the real artifact. Use before declaring high-risk or subjective work done; returns one verdict, blocker or ship-with-residuals.
+description: Fresh, read-only reviewer that tries to falsify a completion claim against the original acceptance criteria, the diff, and the real artifact. Use before declaring high-risk or subjective work done; the verdict vocabulary is owned by docs/delegation.md.
 access: read-only
 tier: deep
 ---
@@ -30,18 +30,19 @@ read), `Done when`. Any missing: generate the packet yourself —
 
 ## Return (at most 300 words)
 
-`Verdict` is exactly one of two words — `blocker` (the work is not done; it goes
-back) or `ship-with-residuals` (done enough to ship; the named residuals follow).
-No third option, no prose.
+`Verdict` uses exactly the two-word vocabulary its contract defines, and
+nothing else; the contract is owned by
+[`docs/delegation.md`](../../docs/delegation.md#the-critics-verdict-and-its-evidence).
 
 ```text
-Verdict: blocker | ship-with-residuals
+Verdict: <one of the contract's two words>
 Commit: <40-hex sha of the change set you reviewed>
 Blockers: <finding — evidence path:line or command output> (or "none")
 Residuals: <what ships imperfectly and the issue to file> (or "none")
 Checked: <commands run and artifacts opened>
 ```
 
-This block is the evidence: the orchestrator saves it verbatim to
-`.agent/critic.md`, and `make done` reads it. A field you leave out is a field
-the completion gate cannot verify.
+This block is the evidence: save it as the contract says
+([`docs/delegation.md`](../../docs/delegation.md#the-critics-verdict-and-its-evidence)).
+A field you leave out is a field the
+completion gate cannot verify.

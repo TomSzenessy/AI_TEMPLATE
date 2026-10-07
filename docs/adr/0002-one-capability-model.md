@@ -71,15 +71,10 @@ command block and `make help` are generated from those declarations, so a
 project command in `.agents/commands/` becomes `make <name>` after `make sync`.
 
 **Packs switch groups off without deleting them.** `project.toml`
-`[packs]` maps a pack name to `true` or `false` and overrides that pack's
-`default` (mechanics: [`self-healing.md`](../self-healing.md)). A disabled pack's
-skills and roles are not rendered into host adapters, its rules are not
-rendered, its checks do not run, and its commands refuse with the line that
-enables them. It still appears in `make capabilities`, `make where`, and
-`make similar`, so it can be found. The kit ships two packs: `product` (build
-a product: kickoff, stack, UX, research, `make next`, `make ui-review`; on) and
-`measure` (`make eval`, `make trial`; off in new projects, on in the template).
-Launch evidence stays in the core: it already switches on by `phase`, and a
+`[packs]` overrides a pack's declared `default`; the switching rules and the
+shipped packs are owned by [`capabilities.md`](../capabilities.md). A disabled
+pack stays findable in `make capabilities`, `make where`, and `make similar`,
+so it can be found. Launch evidence stays in the core: it already switches on by `phase`, and a
 pack that only hides `make readiness` would save nothing. A third-party
 skill's files are pinned by digest, so its pack is recorded in its `[[skills]]`
 provenance entry instead of its frontmatter.
@@ -91,9 +86,9 @@ hook the first time a matching path is edited in a session, and by
 
 **One path to add or find anything.** `make similar Q="<need>"` searches every
 kind, including disabled packs. Nothing similar: the `skill-scout` role searches
-registries and the web and vets the result ([`../skills.md`](../skills.md)),
-and `make new KIND=<kind>` writes the stub with valid metadata, wires it in,
-and leaves `FILL-IN:` lines that fail until the content is real.
+registries and the web and vets the result ([`../skills.md`](../skills.md)), and
+`make new KIND=<kind>` writes the stub and wires it in
+([mechanics](../capabilities.md)).
 
 **Real redundancy merges in the same change:** one reviewer and date rule for
 issues and CI (`core.reviewer_problem`); one headless-agent launcher shared by

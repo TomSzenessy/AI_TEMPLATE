@@ -34,11 +34,15 @@ itself and this table cannot drift. Edit the line in the document, not here.
 | [`ISSUE_TEMPLATE.md`](./ISSUE_TEMPLATE.md) | Canonical issue shape and labels | Filing or materially updating an issue. |
 | [`STACK-DECISION.md`](./STACK-DECISION.md) | Framework/toolchain decision and rationale | Choosing a project stack or replacing an assumed tool. |
 | [`audit.md`](./audit.md) | Whole-repository audit protocol | Finding, prioritizing, and filing improvements without implementing them. |
+| [`bindings.md`](./bindings.md) | Doc-code bindings, staleness, owed docs, and the Docs-Unaffected trailer | A document and its code drift apart, or a commit must exempt a document. |
 | [`building.md`](./building.md) | Product driver: feature list, research record, make next phases, product done, UI review | building or judging a product |
 | [`delegation.md`](./delegation.md) | Orchestrator/subagent roles, brief, return, and critic verdict contract | Work is bounded enough to hand to a scout, implementer, critic, researcher, doc-gardener, or skill-scout. |
+| [`generated-files.md`](./generated-files.md) | Derived files, host adapters, and generated blocks | A generated file looks wrong, or a new agent host is added. |
+| [`hygiene.md`](./hygiene.md) | Deprecation markers, orphan files, change coupling, and product guardrails | Code or files look stale, duplicated, or ownerless. |
+| [`kit-update.md`](./kit-update.md) | The kit lock, make kit-update, and the golden-path test | A kit fix must reach projects, or a project updates from the template. |
 | [`operations.md`](./operations.md) | Failure loop and error ledger rules | A bug, outage, flaky test, or operational failure occurs. |
 | [`production.md`](./production.md) | Production evidence and release boundary | A real project is being prepared for deployment or release. |
-| [`self-healing.md`](./self-healing.md) | When a check may block, hooks, doc-code bindings, deprecation expiry, budgets, generated files, gardener, evals | A check fails, docs drift, a host is added, or the kit itself changes. |
+| [`self-healing.md`](./self-healing.md) | When a check may block, lifecycle hooks, failure output, ceremony by risk, and the gardener | A check fails, a gate blocks, or the kit itself changes. |
 | [`verification.md`](./verification.md) | Definition of done, evidence ladder, and quality loop | A change is ready for review or a quality claim is made. |
 | [`incidents/README.md`](./incidents/README.md) | Reviewed public incident record boundary | A public incident is promoted or a regression artifact is reviewed. |
 
@@ -70,6 +74,8 @@ itself and this table cannot drift. Edit the line in the document, not here.
 
 | Read | Owns | Reach for it when |
 |---|---|---|
+| [`capabilities.md`](./capabilities.md) | How to add, find, or switch off a capability or pack, and the configuration policy | You add, find, or switch off a skill, role, doc, rule, check, command, MCP route, or pack. |
+| [`evals.md`](./evals.md) | Fresh-agent navigation evals and scored build trials | AGENTS.md, the docs, a skill, or a gate changed and needs fresh-agent evidence. |
 | [`resources.md`](./resources.md) | Primary docs, MCP routes, licenses, and resource intake | A task needs a capability, example, current documentation, or external gate. |
 | [`skills.md`](./skills.md) | Skill discovery, provenance, and overlap rules | A task needs a capability the repository does not provide. |
 | [`adr/0001-issue-backed-write-ahead.md`](./adr/0001-issue-backed-write-ahead.md) | Accepted write-ahead and documentation-boundary decision | You need the rationale for issue-backed continuity. |

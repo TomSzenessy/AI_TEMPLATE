@@ -1,17 +1,24 @@
 # Self-healing mechanics
 
-<!-- index: operate | When a check may block, hooks, doc-code bindings, deprecation expiry, budgets, generated files, gardener, evals | A check fails, docs drift, a host is added, or the kit itself changes. -->
-<!-- covers: tools/kit/checks.py tools/kit/docsync.py tools/kit/hygiene.py tools/kit/adapters.py tools/kit/session.py tools/kit/garden.py tools/kit/navigate.py tools/kit/risk.py tools/kit/capabilities.py tools/kit/evals.py tools/kit/trial.py tools/kit/kitupdate.py .agents/trials/** tools/kit/gitinfo.py tools/kit/derive.py tools/kit/scaffold.py tools/kit/config.py tools/kit/reachability.py tools/kit/coupling.py tools/kit/signatures.py .githooks/** .github/workflows/garden.yml .agents/evals/** -->
+<!-- index: operate | When a check may block, lifecycle hooks, failure output, ceremony by risk, and the gardener | A check fails, a gate blocks, or the kit itself changes. -->
+<!-- covers: tools/kit/checks.py tools/kit/session.py tools/kit/risk.py tools/kit/garden.py tools/kit/navigate.py .githooks/** .github/workflows/garden.yml -->
 
 Agents follow written rules well at the start of a session and worst at the end,
 after compaction, which is when cleanup and documentation get skipped. So the
 maintenance rules here are **executed**, not remembered: lifecycle hooks,
 checks in `make check`, and a scheduled gardener. Every mechanism is a
 standard-library command in `tools/kit/`, so it works with any agent host.
-Internally the kit now runs git through one wrapper (`gitinfo.run_git`, with
-unquoted paths and a timeout), derives every hook event from one table
-(`session.HOOK_EVENTS`), and computes the current day once (`core.today`, UTC),
-so every freshness rule agrees across machines.
+
+This page owns the enforcement machinery: what makes a check block, the hooks
+that run it, and the ceremony a change earns by risk. The rules the machinery
+enforces live beside their code — doc-code bindings in
+[`bindings.md`](./bindings.md), markers and file hygiene in
+[`hygiene.md`](./hygiene.md), generated files in
+[`generated-files.md`](./generated-files.md), capabilities and configuration in
+[`capabilities.md`](./capabilities.md), template updates in
+[`kit-update.md`](./kit-update.md), evals and trials in [`evals.md`](./evals.md),
+issue rules in [`ISSUE_TEMPLATE.md`](./ISSUE_TEMPLATE.md), and error-ledger
+rules in [`operations.md`](./operations.md).
 
 ## When a check may block
 
@@ -69,35 +76,6 @@ targets, and every host meets the git commit gate. `make handover` writes the
 ignored `HANDOVER.md` from [`handoffs/TEMPLATE.md`](./handoffs/TEMPLATE.md)
 with the time, branch, commit, uncommitted paths, and owed docs filled in.
 
-## Documentation that tracks the code
-
-A document declares what it describes with one comment near its top, such as
-`<!-- covers: src/billing/** docs/api/billing.yaml -->` (repository globs:
-`*`, `?`, `**`). From that single declaration:
-
-- `make where Q="<path or term>"` and the after-edit hook name the owning doc.
-- **Dead binding** (a glob matches no file): the code moved or died, so
-  `make check` fails until the binding follows it.
-- **Stale document**: a commit newer than the document's last commit touched
-  covered paths. `make check` fails. A commit authored by `dependabot[bot]` whose diff changes only
-  `uses:` lines is ignored (a bot cannot add a trailer); any other change is not. If a change truly does not affect the doc,
-  record that in the commit with a trailer, `Docs-Unaffected: docs/x.md <reason>`
-  (a reason with no path exempts all documents; a value that starts with a
-  non-document path or glob, such as `tools/** untouched`, exempts nothing). Git's own trailer parsing is
-  used everywhere: trailers belong in the message's last paragraph, and a
-  trailer without a reason exempts nothing.
-- **Owed document**: covered paths changed on this branch while the doc did not;
-  the stop gate and `make done` report it before history even exists.
-- **Command references**: every backticked `make <target>` or `repoctl <command>`
-  in Markdown, and every `make` line in a code fence, must exist. A `make`
-  reference resolves to the nearest Makefile above the document (and the
-  files it includes, such as `kit.mk` after `make adopt`), so subprojects and
-  trial seeds keep their own targets.
-
-Bind documents that explain behavior (architecture, module cards, runbooks, API
-notes). Pure policy documents need no binding. Staleness needs full history:
-CI checks out with `fetch-depth: 0`, and shallow clones skip it.
-
 ## A broken check is a finding, not a traceback
 
 Every finding in `make check` and `make garden` is prefixed `[check-name]`, and
@@ -115,165 +93,6 @@ blocks until the file is fixed or deleted. `hook ...` is dispatched before the
 argparse tree is built, the session brief lists the plugin files, and the hook
 skips only (with a loud warning) when no launcher or Python 3.11+ exists.
 
-## Code that cannot rot silently
-
-Markers are plain comments and work in any language:
-
-- `DEPRECATED(remove-by=YYYY-MM-DD, use=<replacement>)` next to replaced code.
-  `make check` fails after the date, so a duplicate path either dies or gets a
-  deliberate new deadline. `make garden` lists dates due within 30 days.
-- A language deprecation annotation (`@deprecated`, `@Deprecated`) needs a
-  `remove-by=` date on its line or within the next three lines.
-- Task markers in code must reference an issue (`#123`, a URL, or `Local-WAL`),
-  because open work lives in the issue register, not in comments.
-- `FILL-IN:` placeholders left by `make new` fail until replaced, so a
-  half-written skill, role, or doc cannot rot unnoticed.
-- A workflow `run:` block longer than 10 lines fails: CI logic belongs in
-  `tools/` where it is unit-tested and runs locally (`repoctl ci <check>`).
-
-## Files that justify themselves
-
-A compact repository is the one property that every reader pays for, so it is
-checked rather than hoped for.
-
-- `orphan-files` **advises** on a tracked file that nothing reaches: no
-  document's `covers:` glob claims it, `make sync` does not generate it, and no
-  code imports or names it. Every message says why the file may still be
-  legitimate (a test tree a runner discovers, a `migrations/` or `management/`
-  tree a framework walks, a `module:callable` or `path:line` reference) and
-  names the fix for the rest — import it, bind it, or delete it. Advice, not a
-  block: the honest claim is only "nothing in this tree names this file", the
-  former blocking class proved wrong in each new ecosystem it met (a bare
-  `src/`, `module:callable`, an adopted project's own `tools/`), and a wrong
-  block is permanent in a project that has no upgrade path. A name two files
-  share resolves to neither, so one stray mention of `index.py` cannot mask a
-  dead file.
-- Kit artifacts are exempt by default, from a list built out of the kit's own
-  constants (`tools/kit/reachability.py`), so a project never has to justify a
-  file the kit itself wrote.
-- `host-read-config` **advises** on files only a host convention reads (editor,
-  git, hosting, scanner config), for the same reason.
-
-## Structure you can see
-
-- `change-coupling` **advises**, from recent git history, when two areas keep
-  changing together. That is what a wrong seam looks like over time, and it is a
-  judgement, so it never blocks.
-
-## Known failures, recognised
-
-Every entry in `docs/ERROR_LOG.md` carries a key (`EL-001`…). When a blocking
-check produces a finding matching a recorded signature, `make check` prints the
-key and its permanent fix. A known failure is recognised in one step instead of
-re-derived — the difference between debugging and pattern-matching. Fresh
-failures add no line, so the ledger cannot manufacture a match. A backticked
-span counts as a matchable literal only when it is at least 12 characters and
-shaped like a message, path, or command; shared vocabulary (`make check`) or a
-bare filename matches nothing, so a new failure stays a new failure and a row
-without a distinctive literal is simply never matched.
-
-## Product guardrails
-
-Steps a fresh agent skipped in a real build trial are checks, each naming its fix:
-
-- A tracked backlog (`docs/*WAL*.md`, `TODO.md`, `BACKLOG.md`, `TASKS.md`,
-  `ROADMAP.md`) fails: live work goes to issues, or to ignored `.agent/wal/`
-  (`make issue` writes it there when the repository has no GitHub remote).
-- Every active product surface needs an owning doc: some `<!-- covers: -->`
-  binding must match files under its path.
-- In a UI project (`[kit].ui_kinds`, by `project.toml` kind) an accepted vision
-  requires `docs/design.md`. (A rule that `quality_oracle` must mention
-  `ux-quality` was retired: a keyword in prose is not a review; the real
-  `make ui-review` gate in [`building.md`](./building.md) replaced it.)
-- Owners in `project.toml` must be handles or team names, not emails.
-
-## Context budgets
-
-`project.toml [budgets]` maps globs to byte limits for files agents load often
-(about 4 bytes per token). An over-budget file fails `make check`; move detail
-into a linked owner document instead of growing the router.
-
-## Derived files: one source each
-
-Nothing that can be generated is maintained by hand. `make sync` (also run by
-`make done`, the session-start hook, and the after-edit hook) renders:
-
-| Derived | Single source |
-|---|---|
-| `.claude/skills/*`, `.claude/agents/*` (redirect stubs) | `.agents/skills/*/SKILL.md`, `.agents/agents/*.md` frontmatter |
-| `.claude/settings.json` (hooks, pre-approved kit commands) | the kit, plus optional `project.toml [adapters.claude]` |
-| `.mcp.json` | `.agents/mcp/*.toml` routes of enabled packs (servers are still approved per person) |
-| The command block in the `Makefile` (`kit.mk` after `make adopt`) and `make help` | each `@command` declaration in `tools/kit/commands.py` and `.agents/commands/` |
-| The project rules block in `AGENTS.md` | `.agents/rules/*.md` without a `scope` |
-| The tables in [`README.md`](./README.md) | each document's `<!-- index: group \| owns \| read when -->` line (transient `docs/handoffs/` records are not indexed) |
-| The role table in [`delegation.md`](./delegation.md) | role frontmatter (`description`, `access`, `tier`) |
-| The description block in the root `README.md` | `project.toml [repository].description` |
-| GitHub description, topics, template flag (`make github-sync`) | `project.toml [repository]`; `make garden` reports drift |
-
-Generated host stubs cover only capabilities of enabled packs.
-`make check` fails on any drift and on hand-written files in a generated host
-directory. Add a host by adding a renderer in `tools/kit/adapters.py` and
-listing it in `project.toml [adapters].hosts`. Codex, Copilot, and Cursor read
-`AGENTS.md` and `.agents/skills/` directly.
-
-## Extending: one model for every capability
-
-Skills, agent roles, docs, rules, checks, commands, MCP routes, and packs are
-all capabilities: one file each, declaring `name`, `description`
-(`<what>; <when>`), and an optional `pack`, read by one loader
-(`tools/kit/registry.py`; the decision is
-[ADR 0002](./adr/0002-one-capability-model.md)). Adding the file adds the
-capability; nothing is registered by hand.
-
-`make similar Q="<need>"` answers first, across every kind and pack: reuse
-(score at or above `[kit].overlap_limit`), read the closest match first (at or
-above half of it), or create.
-`make new KIND=skill|agent|doc|rule|check|command|mcp|pack NAME=<kebab> DESC="<what>; <when>" [PACK=<pack>]`
-is the one way to add one. It refuses a near-duplicate of the same kind
-(`FORCE=1` overrides), writes valid metadata, registers a first-party skill in
-`[capabilities].local_skills`, regenerates every derived file, and leaves
-`FILL-IN:` lines for the content. Refining a capability is an ordinary edit of
-its file; the after-edit hook regenerates what depends on it.
-Agent-instruction paths are `high` risk, so changes to them get a critic.
-
-| Kind | File | What the kit does with it |
-|---|---|---|
-| rule | `.agents/rules/<name>.md` (`scope:` globs optional) | no scope: one line in `AGENTS.md`; scoped: the after-edit hook delivers it once per session when a matching path is edited, and `make where <path>` lists it |
-| check | `.agents/checks/<name>.py` with `@check(name, description, blocks=..., reason=...)` | runs in `make check` and the gates when it blocks, in `make garden` otherwise; a blocking check without a reason fails to load (the blocking rule above) |
-| command | `.agents/commands/<name>.py` with `@command(name, description, args=(arg("--x", var="X"),))` | becomes `repoctl <name>` and, after `make sync`, `make <name> X=...`; make variables reach it as quoted data |
-| mcp | `.agents/mcp/<name>.toml` | rendered into host config when enabled (see [`resources.md`](./resources.md)) |
-| pack | `.agents/packs/<name>.md` (`default: on` or `off`) | groups capabilities; `project.toml [packs]` overrides the default |
-
-A check is a function of a context (`root`, `project`, `files`, `bindings`)
-that returns findings, each naming its fix. Kit checks live in
-`tools/kit/checks.py` and kit commands in `tools/kit/commands.py`; a project's
-own go in `.agents/`, so `make kit-update` never conflicts with them.
-
-**Packs** keep rarely needed capabilities out of every session. A pack that is
-off contributes no host stubs, no `AGENTS.md` rule lines, no running checks,
-and no `make help` lines, and its commands refuse with the line that switches
-it on; it still appears in `make capabilities`, `make where`, and
-`make similar`. The kit ships `product` (on: the product driver in
-[`building.md`](./building.md)) and `measure` (off: `make eval`, `make trial`;
-the template switches it on). A third-party skill, whose files are pinned by
-digest, records its pack in its `[[skills]]` provenance entry.
-
-## Configuration
-
-Policy a project may change lives in `project.toml`, with built-in defaults
-when a key is absent: `[packs]` (switch packs on or off), `[kit]` (docs index groups, unbound-doc exemptions,
-overlap limit, deprecation warning window, skill review age, UI project kinds,
-eval model, Playwright version and previewable kinds for `make ui-review`), `[adapters.claude]`
-(tier-to-model and access-to-tools maps, pre-approved commands), `[risk]`
-(tier globs and optional ceremony text), and `[budgets]` (byte limits for any
-glob, including product code).
-
-Entry files must *load* the router, not just point at it. `CLAUDE.md` imports
-it with `@AGENTS.md`. A pointer-only version failed the fresh-agent benchmark
-(4/5): a one-turn answer skipped the read and invented a commit trailer. With
-the import, Claude scored 5/5, at about 35% more cost per cold single-shot
-task, which the `AGENTS.md` budget keeps bounded.
-
 ## Ceremony by risk
 
 `make risk` classifies this branch's changed paths with `project.toml [risk]`
@@ -283,17 +102,16 @@ independent critic. Tune the globs per project. Never widen `low` to dodge a gat
 
 ### Critic evidence the gate can read
 
-A critic is cheap to request and easy to skip, so the completion gate reads proof
-that one ran (`tools/kit/session.py`): when this branch has **committed** `high`
-paths, `make done` and the stop hook look for `.agent/critic.md` (ignored, so the
-evidence never rides along in a commit).
+A critic is cheap to request and easy to skip, so the completion gate reads the
+record the critic contract defines (`.agent/critic.md`; see
+[`delegation.md`](./delegation.md#the-critics-verdict-and-its-evidence)). When
+this branch has **committed** `high` paths, `make done` and the stop hook
+(`tools/kit/session.py`) check that record field by field:
 
-The record is the [`critic`](../.agents/agents/critic.md) role's return saved
-verbatim, and it is checked field by field:
-
-- **`Verdict:`** must be exactly `blocker` or `ship-with-residuals`. `blocker`
-  fails the gate (fix what it lists, then ask again), and any other word — prose,
-  "looks good", `accept` — fails as an unknown verdict rather than a softer pass.
+- **`Verdict:`** must be one of the two words the contract defines; the
+  `blocker` word fails the gate (fix what it lists, then ask again), and any
+  other word — prose, "looks good", `accept` — fails as an unknown verdict
+  rather than a softer pass.
 - **`Commit:`** must be the current HEAD, so evidence about older work cannot
   vouch for today's change set. That fixes the order: commit the change, then run
   the critic on that commit, then save its return — a record written before the
@@ -309,28 +127,11 @@ review to the host.
 
 ## Write-ahead issues
 
-Before a behavior, schema, contract, security, privacy, or operational change,
-the router in [`AGENTS.md`](../AGENTS.md) requires a search of the issue register
-and `docs/ERROR_LOG.md` first, then one issue per independent root cause carrying
-intended behavior, scope, risks, and evidence-producing acceptance criteria
-**before** implementation. The mechanics behind that rule:
-
-- `make issue TITLE=... BODY=<file> TYPE=... PRIORITY=... AREA=... TOPIC=...`
-  validates against the open and closed register and files on GitHub; the body
-  format is [`ISSUE_TEMPLATE.md`](./ISSUE_TEMPLATE.md).
-- With no GitHub remote, `make issue WAL=Local-WAL-001 …` (or `WAL=all`) writes
-  the draft to ignored `.agent/wal/` instead, which counts as the write-ahead
-  record.
-- Active vulnerabilities and sensitive personal data never go in a public issue:
-  use the private route in [`SECURITY.md`](../SECURITY.md). The disclosure class
-  is an owner decision, and uncertain content stays private.
-- Live work lives in the issue register, never in a Markdown backlog; the tracked
-  backlog check above fails `docs/*WAL*.md`, `TODO.md`, `BACKLOG.md`, `TASKS.md`,
-  and `ROADMAP.md`.
-- `[governance].profile` sets how much friction the gates apply: `agent-first`
-  (default, compact contract), `regulated` (full contract and launch gates),
-  `minimal` (the host owns issues). Change it deliberately and record the reason
-  in the issue.
+The write-ahead record — when one is required before a change, its shape, the
+`Local-WAL` draft route, and the `[governance].profile` levels — is defined in
+[`ISSUE_TEMPLATE.md`](./ISSUE_TEMPLATE.md). An active vulnerability or
+sensitive personal data takes the private route in
+[`../SECURITY.md`](../SECURITY.md) instead of a public issue.
 
 ## The gardener
 
@@ -366,92 +167,8 @@ findings, one root cause per change (see [`delegation.md`](./delegation.md)).
   interpreter (override with `REPOCTL_PYTHON` or `make PYTHON=...`). Windows
   hosts run it from Git Bash or WSL.
 
-## Fixes reach every project: `make kit-update`
-
-A template bug is copied into every project made from it, so fixes flow both
-ways. `make init` and `make adopt` record `tools/kit-lock.json`, the hash of
-every kit file as shipped (generated `repoctl:` blocks excluded, so regenerated
-tables are not edits). `make kit-update [KIT=<template checkout>]` (default: a
-fresh clone of `[template].source`, at `KIT_REF=<commit or tag>` when given,
-printing the commit range it applies) then, per kit file:
-
-| State | What happens |
-|---|---|
-| unchanged since shipped | replaced by the template's new version |
-| changed by the project, kit unchanged | kept, silently |
-| changed by the project and by the kit | kept; the kit's version is saved under `.agent/kit-update/` and listed once to merge by hand |
-| new in the template | added; if you already have your own file there, it is kept and listed once |
-| removed from the template | deleted when unchanged, listed otherwise |
-| your own file that `make adopt` kept at a kit path | never touched; listed only when the kit's version changes |
-
-A conflict is reported once per kit change: the lock then remembers the version
-offered, so the next update is quiet until the kit changes that file again. It
-also remembers the version the project had from the kit before its edit
-(`bases`): if the project later reverts the file to that version, the next
-update applies the kit's version again instead of treating it as an edit. The
-staged version stays in `.agent/kit-update/` and `make garden` lists it on every
-run until you merge it and delete the staged file, so an ignored kit fix is never
-silently lost. A
-project made before the lock existed gets every differing kit file listed once
-on its first update (nothing is overwritten); after that, updates apply
-automatically. A kit checkout without git history keeps the recorded
-`kit_version`, and an update from a lock that never recorded one says so
-instead of printing a placeholder.
-
-Project-owned files are never kit files: `project.toml`, `VISION.md`,
-`README.md`, `LICENSE`, `CONTEXT.md`, the stack decision, design, architecture,
-product, ADR, and incident docs, `.security/`, and generated host files.
-Project make targets go in `project.mk`, which the kit Makefile includes, so the
-Makefile stays the kit's (adopted projects keep `kit.mk`, regenerated with
-their renames). Markdown is localized the same way `make init` does it. The
-update refuses a dirty tree, so it lands as one reviewable change; run
-`make done` after it. `make garden` reports when the template has moved past
-the recorded `kit_version`.
-
-The other direction: an agent that finds a kit bug in a project fixes it there
-and reports it at `[template].source` (AGENTS.md), and the template's fix then
-reaches every project through `make kit-update`. Tests prove that init or adopt
-followed by an update from the same kit changes nothing, and that an update
-applies fixes, additions, and removals while keeping the project's edits.
-
-## The golden path is a test
-
-A bug in the template is copied into every project made from it, so the happy
-path is tested end to end in CI (`GoldenPathTests`): `make init`, a scripted
-minimal intake (accepted vision and stack decision, owner, one real surface),
-a fully green `make done` (which runs the kit's own suite inside the new
-project), and a commit through the git gate. An accepted record that still has
-placeholders must be refused. A template change that breaks any step fails the
-template's CI before it reaches a project.
-
 ## Measuring the kit: fresh-agent evals
 
-`.agents/evals/*.toml` holds navigation tasks with an expected-answer regex.
-`make eval AGENT=claude` (or `codex`, `gemini`; `MODEL=` overrides, and Claude
-defaults to the cheap `[kit].eval_model`, Haiku) runs each task in a fresh,
-read-only headless session that cannot read `.agents/evals/` (its own answer key;
-expectations are anchored regexes that reject negated answers) and has no MCP
-servers, so runs stay fast and deterministic and records pass rate, turns, time, and cost under
-`.agent/evals/`. Re-run it after changing `AGENTS.md`, the map, or the docs.
-A change to the kit that lowers the pass rate or raises cost is a regression.
-For changes to the skills or gates, also run a **build trial**:
-`make trial NAME=<request>` copies this working tree into a fresh `make init`
-project outside the repository (or, for `mode = "adopt"`, an existing codebase
-from `seed` that then runs `make adopt`), gives `claude -p` (Sonnet by
-default, `BUDGET=` caps spend) the owner's request from
-`.agents/trials/<request>.toml`, and writes `.agent/trials/<run>/report.md`:
-spend, turns, kit commands, every gate block, failed kit command, bypass, and
-`Docs-Unaffected` trailer, and the product's final `make next` phase and
-`make done` result. Judge each friction item with the blocking rule above: fix
-the kit, make the check advisory, or justify it. `--analyze <transcript>
---project <dir>` reports on a run made by hand or with another host. Trial
-evidence and friction findings are recorded under [`docs/`](./building.md)
-and linked issues, e.g., [`#9`](https://github.com/TomSzenessy/AI_TEMPLATE/issues/9).
-
-A host-side failure, such as an expired login, is recorded as an error rather
-than as a wrong answer. Evals and trials start agents through one launcher
-(`run_headless` in `tools/kit/evals.py`): it drops the launching session's host
-variables, so a benchmark started from inside an agent session uses the CLI's
-own login, as a truly fresh agent would, and it ignores `SIGTERM` while the
-agent runs, because agents clean up with `pkill -f <name>`, which once killed
-a trial's runner. Both commands belong to the `measure` pack.
+Fresh-agent evals and scored build trials are documented in
+[`evals.md`](./evals.md). (This heading stays so existing links keep
+resolving.)

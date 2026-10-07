@@ -15,6 +15,7 @@ from .core import (
     KEBAB,
     REPOSITORY_INFRASTRUCTURE_DIRECTORIES,
     RepoctlError,
+    check_failed,
     date_is_future,
     date_is_stale,
     read_utf8,
@@ -278,7 +279,7 @@ def check_structure(root: Path, project: dict[str, object]) -> None:
                     errors.append(f"architecture map is missing declared surface: {identifier}")
 
     if errors:
-        raise RepoctlError("structure check failed:\n- " + "\n- ".join(errors))
+        raise check_failed("structure", errors)
 
 
 def _too_old_or_future(value: date, release_gate: bool) -> bool:

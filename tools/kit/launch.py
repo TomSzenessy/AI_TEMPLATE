@@ -11,7 +11,9 @@ from urllib.parse import urlsplit
 from .core import (
     KEBAB,
     RepoctlError,
+    check_failed,
     date_is_stale,
+    date_problem,
     declared_surfaces,
     ensure_inside_root,
     governance_profile,
@@ -93,14 +95,6 @@ def read_evidence_file(
     return content, None
 
 
-def _dated(value: str, stale: str, invalid: str) -> str | None:
-    """The problem with an ISO date that must be recent and not in the future, or None."""
-    parsed = parse_iso_date(value)
-    if parsed is None:
-        return invalid
-    return stale if date_is_stale(parsed) else None
-
-
 def _read_inside(root: Path, relative: str, label: str) -> tuple[str | None, str, str]:
     """(text, state, detail) for a repository file; state is ok, escapes (detail says why), missing, or unreadable."""
     try:
@@ -153,7 +147,7 @@ def _check_threat_model(root: Path) -> list[str]:
     found = re.search(r"(?im)^\*{0,2}Last Updated:\*{0,2}\s*(\d{4}-\d{2}-\d{2})\s*$", text)
     if not found:
         return ["threat model must record Last Updated"]
-    problem = _dated(found.group(1), "threat model review is stale or in the future", "threat model Last Updated is invalid")
+    problem = date_problem(found.group(1), "threat model review is stale or in the future", "threat model Last Updated is invalid")
     return [problem] if problem else []
 
 
@@ -180,7 +174,7 @@ def _check_security_config(root: Path, contact: object) -> list[str]:
     if not isinstance(reviewed_on, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", reviewed_on):
         errors.append("public security configuration needs security_reviewed_on")
     else:
-        problem = _dated(reviewed_on, "security review date is stale or in the future", "security_reviewed_on is invalid")
+        problem = date_problem(reviewed_on, "security review date is stale or in the future", "security_reviewed_on is invalid")
         if problem:
             errors.append(problem)
     if not isinstance(reviewer, str) or is_placeholder(reviewer) or re.search(r"[\[\]]", reviewer) or len(reviewer.strip()) < 3:
@@ -258,7 +252,7 @@ def _check_data_inventory(root: Path, project: dict[str, object]) -> list[str]:
     if not found:
         errors.append("public data inventory must record its review date")
     else:
-        problem = _dated(found.group(1), "public data inventory review is stale or future-dated",
+        problem = date_problem(found.group(1), "public data inventory review is stale or future-dated",
                          "public data inventory review date is invalid")
         if problem:
             errors.append(problem)
@@ -356,7 +350,7 @@ def check_readiness(root: Path) -> None:
         errors.extend(check_public_launch_evidence(root, project))
 
     if errors:
-        raise RepoctlError("readiness check failed:\n- " + "\n- ".join(errors))
+        raise check_failed("readiness", errors)
     if project.get("phase") == "public-launch":
         print(
             "Configured public-launch gates passed; this is not a full production-readiness "

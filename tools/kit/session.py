@@ -17,13 +17,16 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from . import derive, docsync, hygiene
-from .core import RepoctlError, default_branch, governance_profile, load_project, read_text_file, repository_files
+from .core import (
+    GATE_COMMIT_BLOCKED, GATE_NOT_FINISHED, GATE_STOP_BLOCKED,
+    RepoctlError, default_branch, governance_profile, load_project, read_text_file, repository_files,
+)
 from .garden import self_heal_errors
-from .gitinfo import branch, branch_paths, changed_paths, committed_paths, git, head, path_matches
+from .gitinfo import branch, branch_paths, changed_paths, committed_paths, diff_paths, git, head, path_matches
 from .names import HANDOVER
 from .navigate import print_map
 from .product import next_step, product_summary
-from .registry import Registry, project_plugin_files
+from .registry import KINDS, Registry, project_plugin_files
 from .risk import assess, classify, tier_rules
 from .uireview import review_status
 
@@ -103,7 +106,7 @@ def session_changes(root: Path, session: str) -> list[str] | None:
     if start:
         if git(root, "merge-base", "--is-ancestor", start, "HEAD") is None:
             return None  # the start commit is gone or not an ancestor: judge the whole tree
-        committed = (git(root, "diff", "--name-only", f"{start}..HEAD") or "").splitlines()
+        committed = diff_paths(root, f"{start}..HEAD")
     dirty = [path for path in changed_paths(root) if snapshot.get(path) != _digest(root, path)]
     return sorted(path for path in set(dirty) | set(committed) if path and not path.startswith(".agent/"))  # .agent/ is hook scratch
 
@@ -164,8 +167,8 @@ def session_start(root: Path, event: dict[str, object] | None = None) -> None:
         f"  {CRITIC_RECORD}, which `make done` reads before a high-risk change set can be called done.\n"
         "- Navigate with `make where Q=\"...\"` before broad searching; `make risk` sets the ceremony for your change.\n"
         "- Before declaring done: update the docs that cover what you changed, then `make done`."
-        "\n- Missing a capability? `make similar Q=\"...\"`, then `make new KIND=...` (skill, agent, doc, rule, check,"
-        "\n  command, mcp, or pack) wires it in; outside tools go through the skill-scout role first."
+        f"\n- Missing a capability? `make similar Q=\"...\"`, then `make new KIND=...` ({', '.join(KINDS[:5])},"
+        f"\n  {', '.join(KINDS[5:-1])}, or {KINDS[-1]}) wires it in; outside tools go through the skill-scout role first."
     )
 
 
@@ -346,7 +349,7 @@ def _plugin_findings(root: Path) -> list[str]:
 
 def commit_gate(root: Path, message_file: str | None) -> int:
     """git commit-msg gate over the staged change set; returns the exit code."""
-    staged = [path for path in (git(root, "diff", "--cached", "--name-only") or "").splitlines() if path]
+    staged = diff_paths(root, "--cached")
     if not staged:
         return 0
     try:
@@ -365,7 +368,7 @@ def commit_gate(root: Path, message_file: str | None) -> int:
     # stale-document check still read those commits' trailers.
     merged_in: set[str] = set()
     if git(root, "rev-parse", "-q", "--verify", "MERGE_HEAD") is not None:
-        merged_in = set((git(root, "diff", "--name-only", "HEAD...MERGE_HEAD") or "").split())
+        merged_in = set(diff_paths(root, "HEAD...MERGE_HEAD"))
     findings = _plugin_findings(root) + [
         f"{doc} covers staged {', '.join(paths[:4])} but is not staged"
         for doc, paths in docsync.pending_documents(doc_bindings, [p for p in staged if p not in merged_in]).items()
@@ -377,7 +380,7 @@ def commit_gate(root: Path, message_file: str | None) -> int:
     findings += hygiene.scan_markers(root, [path for path in staged if path in file_set]).errors
     if not findings:
         return 0
-    print("Commit blocked by the self-healing gate (docs/self-healing.md):", file=sys.stderr)
+    print(f"{GATE_COMMIT_BLOCKED} by the self-healing gate (docs/self-healing.md):", file=sys.stderr)
     print("\n".join(f"- {item}" for item in findings[:15]), file=sys.stderr)
     print(
         "Owed doc: update and stage it, or add the trailer 'Docs-Unaffected: <doc.md> <reason>'\n"
@@ -415,7 +418,7 @@ def stop(root: Path, event: dict[str, object]) -> None:
         return  # the agent already continued once because of this gate
     findings = finish_findings(root, session_changes(root, str(event.get("session_id", "local"))))
     if findings:
-        reason = "Self-healing gate before stopping:\n" + "\n".join(f"- {item}" for item in findings[:12])
+        reason = f"{GATE_STOP_BLOCKED}:\n" + "\n".join(f"- {item}" for item in findings[:12])
         reason += "\nFix these (delegate doc work to the doc-gardener role if large), or explain to the user why they stay."
         print(json.dumps({"decision": "block", "reason": reason}))
 
@@ -425,7 +428,7 @@ def finish(root: Path) -> int:
     tier, _ = assess(root)
     print(f"Change risk tier: {tier} (details: make risk)")
     if findings:
-        print("Not finished:\n" + "\n".join(f"- {item}" for item in findings))
+        print(f"{GATE_NOT_FINISHED}\n" + "\n".join(f"- {item}" for item in findings))
         return 1
     print("Self-healing gate passed for this branch's change set.")
     if not _product_on(root):
@@ -439,22 +442,26 @@ def finish(root: Path) -> int:
     return 0
 
 
-# The one list of hook events: `repoctl hook <event>`, its argument choices, and the dispatcher all derive from it.
+# The one list of hook events: `repoctl hook <event>` and its argument choices, the host
+# adapter wiring (adapters.py), and the dispatcher below all use these names.
+SESSION_START, PRE_COMPACT, AFTER_EDIT, STOP, COMMIT_MSG = (
+    "session-start", "pre-compact", "after-edit", "stop", "commit-msg",
+)
 HANDLERS = {
-    "session-start": lambda root, event: session_start(root, event),
-    "pre-compact": lambda root, event: pre_compact(root),
-    "after-edit": lambda root, event: after_edit(root, event),
-    "stop": lambda root, event: stop(root, event),
+    SESSION_START: lambda root, event: session_start(root, event),
+    PRE_COMPACT: lambda root, event: pre_compact(root),
+    AFTER_EDIT: lambda root, event: after_edit(root, event),
+    STOP: lambda root, event: stop(root, event),
 }
-HOOK_EVENTS = (*HANDLERS, "commit-msg")
+HOOK_EVENTS = (*HANDLERS, COMMIT_MSG)
 
 
 def run_hook(root: Path, event_name: str, message_file: str | None = None) -> int:
-    if event_name == "commit-msg":
+    if event_name == COMMIT_MSG:
         try:
             return commit_gate(root, message_file)
         except Exception as error:  # noqa: BLE001 - a gate that crashed has not approved the commit
-            print(f"commit blocked: the gate itself failed: {type(error).__name__}: {error} "
+            print(f"{GATE_COMMIT_BLOCKED}: the gate itself failed: {type(error).__name__}: {error} "
                   "(`git commit --no-verify` bypasses it; say why in the PR)", file=sys.stderr)
             return GATE_BLOCKED
     event = read_event()

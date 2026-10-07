@@ -23,7 +23,7 @@ from typing import Callable
 
 import tomllib  # repoctl.py fails fast on Python < 3.11
 
-from .core import KEBAB, RepoctlError, load_project, package_skill, read_utf8, repository_files
+from .core import KEBAB, RepoctlError, check_failed, load_project, package_skill, read_utf8, repository_files
 
 KINDS = ("skill", "agent", "doc", "rule", "check", "command", "mcp", "pack")  # the one list of capability kinds
 CORE = "core"
@@ -160,7 +160,7 @@ def _mcp(root: Path) -> list[Capability]:
         extra = {key: value for key, value in route.items() if key not in {"name", "description", "pack"}}
         routes.append(Capability("mcp", path.stem, str(route.get("description", "")), relative, str(route.get("pack") or CORE), extra))
     if errors:
-        raise RepoctlError("mcp routes check failed:\n- " + "\n- ".join(errors))
+        raise check_failed("mcp routes", errors)
     return routes
 
 

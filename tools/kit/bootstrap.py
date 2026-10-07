@@ -19,6 +19,7 @@ from .core import (
     repository_files,
 )
 from .gitinfo import path_matches
+from .names import STACK_DECISION, VISION
 
 
 def update_readme_identity(root: Path, name: str, kind: str, old_name: str) -> None:
@@ -180,7 +181,7 @@ def reset_vision_for_project(root: Path, manifest: str, project_name: str, templ
         manifest,
         count=1,
     )
-    for relative, skeleton in (("VISION.md", VISION_SKELETON), ("docs/STACK-DECISION.md", STACK_SKELETON)):
+    for relative, skeleton in ((VISION, VISION_SKELETON), (STACK_DECISION, STACK_SKELETON)):
         path = ensure_inside_root(root, root / relative, "intake record")
         if _template_record(path, template_name):
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -307,7 +308,7 @@ def initialize_project(root: Path, name: str, kind: str, owner: str | None = Non
     if owner:
         # Name the accountable owner once here instead of failing later checks on a placeholder.
         manifest = manifest.replace('"project-owner"', f'"{owner}"')
-        for record in ("VISION.md", "docs/STACK-DECISION.md"):
+        for record in (VISION, STACK_DECISION):
             path = root / record
             if path.is_file():
                 path.write_text(path.read_text(encoding="utf-8").replace("Owner: project-owner", f"Owner: {owner}"), encoding="utf-8")

@@ -68,9 +68,7 @@ maintainability, and cleanup. A P0/P1 label is not a substitute for evidence.
 Do not silently implement a broad audit in the same pass. After the issues are
 filed and prioritized, the issue selected for implementation becomes the
 write-ahead record. Re-run its reproduction, make the smallest fix, and use the
-independent quality loop in [`verification.md`](./verification.md).
-
-For a large or subjective creative deliverable, use builder/critic agents and
-real rendered evidence. For a code audit, use a fresh reviewer and focused
-tests. In both cases, cap iterations, record residual disagreement, and avoid
-claiming universal perfection.
+independent quality loop in [`verification.md`](./verification.md#the-quality-loop)
+— for a large or subjective creative deliverable as much as for a code audit.
+It caps the builder/critic iterations and records the residual disagreement
+instead of claiming universal perfection.

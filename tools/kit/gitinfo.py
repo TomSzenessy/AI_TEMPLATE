@@ -69,12 +69,17 @@ def changed_paths(root: Path) -> list[str]:
     return sorted(set(paths))
 
 
+def diff_paths(root: Path, *revisions: str) -> list[str]:
+    """Paths in `git diff --name-only <revisions>`: the one parser for every changed-path list."""
+    return [line for line in (git(root, "diff", "--name-only", *revisions) or "").splitlines() if line]
+
+
 def committed_paths(root: Path, base: str) -> list[str]:
     """Paths committed on this branch since it diverged from base (a critic reviews a diff, not a dirty tree)."""
     merge_base = (git(root, "merge-base", "HEAD", base) or "").strip()
     if not merge_base:
         return []
-    return [line for line in (git(root, "diff", "--name-only", merge_base, "HEAD") or "").splitlines() if line]
+    return diff_paths(root, merge_base, "HEAD")
 
 
 def branch_paths(root: Path, base: str) -> list[str]:

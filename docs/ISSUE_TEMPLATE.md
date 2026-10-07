@@ -3,10 +3,15 @@
 <!-- index: operate | Canonical issue shape and labels | Filing or materially updating an issue. -->
 <!-- covers: tools/kit/issues.py tools/kit/github.py tools/issue_contract.py tools/kit/ci.py .github/ISSUE_TEMPLATE/** .github/issue-labels.json .github/workflows/issue-contract.yml .github/workflows/require-issue-reference.yml -->
 
-GitHub Issues are the live task, status, and evidence register. This file defines
-the minimum shape for a new or materially updated issue. Search open and closed
-issues by title, symptom, path, and topic before filing; update the existing
-record when the root cause and acceptance boundary match.
+GitHub Issues are the live task, status, and evidence register. This file owns
+the write-ahead rule and defines the minimum shape for a new or materially
+updated issue. Before a behavior, schema, contract, security, privacy, or
+operational change, search open and closed issues and `ERROR_LOG.md` by title,
+symptom, path, and topic first, then file one issue per independent root cause
+**before** implementation, carrying intended behavior, scope, risks, and
+evidence-producing acceptance criteria; file confirmed residuals as their own
+issues before completion. Update the existing record when the
+root cause and acceptance boundary match.
 
 ## No GitHub remote yet
 
@@ -19,7 +24,9 @@ so a local plan never costs a round of disclosure paperwork. Cite the id in
 commits. Once the repository has a GitHub target, `make issue WAL=all` (or
 `WAL=Local-WAL-002`) files each draft under the full contract, prints the new
 issue URL, and marks the draft `Filed:` so it is never filed twice; a draft
-that does not meet the contract yet is listed with the reason and left as is. Never keep live work in a tracked Markdown file; `make check` rejects
+that does not meet the contract yet is listed with the reason and left as is. Assembling a
+`Local-WAL` packet is not authorization to implement: the draft (or the issue)
+must exist before the change it covers starts. Never keep live work in a tracked Markdown file; `make check` rejects
 tracked backlogs.
 
 Under the `regulated` profile, public filing also needs `PUBLIC_REVIEWED=1`
@@ -84,7 +91,9 @@ default `agent-first` profile requires the compact contract: `Summary`,
 reviewer. `minimal` delegates the issue contract to the host organization. Native
 GitHub forms are for `agent-first` intake; `regulated` uses the CLI/private route
 and `minimal` uses the host's route, so a project using either profile must
-remove or disable `.github/ISSUE_TEMPLATE/` before `make check` is green.
+remove or disable `.github/ISSUE_TEMPLATE/` before `make check` is green. The
+profile sets how much friction the gates apply overall, not only this contract;
+change it deliberately and record the reason in the issue.
 Replace placeholders; write `N/A — reason` when a section genuinely does not
 apply.
 

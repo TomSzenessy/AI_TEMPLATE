@@ -85,18 +85,20 @@ def render_claude(root: Path) -> dict[str, str]:
             "`docs/delegation.md` (the brief and report contract) before acting, then do the "
             "task in your brief and answer only in the report format they define.\n"
         )
+    from . import session  # local: session imports derive, which imports this module
+
     settings = {
         "$schema": "https://json.schemastore.org/claude-code-settings.json",
         "hooks": {
-            "SessionStart": [{"hooks": [{"type": "command", "command": HOOK.format(event="session-start")}]}],
-            "PreCompact": [{"hooks": [{"type": "command", "command": HOOK.format(event="pre-compact")}]}],
+            "SessionStart": [{"hooks": [{"type": "command", "command": HOOK.format(event=session.SESSION_START)}]}],
+            "PreCompact": [{"hooks": [{"type": "command", "command": HOOK.format(event=session.PRE_COMPACT)}]}],
             "PostToolUse": [
                 {
                     "matcher": "Edit|Write|MultiEdit|NotebookEdit",
-                    "hooks": [{"type": "command", "command": HOOK.format(event="after-edit")}],
+                    "hooks": [{"type": "command", "command": HOOK.format(event=session.AFTER_EDIT)}],
                 }
             ],
-            "Stop": [{"hooks": [{"type": "command", "command": HOOK.format(event="stop")}]}],
+            "Stop": [{"hooks": [{"type": "command", "command": HOOK.format(event=session.STOP)}]}],
         },
         "permissions": {"allow": [f"Bash({command})" for command in allow]},
     }

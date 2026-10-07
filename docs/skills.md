@@ -119,20 +119,18 @@ grows without losing its shape:
 1. **Look here first.** `make similar Q="<what it should do>"` scores every
    kind (skills, roles, rules, checks, commands, MCP routes, packs, docs),
    including packs that are switched off. At or above `[kit].overlap_limit`
-   (0.30) for the same kind, extend that capability instead; `make new`
-   refuses a near-duplicate of the same kind unless `FORCE=1`.
+   (0.30) for the same kind, extend that capability instead.
 2. **Look outside.** Nothing fits: the `skill-scout` role searches skill
    catalogs, MCP registries, and the web, vets candidates under the discovery
    loop above, and returns a ready-to-review provenance entry. It never
    installs anything; the owner decides.
 3. **Integrate.** `make new KIND=<kind> NAME=... DESC="<what>; <when>"`
-   writes the file with valid metadata (`PACK=<pack>` groups it), wires it in,
-   and leaves `FILL-IN:` lines that fail until the content is real. A vetted
+   (`PACK=<pack>` groups it) writes the file and wires it in
+   ([mechanics](./capabilities.md)). A vetted
    third-party skill is vendored into `.agents/skills/<name>/` with its
    `[[skills]]` provenance (and its `pack`, since its files are pinned by digest).
 
-A capability only a few projects need goes into a pack that is off by
-default; it costs no context until someone switches it on.
+A capability only a few projects need goes into a [pack](./capabilities.md).
 
 ## Reviewed capability pack: reference-product work
 

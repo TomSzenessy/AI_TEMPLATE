@@ -194,7 +194,7 @@ def _is_pin_bump(root: Path, commit: str, email: str, name: str) -> bool:
     """A Dependabot-authored commit that changes only `uses:` pins (one git call, bot commits only)."""
     if email.strip().lower() not in BOT_EMAILS and name.strip().lower() not in BOT_NAMES:
         return False
-    diff = git(root, "-c", "core.quotepath=false", "show", "--format=", "-U0", "--no-color", commit, timeout=60)
+    diff = git(root, "show", "--format=", "-U0", "--no-color", commit, timeout=60)
     return diff is not None and pin_only_diff(diff)
 
 
@@ -208,8 +208,6 @@ def history_read(
     """
     output = git(
         root,
-        "-c",
-        "core.quotepath=false",  # keep non-ASCII paths unquoted so they match covers globs
         "log",
         *([revisions] if revisions else []),
         f"-n{HISTORY_LIMIT}",

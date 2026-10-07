@@ -3,9 +3,9 @@
 <!-- index: operate | Lean core, artifact lifecycle, packs, and capability patterns | Turning the template into a project without generating unnecessary structure. -->
 <!-- covers: tools/kit/bootstrap.py tools/kit/adopt.py -->
 
-The template is a small kernel plus switchable packs (`.agents/packs/`,
-`project.toml [packs]`), not a universal application scaffold. `make init`
-starts a project with each pack's default: `product` on, `measure` off. The kernel stays responsible for navigation, the project
+The template is a small kernel plus switchable packs (`.agents/packs/`;
+[`[packs]` switching rules](./capabilities.md)), not a universal application scaffold. `make init`
+starts a project from each pack's declared default. The kernel stays responsible for navigation, the project
 manifest, issue-backed intent, path safety, declared verification, and bounded
 review. Project-specific policy and code are added only after the vision intake
 identifies a real need.
@@ -25,7 +25,7 @@ a project small:
 | `docs/ISSUE_TEMPLATE.md` and `.github/ISSUE_TEMPLATE/` | Keep as `agent-first` intake schemas. | Do not turn them into a status board; remove/disable native forms in `regulated` or `minimal` profiles. |
 | `docs/legal/*.template.md` | Keep while a document may apply. | Replace with a reviewed final document and update `legal_document_paths`; unused templates may be removed from a project copy. |
 | `docs/research/` | Keep as provenance while its guidance matters. | Archive/remove after the knowledge has been internalized and no decision cites it. |
-| `tools/kit-lock.json` | Written by `make init`, `make adopt`, and `make kit-update`: what the project got from the kit. | Never edit by hand; `make kit-update` maintains it; `KIT_REF=<sha>` pins an update to one template commit instead of its HEAD ([self-healing](./self-healing.md#fixes-reach-every-project-make-kit-update)). |
+| `tools/kit-lock.json` | Written by `make init`, `make adopt`, and `make kit-update`: what the project got from the kit. | Never edit by hand; `make kit-update` maintains it; `KIT_REF=<sha>` pins an update to one template commit instead of its HEAD ([`kit-update.md`](./kit-update.md)). |
 | `project.mk` | Your own make targets; the kit Makefile includes it. | Keep project targets here, not in the kit's Makefile. |
 | `.agents/trials/` | Template maintenance: build-trial requests and seeds. | Pruned by `make init` and skipped by `make adopt`, together with any doc binding that only pointed at them; add your own requests to run `make trial`. |
 | `docs/ERROR_LOG.md` | Keep as an append-only solved-failure ledger. | Do not use it for open work; link open work to Issues. |

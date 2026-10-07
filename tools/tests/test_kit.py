@@ -653,7 +653,7 @@ class UiReviewTests(KitRepository):
         self.assertIn("never had a UI review", str(raised.exception))
 
 
-class TrialTests(unittest.TestCase):
+class TrialTests(Scratch):
     """make trial: the build-trial request format, setup, and friction analysis."""
 
     def test_analysis_counts_spend_commands_and_friction(self) -> None:
@@ -714,7 +714,7 @@ class TrialTests(unittest.TestCase):
 
 
 @template_only
-class GoldenPathTests(unittest.TestCase):
+class GoldenPathTests(Scratch):
     """The promise of the template: an agent that does the intake meets no template bug.
 
     init -> minimal intake (accepted vision and stack, owner, one real surface) -> make done
@@ -777,7 +777,7 @@ class GoldenPathTests(unittest.TestCase):
 
 
 @template_only
-class KitUpdateTests(unittest.TestCase):
+class KitUpdateTests(Scratch):
     """Template fixes reach projects already made from it, without overwriting the project's changes."""
 
     def git(self, where: Path, *args: str) -> str:
@@ -880,7 +880,7 @@ class KitUpdateTests(unittest.TestCase):
 
 
 @template_only
-class InitOwnerTests(unittest.TestCase):
+class InitOwnerTests(Scratch):
     def test_init_names_the_owner_everywhere_and_refuses_emails(self) -> None:
         from kit import trial
         with tempfile.TemporaryDirectory() as folder:

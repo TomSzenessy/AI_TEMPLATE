@@ -196,10 +196,24 @@ def build_demo(root: Path) -> None:
     git_in(root, "commit", "-q", "-m", "initial")
 
 
+_DEMO: Path | None = None
+_DEMO_HOME: tempfile.TemporaryDirectory[str] | None = None  # held for the process so the template outlives every test
+
+
+def demo_template() -> Path:
+    """The demo repository, built once per process: the same tree for every test, copied, never shared."""
+    global _DEMO, _DEMO_HOME
+    if _DEMO is None:
+        _DEMO_HOME = tempfile.TemporaryDirectory()
+        _DEMO = Path(_DEMO_HOME.name) / "repo"
+        build_demo(_DEMO)
+    return _DEMO
+
+
 class KitRepository(Scratch):
     """A throwaway git repository with one bound doc, one skill, and one role.
 
-    The base tree is built once per test class and copied per test (#43, T-04);
+    The base tree is built once per process and copied per test (#43, T-04);
     each test mutates and commits its own copy.
     """
 
@@ -209,17 +223,9 @@ class KitRepository(Scratch):
     CONTRACT = frozenset({"manifest-structure", "skill-provenance", "file-hygiene", "markdown-links", "docs-index",
                           "orphan-files", "host-read-config"})
 
-    @classmethod
-    def setUpClass(cls) -> None:
-        super().setUpClass()
-        built = tempfile.TemporaryDirectory()
-        cls.addClassCleanup(built.cleanup)
-        cls._demo = Path(built.name) / "repo"
-        build_demo(cls._demo)
-
     def setUp(self) -> None:
         super().setUp()
-        shutil.copytree(self._demo, self.root, dirs_exist_ok=True)
+        shutil.copytree(demo_template(), self.root, dirs_exist_ok=True)
 
     def self_heal(self) -> str:
         """The self-healing findings `make check` adds on top of the repository-contract checks."""

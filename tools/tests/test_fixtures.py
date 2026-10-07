@@ -14,7 +14,7 @@ from pathlib import Path
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # `fixtures`, however this file is invoked (#33)
-from fixtures import KitRepository, Scratch  # noqa: E402
+from fixtures import Scratch, git_in  # noqa: E402
 
 
 def hostile_home(root: Path) -> Path:
@@ -40,14 +40,15 @@ class GitIsolationTests(Scratch):
             self.assertEqual(self.git_result("config", "--get", "core.hooksPath").stdout, "")
 
 
-class KitGitIsolationTests(KitRepository):
-    def test_the_kit_and_the_in_process_cli_ignore_a_hostile_global_git_config(self) -> None:
-        self.write("src/billing/invoice.py", "def render_invoice():\n    return 2\n")
-        self.commit("change billing")
+class KitGitIsolationTests(Scratch):
+    def test_the_kits_own_git_commits_ignore_a_hostile_global_git_config(self) -> None:
+        from kit import trial
+        self.git("init", "-q", "-b", "main")
+        self.write("a.txt", "x\n")
         with mock.patch.dict(os.environ, {"HOME": str(hostile_home(self.root))}):
-            self.assertIn("docs/billing.md: stale since", self.self_heal())  # kit-internal git, read path
-            result = self.cli("check")  # the same through the in-process CLI entry point
-            self.assertIn("stale since", result.stderr)
+            trial._commit(self.root, "kit-driven commit")  # gpgsign in the hostile config would refuse it
+            self.assertEqual(git_in(self.root, "log", "-1", "--format=%s").stdout, "kit-driven commit\n")
+            result = self.cli("check")  # and the in-process CLI entry point runs the same git
             self.assertNotIn("Traceback", result.stderr)
 
 

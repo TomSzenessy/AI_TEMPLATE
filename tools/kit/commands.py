@@ -11,7 +11,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from . import ci, derive, scaffold, session
-from .core import RepoctlError, ensure_inside_root, load_project
+from .core import RepoctlError, check_failed, ensure_inside_root, load_project
 from .registry import KINDS, arg, command
 
 # make help groups, in display order.
@@ -36,8 +36,8 @@ def _require_self_heal(root: Path) -> None:
     if errors:
         from .registry import Registry, blocking_reasons
         reasons = blocking_reasons(Registry(root), errors)
-        raise RepoctlError("self-healing check failed:\n- " + "\n- ".join(errors)
-                           + ("\nWhy these block:\n  " + "\n  ".join(reasons) if reasons else ""))
+        raise check_failed("self-healing", errors,
+                           "\nWhy these block:\n  " + "\n  ".join(reasons) if reasons else "")
 
 
 # --- Every session ---------------------------------------------------------------

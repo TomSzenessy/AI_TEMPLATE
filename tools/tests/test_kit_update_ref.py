@@ -13,16 +13,18 @@ from pathlib import Path
 TOOLS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(TOOLS))
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # `fixtures`, however this file is invoked (#33)
+from fixtures import Scratch, git_in, run_cli  # noqa: E402  shared builders, in-process CLI, isolated git (#43)
+
 IN_TEMPLATE = tomllib.loads((TOOLS.parent / "project.toml").read_text(encoding="utf-8")).get("kind") == "template"
 
 
 def git(where: Path, *args: str) -> str:
-    return subprocess.run(["git", "-C", str(where), "-c", "user.name=t", "-c", "user.email=t@example.invalid", *args],
-                          check=True, capture_output=True, text=True).stdout
+    return git_in(where, *args).stdout
 
 
 @unittest.skipUnless(IN_TEMPLATE, "template maintenance: runs in the template checkout only")
-class KitRefTests(unittest.TestCase):
+class KitRefTests(Scratch):
     def build(self, temp: str) -> tuple[Path, Path, str, str]:
         """A local template with commits A then B, and a project made from A whose [template].source is it."""
         from kit import core, trial
@@ -53,8 +55,7 @@ class KitRefTests(unittest.TestCase):
         return kit, project, first, second
 
     def run_update(self, project: Path, *args: str) -> subprocess.CompletedProcess[str]:
-        return subprocess.run([sys.executable, "tools/repoctl.py", "kit-update", *args],
-                              cwd=project, capture_output=True, text=True)
+        return run_cli(project, "kit-update", *args)
 
     def test_pinned_ref_applies_that_commit_and_prints_the_range(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

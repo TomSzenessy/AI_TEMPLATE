@@ -1,6 +1,6 @@
 ---
 name: critic
-description: "Fresh, read-only reviewer that tries to falsify a completion claim against the original acceptance criteria, the diff, and the real artifact. Use before declaring high-risk or subjective work done; returns one verdict, blocker or ship-with-residuals."
+description: "Fresh, read-only reviewer that tries to falsify a completion claim against the original acceptance criteria, the diff, and the real artifact. Use before declaring high-risk or subjective work done; the verdict vocabulary is owned by docs/delegation.md."
 tools: Read, Grep, Glob, Bash
 model: opus
 ---

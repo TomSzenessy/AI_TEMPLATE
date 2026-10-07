@@ -46,6 +46,20 @@ class RepoctlError(Exception):
     """An actionable repository governance failure."""
 
 
+# The gate vocabulary: the exact phrases a gate prints when it blocks, defined once so the
+# trial friction counter (trial.py compiles them into BLOCK) and the gates cannot drift apart.
+GATE_COMMIT_BLOCKED = "Commit blocked"
+GATE_NOT_FINISHED = "Not finished:"
+GATE_CHECK_FAILED = "check failed"
+GATE_STOP_BLOCKED = "Self-healing gate before stopping"
+GATE_BLOCK_PHRASES = (GATE_COMMIT_BLOCKED, GATE_NOT_FINISHED, GATE_CHECK_FAILED, GATE_STOP_BLOCKED)
+
+
+def check_failed(name: str, errors: list[str], note: str = "") -> RepoctlError:
+    """The one "check failed" error a gate raises when it lists findings (trial counts its phrase)."""
+    return RepoctlError(f"{name} {GATE_CHECK_FAILED}:\n- " + "\n- ".join(errors) + note)
+
+
 def replace_manifest_field(manifest: str, field: str, value: str) -> str:
     pattern = re.compile(rf'^{re.escape(field)} = "[^"]*"$', re.MULTILINE)
     replacement = f'{field} = "{value}"'
@@ -263,6 +277,17 @@ def date_is_stale(value: "date") -> bool:
     return value > today() or value < today() - timedelta(days=365)
 
 
+def date_problem(value: str | None, stale: str, invalid: str) -> str | None:
+    """The problem with an ISO date that must be recent and not in the future, or None.
+
+    One idiom for every "is this review date current?" rule (launch evidence, issue review).
+    """
+    parsed = parse_iso_date(value)
+    if parsed is None:
+        return invalid
+    return stale if date_is_stale(parsed) else None
+
+
 def is_placeholder(value: object) -> bool:
     if not isinstance(value, str) or not value.strip():
         return True
@@ -318,6 +343,11 @@ def safe_markdown_text(value: str) -> str:
 def package_skill(package: object) -> str:
     """The skill name of a `owner/repo@skill` provenance package (the whole text when it has no `@`)."""
     return str(package).rpartition("@")[2]
+
+
+def package_repo(package: object) -> str:
+    """The `owner/repo` half of a provenance package spec (everything before its first `@`)."""
+    return str(package).partition("@")[0]
 
 
 def slugify(value: str) -> str:

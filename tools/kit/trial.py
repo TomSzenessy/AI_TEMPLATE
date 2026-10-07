@@ -36,14 +36,14 @@ from pathlib import Path
 
 import tomllib
 
-from .core import RepoctlError, ensure_inside_root, repository_files
+from .core import GATE_BLOCK_PHRASES, RepoctlError, ensure_inside_root, repository_files
 from .evals import run_headless
-from .gitinfo import git
+from .gitinfo import git, run_git
 
 TRIALS = ".agents/trials"
 REPORTS = ".agent/trials"
 MODES = {"new", "adopt"}
-BLOCK = re.compile(r"Commit blocked|Not finished:|check failed|Self-healing gate before stopping")
+BLOCK = re.compile("|".join(re.escape(phrase) for phrase in GATE_BLOCK_PHRASES))  # gate phrases live in core
 MAKE = re.compile(r"\bmake\s+([a-z][a-z0-9-]*)")
 
 
@@ -83,18 +83,26 @@ def _run(command: list[str], cwd: Path) -> None:
         raise RepoctlError(f"trial setup failed: {' '.join(command)}\n{(result.stdout + result.stderr).strip()[-600:]}")
 
 
+def _git(project: Path, *arguments: str) -> None:
+    """Trial setup runs git through gitinfo like every other kit call: its timeout and one owner."""
+    result = run_git(project, *arguments)
+    if result is None or result.returncode != 0:
+        detail = "" if result is None else (result.stdout + result.stderr).strip()[-600:]
+        raise RepoctlError(f"trial setup failed: git {' '.join(arguments)}\n{detail}")
+
+
 def _commit(project: Path, message: str) -> None:
-    _run(["git", "add", "-A"], project)
-    _run(["git", "-c", "user.name=Trial Owner", "-c", "user.email=trial@example.invalid",
-          "commit", "-q", "-m", message], project)
+    _git(project, "add", "-A")
+    _git(project, "-c", "user.name=Trial Owner", "-c", "user.email=trial@example.invalid",
+         "commit", "-q", "-m", message)
 
 
 def prepare(root: Path, spec: dict[str, object], project: Path) -> None:
     """A fresh project as the owner would have it before asking the agent."""
     project.mkdir(parents=True, exist_ok=True)
-    _run(["git", "init", "-q", "-b", "main"], project)
-    _run(["git", "config", "user.name", "Trial Owner"], project)
-    _run(["git", "config", "user.email", "trial@example.invalid"], project)
+    _git(project, "init", "-q", "-b", "main")
+    _git(project, "config", "user.name", "Trial Owner")
+    _git(project, "config", "user.email", "trial@example.invalid")
     if spec["mode"] == "new":
         _copy(root, repository_files(root), project)
         _run([sys.executable, "tools/repoctl.py", "init", "--name", str(spec["id"]), "--kind", str(spec["kind"]),
