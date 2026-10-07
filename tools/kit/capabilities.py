@@ -1,7 +1,9 @@
-"""Report what this machine and checkout can do, without revealing any secret.
+"""Report what this checkout and machine can do, without revealing any secret.
 
-Agents should know up front whether they can browse, search, read current docs,
-file issues, or run containers, instead of discovering a gap mid-task.
+First every capability of the repository by kind and pack (docs/adr/0002),
+including packs that are switched off and how to switch them on; then whether
+this machine can browse, search, read current docs, file issues, or run
+containers, so agents learn a gap up front instead of mid-task.
 """
 
 from __future__ import annotations
@@ -12,7 +14,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-from .adapters import configured_hosts, mcp_routes
+from .adapters import configured_hosts
+from .registry import KINDS, Registry
 
 TOOLS = {
     "git": "version control",
@@ -33,7 +36,19 @@ def _gh_authenticated() -> bool:
 
 
 def print_capabilities(root: Path) -> None:
-    print(f"python: {sys.version.split()[0]} ({'ok' if sys.version_info >= (3, 11) else 'needs 3.11+'})")
+    registry = Registry(root)
+    print("## Packs (project.toml [packs] overrides each default)")
+    for pack in registry.of("pack", enabled_only=False):
+        state = "on" if registry.enabled(pack) else f"off (enable: {pack.name} = true under [packs])"
+        print(f"- {pack.name} [{state}]: {pack.description}")
+    print("\n## Capabilities by kind (make where Q=<name> opens one; make new KIND=<kind> adds one)")
+    for kind in KINDS:
+        if kind in {"pack", "doc"}:
+            continue
+        names = [item.name + ("" if registry.enabled(item) else f" (off: {item.pack})") for item in registry.of(kind, enabled_only=False)]
+        print(f"- {kind} ({len(names)}): {', '.join(names) or 'none'}")
+    print(f"- doc ({len(registry.of('doc'))}): indexed in docs/README.md")
+    print(f"\npython: {sys.version.split()[0]} ({'ok' if sys.version_info >= (3, 11) else 'needs 3.11+'})")
     print("\n## Tools on PATH")
     for tool, purpose in TOOLS.items():
         found = shutil.which(tool)
@@ -44,16 +59,15 @@ def print_capabilities(root: Path) -> None:
     print("\n## Agent hosts installed")
     print("- " + ", ".join(f"{label}: {'yes' if shutil.which(binary) else 'no'}" for binary, label in AGENT_HOSTS.items()))
     print(f"- adapters generated for: {', '.join(configured_hosts(root)) or 'none'} (Codex/Copilot/Cursor read AGENTS.md and .agents/ directly)")
-    print("\n## MCP routes (resources.toml)")
-    routes = mcp_routes(root)
+    print("\n## MCP routes (.agents/mcp/)")
+    routes = registry.of("mcp", enabled_only=False)
     if not routes:
         print("- none declared")
     for route in routes:
-        variables = list(route.get("env_headers", {}).values())
+        spec = route.fields
+        variables = list(spec.get("env_headers", {}).values())
         keys = ", ".join(f"{name} {'set' if os.environ.get(name) else 'unset'}" for name in variables) or "no key needed"
-        runnable = route["transport"] == "http" or shutil.which(str(route["command"][0])) is not None
-        print(
-            f"- {route['id']} [{'enabled' if route.get('enabled') else 'disabled'}, {route['transport']}, "
-            f"{'runnable' if runnable else 'runner missing'}; {keys}]: {route['purpose']}"
-        )
+        runnable = spec["transport"] == "http" or shutil.which(str(spec["command"][0])) is not None
+        state = "enabled" if spec.get("enabled") and registry.enabled(route) else "disabled"
+        print(f"- {route.name} [{state}, {spec['transport']}, {'runnable' if runnable else 'runner missing'}; {keys}]: {route.description}")
     print("\nWeb access: hosts with built-in search/fetch work without MCP; MCP routes add current docs, search, and a real browser.")

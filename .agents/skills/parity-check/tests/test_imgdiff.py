@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Jake Schincariol. Adapted from https://github.com/Jakeschincariol/replica-skill @ 77c9436fb3d18c3d58169efb8caf4fe906b0dc51.
+# Copyright (c) 2026 Jake Schincariol. Adapted from https://github.com/Jakeschincariol/replica-skill (revision: see project.toml [[skills]]).
 
 import io
 import json
@@ -193,6 +193,16 @@ class Compare(unittest.TestCase):
         rep, _ = imgdiff.compare(page(), (w, h, canvas(w, h)), mode="layout")
         self.assertLess(rep["score"], 50.0)
         self.assertEqual(rep["verdict"], "different")
+
+    def test_blank_vs_blank_is_not_a_perfect_match(self):
+        w, h = 240, 360
+        rep, _ = imgdiff.compare((w, h, canvas(w, h)), (w, h, canvas(w, h)), mode="layout")
+        self.assertLess(rep["score"], 100.0)
+        self.assertIs(rep["comparable"], False)
+        self.assertNotEqual(rep["verdict"], "matches")
+        # pixel mode still says identical pixels are identical
+        rep, _ = imgdiff.compare((w, h, canvas(w, h)), (w, h, canvas(w, h)), mode="pixel")
+        self.assertEqual(rep["score"], 100.0)
 
     def test_retina_screenshot_compares_at_same_width(self):
         w, h, rows = page(120, 180)

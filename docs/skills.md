@@ -1,7 +1,7 @@
 # Skill discovery and provenance
 
 <!-- index: extend | Skill discovery, provenance, and overlap rules | A task needs a capability the repository does not provide. -->
-<!-- covers: .agents/skills/** tools/kit/skills.py -->
+<!-- covers: .agents/skills/** .agents/packs/** tools/kit/skills.py -->
 
 Skills are reviewed instruction packages, not magic prompt dumps. Use the
 smallest capability that closes the current gap and keep the repository lean.
@@ -73,17 +73,19 @@ rather than a large prompt collection:
 - [`../.agents/skills/repository-audit/SKILL.md`](../.agents/skills/repository-audit/SKILL.md)
   turns broad reviews into evidence-backed issues;
 - [`../.agents/skills/product-kickoff/SKILL.md`](../.agents/skills/product-kickoff/SKILL.md)
-  turns "build me an app" into confirmed platform, stack, and visual-direction
-  decisions with mockups before code;
+  turns "build me an app" into researched, confirmed decisions (research
+  record, feature list with production rows, platform, stack, mockups) before
+  code, then hands over to `make next`;
 - [`../.agents/skills/ux-quality/SKILL.md`](../.agents/skills/ux-quality/SKILL.md)
-  sets the UI/UX bar (platform conventions, states, accessibility, ethical
-  onboarding) and the screenshot review loop;
+  sets the UI/UX bar (visual polish against references, platform conventions,
+  states, accessibility, ethical onboarding) and the `make ui-review` loop;
 - [`../.agents/skills/stack-foundation/SKILL.md`](../.agents/skills/stack-foundation/SKILL.md)
   sets up a walking skeleton with strict types, lint, tests, CI, preview
   deploys, configuration, and error tracking before feature work.
 
 They are first-party bundled skills: they are source-controlled with the
 repository and do not belong in the third-party `[[skills]]` provenance ledger.
+`tools/kit/skills.py:BUNDLED_SKILLS` lists the template's defaults; `project.toml [capabilities].local_skills` declares which first-party skills the project actually uses.
 Third-party skills added later must include exact package/source match, an
 immutable revision, a matching whole-tree `content_digest`, a real review date,
 least-privilege permissions, and a rollback action. Add a new skill only when
@@ -92,7 +94,11 @@ keep the procedure in the owning document. Create first-party skills with
 `make new KIND=skill NAME=<name> DESC="<what>; <when>"`: it checks overlap,
 registers the skill in `project.toml [capabilities].local_skills`, and
 generates its host adapters. Third-party skills never use that path; they need
-`[[skills]]` provenance.
+`[[skills]]` provenance. A `reviewed_on` older than `[kit].skill_review_days`
+(a year by default) is reported by
+`make garden` and fails only `make readiness` from `private-preview` on; that
+age limit is now the setting instead of a hard-coded year, and `package` names
+parse through the shared `core.package_skill`.
 
 ## One canonical copy, any host
 
@@ -104,14 +110,29 @@ instructions, `make check` fails if they drift, and the after-edit hook
 regenerates them when a canonical skill changes. Subagent roles follow the same
 pattern from `.agents/agents/` (see [`delegation.md`](./delegation.md)).
 
-## Avoiding redundant capabilities
+## One path to find and integrate a capability
 
-Before adding a skill, role, or MCP route, run
-`make similar Q="<what it should do>"`. An overlap of 0.30 or more
-means you should extend or reuse the existing capability. The `skill-scout`
-role runs this check, searches catalogs, vets candidates under the discovery
-loop above, and returns a ready-to-review `[[skills]]` or `[[mcp]]` entry. It
-never installs anything itself.
+Every capability, local or from outside, ends up as one file in the same
+format ([ADR 0002](./adr/0002-one-capability-model.md)), so the repository
+grows without losing its shape:
+
+1. **Look here first.** `make similar Q="<what it should do>"` scores every
+   kind (skills, roles, rules, checks, commands, MCP routes, packs, docs),
+   including packs that are switched off. At or above `[kit].overlap_limit`
+   (0.30) for the same kind, extend that capability instead; `make new`
+   refuses a near-duplicate of the same kind unless `FORCE=1`.
+2. **Look outside.** Nothing fits: the `skill-scout` role searches skill
+   catalogs, MCP registries, and the web, vets candidates under the discovery
+   loop above, and returns a ready-to-review provenance entry. It never
+   installs anything; the owner decides.
+3. **Integrate.** `make new KIND=<kind> NAME=... DESC="<what>; <when>"`
+   writes the file with valid metadata (`PACK=<pack>` groups it), wires it in,
+   and leaves `FILL-IN:` lines that fail until the content is real. A vetted
+   third-party skill is vendored into `.agents/skills/<name>/` with its
+   `[[skills]]` provenance (and its `pack`, since its files are pinned by digest).
+
+A capability only a few projects need goes into a pack that is off by
+default; it costs no context until someone switches it on.
 
 ## Reviewed capability pack: reference-product work
 

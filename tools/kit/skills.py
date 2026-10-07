@@ -4,15 +4,13 @@ from __future__ import annotations
 
 import hashlib
 import re
-try:
-    import tomllib
-except ModuleNotFoundError as error:  # pragma: no cover - exercised on Python 3.10
-    raise SystemExit("repoctl requires Python 3.11 or newer") from error
-from datetime import datetime, timedelta, timezone
+import tomllib  # repoctl.py fails fast on Python < 3.11
+from datetime import datetime, timedelta
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from .core import RepoctlError, ensure_inside_root, is_link_like, is_placeholder, load_project
+from .config import project_setting
+from .core import KEBAB, RepoctlError, package_skill, today, ensure_inside_root, is_link_like, is_placeholder, load_project
 
 
 BUNDLED_SKILLS = {"agent-handover", "quality-loop", "repository-audit"}
@@ -52,7 +50,7 @@ def load_resource_registry(root: Path, project: dict[str, object] | None = None)
         scope = entry.get("scope")
         summary = entry.get("summary")
         mcp = entry.get("mcp", "")
-        if not isinstance(identifier, str) or not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", identifier):
+        if not isinstance(identifier, str) or not KEBAB.fullmatch(identifier):
             errors.append(f"resource #{position} id must be kebab-case")
         elif identifier in identifiers:
             errors.append(f"duplicate resource id: {identifier}")
@@ -70,18 +68,19 @@ def load_resource_registry(root: Path, project: dict[str, object] | None = None)
             parsed = urlsplit(source)
             if not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment:
                 errors.append(f"resource #{position} source must be a clean HTTPS URL")
-        if not isinstance(scope, str) or not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", scope):
+        if not isinstance(scope, str) or not KEBAB.fullmatch(scope):
             errors.append(f"resource #{position} scope must be kebab-case")
         if not isinstance(summary, str) or is_placeholder(summary):
             errors.append(f"resource #{position} summary is required")
-        if mcp and (not isinstance(mcp, str) or not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", mcp)):
+        if mcp and (not isinstance(mcp, str) or not KEBAB.fullmatch(mcp)):
             errors.append(f"resource #{position} mcp must be a kebab-case adapter name")
     if errors:
         raise RepoctlError("resource registry check failed:\n- " + "\n- ".join(errors))
     return entries
 
 
-def check_skill_provenance(project: dict[str, object]) -> None:
+def check_skill_provenance(project: dict[str, object], release_gate: bool = False) -> None:
+    """Provenance must be complete. Review age is a release gate; make garden reports it earlier."""
     skills = project.get("skills", [])
     if not isinstance(skills, list) or not all(isinstance(skill, dict) for skill in skills):
         raise RepoctlError("project.toml skills must be an array of tables")
@@ -128,9 +127,10 @@ def check_skill_provenance(project: dict[str, object]) -> None:
         if isinstance(reviewed_on, str) and reviewed_on.strip():
             try:
                 reviewed_date = datetime.strptime(reviewed_on, "%Y-%m-%d").date()
-                today = datetime.now(timezone.utc).date()
-                if reviewed_date > today or reviewed_date < today - timedelta(days=365):
-                    errors.append(f"skill #{position} reviewed_on is stale or in the future")
+                if reviewed_date > today():
+                    errors.append(f"skill #{position} reviewed_on is in the future")
+                elif release_gate and reviewed_date < today() - timedelta(days=int(project_setting(project, "skill_review_days"))):
+                    errors.append(f"skill #{position} reviewed_on is older than a year: re-review it before release")
             except ValueError:
                 errors.append(f"skill #{position} reviewed_on must be YYYY-MM-DD")
         permissions = skill.get("permissions")
@@ -178,7 +178,7 @@ def check_skill_admission(root: Path, project: dict[str, object]) -> None:
     if not isinstance(entries, list):
         raise RepoctlError("skills must be an array of tables")
     provenance = {
-        str(entry.get("package", "")).split("@", 1)[1]: entry
+        package_skill(entry.get("package", "")): entry
         for entry in entries
         if isinstance(entry, dict) and "@" in str(entry.get("package", ""))
     }

@@ -1,0 +1,41 @@
+# Acceptance benchmark (#21): a shape this template ships NO pack for.
+#
+# The template ships `product` and `measure` and no stack packs. A vision that
+# needs a capability the kit does not have is the only way to measure whether an
+# agent can shape the repository itself, rather than confirm a path already wired.
+#
+# Judged on the four audiences, not on lines: happy user (it works), happy
+# developer (compact, modular), happy designer (stunning, intuitive), happy agent
+# (a cold agent navigates it). Plus: green `make done`, no `--no-verify`, no gate
+# bypassed, and a kit-bug count of zero.
+id = "poster-press"
+kind = "web"
+mode = "new"
+budget_usd = 30
+prompt = '''
+I want "Press", a browser tool that makes generative art posters.
+
+I won't be available during this run. Answer my kickoff questions with your own
+recommendations and write down what you chose; for anything else, use your best
+judgement and record the decision.
+
+- Users: designers and hobbyists who want a striking, one-off image for a
+  screen print, a poster, or a phone wallpaper. They are not programmers.
+  Success = someone who has never seen it can produce a poster they would
+  actually print within a minute of opening the page.
+- The tool generates a poster from a seed plus a handful of controls: palette,
+  form (geometric, organic, typographic), density, scale, and a seed you can
+  lock and re-roll. Seeded generation, so the same seed always gives the same
+  poster and a poster can be shared as a link.
+- Controls are live: changing one re-renders without a loading spinner. Sliders
+  and swatches, keyboard accessible.
+- Export: download as PNG at print resolution, and copy a shareable link.
+- Visual quality is the product, not a detail. Restraint, real hierarchy, a
+  palette that holds together at poster scale. Empty space is a feature.
+- Pure browser. No accounts, no server, no backend, nothing leaves the machine.
+- Stack: your call.
+- Not now: animation, video export, saving to an account, a template gallery.
+
+Build it in this repository as far as you can toward something I could show
+someone tomorrow.
+'''

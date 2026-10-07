@@ -12,26 +12,29 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-try:
-    import tomllib
-except ModuleNotFoundError as error:  # pragma: no cover - exercised on Python 3.10
-    raise SystemExit("repoctl requires Python 3.11 or newer") from error
+import tomllib  # repoctl.py fails fast on Python < 3.11
 
 from .config import setting
 from .core import RepoctlError
 
 READ_ONLY_TOOLS = "Read Grep Glob Bash(make where:*) Bash(make map) Bash(git log:*) Bash(git status)"
+# The agent under test must not read its own answer key (.agents/evals/**), so the
+# claude command denies reads of it. Deny rules win over allow rules.
+EVAL_KEY = ".agents/evals"
+DENIED_READS = [f"{tool}({pattern})" for tool in ("Read", "Grep", "Glob") for pattern in (f"{EVAL_KEY}/**", f"**/{EVAL_KEY}/**")]
 HOST_COMMANDS = {
     # Navigation needs no MCP servers; an empty strict config keeps runs fast and deterministic.
     "claude": lambda prompt, model: [
         "claude", "-p", prompt, "--output-format", "json", "--strict-mcp-config",
         "--mcp-config", '{"mcpServers": {}}', *(["--model", model] if model else []),
         "--allowedTools", *READ_ONLY_TOOLS.split(" "),
+        "--disallowedTools", *DENIED_READS,
     ],
     "codex": lambda prompt, model: ["codex", "exec", "--sandbox", "read-only", *(["--model", model] if model else []), prompt],
     "gemini": lambda prompt, model: ["gemini", *(["--model", model] if model else []), "-p", prompt],
@@ -39,29 +42,83 @@ HOST_COMMANDS = {
 # A fresh agent must not inherit the launching session: host session variables
 # would route a nested CLI through the parent's (short-lived) session auth.
 INHERITED_SESSION = ("CLAUDECODE", "CLAUDE_CODE_", "CLAUDE_PID", "CLAUDE_AGENT_SDK", "CLAUDE_EFFORT", "CLAUDE_PREVIEW", "ANTHROPIC_BASE_URL")
+HOST_BINARIES = {"claude": "claude", "codex": "codex", "gemini": "gemini"}
 PREFIX = "You are a fresh agent in this repository. Do not edit files. Answer briefly. Task: "
+
+
+def run_headless(command: list[str], cwd: Path, timeout: int, stdout=None) -> subprocess.CompletedProcess[str]:
+    """Run a fresh headless agent: the one launcher behind make eval and make trial.
+
+    It drops the launching session's host variables (so the CLI uses its own login,
+    as a truly fresh agent would), allows bypassed permissions when running as root
+    in a sandbox, and shields itself from SIGTERM while the agent runs: agents clean up with
+    `pkill -f <name>`, which also matches the runner's command line (a trial killed
+    its own runner that way). On timeout (or interrupt) it SIGKILLs the whole process group, then raises
+    subprocess.TimeoutExpired like subprocess.run.
+    """
+    environment = {key: value for key, value in os.environ.items() if not key.startswith(INHERITED_SESSION)}
+    if hasattr(os, "geteuid") and os.geteuid() == 0:
+        environment.setdefault("IS_SANDBOX", "1")  # the CLI refuses bypassed permissions as root outside a sandbox
+    # A no-op handler (not SIG_IGN): exec resets handlers to default, so the agent's own
+    # children keep default SIGTERM handling, while this runner still survives `pkill -f`.
+    previous = signal.signal(signal.SIGTERM, lambda *_: None) if hasattr(signal, "SIGTERM") else None
+    streams = {"stdout": stdout, "stderr": subprocess.STDOUT} if stdout else {"stdout": subprocess.PIPE, "stderr": subprocess.PIPE}
+    try:
+        process = subprocess.Popen(command, cwd=cwd, env=environment, text=True, start_new_session=True, **streams)
+        try:
+            out, err = process.communicate(timeout=timeout)
+        except BaseException:
+            kill_group(process)
+            process.communicate()
+            raise
+        kill_group(process)  # nothing the agent backgrounded outlives the run
+        return subprocess.CompletedProcess(command, process.returncode, out, err)
+    finally:
+        if previous is not None:
+            signal.signal(signal.SIGTERM, previous)
+
+
+def kill_group(process: subprocess.Popen) -> None:
+    """SIGKILL the run's whole process group (it leads its own session)."""
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except (ProcessLookupError, PermissionError, AttributeError):
+        pass
 
 
 def load_tasks(root: Path, only: str | None = None) -> list[dict[str, str]]:
     tasks = []
     for suite in sorted((root / ".agents" / "evals").glob("*.toml")):
-        with suite.open("rb") as handle:
-            data = tomllib.load(handle)
+        try:
+            with suite.open("rb") as handle:
+                data = tomllib.load(handle)
+        except tomllib.TOMLDecodeError as error:
+            raise RepoctlError(f"{suite.name}: invalid TOML: {error}") from error
         for task in data.get("tasks", []):
             if not all(isinstance(task.get(key), str) and task[key] for key in ("id", "prompt", "expect")):
                 raise RepoctlError(f"{suite.name}: every task needs id, prompt, and expect")
-            re.compile(task["expect"])
+            try:
+                re.compile(task["expect"])
+            except re.error as error:
+                raise RepoctlError(f"{suite.name}: task {task['id']} has an invalid expect regex: {error}") from error
             if only is None or task["id"] in only.split(","):
                 tasks.append(task)
+    if only is not None:
+        unknown = [name for name in only.split(",") if name not in {task["id"] for task in tasks}]
+        if unknown:
+            raise RepoctlError(f"unknown eval task id(s): {', '.join(unknown)}")
     return tasks
+
+
+def answer_matches(task: dict[str, str], answer: str) -> bool:
+    return bool(re.search(task["expect"], answer, re.IGNORECASE))
 
 
 def run_task(root: Path, host: str, task: dict[str, str], timeout: int, model: str = "") -> dict[str, object]:
     command = HOST_COMMANDS[host](PREFIX + task["prompt"], model)
     started = time.monotonic()
     try:
-        environment = {key: value for key, value in os.environ.items() if not key.startswith(INHERITED_SESSION)}
-        result = subprocess.run(command, cwd=root, env=environment, capture_output=True, text=True, timeout=timeout, check=False)
+        result = run_headless(command, root, timeout)
         output = result.stdout
     except subprocess.TimeoutExpired:
         return {"id": task["id"], "passed": False, "error": f"timeout after {timeout}s"}
@@ -76,7 +133,7 @@ def run_task(root: Path, host: str, task: dict[str, str], timeout: int, model: s
                 return {**record, "passed": False, "error": answer[:300]}
         except json.JSONDecodeError:
             pass
-    record["passed"] = bool(re.search(task["expect"], answer, re.IGNORECASE))
+    record["passed"] = answer_matches(task, answer)
     record["answer"] = " ".join(answer.split())[:240]
     if result.returncode != 0 and not record["passed"]:
         record["error"] = (result.stderr or "").strip()[-300:]
@@ -88,7 +145,7 @@ def run_evals(root: Path, host: str, only: str | None = None, timeout: int = 300
         raise RepoctlError(f"unsupported eval host {host}; choose {', '.join(HOST_COMMANDS)}")
     if model is None:
         model = str(setting(root, "eval_model")) if host == "claude" else ""
-    if shutil.which(HOST_COMMANDS[host]("x", "")[0]) is None:
+    if shutil.which(HOST_BINARIES[host]) is None:
         raise RepoctlError(f"{host} CLI is not installed")
     tasks = load_tasks(root, only)
     if not tasks:

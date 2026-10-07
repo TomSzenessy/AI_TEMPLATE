@@ -2,110 +2,48 @@
 # tools/repoctl applies the same rule for hooks. Override with PYTHON=...
 PYTHON ?= $(shell for p in python3.14 python3.13 python3.12 python3.11 python3 python; do command -v $$p >/dev/null 2>&1 && $$p -c 'import sys; sys.exit(sys.version_info < (3, 11))' 2>/dev/null && { echo $$p; break; }; done)
 REPOCTL := $(PYTHON) tools/repoctl.py
+# This kit's directory, also when run from another repository with make -f (make adopt).
+# Read from the single MAKEFILE_LIST entry through the shell so a path with spaces survives;
+# override with KIT_DIR=<kit> on the command line (adopt fails fast, naming KIT_DIR, when this is not a kit).
+# An inherited KIT_DIR (exported by an outer make) is ignored, so nested makes find their own kit.
+ifneq ($(origin KIT_DIR),command line)
+KIT_DIR := $(shell cd "$$(dirname "$(strip $(MAKEFILE_LIST))")" 2>/dev/null && pwd)
+endif
+export KIT_DIR
 SKILL_TEST_SUITES := $(wildcard .agents/skills/*/tests)
 
 .DEFAULT_GOAL := help
 
-.PHONY: help python-check init inventory resources skill-digest check doctor readiness test verify validate incident issue labels review-packet \
-	start done new handover map where risk garden capabilities sync github-sync similar eval
-
-# Export user-supplied values so recipes pass them as data, not as shell source.
-export Q AGENT MODEL TASKS DESC GROUP COVERS ACCESS TIER FORCE NAME KIND TITLE SUMMARY BODY TYPE PRIORITY AREA TOPIC STATUS SURFACE GATE PUBLIC_REVIEWED REVIEW_EVIDENCE ISSUE_FILE PUBLIC_SAFE
-
-help:
-	@printf '%s\n' \
-	  'EVERY SESSION (this is all most tasks need)' \
-	  '  make start                       Brief: branch, handover, map, what needs attention' \
-	  '  make where Q="login form"        Find files, functions, owning docs, past failures' \
-	  '  make done                        Before saying "done": heal derived files, gates, all tests' \
-	  '' \
-	  'EXTEND THE SYSTEM (searches for overlap first, wires everything in)' \
-	  '  make new KIND=skill NAME=x DESC="what; when to use"     Reusable procedure' \
-	  '  make new KIND=agent NAME=x DESC="job; when" [ACCESS=read-only TIER=fast]   Subagent role' \
-	  '  make new KIND=doc NAME=x DESC="owns; read when" [GROUP=design COVERS="src/x/**"]' \
-	  '  make similar Q="release notes"   Does a similar skill or role already exist?' \
-	  '  make capabilities                Tools, agent hosts, and MCP routes available here' \
-	  '' \
-	  'WHEN NEEDED' \
-	  '  make risk                        How much ceremony this change needs' \
-	  '  make handover                    Write HANDOVER.md before pausing (git facts pre-filled)' \
-	  '  make map                         One-screen repository map' \
-	  '  make garden                      Full rot report' \
-	  '  make sync                        Regenerate derived files after editing their sources' \
-	  '  make issue BODY=path TITLE="..." TYPE=... PRIORITY=... AREA=... TOPIC=...   File an issue' \
-	  '  make review-packet ISSUE_FILE=path   Brief for a fresh critic' \
-	  '  make incident TITLE="..." SUMMARY="..."   Private incident draft' \
-	  '' \
-	  'PROJECT SETUP AND MAINTENANCE' \
-	  '  make init NAME=my-project KIND=web   Turn the template into your project' \
-	  '  make check | verify | doctor | readiness | inventory | resources | labels | github-sync' \
-	  '  make eval AGENT=claude [MODEL=haiku]   Fresh-agent navigation benchmark (cheap model by default)' \
-	  '  make validate BODY=path | skill-digest SKILL_PATH=.agents/skills/name'
+.PHONY: python-check test test-slow test-future verify done
 
 python-check:
 	@test -n "$(PYTHON)" && $(PYTHON) -c 'import sys; sys.exit(sys.version_info < (3, 11))' 2>/dev/null || { echo "Needs Python 3.11+ (found: '$(PYTHON)'); install python3.11 or newer, or run: make PYTHON=/path/to/python3.11 ..." >&2; exit 1; }
 
-init: python-check
-	$(REPOCTL) init --name "$${NAME}" --kind "$${KIND}"
-
-inventory:
-	$(REPOCTL) inventory
-
-resources: python-check
-	$(REPOCTL) resources
-
-skill-digest:
-	$(REPOCTL) skill-digest "$${SKILL_PATH}"
-
-check: python-check
-	$(REPOCTL) check
-
-doctor: python-check
-	$(REPOCTL) doctor
-
-readiness: python-check
-	$(REPOCTL) readiness
-
+# KIT_INNER=1 (set for a project's inner suite run) runs a smoke subset; KIT_SLOW=1 keeps the full inner run.
 test: python-check
+ifeq ($(KIT_INNER)$(KIT_SLOW),1)
+	$(PYTHON) -m unittest discover -s tools/tests -p 'test_repoctl.py' -k init
+	$(PYTHON) -m unittest discover -s tools/tests -p 'test_kit.py' -k GlobTests -k HygieneTests -k AdapterTests
+else
 	$(PYTHON) -m unittest discover -s tools/tests -p 'test_*.py'
+endif
 	@for suite in $(SKILL_TEST_SUITES); do \
 	  echo "-- $$suite"; \
 	  $(PYTHON) -m unittest discover -s "$$suite" -p 'test_*.py' || exit 1; \
 	done
 
+# The full suite including the full inner runs (golden-path and adopt tests re-run the suite in a new project).
+test-slow: python-check
+	KIT_SLOW=1 $(MAKE) --no-print-directory test
+
+# The same suite 800 days ahead: fails when a fixture or check rots with the calendar (#10).
+test-future: python-check
+	PYTHONPATH="$(CURDIR)/tools/tests/clockshift" SHIFT_DAYS=800 $(MAKE) --no-print-directory test
+
 verify: python-check
-	$(MAKE) test
+	$(MAKE) --no-print-directory test
 	$(REPOCTL) verify
 	$(REPOCTL) doctor
-
-validate: python-check
-	$(REPOCTL) validate-issue --body-file "$${BODY}" --status "$${STATUS}"
-
-incident:
-	$(REPOCTL) incident --title "$${TITLE}" --summary "$${SUMMARY}" $(if $(filter 1 yes true,$(PUBLIC_SAFE)),--public-safe --review-evidence "$${REVIEW_EVIDENCE}",)
-
-issue:
-	$(REPOCTL) issue \
-	  --title "$${TITLE}" \
-	  --body-file "$${BODY}" \
-	  --type "$${TYPE}" \
-	  --priority "$${PRIORITY}" \
-	  --area "$${AREA}" \
-	  --topic "$${TOPIC}" \
-	  --status "$${STATUS}" \
-	  --surface "$${SURFACE}" \
-	  --gate "$${GATE}" \
-	  $(if $(filter 1 yes true,$(PUBLIC_REVIEWED)),--public-reviewed,) \
-	  --review-evidence "$${REVIEW_EVIDENCE}"
-
-labels:
-	$(REPOCTL) labels --sync
-
-review-packet:
-	$(REPOCTL) review-packet --issue-file "$${ISSUE_FILE}"
-
-start: python-check
-	@$(REPOCTL) start
 
 # The one completion command: heal derived files, run the change gate, then
 # everything CI runs. Prints the risk tier so the right review follows.
@@ -115,14 +53,74 @@ done: python-check
 	@$(MAKE) --no-print-directory verify
 	@echo "All gates passed. Get the review your risk tier requires, then hand over or open the PR."
 
+# Every repoctl command, generated by `make sync` from its @command declaration
+# (tools/kit/commands.py and .agents/commands/). Make variables reach repoctl as
+# quoted data, never as shell source. Edit the declaration, not this block.
+# <repoctl:commands>
+.PHONY: start next where ui-review new similar capabilities risk handover map garden sync issue review-packet incident init adopt kit-update check doctor readiness inventory resources skill-digest validate labels github-sync eval trial help
+
+export KIT_IN_ACCESS = $(if $(filter command line,$(origin ACCESS)),$(value ACCESS))
+export KIT_IN_AGENT = $(if $(filter command line,$(origin AGENT)),$(value AGENT))
+export KIT_IN_AREA = $(if $(filter command line,$(origin AREA)),$(value AREA))
+export KIT_IN_BODY = $(if $(filter command line,$(origin BODY)),$(value BODY))
+export KIT_IN_BUDGET = $(if $(filter command line,$(origin BUDGET)),$(value BUDGET))
+export KIT_IN_COVERS = $(if $(filter command line,$(origin COVERS)),$(value COVERS))
+export KIT_IN_DESC = $(if $(filter command line,$(origin DESC)),$(value DESC))
+export KIT_IN_FORCE = $(if $(filter command line,$(origin FORCE)),$(value FORCE))
+export KIT_IN_GATE = $(if $(filter command line,$(origin GATE)),$(value GATE))
+export KIT_IN_GROUP = $(if $(filter command line,$(origin GROUP)),$(value GROUP))
+export KIT_IN_ISSUE_FILE = $(if $(filter command line,$(origin ISSUE_FILE)),$(value ISSUE_FILE))
+export KIT_IN_KIND = $(if $(filter command line,$(origin KIND)),$(value KIND))
+export KIT_IN_KIT = $(if $(filter command line,$(origin KIT)),$(value KIT))
+export KIT_IN_KIT_REF = $(if $(filter command line,$(origin KIT_REF)),$(value KIT_REF))
+export KIT_IN_MODEL = $(if $(filter command line,$(origin MODEL)),$(value MODEL))
+export KIT_IN_NAME = $(if $(filter command line,$(origin NAME)),$(value NAME))
+export KIT_IN_OWNER = $(if $(filter command line,$(origin OWNER)),$(value OWNER))
+export KIT_IN_PACK = $(if $(filter command line,$(origin PACK)),$(value PACK))
+export KIT_IN_PRIORITY = $(if $(filter command line,$(origin PRIORITY)),$(value PRIORITY))
+export KIT_IN_PUBLIC_REVIEWED = $(if $(filter command line,$(origin PUBLIC_REVIEWED)),$(value PUBLIC_REVIEWED))
+export KIT_IN_PUBLIC_SAFE = $(if $(filter command line,$(origin PUBLIC_SAFE)),$(value PUBLIC_SAFE))
+export KIT_IN_Q = $(if $(filter command line,$(origin Q)),$(value Q))
+export KIT_IN_REVIEW_EVIDENCE = $(if $(filter command line,$(origin REVIEW_EVIDENCE)),$(value REVIEW_EVIDENCE))
+export KIT_IN_SKILL_PATH = $(if $(filter command line,$(origin SKILL_PATH)),$(value SKILL_PATH))
+export KIT_IN_STATUS = $(if $(filter command line,$(origin STATUS)),$(value STATUS))
+export KIT_IN_SUMMARY = $(if $(filter command line,$(origin SUMMARY)),$(value SUMMARY))
+export KIT_IN_SURFACE = $(if $(filter command line,$(origin SURFACE)),$(value SURFACE))
+export KIT_IN_TASKS = $(if $(filter command line,$(origin TASKS)),$(value TASKS))
+export KIT_IN_TIER = $(if $(filter command line,$(origin TIER)),$(value TIER))
+export KIT_IN_TITLE = $(if $(filter command line,$(origin TITLE)),$(value TITLE))
+export KIT_IN_TOPIC = $(if $(filter command line,$(origin TOPIC)),$(value TOPIC))
+export KIT_IN_TYPE = $(if $(filter command line,$(origin TYPE)),$(value TYPE))
+export KIT_IN_WAL = $(if $(filter command line,$(origin WAL)),$(value WAL))
+
+start: python-check
+	@$(REPOCTL) start
+
+next: python-check
+	@$(REPOCTL) next
+
+where: python-check
+	$(if $(KIT_IN_Q),,$(error Add what to look for: make where Q="login form"))
+	@$(REPOCTL) where -- "$${KIT_IN_Q}"
+
+ui-review: python-check
+	@$(REPOCTL) ui-review
+
 new: python-check
-	$(if $(KIND),,$(error Choose what to create: make new KIND=skill|agent|doc NAME=my-name DESC="what it does; when to use it"))
-	$(if $(NAME),,$(error Name it: NAME=kebab-case-name))
-	$(if $(DESC),,$(error Describe it: DESC="what it does; when to use it"))
-	@$(REPOCTL) new --kind "$${KIND}" --name "$${NAME}" \
-	  --description "$${DESC}" \
-	  --group "$${GROUP:-operate}" --covers "$${COVERS:-}" --access "$${ACCESS:-read-only}" \
-	  --tier "$${TIER:-balanced}" $(if $(filter 1 yes true,$(FORCE)),--force,)
+	$(if $(KIT_IN_KIND),,$(error Choose what to create: make new KIND=skill|agent|doc|rule|check|command|mcp|pack NAME=my-name DESC="what it does; when to use it"))
+	$(if $(KIT_IN_NAME),,$(error Name it: NAME=kebab-case-name))
+	$(if $(KIT_IN_DESC),,$(error Describe it: DESC="what it does; when to use it"))
+	@$(REPOCTL) new $(if $(KIT_IN_KIND),--kind "$${KIT_IN_KIND}",) $(if $(KIT_IN_NAME),--name "$${KIT_IN_NAME}",) $(if $(KIT_IN_DESC),--description "$${KIT_IN_DESC}",) $(if $(KIT_IN_PACK),--pack "$${KIT_IN_PACK}",) $(if $(KIT_IN_GROUP),--group "$${KIT_IN_GROUP}",) $(if $(KIT_IN_COVERS),--covers "$${KIT_IN_COVERS}",) $(if $(KIT_IN_ACCESS),--access "$${KIT_IN_ACCESS}",) $(if $(KIT_IN_TIER),--tier "$${KIT_IN_TIER}",) $(if $(filter 1 yes true,$(KIT_IN_FORCE)),--force,)
+
+similar: python-check
+	$(if $(KIT_IN_Q),,$(error Describe the capability: make similar Q="draft release notes"))
+	@$(REPOCTL) similar -- "$${KIT_IN_Q}"
+
+capabilities: python-check
+	@$(REPOCTL) capabilities
+
+risk: python-check
+	@$(REPOCTL) risk
 
 handover: python-check
 	@$(REPOCTL) handover
@@ -130,28 +128,76 @@ handover: python-check
 map: python-check
 	@$(REPOCTL) map
 
-where: python-check
-	$(if $(Q),,$(error Add what to look for: make where Q="login form"))
-	@$(REPOCTL) where "$${Q}"
-
-risk: python-check
-	@$(REPOCTL) risk
-
 garden: python-check
-	$(REPOCTL) garden
-
-capabilities: python-check
-	@$(REPOCTL) capabilities
+	@$(REPOCTL) garden
 
 sync: python-check
-	$(REPOCTL) sync
+	@$(REPOCTL) sync
+
+issue: python-check
+	@$(REPOCTL) issue $(if $(KIT_IN_WAL),--wal "$${KIT_IN_WAL}",) $(if $(KIT_IN_TITLE),--title "$${KIT_IN_TITLE}",) $(if $(KIT_IN_BODY),--body-file "$${KIT_IN_BODY}",) $(if $(KIT_IN_TYPE),--type "$${KIT_IN_TYPE}",) $(if $(KIT_IN_PRIORITY),--priority "$${KIT_IN_PRIORITY}",) $(if $(KIT_IN_AREA),--area "$${KIT_IN_AREA}",) $(if $(KIT_IN_TOPIC),--topic "$${KIT_IN_TOPIC}",) $(if $(KIT_IN_STATUS),--status "$${KIT_IN_STATUS}",) $(if $(KIT_IN_SURFACE),--surface "$${KIT_IN_SURFACE}",) $(if $(KIT_IN_GATE),--gate "$${KIT_IN_GATE}",) $(if $(filter 1 yes true,$(KIT_IN_PUBLIC_REVIEWED)),--public-reviewed,) $(if $(KIT_IN_REVIEW_EVIDENCE),--review-evidence "$${KIT_IN_REVIEW_EVIDENCE}",)
+
+review-packet: python-check
+	$(if $(KIT_IN_ISSUE_FILE),,$(error Name the issue: ISSUE_FILE=path))
+	@$(REPOCTL) review-packet $(if $(KIT_IN_ISSUE_FILE),--issue-file "$${KIT_IN_ISSUE_FILE}",)
+
+incident: python-check
+	$(if $(KIT_IN_TITLE),,$(error Title it: make incident TITLE="..." SUMMARY="..."))
+	$(if $(KIT_IN_SUMMARY),,$(error Summarize it: SUMMARY="..."))
+	@$(REPOCTL) incident $(if $(KIT_IN_TITLE),--title "$${KIT_IN_TITLE}",) $(if $(KIT_IN_SUMMARY),--summary "$${KIT_IN_SUMMARY}",) $(if $(filter 1 yes true,$(KIT_IN_PUBLIC_SAFE)),--public-safe,) $(if $(KIT_IN_REVIEW_EVIDENCE),--review-evidence "$${KIT_IN_REVIEW_EVIDENCE}",)
+
+init: python-check
+	$(if $(KIT_IN_NAME),,$(error Name the project: make init NAME=my-project KIND=web))
+	$(if $(KIT_IN_KIND),,$(error Give its kind: make init NAME=my-project KIND=web))
+	@$(REPOCTL) init $(if $(KIT_IN_NAME),--name "$${KIT_IN_NAME}",) $(if $(KIT_IN_KIND),--kind "$${KIT_IN_KIND}",) $(if $(KIT_IN_OWNER),--owner "$${KIT_IN_OWNER}",)
+
+adopt: python-check
+	$(if $(KIT_IN_NAME),,$(error Name the project: make -f <kit>/Makefile adopt NAME=my-app KIND=web OWNER=you; if the kit path is not found add KIT_DIR=<kit>))
+	$(if $(shell test -f "$(KIT_DIR)/tools/repoctl.py" && echo ok),,$(error KIT_DIR is not a kit checkout: pass KIT_DIR=<kit> (the directory holding tools/repoctl.py)))
+	$(PYTHON) "$${KIT_DIR}/tools/repoctl.py" --root "$(CURDIR)" adopt --from "$${KIT_DIR}" --name "$${KIT_IN_NAME}" --kind "$${KIT_IN_KIND}" $(if $(KIT_IN_OWNER),--owner "$${KIT_IN_OWNER}",)
+
+kit-update: python-check
+	@$(REPOCTL) kit-update $(if $(KIT_IN_KIT),--kit "$${KIT_IN_KIT}",) $(if $(KIT_IN_KIT_REF),--ref "$${KIT_IN_KIT_REF}",)
+
+check: python-check
+	@$(REPOCTL) check
+
+doctor: python-check
+	@$(REPOCTL) doctor
+
+readiness: python-check
+	@$(REPOCTL) readiness
+
+inventory: python-check
+	@$(REPOCTL) inventory
+
+resources: python-check
+	@$(REPOCTL) resources
+
+skill-digest: python-check
+	$(if $(KIT_IN_SKILL_PATH),,$(error Name the skill: SKILL_PATH=.agents/skills/name))
+	@$(REPOCTL) skill-digest -- "$${KIT_IN_SKILL_PATH}"
+
+validate: python-check
+	$(if $(KIT_IN_BODY),,$(error Name the body: BODY=path))
+	@$(REPOCTL) validate-issue $(if $(KIT_IN_BODY),--body-file "$${KIT_IN_BODY}",) $(if $(KIT_IN_STATUS),--status "$${KIT_IN_STATUS}",)
+
+labels: python-check
+	@$(REPOCTL) labels --sync
 
 github-sync: python-check
-	$(REPOCTL) github-sync
-
-similar: python-check
-	$(if $(Q),,$(error Describe the capability: make similar Q="draft release notes"))
-	@$(REPOCTL) similar "$${Q}"
+	@$(REPOCTL) github-sync
 
 eval: python-check
-	$(REPOCTL) eval --host "$${AGENT:-claude}" $(if $(TASKS),--tasks "$${TASKS}",) $(if $(MODEL),--model "$${MODEL}",)
+	@$(REPOCTL) eval $(if $(KIT_IN_AGENT),--host "$${KIT_IN_AGENT}",) $(if $(KIT_IN_TASKS),--tasks "$${KIT_IN_TASKS}",) $(if $(KIT_IN_MODEL),--model "$${KIT_IN_MODEL}",)
+
+trial: python-check
+	$(if $(KIT_IN_NAME),,$(error Name a request in .agents/trials/: make trial NAME=waypoint))
+	@$(REPOCTL) trial $(if $(KIT_IN_MODEL),--model "$${KIT_IN_MODEL}",) $(if $(KIT_IN_BUDGET),--budget "$${KIT_IN_BUDGET}",) -- "$${KIT_IN_NAME}"
+
+help: python-check
+	@$(REPOCTL) help
+# </repoctl:commands>
+
+# Project-specific targets live in project.mk, so this Makefile stays the kit's and kit-update can refresh it.
+-include project.mk

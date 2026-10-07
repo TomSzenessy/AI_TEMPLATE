@@ -15,12 +15,17 @@ builds from what this writes. A bad recon map means a bad build.
 
 ```
 reference/recon.md        the recon map (template: recon-map.md in this folder)
-reference/features.csv    the feature matrix (template: features.csv in this folder)
 reference/screens/        reference product's screenshots. Never shipped.
+docs/product/features.csv the feature matrix, shared with product-kickoff,
+                          review-mining, parity-check and `make next`
 ```
 
+`reference/` holds recon evidence only (screens, notes, the map); the matrix
+lives in `docs/product/features.csv` so `make next` sees it.
+
 Once per project, add `"reference"` to `infrastructure_paths` in `project.toml`
-(or declare it a surface): `make check` flags unregistered top-level dirs.
+(or declare it a surface): `make check` flags unregistered top-level dirs. The
+other product skills write under `reference/` too and rely on this step.
 
 ## The rules, before anything else
 
@@ -90,14 +95,18 @@ guesses. The build turns this into a real schema.
 
 ## Step 7: feature matrix
 
-Write `reference/features.csv` (columns: feature, area, priority, original,
-clone, notes). Priority is must / should / could. `original` is does the
-reference product have it; `clone` is does this build have it, starting at
-`no` and filled in during the build. parity-check scores it.
+Append one row per feature the reference product has to
+`docs/product/features.csv` (columns: feature, area, priority, status,
+evidence, acceptance, source; template: `features.csv` in this folder; create
+the file with its header if kickoff has not). Priority is must / should /
+could. `status` is does this build have it, starting at `no` and filled in
+during the build; `source` is `product-recon`. A must row needs an
+acceptance criterion. Quote any value that contains a comma. parity-check
+and `make next` both read this file.
 
 ## Step 8: what cannot be cloned
 
-List it honestly, as `skip` rows with a reason: licensed content (a music
+List it honestly, as `status=skip` rows with the reason in `acceptance`: licensed content (a music
 catalogue, a stock library), the network and its users, data the product
 owns, partner deals, hardware, regulated licences (banking, health).
 Learning from a product means the features and the flow, not what it owns.
@@ -110,11 +119,11 @@ few weeks), L (a quarter), XL (rescope it). No promises of a perfect clone.
 
 ## Output
 
-`reference/recon.md` and `reference/features.csv`, then a five-line summary:
+`reference/recon.md` and the new rows in `docs/product/features.csv`, then a five-line summary:
 the core loop, screen and flow counts, the three hardest parts, what is out
 of scope, and the next step: design-tokens, then the project's issue-backed
 build loop (AGENTS.md).
 
 ## Source
 
-Adapted from the upstream skill in https://github.com/Jakeschincariol/replica-skill (MIT, © 2026 Jake Schincariol), revision 77c9436fb3d18c3d58169efb8caf4fe906b0dc51.
+Adapted from the upstream skill in https://github.com/Jakeschincariol/replica-skill (MIT, © 2026 Jake Schincariol); revision: see `project.toml` `[[skills]]`.

@@ -1,6 +1,6 @@
 # Recon map: {{product}} ({{platform}})
 
-_Adapted from `replica-recon/recon-map.md` in [Jakeschincariol/replica-skill](https://github.com/Jakeschincariol/replica-skill) (MIT, © 2026 Jake Schincariol), revision 77c9436fb3d18c3d58169efb8caf4fe906b0dc51._
+_Adapted from `replica-recon/recon-map.md` in [Jakeschincariol/replica-skill](https://github.com/Jakeschincariol/replica-skill) (MIT, © 2026 Jake Schincariol); revision: see `project.toml` `[[skills]]`._
 
 Scope: {{the slice being studied}}
 For: {{who it is for, or what decision it feeds}}
@@ -49,7 +49,7 @@ Relationships: {{User 1-n EventType, EventType 1-n Booking, ...}}
 
 ## Feature matrix
 
-See `features.csv`. Must: {{n}}, should: {{n}}, could: {{n}}, skip: {{n}}.
+See `docs/product/features.csv`. Must: {{n}}, should: {{n}}, could: {{n}}, skip: {{n}}.
 
 ## Out of reach (cannot or should not be cloned)
 

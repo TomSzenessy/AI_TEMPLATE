@@ -103,6 +103,13 @@ artifact works.
 A project is ready to call itself production-ready only when its accountable
 owner can show the evidence matrix, all applicable external gates are closed or
 explicitly accepted, and residual risks are visible in the issue register. The
-`repoctl readiness`/`make readiness` command checks the configured structural
-and public-launch prerequisites; it deliberately does **not** validate the
-whole matrix above. The template leaves those facts to the instantiated project.
+`repoctl readiness`/`make readiness` command now runs every blocking check the
+registry knows (`run_checks(blocking_only=True)`), the release-gated skill
+provenance check, and the public-launch prerequisites (split into one helper per
+artifact — routes, `SECURITY.md`, threat model, security config, launch
+evidence, data inventory — with the same rules as before); it deliberately does
+**not** validate the whole matrix above. The template leaves those facts to the instantiated project.
+From `phase = "private-preview"` on it also requires a fresh, passing UI
+review for every web UI surface ([`building.md`](./building.md#ui-review)),
+and a vision, stack decision, skill provenance, and critic evidence reviewed
+within the last year; before that, their age is advice from `make garden`, never a failure.

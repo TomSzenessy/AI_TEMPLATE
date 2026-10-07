@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Jake Schincariol. Adapted from https://github.com/Jakeschincariol/replica-skill @ 77c9436fb3d18c3d58169efb8caf4fe906b0dc51.
+# Copyright (c) 2026 Jake Schincariol. Adapted from https://github.com/Jakeschincariol/replica-skill (revision: see project.toml [[skills]]).
 """Contrast check for design-tokens. Standard library only.
 
 Every text colour in your token file, checked against the backgrounds it sits
@@ -24,20 +24,33 @@ Exit code 1 when any pair fails AA, so it can gate a build.
 
 import argparse
 import json
+import os
 import re
 import sys
 
-HEX = re.compile(r"^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
+# Same forms as brand-sweep's colour arguments (kept self-contained on purpose):
+# bare or with #, 3/4/6/8 digits, alpha dropped. rgb() and names are errors.
+HEX = re.compile(r"#?(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{4}|[0-9a-fA-F]{3})")
 NEEDS = {"normal": (4.5, 7.0), "large": (3.0, 4.5), "ui": (3.0, 3.0)}
 
 
-def parse_hex(value):
-    m = HEX.match(value.strip())
-    if not m:
-        raise ValueError("not a hex colour: %r" % value)
-    h = m.group(1)
-    if len(h) == 3:
+def norm_hex(value):
+    """Normalise 3/4/6/8-digit hex (with or without #) to #rrggbb, dropping alpha."""
+    h = value.strip().lower().lstrip("#")
+    if len(h) in (3, 4):
         h = "".join(c * 2 for c in h)
+    return "#" + h[:6]
+
+
+def is_hex(value):
+    return isinstance(value, str) and bool(HEX.fullmatch(value.strip()))
+
+
+def parse_hex(value):
+    if not is_hex(value):
+        raise ValueError("not a hex colour: %r (use #006bff, 006bff, #06f or "
+                         "#006bffaa; rgb() and names are not supported)" % (value,))
+    h = norm_hex(value)[1:]
     return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
 
 
@@ -70,14 +83,14 @@ def flatten(obj, prefix=""):
                 continue
             key = "%s-%s" % (prefix, k) if prefix else k
             out.update(flatten(v, key))
-    elif isinstance(obj, str) and HEX.match(obj.strip()):
+    elif is_hex(obj):
         out[prefix] = obj.strip()
     return out
 
 
 def colours(tokens):
     src = tokens.get("color", tokens.get("colors", tokens.get("colour", {})))
-    return {k: v for k, v in flatten(src).items() if HEX.match(v)}
+    return {k: v for k, v in flatten(src).items() if is_hex(v)}
 
 
 def default_pairs(cols):
@@ -130,7 +143,7 @@ def main(argv=None):
     ap.add_argument("--json", action="store_true")
     a = ap.parse_args(argv)
     try:
-        if len(a.args) == 2 and all(HEX.match(x) for x in a.args):
+        if len(a.args) == 2 and all(is_hex(x) for x in a.args) and not os.path.exists(a.args[0]):
             cols = {"fg": a.args[0], "bg": a.args[1]}
             pairs = [["fg", "bg"]]
         else:

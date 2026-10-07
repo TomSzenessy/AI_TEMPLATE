@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import os
 import re
+import sys
 from pathlib import Path, PureWindowsPath
 from urllib.parse import unquote, urlsplit
 
+from .docsync import INDEX_SKIP
 from .core import (
     RepoctlError,
     ensure_inside_root,
@@ -14,6 +16,7 @@ from .core import (
     is_link_like,
     markdown_link_target,
     markdown_without_fenced_code,
+    read_utf8,
     secret_matches,
     worktree_files,
 )
@@ -30,7 +33,11 @@ def check_markdown_links(root: Path) -> None:
         if is_link_like(document) or has_link_component(root, document):
             errors.append(f"unsafe Markdown document symlink or reparse point: {document_label}")
             continue
-        markdown = markdown_without_fenced_code(document.read_text(encoding="utf-8"))
+        try:
+            markdown = markdown_without_fenced_code(document.read_text(encoding="utf-8"))
+        except UnicodeDecodeError:
+            errors.append(f"not valid UTF-8: {document_label}")
+            continue
         for raw_target in link_pattern.findall(markdown):
             target = markdown_link_target(raw_target)
             if not target or target.startswith("#"):
@@ -84,7 +91,7 @@ def check_docs_index(root: Path) -> None:
     docs = root / "docs"
     index = ensure_inside_root(root, docs / "README.md", "documentation index")
     try:
-        index_content = index.read_text(encoding="utf-8")
+        index_content = read_utf8(index)
     except FileNotFoundError as error:
         raise RepoctlError("docs/README.md is missing") from error
 
@@ -93,15 +100,21 @@ def check_docs_index(root: Path) -> None:
         if document == index:
             continue
         relative = document.relative_to(docs).as_posix()
+        if f"docs/{relative}".startswith(INDEX_SKIP):
+            continue
         link = re.compile(rf"\]\((?:\./)?{re.escape(relative)}(?:#[^)]+)?\)")
         if not link.search(index_content):
-            errors.append(f"document is not linked from docs/README.md: {relative}")
+            errors.append(
+                f"document is not linked from docs/README.md: {relative} (add `<!-- index: group | owns | read when -->` "
+                "under its title, then run make sync)"
+            )
     if errors:
         raise RepoctlError("documentation index check failed:\n- " + "\n- ".join(errors))
 
 
 def check_file_hygiene(root: Path) -> None:
     errors: list[str] = []
+    notes: list[str] = []
     for path in worktree_files(root):
         relative = path.relative_to(root).as_posix()
         if is_link_like(path) or has_link_component(root, path):
@@ -125,21 +138,62 @@ def check_file_hygiene(root: Path) -> None:
         }:
             errors.append(f"sensitive key file must not be tracked: {relative}")
             continue
-        try:
-            if path.stat().st_size > 1_000_000:
-                continue
-            content = path.read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError):
-            continue
-        for label in secret_matches(content):
+        labels, complete = scan_file_for_secrets(path)
+        for label in labels:
             errors.append(f"possible {label} in tracked file: {relative}")
+        if not complete:
+            notes.append(f"not fully scanned: {relative} (over {SCAN_CAP_BYTES // (1024 * 1024)} MiB)")
     if errors:
-        raise RepoctlError("file hygiene check failed:\n- " + "\n- ".join(errors))
+        raise RepoctlError("file hygiene check failed:\n- " + "\n- ".join(errors + notes))
+    for note in notes:  # advisory: the check only raises blocking findings
+        print(f"warning: {note}", file=sys.stderr)
+
+
+SCAN_CHUNK_BYTES = 1024 * 1024
+SCAN_OVERLAP_BYTES = 4096
+SCAN_CAP_BYTES = 32 * 1024 * 1024
+BINARY_SUFFIXES = {
+    ".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".bmp", ".pdf", ".zip", ".gz", ".tgz", ".bz2",
+    ".xz", ".7z", ".woff", ".woff2", ".ttf", ".otf", ".eot", ".mp3", ".mp4", ".mov", ".wav", ".pyc",
+    ".so", ".dylib", ".dll", ".exe", ".class", ".jar", ".wasm",
+}
+
+
+def scan_file_for_secrets(path: Path) -> tuple[list[str], bool]:
+    """Scan a file in overlapping chunks; return (pattern labels, fully scanned)."""
+    if path.suffix.lower() in BINARY_SUFFIXES:
+        return [], True
+    found: dict[str, None] = {}
+    try:
+        with path.open("rb") as handle:
+            head = handle.read(8192)
+            codec = "utf-8"
+            if head.startswith(b"\xff\xfe"):
+                codec = "utf-16-le"
+            elif head.startswith(b"\xfe\xff"):
+                codec = "utf-16-be"
+            elif b"\0" in head:
+                return [], True
+            handle.seek(2 if codec != "utf-8" else 0)
+            carry = b""
+            scanned = 0
+            while scanned < SCAN_CAP_BYTES:
+                data = handle.read(min(SCAN_CHUNK_BYTES, SCAN_CAP_BYTES - scanned))
+                if not data:
+                    return list(found), True
+                scanned += len(data)
+                buffer = carry + data
+                for label in secret_matches(buffer.decode(codec, errors="ignore")):
+                    found.setdefault(label)
+                carry = buffer[-SCAN_OVERLAP_BYTES:]
+            return list(found), not handle.read(1)
+    except OSError:
+        return list(found), True
 
 
 def docs_index_link_content(root: Path, marker: str, link: str) -> str:
     index = ensure_inside_root(root, root / "docs" / "README.md", "documentation index")
-    content = index.read_text(encoding="utf-8")
+    content = read_utf8(index)
     start_marker = f"<!-- repoctl:{marker} -->"
     end_marker = f"<!-- /repoctl:{marker} -->"
     block = f"{start_marker}\n{link}\n{end_marker}"
@@ -165,6 +219,3 @@ def docs_index_link_content(root: Path, marker: str, link: str) -> str:
     return updated
 
 
-def add_docs_index_link(root: Path, marker: str, link: str) -> None:
-    index = ensure_inside_root(root, root / "docs" / "README.md", "documentation index")
-    index.write_text(docs_index_link_content(root, marker, link), encoding="utf-8")

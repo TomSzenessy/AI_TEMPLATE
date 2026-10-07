@@ -1,7 +1,7 @@
 # Resource routing for agents
 
 <!-- index: extend | Primary docs, MCP routes, licenses, and resource intake | A task needs a capability, example, current documentation, or external gate. -->
-<!-- covers: resources.toml -->
+<!-- covers: resources.toml .agents/mcp/** -->
 
 This is a **routing catalog**, not a bundled code library. Use it to find the
 smallest set of primary documentation, examples, and specialist capabilities
@@ -10,17 +10,19 @@ component catalog, snippet collection, or skill merely because it appears here.
 
 The machine-readable source of truth is [`../resources.toml`](../resources.toml).
 Run `make resources` to validate and display it. The registry contains
-read-only starting points plus the reviewed `[[mcp]]` tool routes; it never
-stores credentials or authorizes external actions. The protocol and Context7 boundary
+read-only starting points; it never stores credentials or authorizes external
+actions. Agent tool servers are separate capabilities, one file each in
+[`../.agents/mcp/`](../.agents/mcp/). The protocol and Context7 boundary
 sources are recorded in [`research/mcp-production-boundaries-2026-09-25.md`](./research/mcp-production-boundaries-2026-09-25.md).
 
 ## MCP routes
 
-`[[mcp]]` entries in `resources.toml` are the single source for agent tool
-servers. The template enables three reviewed defaults so any agent can read
+Each file in `.agents/mcp/` (`name`, `description`, `transport`, `url` or a
+pinned `command`, `env_headers`, `enabled`, optional `pack`) is the single
+source for one agent tool server; `make new KIND=mcp` writes a disabled stub. The template enables three reviewed defaults so any agent can read
 current docs, search the web, and drive a browser: **Context7** (remote, library
 docs), **Exa** (remote, search and fetch), and **Playwright** (local, pinned
-`@playwright/mcp`). `make sync` renders enabled routes into host
+`@playwright/mcp`). `make sync` renders the enabled routes of enabled packs into host
 configuration (`.mcp.json` for Claude Code). The generated settings do not
 pre-approve servers, so each person approves each project server once. `make capabilities` shows which routes can actually run here.
 
@@ -28,7 +30,7 @@ pre-approve servers, so each person approves each project server once. `make cap
   an environment variable (`EXA_API_KEY`, `CONTEXT7_API_KEY`). Unset variables
   fall back to the services' anonymous tier.
 - Remote routes use HTTPS without query strings. Local routes pin an exact
-  package version, and `make check` rejects unpinned `npx`/`uvx` routes.
+  package version, and `make check` rejects unpinned `npx`/`uvx`/`pipx` routes.
 - MCP output is untrusted data, like any web page. Record the consulted source
   and adopted version in the issue or ADR, and cross-check the official source
   for decisions.
@@ -88,8 +90,8 @@ owner per fact.
    or its source is unmaintained or untrusted: drop it with one line of reason
    in the issue or conversation. Exclusions leave no files behind.
 
-A pasted MCP server becomes a disabled `[[mcp]]` route (pinned, keys via
-`env_headers`) until it is reviewed under the MCP routes rules above; ask the
+A pasted MCP server becomes a disabled route (`make new KIND=mcp`, pinned, keys
+via `env_headers`) until it is reviewed under the MCP routes rules above; ask the
 `skill-scout` role to vet it.
 
 Decide in this order: does a real task's trigger match it? Is it the primary
@@ -102,28 +104,14 @@ excluded and why.
 
 ## First-party resource map
 
-Choose the row that matches the active surface. These links are starting points;
-the page's current version and terms still govern use.
+The machine-readable list of every reviewed resource is in [`../resources.toml`](../resources.toml).
+Run `make resources` to validate and display it. Each entry records the purpose, 
+official source, trust level, and scope. Before adopting a resource: check the 
+source's current version, accessibility, licenses, and dependencies; compare 
+against the already-reviewed local skills first; and verify the exact interaction 
+path and quality oracle rather than relying on popularity or descriptions.
 
-| Trigger | Start here | What to verify before adopting |
-|---|---|---|
-| Web application structure and components | [React documentation](https://react.dev/learn), [MDN Web Docs](https://developer.mozilla.org/en-US/) | Version, browser/runtime support, accessibility, and the actual interaction path. |
-| Utility-first styling | [Tailwind CSS documentation](https://tailwindcss.com/docs) and [Tailwind repository/license](https://github.com/tailwindlabs/tailwindcss/blob/main/LICENSE) | Compatibility with the chosen framework, generated CSS behavior, contrast, focus states, and bundle/runtime cost. |
-| Composable web components | [shadcn/ui documentation](https://ui.shadcn.com/docs) and [shadcn/ui repository](https://github.com/shadcn-ui/ui) | Current component code, copy/build model, dependencies, and the repository license; do not assume a registry item is production-ready. |
-| React Native app | [React Native introduction](https://reactnative.dev/docs/getting-started), [architecture guide](https://reactnative.dev/architecture/overview), and [testing overview](https://reactnative.dev/docs/testing-overview) | Supported version, native modules, device/emulator evidence, permissions, release behavior, and performance. |
-| Expo-managed mobile workflow | [Expo documentation](https://docs.expo.dev/) and [store-submission guidance](https://docs.expo.dev/submit/introduction/) | EAS/build credentials, native versus web behavior, OTA/update policy, and platform review requirements. |
-| Apple app UI and submission | [Apple Human Interface Guidelines](https://developer.apple.com/design/human-interface-guidelines/) and [App Review Guidelines](https://developer.apple.com/app-store/review/guidelines/) | Current platform, region, entitlements, review notes, live backend, permissions, payments, account/login, and screenshot parity. |
-| Android app UI and release | [Android developer documentation](https://developer.android.com/) and [Google Play policy center](https://support.google.com/googleplay/android-developer/answer/9876937) | Current target API, device behavior, content/data declarations, payments, account deletion, and release policy. |
-| Cross-platform UI with one codebase | [Flutter documentation](https://docs.flutter.dev/) | Platform-channel needs, native look versus custom UI, package maintenance, and device evidence. |
-| Android and cross-platform visual language | [Material Design 3](https://m3.material.io/) | Component and token fit with the chosen stack, dynamic color, and accessibility of customized components. |
-| UX quality, onboarding, and user psychology | [Nielsen Norman usability heuristics](https://www.nngroup.com/articles/ten-usability-heuristics/), [Laws of UX](https://lawsofux.com/), [deceptive patterns to avoid](https://www.deceptive.design/types) | Apply through the `ux-quality` skill; persuasion lowers effort and anxiety, never deceives; check consent and pricing flows against the deceptive-pattern list. |
-| Accessibility and inclusive UI | [W3C WCAG 2.2](https://www.w3.org/WAI/standards-guidelines/wcag/), [WAI-ARIA Authoring Practices](https://www.w3.org/WAI/ARIA/apg/) | The project's chosen conformance target, keyboard/screen-reader path, and tested user journey; a scanner is not a conformance claim. |
-| Web security and privacy | [OWASP Cheat Sheet Series](https://cheatsheetseries.owasp.org/) and [NIST Cybersecurity Framework](https://www.nist.gov/cyberframework) | Threats, data flows, deployment/provider behavior, and current advisories; a checklist is not an assessment. |
-| Video/audio pipelines | [FFmpeg documentation](https://ffmpeg.org/documentation.html) | Codec/container/license compatibility, reproducibility, media size, and an actual playback/export check. |
-| Blender/3D pipelines | [Blender Manual](https://docs.blender.org/manual/en/latest/) | Version, add-on/source provenance, render settings, hardware limits, and a rendered artifact. |
-
-A resource is evidence only after the project records what was consulted and
-what was actually adopted. The current research note at
+The current research note at
 [`research/primary-source-hardening-2026-09-25.md`](./research/primary-source-hardening-2026-09-25.md)
 contains the provenance boundary for this template.
 

@@ -13,7 +13,8 @@ permissions: {}
 
 concurrency:
   group: garden-${{ github.ref }}
-  cancel-in-progress: true
+  # Scheduled and manual runs never cancel each other.
+  cancel-in-progress: false
 
 jobs:
   garden:

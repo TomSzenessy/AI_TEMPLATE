@@ -8,19 +8,25 @@ from functools import lru_cache
 from pathlib import Path
 
 
-def git(root: Path, *arguments: str, timeout: int = 30) -> str | None:
-    """Return git stdout, or None when git is unavailable or the command fails."""
+def run_git(root: Path | None, *arguments: str, timeout: int = 30, input: str | None = None) -> subprocess.CompletedProcess[str] | None:
+    """The one place the kit runs git: unquoted paths, a timeout, and None when git cannot run.
+
+    `root=None` runs outside any repository (clone, ls-remote).
+    """
+    where = ["-C", str(root)] if root is not None else []
     try:
-        result = subprocess.run(
-            ["git", "-C", str(root), *arguments],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
+        return subprocess.run(
+            ["git", *where, "-c", "core.quotepath=false", *arguments],
+            check=False, capture_output=True, text=True, timeout=timeout, input=input,
         )
-    except (FileNotFoundError, subprocess.TimeoutExpired):
+    except (OSError, subprocess.TimeoutExpired):
         return None
-    return result.stdout if result.returncode == 0 else None
+
+
+def git(root: Path | None, *arguments: str, timeout: int = 30, input: str | None = None) -> str | None:
+    """Return git stdout, or None when git is unavailable or the command fails."""
+    result = run_git(root, *arguments, timeout=timeout, input=input)
+    return result.stdout if result is not None and result.returncode == 0 else None
 
 
 def is_repository(root: Path) -> bool:
@@ -63,14 +69,17 @@ def changed_paths(root: Path) -> list[str]:
     return sorted(set(paths))
 
 
+def committed_paths(root: Path, base: str) -> list[str]:
+    """Paths committed on this branch since it diverged from base (a critic reviews a diff, not a dirty tree)."""
+    merge_base = (git(root, "merge-base", "HEAD", base) or "").strip()
+    if not merge_base:
+        return []
+    return [line for line in (git(root, "diff", "--name-only", merge_base, "HEAD") or "").splitlines() if line]
+
+
 def branch_paths(root: Path, base: str) -> list[str]:
     """Paths changed on this branch since it diverged from base, plus uncommitted ones."""
-    committed: list[str] = []
-    merge_base = git(root, "merge-base", "HEAD", base)
-    if merge_base:
-        diff = git(root, "diff", "--name-only", merge_base.strip(), "HEAD")
-        committed = [line for line in (diff or "").splitlines() if line]
-    return sorted(set(committed) | set(changed_paths(root)))
+    return sorted(set(committed_paths(root, base)) | set(changed_paths(root)))
 
 
 @lru_cache(maxsize=512)

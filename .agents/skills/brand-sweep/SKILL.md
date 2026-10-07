@@ -22,8 +22,11 @@ python3 .agents/skills/brand-sweep/sweep.py . --avoid "Original Name,Its Company
 python3 .agents/skills/brand-sweep/sweep.py . --config reference/brand.json        # same, from the brand file
 ```
 
-Writes `reference/brand.md` and `reference/brand.json` (`avoid`, `domains`,
-`colors`, used by `sweep.py`).
+The sweep only reads. You (the agent) write `reference/brand.md` and
+`reference/brand.json` (`avoid`, `domains`, `colors`, optional `exclude`),
+which `sweep.py --config` then reads. Colours are hex (`#006bff`, `006bff`,
+`#06f`, `#006bffaa`; alpha is ignored); `rgb(...)` or a typo exits 2, never a
+silent "Clean".
 
 ## Step 1: the name
 
@@ -67,7 +70,7 @@ theirs is blue, yours is not a nearby blue). Then:
 python3 .agents/skills/design-tokens/contrast.py reference/design/tokens.json
 ```
 
-Zero AA failures. Add the reference product's brand colours to
+Zero failures. Add the reference product's brand colours to
 `reference/brand.json` so the sweep catches any that survive.
 
 ## Step 4: logo brief
@@ -101,9 +104,21 @@ python3 .agents/skills/brand-sweep/sweep.py . --config reference/brand.json
 
 It searches file contents and file names for the reference product's name
 (also inside identifiers like `CalendlyEmbed`), domains and colours, skipping
-`node_modules`, build output and the top-level `reference/` artifact folder
-(where their name belongs). Pass `--include-reference` to check that folder
-too, for example if it sits inside `public/`. Exit 1 means something is left.
+`node_modules`, build output and the top-level `reference/`, `.agent/` and
+`.review/` folders (where their name belongs). Pass `--include-reference` to
+check `reference/` too, for example if it sits inside `public/`.
+
+product-kickoff requires naming the reference product in `docs/product/research.md`
+and `docs/design.md`; those are scanned, so exclude them (repeatable
+`--exclude <glob>`, or `"exclude": [...]` in `brand.json`):
+
+```bash
+python3 .agents/skills/brand-sweep/sweep.py . --config reference/brand.json \
+  --exclude docs/product/research.md --exclude docs/design.md
+```
+
+Exclude only research and planning docs, never shipped code or copy.
+Exit 1 means something is left; exit 2 means bad input.
 Fix until it says clean. Also check by eye: the favicon, the page titles, the
 email templates, the OG image, the app icon.
 
@@ -112,9 +127,7 @@ email templates, the OG image, the app icon.
 `reference/brand.md` (name with checks, palette, logo brief, voice),
 `reference/brand.json`, updated tokens, rewritten strings, and a clean sweep.
 That clean sweep is the pre-launch gate: nothing ships while it exits 1.
-Remember: `reference/` must be registered in `project.toml` (see
-product-recon).
 
 ## Source
 
-Adapted from the upstream skill in https://github.com/Jakeschincariol/replica-skill (MIT, © 2026 Jake Schincariol), revision 77c9436fb3d18c3d58169efb8caf4fe906b0dc51.
+Adapted from the upstream skill in https://github.com/Jakeschincariol/replica-skill (MIT, © 2026 Jake Schincariol); revision: see `project.toml` `[[skills]]`.

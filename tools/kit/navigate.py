@@ -1,8 +1,8 @@
-"""Cheap navigation: a one-screen repository map, `where` lookups, and skill overlap.
+"""Cheap navigation: a one-screen repository map, `where` lookups, and capability overlap.
 
-These answer "what is here", "where does X live / who owns it / did it break
-before", and "does a capability already exist" in one call, so agents spend
-context on the task instead of on repeated searches.
+These answer "what is here", "where does X live / who owns it / which rule
+applies / did it break before", and "does a capability already exist" in one
+call, so agents spend context on the task instead of on repeated searches.
 """
 
 from __future__ import annotations
@@ -10,10 +10,11 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from .adapters import canonical_roles, canonical_skills
 from .core import declared_surfaces, governance_profile, load_project, read_text_file, repository_files
 from .docsync import bindings, owners
-from .gitinfo import git, is_repository
+from .gitinfo import git, is_repository, path_matches
+from .names import ERROR_LOG
+from .registry import Registry
 
 SYMBOL = re.compile(
     r"^\s*(?:export\s+)?(?:default\s+)?(?:async\s+)?(?:pub(?:\([^)]*\))?\s+)?"
@@ -21,7 +22,7 @@ SYMBOL = re.compile(
     r"([A-Za-z_][A-Za-z0-9_]*)"
 )
 HEADING = re.compile(r"^#{1,4}\s+(.+)$")
-MEMORY_FILES = ("docs/ERROR_LOG.md",)
+MEMORY_FILES = (ERROR_LOG,)
 SKIP_PREFIXES = (".claude/",)
 WORD = re.compile(r"[a-z0-9]+")
 
@@ -51,15 +52,19 @@ def print_map(root: Path, limit: int | None = None) -> None:
             print(f"- {doc} ← {_short(' '.join(patterns), 110)}")
         if limit is not None and len(items) > limit:
             print(f"- … {len(items) - limit} more (make map)")
-    roles = canonical_roles(root)
+    registry = Registry(root)
+    roles = registry.of("agent")
     if roles:
         print("\n## Delegation roles (.agents/agents/, contract: docs/delegation.md)")
         for role in roles:
-            print(f"- {role['name']} [{role['access']}, {role['tier']}]: {_short(role['description'], 80)}")
-    skills = canonical_skills(root)
+            print(f"- {role.name} [{role.fields['access']}, {role.fields['tier']}]: {_short(role.description, 80)}")
+    skills = registry.of("skill")
     if skills:
         print("\n## Skills (.agents/skills/)")
-        print("- " + ", ".join(skill["name"] for skill in skills))
+        print("- " + ", ".join(skill.name for skill in skills))
+    off = sorted(name for name, enabled in registry.pack_state.items() if not enabled)
+    if off:
+        print(f"\n## Packs switched off (findable with make capabilities): {', '.join(off)}")
     print("\n## Commands")
     print("- make where Q=\"...\" · make done · make new · make similar Q=\"...\" · make risk · make garden · make help")
 
@@ -135,8 +140,25 @@ def where(root: Path, query: str, limit: int = 20) -> list[str]:
         if score:
             weight = {"symbol": 3, "heading": 2, "seen-before": 3}[kind]
             hits.append((score * weight, f"{relative}:{number}  [{kind}] {_short(label)}"))
+    hits += _capability_hits(root, terms, query)
     hits.sort(key=lambda hit: (-hit[0], hit[1]))
     return [line for _, line in hits[:limit]]
+
+
+def _capability_hits(root: Path, terms: list[str], query: str) -> list[tuple[int, str]]:
+    """Capabilities of every kind and pack whose name or description matches, and rules scoped to a queried path."""
+    registry = Registry(root)
+    hits = []
+    for item in registry.items:
+        if item.kind == "doc":
+            continue  # documents are found by path and heading above
+        state = "" if registry.enabled(item) else (", off" if item.kind == "pack" else f", pack {item.pack} off")
+        score = _score(terms, f"{item.name} {item.description}")
+        if item.kind == "rule" and any(path_matches(query.strip(), pattern) for pattern in item.fields["scope"]):
+            score += len(terms) + 2
+        if score:
+            hits.append((score * 4, f"{item.path}  [{item.kind}{state}] {item.name}: {_short(item.description, 80)}"))
+    return hits
 
 
 def _stem(word: str) -> str:
@@ -156,7 +178,7 @@ def _jaccard(left: set[str], right: set[str]) -> float:
 
 
 def skill_overlap(root: Path, description: str, name: str = "", limit: int = 5) -> list[tuple[float, str, str]]:
-    """Similarity of a proposed capability to existing skills/roles (0..1).
+    """Similarity of a proposed capability to existing capabilities of every kind and pack (0..1).
 
     Description word overlap, plus half the overlap of the names when a name is
     proposed, so `handover-writer` is caught next to `agent-handover`.
@@ -165,8 +187,7 @@ def skill_overlap(root: Path, description: str, name: str = "", limit: int = 5) 
     proposed_name = _tokens(name.replace("-", " "))
     if not proposed:
         return []
-    candidates = [("skill", item["name"], item["description"]) for item in canonical_skills(root)]
-    candidates += [("role", item["name"], item["description"]) for item in canonical_roles(root)]
+    candidates = [(item.kind, item.name, item.description) for item in Registry(root).items]
     scored = []
     for kind, existing_name, text in candidates:
         score = _jaccard(proposed, _tokens(text)) + 0.5 * _jaccard(proposed_name, _tokens(existing_name.replace("-", " ")))

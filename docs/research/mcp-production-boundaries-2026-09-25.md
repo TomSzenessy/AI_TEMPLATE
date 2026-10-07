@@ -1,11 +1,11 @@
 # MCP and production boundaries — 2026-09-25
 
-<!-- index: extend | MCP/resource and production-evidence boundaries | Adding a documentation provider or preparing a real release. -->
+> **Snapshot banner (2026-10-07):** This research note is a point-in-time record from 2026-09-25. The "Remaining gap" section's reference to `AGENT_TEMPLATE` is now implemented by `.agents/mcp/`. Consult the current [`docs/resources.md`](../resources.md) and [`docs/production.md`](../production.md) for the active state.
 
 **Research/access date:** 2026-09-25 UTC
 **Scope:** optional MCP, documentation, and resource providers (especially Context7-style library-documentation retrieval), plus the evidence a generic production-readiness gate should require for web, native, backend, and media projects.
-**Method:** current protocol specifications, official standards/guidance, and first-party provider/platform documentation. `[Fact]` means the cited source states the point. `[Template inference]` means this note recommends it for `AGENT_TEMPLATE`; it is not a universal standard or a product-specific finding.
-**Repository snapshot:** the untracked local `AGENT_TEMPLATE` worktree observed during this research. Re-check the current files before implementation.
+**Method:** current protocol specifications, official standards/guidance, and first-party provider/platform documentation. `[Fact]` means the cited source states the point. `[Template inference]` means this note recommends it for `AI_TEMPLATE`; it is not a universal standard or a product-specific finding.
+**Repository snapshot:** the untracked local `AI_TEMPLATE` worktree observed during this research. Re-check the current files before implementation.
 
 > **Boundary:** this is an engineering research note, not a security assessment, penetration test, legal opinion, accessibility audit, or certification. A provider response, green scanner, test, MCP Registry entry, or release checklist does not establish universal correctness, security, privacy, accessibility, SSDF, SLSA, WCAG, GDPR, store-policy, or other compliance. NIST SP 800-218 Rev. 1 is still a draft as accessed on 2026-09-25; the final SSDF publication is version 1.1.
 

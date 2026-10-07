@@ -36,6 +36,13 @@ failure signatures: symptom, root cause, permanent fix, regression evidence, and
 remaining operational action. It is not a task list. Do not copy an unresolved
 finding there; keep that work in GitHub Issues.
 
+Each row starts with a key `EL-###` (e.g., `EL-001`), backticks the exact
+literals the failure prints in its symptom cell (a distinctive message or path,
+not shared vocabulary), and cites the regression test as evidence. When a
+blocking finding repeats a recorded literal, `make check` adds a
+`known failure EL-###` line with the permanent fix, so a known failure is
+recognised instead of re-diagnosed.
+
 ## Safety during incidents
 
 - Incident records are private drafts by default; promotion to tracked

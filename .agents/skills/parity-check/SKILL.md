@@ -11,17 +11,18 @@ description: >-
 
 # parity-check
 
-Reads `reference/features.csv`, which product-recon starts and the build
-fills in, plus the two screenshot sets. Writes `reference/parity.md`.
+Reads `docs/product/features.csv` (the one matrix, shared with kickoff, recon,
+review-mining and `make next`), plus the two screenshot sets. Writes
+`reference/parity.md`.
 
 Two tools in this folder, both standard-library Python, no installs
 (commands run from the project root):
 
 ```bash
-python3 .agents/skills/parity-check/parity.py reference/features.csv                         # feature parity + missing list
+python3 .agents/skills/parity-check/parity.py docs/product/features.csv                         # feature parity + missing list
 python3 .agents/skills/parity-check/imgdiff.py reference/screens/S07.png reference/build-screens/S07.png --out reference/diffs/S07.png
 python3 .agents/skills/parity-check/imgdiff.py a.png b.png --json > reference/diffs/S07.json # for parity.py --visual
-python3 .agents/skills/parity-check/parity.py reference/features.csv --visual reference/diffs/*.json --markdown > reference/parity.md
+python3 .agents/skills/parity-check/parity.py docs/product/features.csv --visual reference/diffs/*.json --markdown > reference/parity.md
 ```
 
 ## What parity means here
@@ -37,17 +38,18 @@ before launch.
 
 ## Step 1: feature parity
 
-Make sure `reference/features.csv` is current: every row's `clone` column is
-`yes`, `partial` (with a note), `no`, or `skip` (with a reason). `original`
-is does the reference product have it; `clone` is does this build have it.
-Then:
+Make sure `docs/product/features.csv` is current: every row's `status` is
+`yes`, `partial` (with a note), `no`, or `skip` (with a reason). `status` is
+does this build have it. An old `reference/features.csv` with a `clone`
+column still scores (deprecated; rename it to `status`). Then:
 
 ```bash
-python3 .agents/skills/parity-check/parity.py reference/features.csv
+python3 .agents/skills/parity-check/parity.py docs/product/features.csv
 ```
 
 It weights must 3, should 2, could 1, counts partial as half, leaves out
-`skip` rows and rows you added that the reference product does not have, and
+`skip` rows and rows you added that the reference product does not have
+(`source` review-mining, or `original` no), and
 prints: the score, must-haves done of total, each area weakest first, and the
 missing list in build order. Must-haves not done means not shippable, and it
 says so.
@@ -74,6 +76,8 @@ the same width.
 
 `--mode pixel` is exact comparison. Use it for your own regressions (this
 build today against this build last week), not against the reference.
+`parity.py --visual` averages layout scores only and lists pixel-mode or blank
+comparisons as ignored.
 
 ## Step 3: behaviour diff
 
@@ -99,9 +103,8 @@ Give honest numbers. A build at 62% is at 62%.
 
 `reference/parity.md`, the diff images in `reference/diffs/`, and the top five
 things to build next. Then the project's issue-backed build loop (AGENTS.md)
-for the gaps, or review-mining when parity is there. Remember: `reference/`
-must be registered in `project.toml` (see product-recon).
+for the gaps, or review-mining when parity is there.
 
 ## Source
 
-Adapted from the upstream skill in https://github.com/Jakeschincariol/replica-skill (MIT, © 2026 Jake Schincariol), revision 77c9436fb3d18c3d58169efb8caf4fe906b0dc51.
+Adapted from the upstream skill in https://github.com/Jakeschincariol/replica-skill (MIT, © 2026 Jake Schincariol); revision: see `project.toml` `[[skills]]`.

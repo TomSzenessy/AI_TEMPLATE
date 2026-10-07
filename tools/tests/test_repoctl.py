@@ -1,23 +1,26 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import os
 import re
-import subprocess
 import sys
-import tempfile
 import textwrap
 import unittest
 from pathlib import Path
 
-REPOCTL = Path(__file__).resolve().parents[1] / "repoctl.py"
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # `fixtures`, however this file is invoked (#33)
+from fixtures import RECENT, Scratch, fake_gh  # noqa: E402  shared builders, in-process CLI (#43)
 
 
-class RepoctlCliTests(unittest.TestCase):
+def kit_workflow(root: Path, name: str) -> Path:
+    """The kit's workflow: after make adopt, a project's own workflow keeps the name and the kit's is kit-<name>."""
+    renamed = root / ".github/workflows" / f"kit-{name}"
+    return renamed if renamed.is_file() else root / ".github/workflows" / name
+
+
+class RepoctlCliTests(Scratch):
     def setUp(self) -> None:
-        self.temp = tempfile.TemporaryDirectory()
-        self.root = Path(self.temp.name)
+        super().setUp()
         self.write("project.toml", """schema = 1
 name = "REPLACE_WITH_PROJECT_NAME"
 kind = "template"
@@ -28,10 +31,7 @@ owners = []
 profile = "regulated"
 """)
         self.write("docs/README.md", "# Docs\n")
-        self.write("review.md", "Issue: #42\nCommit: " + "a" * 40 + "\nArtifact: review.md\nReviewer: test reviewer\nDate: 2026-08-25\nResult: pass\n")
-
-    def tearDown(self) -> None:
-        self.temp.cleanup()
+        self.write("review.md", "Issue: #42\nCommit: " + "a" * 40 + "\nArtifact: review.md\nReviewer: test reviewer\nDate: " + RECENT + "\nResult: pass\n")
 
     def write(self, name: str, content: str | bytes) -> Path:
         if name == "project.toml" and isinstance(content, str) and "[vision]" not in content:
@@ -41,35 +41,17 @@ profile = "regulated"
             project_kind = kind_match.group(1) if kind_match else "web"
             content += f'''\n[vision]\nstatus = "accepted"\nrecord = "VISION.md"\nstack_decision = "docs/STACK-DECISION.md"\n'''
             (self.root / "VISION.md").write_text(
-                f"# Project vision\n\nStatus: accepted\nProject: {project_name}\nOwner: test owner\nDate: 2026-08-25\n",
+                f"# Project vision\n\nStatus: accepted\nProject: {project_name}\nOwner: test owner\nDate: " + RECENT + "\n",
                 encoding="utf-8",
             )
             (self.root / "docs" / "STACK-DECISION.md").parent.mkdir(parents=True, exist_ok=True)
             (self.root / "docs" / "STACK-DECISION.md").write_text(
-                f"# Stack\n\nStatus: accepted\nProject: {project_name}\nOwner: test owner\nDate: 2026-08-25\n",
+                f"# Stack\n\nStatus: accepted\nProject: {project_name}\nOwner: test owner\nDate: " + RECENT + "\n",
                 encoding="utf-8",
             )
         if name == "docs/README.md" and isinstance(content, str) and "STACK-DECISION.md" not in content:
             content += "\n- [Stack decision](STACK-DECISION.md)\n"
-        path = self.root / name
-        path.parent.mkdir(parents=True, exist_ok=True)
-        if isinstance(content, bytes):
-            path.write_bytes(content)
-        else:
-            path.write_text(textwrap.dedent(content), encoding="utf-8")
-        return path
-
-    def cli(self, *args: str, env: dict[str, str] | None = None):
-        environment = os.environ.copy()
-        if env:
-            environment.update(env)
-        return subprocess.run(
-            [sys.executable, str(REPOCTL), "--root", str(self.root), *args],
-            capture_output=True,
-            text=True,
-            check=False,
-            env=environment,
-        )
+        return super().write(name, content)
 
     def issue_body(self, safe: bool = True) -> str:
         review = "not applicable" if safe else "private security review"
@@ -100,7 +82,7 @@ profile = "regulated"
             - **Disclosure class:** ordinary
             - **Public-safe:** yes
             - **Security/privacy review:** {review}
-            - **Reviewer/date:** 2026-08-25 test reviewer
+            - **Reviewer/date:** {RECENT} test reviewer
             ### Dependencies and handoff
             - **Owner / next action:** test owner; implement and verify the refresh path
             """)
@@ -112,7 +94,7 @@ profile = "regulated"
             self.write(
                 "review.md",
                 "Issue: #42\nCommit: " + "a" * 40 + "\nArtifact: review.md\n"
-                "Reviewer: test reviewer\nDate: 2026-08-25\nResult: pass\n"
+                "Reviewer: test reviewer\nDate: " + RECENT + "\nResult: pass\n"
                 f"Body-SHA256: {body_hash}\n",
             )
         return [
@@ -124,30 +106,8 @@ profile = "regulated"
 
     def github(self, duplicate: bool = False, results: list[dict] | None = None) -> tuple[Path, Path]:
         directory = self.root / "bin"
-        directory.mkdir(exist_ok=True)
-        log = directory / "gh.log"
         search_results = results if results is not None else ([{"number": 12, "title": "Login refresh rejects valid sessions", "url": "https://example.test/12", "state": "OPEN"}] if duplicate else [])
-        results_literal = json.dumps(search_results)
-        script = f"""#!/usr/bin/env python3
-import json, os, sys
-from pathlib import Path
-args = sys.argv[1:]
-if args[:2] == ['repo', 'view']:
-    print(json.dumps({{'nameWithOwner': 'example/project'}}))
-elif args[:2] == ['issue', 'list']:
-    print({results_literal!r})
-elif args[:2] == ['issue', 'create']:
-    Path(os.environ['GH_LOG']).open('a', encoding='utf-8').write(json.dumps({{'args': args, 'stdin': sys.stdin.read()}}) + '\\n')
-    print('https://github.com/example/project/issues/17')
-elif args[:2] == ['label', 'create']:
-    Path(os.environ['GH_LOG']).open('a', encoding='utf-8').write('\\n'.join(args) + '\\n')
-else:
-    raise SystemExit(2)
-"""
-        fake = directory / "gh"
-        fake.write_text(script, encoding="utf-8")
-        fake.chmod(0o755)
-        return directory, log
+        return directory, fake_gh(directory, results=search_results)
 
     def test_init_replaces_template_readme(self) -> None:
         self.write("README.md", """# Agent Template
@@ -200,14 +160,16 @@ purpose = "bounded test capability"
 reviewed_on = "2026-08-25"
 permissions = "read-only / project-local"
 rollback = "remove the project-local skill and restore the previous lockfile"
-""")
+""".replace("2026-08-25", RECENT))
         result = self.cli("init", "--name", "Demo", "--kind", "game")
         self.assertEqual(result.returncode, 0, result.stderr)
         manifest = (self.root / "project.toml").read_text(encoding="utf-8")
         self.assertIn('id = "template-bootstrap"', manifest)
         self.assertIn("[[skills]]", manifest)
         self.assertIn("content_digest", manifest)
-        self.assertNotIn("make init NAME=my-project", (self.root / "README.md").read_text(encoding="utf-8"))
+        # Column 0 is the hand-written quickstart; the generated command list prints the same
+        # command indented, and listing it is not leftover scaffolding (#16).
+        self.assertNotIn("\nmake init NAME=my-project", (self.root / "README.md").read_text(encoding="utf-8"))
 
     def test_infrastructure_defaults_and_root_surface_rogue_detection(self) -> None:
         (self.root / "tests").mkdir()
@@ -226,6 +188,22 @@ infrastructure_paths = ["tests", "config"]
         result = self.cli("check")
         self.assertEqual(result.returncode, 1)
         self.assertIn("unregistered product surface: apps/rogue", result.stderr)
+
+    def test_test_and_example_folders_are_infrastructure_by_default(self) -> None:
+        for folder in ("tests", "e2e", "test-results", "examples", "scripts"):
+            self.write(f"{folder}/x.py", "X = 1\n")
+        self.write("project.toml", """schema = 1
+name = "Demo"
+kind = "web"
+phase = "development"
+license = "MIT"
+owners = ["team"]
+""")
+        self.write("LICENSE", "MIT")
+        result = self.cli("check")
+        for folder in ("tests", "e2e", "test-results", "examples"):
+            self.assertNotIn(f"unregistered product surface: {folder}", result.stderr)
+        self.assertIn("unregistered product surface: scripts", result.stderr, "ambiguous names still need a declaration")
 
     def test_infrastructure_cannot_hide_container_or_surface(self) -> None:
         self.write("project.toml", """schema = 1
@@ -284,7 +262,7 @@ quality_oracle = "Independent rendered-image comparison"
         self.assertEqual(missing.returncode, 1)
         self.assertIn("critic_evidence", missing.stderr)
         self.write("renders/scene.png", b"png")
-        self.write("review.md", "Issue: #42\nCommit: " + "a" * 40 + "\nArtifact: renders/scene.png\nReviewer: artist\nDate: 2026-08-25\nResult: pass\n")
+        self.write("review.md", "Issue: #42\nCommit: " + "a" * 40 + "\nArtifact: renders/scene.png\nReviewer: artist\nDate: " + RECENT + "\nResult: pass\n")
         self.write("project.toml", """schema = 1
 name = "Demo"
 kind = "design"
@@ -357,7 +335,7 @@ critic_evidence = ["review.md"]
         github, log = self.github(results=unrelated)
         result = self.cli(*args, env={"PATH": f"{github}:{os.environ['PATH']}", "GH_LOG": str(log)})
         self.assertEqual(result.returncode, 0, result.stderr)
-        same_path = [{"number": 13, "title": "Different title", "body": "Authentication adapter and session refresh route (src/auth/session.ts)", "url": "u", "state": "OPEN"}]
+        same_path = [{"number": 13, "title": "Different title", "body": "Authentication adapter and session refresh route (src/auth/session.ts)", "labels": [{"name": "topic:session-refresh"}], "url": "u", "state": "OPEN"}]
         self.github(results=same_path)
         result = self.cli(*args, env={"PATH": f"{github}:{os.environ['PATH']}", "GH_LOG": str(log)})
         self.assertEqual(result.returncode, 1)
@@ -392,10 +370,16 @@ critic_evidence = ["review.md"]
         result = self.cli("incident", "--title", "ghp_" + "a" * 30, "--summary", "safe")
         self.assertEqual(result.returncode, 1)
         self.assertIn("possible secret", result.stderr)
+        self.git("init", "-q", "-b", "main")
         self.write("issue.md", "Issue #42\n" + self.issue_body())
-        self.write("secret.txt", "ghp_" + "a" * 30)
+        self.write("deploy.sh", "echo safe\n")
+        self.git("add", "issue.md", "deploy.sh")
+        self.git("commit", "-qm", "base")
+        self.write("deploy.sh", "ghp_" + "a" * 30 + "\n")  # the token now sits in the patch the packet shows
         result = self.cli("review-packet", "--issue-file", "issue.md")
         self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("ghp_" + "a" * 30, result.stdout, "a token in the patch is redacted, not copied into the packet")
+        self.assertIn("[REDACTED]", result.stdout)
 
     def test_review_packet_requires_canonical_issue(self) -> None:
         self.write("issue.md", "Issue #42\n" + self.issue_body())
@@ -439,12 +423,10 @@ rollback = "none"
         self.assertIn("neither first-party", result.stderr)
 
     def test_review_packet_redacts_private_key_blocks_from_patch(self) -> None:
-        subprocess.run(["git", "init", "-q"], cwd=self.root, check=True)
-        subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=self.root, check=True)
-        subprocess.run(["git", "config", "user.name", "Test"], cwd=self.root, check=True)
+        self.git("init", "-q", "-b", "main")
         self.write("tracked.txt", "safe\n")
-        subprocess.run(["git", "add", "tracked.txt"], cwd=self.root, check=True)
-        subprocess.run(["git", "commit", "-qm", "base"], cwd=self.root, check=True)
+        self.git("add", "tracked.txt")
+        self.git("commit", "-qm", "base")
         self.write(
             "tracked.txt",
             "-----BEGIN " + "PRIVATE KEY-----\nsecret-base64-body\n" + "-----END PRIVATE KEY-----\n",
@@ -454,16 +436,6 @@ rollback = "none"
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertNotIn("secret-base64-body", result.stdout)
         self.assertIn("[REDACTED]", result.stdout)
-
-        root = Path(__file__).resolve().parents[2]
-        for name in ("config.yml", "bug.yml", "improvement.yml", "feature.yml"):
-            content = (root / ".github" / "ISSUE_TEMPLATE" / name).read_text(encoding="utf-8")
-            self.assertIn("Disclosure classification", content)
-            self.assertIn("public-safe", content)
-        self.assertIn("[enhancement/P2]", (root / ".github/ISSUE_TEMPLATE/feature.yml").read_text(encoding="utf-8"))
-        workflow = (root / ".github/workflows/require-issue-reference.yml").read_text(encoding="utf-8") + (root / "tools/kit/ci.py").read_text(encoding="utf-8")
-        self.assertIn("Fixes", workflow)
-        self.assertIn("Security-Reference", workflow)
 
     def test_vision_intake_is_required_and_path_bound(self) -> None:
         (self.root / "project.toml").write_text("schema = 1\nname = \"Demo\"\nkind = \"web\"\nphase = \"development\"\n", encoding="utf-8")
@@ -479,20 +451,10 @@ status = "accepted"
 record = "docs/other.md"
 stack_decision = "docs/STACK-DECISION.md"
 """)
-        self.write("docs/other.md", "Status: accepted\nProject: Demo\nOwner: test\nDate: 2026-08-25\n")
+        self.write("docs/other.md", "Status: accepted\nProject: Demo\nOwner: test\nDate: " + RECENT + "\n")
         result = self.cli("check")
         self.assertEqual(result.returncode, 1)
         self.assertIn("exactly VISION.md", result.stderr)
-
-        root = Path(__file__).resolve().parents[2]
-        for name in ("config.yml", "bug.yml", "improvement.yml", "feature.yml"):
-            content = (root / ".github" / "ISSUE_TEMPLATE" / name).read_text(encoding="utf-8")
-            self.assertIn("Disclosure classification", content)
-            self.assertIn("public-safe", content)
-        self.assertIn("[enhancement/P2]", (root / ".github/ISSUE_TEMPLATE/feature.yml").read_text(encoding="utf-8"))
-        workflow = (root / ".github/workflows/require-issue-reference.yml").read_text(encoding="utf-8") + (root / "tools/kit/ci.py").read_text(encoding="utf-8")
-        self.assertIn("Fixes", workflow)
-        self.assertIn("Security-Reference", workflow)
 
     def test_agent_first_rendered_form_shape_validates(self) -> None:
         self.write("project.toml", """schema = 1
@@ -515,7 +477,7 @@ Test evidence: integration output; Artifact: review.md
 - **Disclosure class:** ordinary
 - **Public-safe:** yes
 - **Security/privacy review:** not applicable
-- **Reviewer/date:** tester 2026-08-25
+- **Reviewer/date:** tester """ + RECENT + """
 ### Dependencies and handoff
 - **Owner / next action:** auth team; run the declared test
 """)
@@ -544,7 +506,7 @@ Test evidence: unit test output.
 - **Disclosure class:** ordinary
 - **Public-safe:** yes
 - **Security/privacy review:** not applicable
-- **Reviewer/date:** tester 2026-08-25
+- **Reviewer/date:** tester """ + RECENT + """
 ### Dependencies and handoff
 - **Owner / next action:** maintainer; review the branch
 """
@@ -576,7 +538,7 @@ Test evidence: the regression is reproducible.
 - **Disclosure class:** ordinary
 - **Public-safe:** yes
 - **Security/privacy review:** not applicable
-- **Reviewer/date:** tester 2026-08-25
+- **Reviewer/date:** tester """ + RECENT + """
 ### Dependencies and handoff
 - **Owner / next action:** security owner; use the private route
 """
@@ -722,14 +684,16 @@ quality_oracle = "human review"
 
     def test_workflow_has_checkout_permissions_and_label_families(self) -> None:
         root = Path(__file__).resolve().parents[2]
-        issue_workflow = (root / ".github/workflows/issue-contract.yml").read_text(encoding="utf-8") + (root / "tools/kit/ci.py").read_text(encoding="utf-8")
+        issue_workflow = kit_workflow(root, "issue-contract.yml").read_text(encoding="utf-8") + "".join(
+            (root / name).read_text(encoding="utf-8") for name in ("tools/kit/ci.py", "tools/kit/issues.py", "tools/issue_contract.py")
+        )
         self.assertIn("contents: read", issue_workflow)
         self.assertIn("actions/checkout@", issue_workflow)
         self.assertIn("topic", issue_workflow)
-        self.assertIn("labeled", issue_workflow)
-        self.assertIn("registry_path", issue_workflow)
+        self.assertIn("cancel-in-progress", issue_workflow)
+        self.assertIn("load_label_registry", issue_workflow)
         self.assertIn("Disclosure class", issue_workflow)
-        reference_workflow = (root / ".github/workflows/require-issue-reference.yml").read_text(encoding="utf-8") + (root / "tools/kit/ci.py").read_text(encoding="utf-8")
+        reference_workflow = kit_workflow(root, "require-issue-reference.yml").read_text(encoding="utf-8") + (root / "tools/kit/ci.py").read_text(encoding="utf-8")
         self.assertNotIn("security-events: read", reference_workflow)
         self.assertNotIn("security-advisories/", reference_workflow)
         self.assertIn("maintainer-attested", reference_workflow)
@@ -741,14 +705,14 @@ quality_oracle = "human review"
         self.assertIn("PR_AUTHOR_ASSOCIATION", reference_workflow)
         self.assertIn("private security prs require", reference_workflow.casefold())
         for workflow_name, check in (("require-issue-reference.yml", "pr-reference"), ("issue-contract.yml", "issue-contract")):
-            text = (root / ".github/workflows" / workflow_name).read_text(encoding="utf-8")
+            text = kit_workflow(root, workflow_name).read_text(encoding="utf-8")
             # Logic lives in tested repository code; the workflow checks out, then calls it.
             self.assertLess(text.index("actions/checkout@"), text.index(f"ci {check}"))
             self.assertNotIn("python3 - <<", text)
-        ci_workflow = (root / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+        ci_workflow = kit_workflow(root, "ci.yml").read_text(encoding="utf-8")
         self.assertNotIn("GH_TOKEN", ci_workflow)
         self.assertIn("permissions: {}", ci_workflow)
-        scans = (root / ".github/workflows/specialist-scans.yml").read_text(encoding="utf-8")
+        scans = kit_workflow(root, "specialist-scans.yml").read_text(encoding="utf-8")
         self.assertIn("pull_request:", scans)
         scan_args = scans.split("args:", 1)[1].split("fail:", 1)[0]
         self.assertNotIn("403", scan_args)
@@ -784,9 +748,9 @@ verification = [["python3", "-c", "print('ok')"]]
 """)
         self.write("LICENSE", "MIT")
         self.write("README.md", "# Demo\n<!-- repoctl:project-readme -->\n> Project initialized: **Demo** (`web`).\n")
-        self.write("docs/legal/privacy-notice.template.md", "# Draft\nProject: Demo\nLegal owner: [name/team]\nReviewer: Alice [to be confirmed]\nDate: 2026-08-25\n")
+        self.write("docs/legal/privacy-notice.template.md", "# Draft\nProject: Demo\nLegal owner: [name/team]\nReviewer: Alice [to be confirmed]\nDate: " + RECENT + "\n")
         self.write("docs/legal/data-inventory.md", "# Inventory\n")
-        self.write(".security/config.json", '{"security_team_contacts": [], "security_reviewed_on": "2026-08-25", "security_reviewer": "Alice [pending]"}')
+        self.write(".security/config.json", '{"security_team_contacts": [], "security_reviewed_on": "' + RECENT + '", "security_reviewer": "Alice [pending]"}')
         result = self.cli("readiness")
         self.assertEqual(result.returncode, 1)
         self.assertIn("security.contact", result.stderr)
@@ -821,17 +785,18 @@ verification = [["python3", "-c", "print('ok')"]]
 
     def test_forms_and_pr_workflow_keep_public_contracts(self) -> None:
         root = Path(__file__).resolve().parents[2]
-        for name in ("config.yml", "bug.yml", "improvement.yml", "feature.yml"):
+        for name in ("issue-tracker.yml", "bug.yml", "improvement.yml", "feature.yml"):
             content = (root / ".github" / "ISSUE_TEMPLATE" / name).read_text(encoding="utf-8")
             self.assertIn("Disclosure classification", content)
             self.assertIn("Disclosure class", content)
             self.assertIn("public-safe", content)
         self.assertIn("[enhancement/P2]", (root / ".github/ISSUE_TEMPLATE/feature.yml").read_text(encoding="utf-8"))
-        issue_workflow = (root / ".github/workflows/issue-contract.yml").read_text(encoding="utf-8") + (root / "tools/kit/ci.py").read_text(encoding="utf-8")
+        issue_workflow = kit_workflow(root, "issue-contract.yml").read_text(encoding="utf-8") + (root / "tools/kit/ci.py").read_text(encoding="utf-8")
         self.assertIn("Regulated profile uses the CLI/private issue route", issue_workflow)
         self.assertIn("Minimal profile delegates issue intake", issue_workflow)
-        workflow = (root / ".github/workflows/require-issue-reference.yml").read_text(encoding="utf-8") + (root / "tools/kit/ci.py").read_text(encoding="utf-8")
+        workflow = kit_workflow(root, "require-issue-reference.yml").read_text(encoding="utf-8") + (root / "tools/kit/ci.py").read_text(encoding="utf-8")
         self.assertIn("Fixes", workflow)
+        self.assertIn("Security-Reference", workflow)
         self.assertIn("private security prs require", workflow.casefold())
     def test_incident_updates_empty_docs_marker_and_passes_check(self) -> None:
         result = self.cli("incident", "--title", "Probe failure", "--summary", "A reproducible probe")
@@ -840,7 +805,8 @@ verification = [["python3", "-c", "print('ok')"]]
 
     def test_public_incident_requires_reviewed_safe_flag(self) -> None:
         body_hash = hashlib.sha256(b"A redacted failure").hexdigest()
-        self.write("incident-review.md", "Issue: #42\nCommit: " + "a" * 40 + "\nArtifact: incident-review.md\nReviewer: reviewer\nDate: 2026-08-25\nResult: public-safe\n" + f"Body-SHA256: {body_hash}\n")
+        self.write("incident-review.md", "Issue: #42\nCommit: " + "a" * 40 + "\nArtifact: incident-review.md\nReviewer: reviewer\nDate: " + RECENT + "\nResult: public-safe\n" + f"Body-SHA256: {body_hash}\n")
+        self.write("docs/README.md", "# Docs\n- [Incident evidence](../incident-review.md)\n")  # indexed, so it is not orphaned
         result = self.cli("incident", "--title", "Public failure", "--summary", "A redacted failure", "--public-safe", "--review-evidence", "incident-review.md")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.cli("check").returncode, 0)
@@ -849,21 +815,25 @@ verification = [["python3", "-c", "print('ok')"]]
         self.assertIn("private incident draft", sensitive.stderr)
 
     def test_multiple_public_incidents_remain_indexed(self) -> None:
-        for index, title in enumerate(("First failure", "Second failure"), start=1):
-            summary = f"A redacted failure {index}"
+        for number, title in enumerate(("First failure", "Second failure"), start=1):
+            summary = f"A redacted failure {number}"
             body_hash = hashlib.sha256(summary.encode()).hexdigest()
-            evidence = f"incident-review-{index}.md"
-            self.write(evidence, "Issue: #42\nCommit: " + "a" * 40 + "\nArtifact: " + evidence + "\nReviewer: reviewer\nDate: 2026-08-25\nResult: public-safe\n" + f"Body-SHA256: {body_hash}\n")
+            evidence = f"incident-review-{number}.md"
+            self.write(evidence, "Issue: #42\nCommit: " + "a" * 40 + "\nArtifact: " + evidence + "\nReviewer: reviewer\nDate: " + RECENT + "\nResult: public-safe\n" + f"Body-SHA256: {body_hash}\n")
+            listed = self.root / "docs" / "README.md"
+            listed.write_text(listed.read_text(encoding="utf-8") + f"- [Evidence {number}](../{evidence})\n")  # indexed, so it is not orphaned
             result = self.cli("incident", "--title", title, "--summary", summary, "--public-safe", "--review-evidence", evidence)
             self.assertEqual(result.returncode, 0, result.stderr)
-        index = (self.root / "docs" / "README.md").read_text(encoding="utf-8")
-        self.assertIn("First failure", index)
-        self.assertIn("Second failure", index)
+        listed = (self.root / "docs" / "README.md").read_text(encoding="utf-8")
+        self.assertIn("First failure", listed)
+        self.assertIn("Second failure", listed)
         self.assertEqual(self.cli("check").returncode, 0)
 
     def test_third_party_skill_digest_binds_tree_and_mode(self) -> None:
         self.write(".agents/skills/example/SKILL.md", "# Reviewed skill\n")
         self.write(".agents/skills/example/reference.md", "bounded reference\n")
+        self.write("docs/skills.md", "# Skills\n\n<!-- covers: .agents/skills/** -->\n")  # the owner doc binds the tree
+        self.write("docs/README.md", "# Docs\n- [Skills](skills.md)\n")
         digest_result = self.cli("skill-digest", ".agents/skills/example")
         self.assertEqual(digest_result.returncode, 0, digest_result.stderr)
         digest = digest_result.stdout.strip()
@@ -882,7 +852,7 @@ purpose = "bounded test capability"
 reviewed_on = "2026-08-25"
 permissions = "read-only / project-local"
 rollback = "remove the project-local skill and restore the previous lockfile"
-""".replace("DIGEST", digest))
+""".replace("DIGEST", digest).replace("2026-08-25", RECENT))
         self.write("README.md", "# Demo\n<!-- repoctl:project-readme -->\n> Project initialized: **Demo** (`web`).\n")
         self.assertEqual(self.cli("check").returncode, 0)
         skill_path = self.root / ".agents" / "skills" / "example" / "SKILL.md"
@@ -909,7 +879,7 @@ rollback = "remove the project-local skill and restore the previous lockfile"
     def test_public_incident_index_failure_leaves_no_orphan(self) -> None:
         summary = "A redacted failure"
         body_hash = hashlib.sha256(summary.encode()).hexdigest()
-        self.write("incident-review.md", "Issue: #42\nCommit: " + "a" * 40 + "\nArtifact: incident-review.md\nReviewer: reviewer\nDate: 2026-08-25\nResult: public-safe\n" + f"Body-SHA256: {body_hash}\n")
+        self.write("incident-review.md", "Issue: #42\nCommit: " + "a" * 40 + "\nArtifact: incident-review.md\nReviewer: reviewer\nDate: " + RECENT + "\nResult: public-safe\n" + f"Body-SHA256: {body_hash}\n")
         index = self.root / "docs" / "README.md"
         index.unlink()
         index.mkdir()

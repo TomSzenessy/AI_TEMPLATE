@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Jake Schincariol. Adapted from https://github.com/Jakeschincariol/replica-skill @ 77c9436fb3d18c3d58169efb8caf4fe906b0dc51.
+# Copyright (c) 2026 Jake Schincariol. Adapted from https://github.com/Jakeschincariol/replica-skill (revision: see project.toml [[skills]]).
 """Feedback ranker for review-mining. Standard library only.
 
 Takes the real reviews you collected about the app you are cloning and ranks
@@ -24,7 +24,10 @@ The CSV needs these columns (extra columns are ignored):
 A row without a url or without text is dropped and counted, never guessed.
 This tool only reorganises what you give it. It does not write reviews, it
 does not paraphrase them, and every quote it prints is a substring of a row
-you supplied, with that row's link.
+you supplied, with that row's link. A cut quote is marked [excerpt] outside the
+quotation marks; the quote itself is never altered. A rating outside 1 to 5 is
+counted as unrated and reported. A duplicate is the same text under the same
+link; the same words from a different link are different users.
 
 How a theme is ranked: every review that matches it adds a weight. A 1 star
 review adds 1.0, a 5 star review adds 0.2, an unrated one adds 0.6. Reviews
@@ -74,6 +77,7 @@ def parse_date(text):
 
 
 def parse_rating(text):
+    """1 to 5 as a float; None when blank, unparseable or out of range."""
     text = (text or "").strip()
     if not text:
         return None
@@ -84,6 +88,12 @@ def parse_rating(text):
     if value < 1 or value > 5:
         return None
     return value
+
+
+def rating_is_invalid(text):
+    """True when a rating was given but is not a number from 1 to 5."""
+    text = (text or "").strip()
+    return bool(text) and parse_rating(text) is None
 
 
 def load_reviews(path):
@@ -109,7 +119,9 @@ def load_reviews(path):
             if not url or not text or not re.match(r"^https?://", url):
                 dropped += 1
                 continue
-            key = re.sub(r"\W+", " ", text.lower()).strip()
+            # Same text under the same link is one review pasted twice; the
+            # same words from a different link are a different user.
+            key = (url, re.sub(r"\W+", " ", text.lower()).strip())
             if key in seen:
                 dupes += 1
                 continue
@@ -120,6 +132,7 @@ def load_reviews(path):
                 "url": url,
                 "date": parse_date(row.get("date", "")),
                 "rating": parse_rating(row.get("rating", "")),
+                "rating_invalid": row.get("rating", "") if rating_is_invalid(row.get("rating", "")) else "",
                 "text": text,
             })
     return kept, dropped, dupes
@@ -141,18 +154,23 @@ def weight(review, today, months):
 
 
 def snippet(text, pattern, limit=220):
-    """The first sentence of text that matches pattern, verbatim."""
+    """(excerpt, truncated): the first sentence matching pattern, verbatim.
+
+    The excerpt is always an exact substring of text; a cut is reported by the
+    flag, never by characters added to the quote.
+    """
     for sent in SENTENCE.split(text):
         if pattern.search(sent):
             s = sent.strip()
             if len(s) > limit:
                 m = pattern.search(s)
                 start = max(0, m.start() - limit // 2)
-                s = s[start:start + limit].strip()
-                s = ("..." if start > 0 else "") + s + "..."
-            return s
+                return s[start:start + limit].strip(), True
+            return s, False
     s = text.strip()
-    return s if len(s) <= limit else s[:limit].rstrip() + "..."
+    if len(s) <= limit:
+        return s, False
+    return s[:limit].rstrip(), True
 
 
 def analyse(reviews, themes, request_patterns, today=None, months=18):
@@ -172,10 +190,12 @@ def analyse(reviews, themes, request_patterns, today=None, months=18):
             matched = True
             res = results[t["id"]]
             res["score"] += w
-            res["reviews"].append({"rv": rv, "quote": snippet(rv["text"], hit)})
+            quote, cut = snippet(rv["text"], hit)
+            res["reviews"].append({"rv": rv, "quote": quote, "truncated": cut})
         req = next((p for p in request_patterns if p.search(rv["text"])), None)
         if req is not None:
-            requests.append({"quote": snippet(rv["text"], req), "url": rv["url"],
+            quote, cut = snippet(rv["text"], req)
+            requests.append({"quote": quote, "truncated": cut, "url": rv["url"],
                              "source": rv["source"], "rating": rv["rating"]})
         if not matched and rv["rating"] is not None and rv["rating"] <= 2:
             unthemed_negative.append(rv)
@@ -199,7 +219,7 @@ def analyse(reviews, themes, request_patterns, today=None, months=18):
             "avg_rating": round(sum(rated) / len(rated), 2) if rated else None,
             "sources": sources,
             "thin": len(items) < 3 or len(sources) < 2,
-            "quotes": [{"quote": x["quote"], "url": x["rv"]["url"],
+            "quotes": [{"quote": x["quote"], "truncated": x["truncated"], "url": x["rv"]["url"],
                         "source": x["rv"]["source"], "rating": x["rv"]["rating"]}
                        for x in items[:3]],
         })
@@ -211,9 +231,16 @@ def analyse(reviews, themes, request_patterns, today=None, months=18):
         "themes": ranked,
         "requests": requests,
         "unthemed_negative": [{"url": r["url"], "source": r["source"],
-                               "rating": r["rating"], "text": r["text"][:220]}
+                               "rating": r["rating"], "text": r["text"][:220],
+                               "truncated": len(r["text"]) > 220}
                               for r in unthemed_negative],
+        "invalid_ratings": [{"url": r["url"], "rating": r["rating_invalid"]}
+                            for r in reviews if r.get("rating_invalid")],
     }
+
+
+def _cut(item):
+    return " [excerpt]" if item.get("truncated") else ""
 
 
 def _stars(r):
@@ -229,7 +256,11 @@ def render(result, dropped=0, dupes=0):
         out.append("%d rows dropped: no link or no text. Nothing is counted without "
                    "its source." % dropped)
     if dupes:
-        out.append("%d duplicate reviews removed." % dupes)
+        out.append("%d duplicate reviews removed (same link, same text)." % dupes)
+    if result.get("invalid_ratings"):
+        out.append("%d rows had a rating outside 1 to 5 and were counted as unrated: %s" % (
+            len(result["invalid_ratings"]),
+            ", ".join("%s (%s)" % (r["url"], r["rating"]) for r in result["invalid_ratings"])))
     if result["reviews"] < 30:
         out.append("")
         out.append("Small sample. Under 30 reviews supports a direction, not a "
@@ -253,15 +284,15 @@ def render(result, dropped=0, dupes=0):
             out.append("")
             out.append("**%s**" % t["label"])
             for q in t["quotes"]:
-                out.append('- "%s" (%s, %s) %s' % (q["quote"], q["source"],
-                                                   _stars(q["rating"]), q["url"]))
+                out.append('- "%s"%s (%s, %s) %s' % (q["quote"], _cut(q), q["source"],
+                                                     _stars(q["rating"]), q["url"]))
     if result["requests"]:
         out.append("")
         out.append("## Asked for in their own words")
         out.append("")
         for q in result["requests"][:25]:
-            out.append('- "%s" (%s, %s) %s' % (q["quote"], q["source"],
-                                               _stars(q["rating"]), q["url"]))
+            out.append('- "%s"%s (%s, %s) %s' % (q["quote"], _cut(q), q["source"],
+                                                 _stars(q["rating"]), q["url"]))
     if result["unthemed_negative"]:
         out.append("")
         out.append("## Read these by hand")
@@ -270,8 +301,8 @@ def render(result, dropped=0, dupes=0):
                    "themes.json does not have yet. Often the most useful part.")
         out.append("")
         for r in result["unthemed_negative"][:15]:
-            out.append('- (%s, %s) %s: "%s"' % (r["source"], _stars(r["rating"]),
-                                               r["url"], r["text"]))
+            out.append('- (%s, %s) %s: "%s"%s' % (r["source"], _stars(r["rating"]),
+                                                 r["url"], r["text"], _cut(r)))
     return "\n".join(out) + "\n"
 
 
@@ -300,9 +331,9 @@ def main(argv=None):
     result["dropped"] = dropped
     result["duplicates"] = dupes
     if args.json:
-        print(json.dumps(result, indent=2, default=str))
-        return 0
-    text = render(result, dropped, dupes)
+        text = json.dumps(result, indent=2, default=str) + "\n"
+    else:
+        text = render(result, dropped, dupes)
     if args.out:
         with open(args.out, "w", encoding="utf-8") as fh:
             fh.write(text)

@@ -11,6 +11,10 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from .core import RepoctlError, ensure_inside_root, governance_profile, load_project
+from .gitinfo import git
+
+
+OWNER_NAME = r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"
 
 
 def github_environment() -> dict[str, str]:
@@ -20,56 +24,68 @@ def github_environment() -> dict[str, str]:
     return environment
 
 
+def _gh(root: Path | None, args: list[str], *, input: str | None = None, timeout: int = 60) -> str:
+    """Run `gh` and return stdout; every failure mode becomes a RepoctlError."""
+    label = " ".join(args[:2])
+    try:
+        result = subprocess.run(
+            ["gh", *args],
+            check=False,
+            capture_output=True,
+            text=True,
+            input=input,
+            timeout=timeout,
+            cwd=root,
+            env=github_environment(),
+        )
+    except FileNotFoundError as error:
+        raise RepoctlError("GitHub CLI (gh) is required for this command") from error
+    except subprocess.TimeoutExpired as error:
+        raise RepoctlError(f"gh {label} timed out") from error
+    if result.returncode != 0:
+        raise RepoctlError(f"gh {label} failed: {result.stderr.strip()[-300:]}")
+    return result.stdout
+
+
+def _gh_json(root: Path | None, args: list[str], what: str, kind: type) -> object:
+    try:
+        data = json.loads(_gh(root, args) or ("[]" if kind is list else "{}"))
+    except json.JSONDecodeError as error:
+        raise RepoctlError(f"GitHub CLI returned invalid {what} JSON") from error
+    if not isinstance(data, kind):
+        raise RepoctlError(f"GitHub CLI {what} must be a JSON {kind.__name__}")
+    return data
+
+
+def origin_target(root: Path) -> str | None:
+    """owner/name of the checkout's origin remote, or None when unknown."""
+    remote = git(root, "remote", "get-url", "origin", timeout=10)
+    return github_target_from_remote(remote) if remote is not None else None
+
+
 def resolve_github_repo(root: Path) -> str:
     project = load_project(root)
     repository = project.get("repository", {})
     configured = repository.get("github") if isinstance(repository, dict) else None
     if configured:
-        if not isinstance(configured, str) or not re.fullmatch(
-            r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", configured
-        ):
+        if not isinstance(configured, str) or not re.fullmatch(OWNER_NAME, configured):
             raise RepoctlError("repository.github must be an owner/name string")
-        try:
-            remote = subprocess.run(
-                ["git", "-C", str(root), "remote", "get-url", "origin"],
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=10,
+        remote_target = origin_target(root)
+        if remote_target and remote_target != configured:
+            raise RepoctlError(
+                f"repository.github conflicts with checkout origin: {configured} != {remote_target}"
             )
-        except (FileNotFoundError, subprocess.TimeoutExpired):
-            remote = None
-        if remote is not None and remote.returncode == 0:
-            remote_target = github_target_from_remote(remote.stdout)
-            if remote_target and remote_target != configured:
-                raise RepoctlError(
-                    f"repository.github conflicts with checkout origin: {configured} != {remote_target}"
-                )
         return configured
     try:
-        result = subprocess.run(
-            ["gh", "repo", "view", "--json", "nameWithOwner"],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=60,
-            cwd=root,
-            env=github_environment(),
-        )
-    except FileNotFoundError as error:
-        raise RepoctlError("GitHub CLI (gh) is required to resolve the target repository") from error
-    except subprocess.TimeoutExpired as error:
-        raise RepoctlError("GitHub repository resolution timed out") from error
-    if result.returncode != 0:
+        data = _gh_json(root, ["repo", "view", "--json", "nameWithOwner"], "repository", dict)
+    except RepoctlError as error:
+        if "invalid" in str(error) or "must be" in str(error):
+            raise
         raise RepoctlError(
             "could not resolve the GitHub repository; set repository.github in project.toml"
-        )
-    try:
-        data = json.loads(result.stdout or "{}")
-        name = data.get("nameWithOwner") if isinstance(data, dict) else None
-    except json.JSONDecodeError as error:
-        raise RepoctlError("GitHub CLI returned invalid repository JSON") from error
-    if not isinstance(name, str) or not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", name):
+        ) from error
+    name = data.get("nameWithOwner")
+    if not isinstance(name, str) or not re.fullmatch(OWNER_NAME, name):
         raise RepoctlError("GitHub CLI returned an invalid owner/name repository")
     return name
 
@@ -96,64 +112,43 @@ def normalized_title(value: str) -> str:
     return " ".join(re.findall(r"[\w]+", value.casefold(), flags=re.UNICODE))
 
 
-def check_github_duplicates(
-    root: Path, title: str, repository: str, search_terms: tuple[str, ...] = ()
-) -> list[dict[str, object]]:
-    try:
-        result = subprocess.run(
-            [
-                "gh",
-                "issue",
-                "list",
-                "--state",
-                "all",
-                "--search",
-                " ".join((title,) + search_terms),
-                "--json",
-                "number,title,url,state,body",
-                "--limit",
-                "100",
-                "--repo",
-                repository,
-            ],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=60,
-            cwd=root,
-            env=github_environment(),
-        )
-    except FileNotFoundError as error:
-        raise RepoctlError("GitHub CLI (gh) is required to file issues") from error
-    except subprocess.TimeoutExpired as error:
-        raise RepoctlError("GitHub duplicate search timed out") from error
-    if result.returncode != 0:
-        raise RepoctlError(f"GitHub duplicate search failed: {result.stderr.strip()}")
-    try:
-        issues = json.loads(result.stdout or "[]")
-    except json.JSONDecodeError as error:
-        raise RepoctlError("GitHub CLI returned invalid issue search JSON") from error
-    if not isinstance(issues, list):
-        raise RepoctlError("GitHub CLI issue search must return a list")
+def check_github_duplicates(root: Path, title: str, repository: str) -> list[dict[str, object]]:
+    """Recent issues (any state), fetched without --search so the index lag cannot hide a duplicate."""
+    issues = _gh_json(
+        root,
+        [
+            "issue", "list", "--state", "all", "--limit", "200",
+            "--json", "number,title,url,state,body,labels", "--repo", repository,
+        ],
+        "issue list",
+        list,
+    )
     return [issue for issue in issues if isinstance(issue, dict)]
 
 
-def github_label_command(repository: str, label: str) -> list[str]:
+def label_attributes(label: str) -> tuple[str, str]:
     digest = hashlib.sha256(label.encode("utf-8")).hexdigest()[:6].upper()
-    family = label.split(":", 1)[0]
-    return [
-        "gh",
-        "label",
-        "create",
-        label,
-        "--color",
-        digest,
-        "--description",
-        f"Repository issue classification: {family}",
-        "--repo",
-        repository,
-        "--force",
-    ]
+    return digest, f"Repository issue classification: {label.split(':', 1)[0]}"
+
+
+def github_label_args(repository: str, label: str, *, force: bool = False) -> list[str]:
+    color, description = label_attributes(label)
+    args = ["label", "create", label, "--color", color, "--description", description, "--repo", repository]
+    return args + ["--force"] if force else args
+
+
+def existing_labels(root: Path, repository: str) -> dict[str, dict[str, object]]:
+    """Existing repo labels keyed by casefolded name (one call); {} when gh cannot list them."""
+    try:
+        rows = _gh_json(
+            root,
+            ["label", "list", "--limit", "1000", "--json", "name,color,description", "--repo", repository],
+            "label list",
+            list,
+        )
+    except RepoctlError:
+        return {}
+    return {str(row["name"]).casefold(): row for row in rows if isinstance(row, dict) and "name" in row}
 
 
 def sync_issue_labels(root: Path) -> None:
@@ -163,113 +158,92 @@ def sync_issue_labels(root: Path) -> None:
     repository = resolve_github_repo(root)
     print(f"Synchronizing issue labels in {repository}.")
     registry = load_label_registry(root, project)
+    existing = existing_labels(root, repository)
     for family, values in registry.items():
         if not isinstance(values, list) or not all(isinstance(value, str) for value in values):
             raise RepoctlError(f"label family {family} must be an array of strings")
         for value in values:
             label = f"{family}:{value}"
-            command = github_label_command(repository, label)
-            try:
-                result = subprocess.run(
-                    command,
-                    check=False,
-                    capture_output=True,
-                    text=True,
-                    timeout=60,
-                    cwd=root,
-                    env=github_environment(),
-                )
-            except FileNotFoundError as error:
-                raise RepoctlError("GitHub CLI (gh) is required to sync labels") from error
-            except subprocess.TimeoutExpired as error:
-                raise RepoctlError(f"GitHub label sync timed out for {label}") from error
-            if result.returncode != 0:
-                raise RepoctlError(f"GitHub label sync failed for {label}: {result.stderr.strip()}")
+            current = existing.get(label.casefold())
+            color, description = label_attributes(label)
+            if (
+                current
+                and str(current.get("color", "")).upper() == color
+                and current.get("description") == description
+            ):
+                continue
+            _gh(root, github_label_args(repository, label, force=True))
     print("Issue label taxonomy synchronized.")
+
+
+def ensure_labels(root: Path, repository: str, labels: list[str]) -> None:
+    existing = existing_labels(root, repository)
+    for label in labels:
+        if label.casefold() in existing:
+            continue
+        try:
+            _gh(root, github_label_args(repository, label))
+        except RepoctlError as error:
+            if "already exists" not in str(error):
+                raise
 
 
 def create_github_issue(
     root: Path, repository: str, title: str, body: str, labels: list[str]
 ) -> str:
+    ensure_labels(root, repository, labels)
+    args = ["issue", "create", "--title", title, "--body-file", "-", "--repo", repository]
     for label in labels:
-        try:
-            ensure_result = subprocess.run(
-                github_label_command(repository, label),
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=60,
-                cwd=root,
-                env=github_environment(),
-            )
-        except FileNotFoundError as error:
-            raise RepoctlError("GitHub CLI (gh) is required to file issues") from error
-        except subprocess.TimeoutExpired as error:
-            raise RepoctlError(f"GitHub label creation timed out for {label}") from error
-        if ensure_result.returncode != 0:
-            raise RepoctlError(
-                f"GitHub label creation failed for {label}: {ensure_result.stderr.strip()}"
-            )
-    command = [
-        "gh",
-        "issue",
-        "create",
-        "--title",
-        title,
-        "--body-file",
-        "-",
-        "--repo",
-        repository,
-    ]
-    for label in labels:
-        command.extend(("--label", label))
-    try:
-        result = subprocess.run(
-            command,
-            check=False,
-            capture_output=True,
-            text=True,
-            input=body,
-            timeout=60,
-            cwd=root,
-            env=github_environment(),
-        )
-    except FileNotFoundError as error:
-        raise RepoctlError("GitHub CLI (gh) is required to file issues") from error
-    except subprocess.TimeoutExpired as error:
-        raise RepoctlError("GitHub issue creation timed out") from error
-    if result.returncode != 0:
-        raise RepoctlError(f"GitHub issue creation failed: {result.stderr.strip()}")
-    url = result.stdout.strip()
+        args.extend(("--label", label))
+    url = _gh(root, args, input=body).strip()
     if not re.fullmatch(r"https://github\.com/[^\s]+/issues/\d+", url):
         raise RepoctlError("GitHub CLI returned an invalid issue URL")
     return url
 
 
+PATH_EXTENSIONS = (
+    "py|ts|tsx|js|jsx|mjs|md|toml|json|yml|yaml|sh|go|rs|css|html|mk|txt|swift|kt|java|rb|sql|cfg|ini"
+)
+PATH_TOKEN = re.compile(rf"[\w.-]+/[\w./-]+|[\w-]+(?:\.[\w-]+)*\.(?:{PATH_EXTENSIONS})\b")
+QUALIFIER = re.compile(r"\b(?:label|is|in|state|author|assignee|type|no|sort|repo|org|user):\S*", re.I)
+
+
+def strip_qualifiers(value: str) -> str:
+    """Drop GitHub search qualifiers (label:, is:, ...) so text can never act as a query."""
+    return " ".join(QUALIFIER.sub(" ", value).split())
+
+
+def path_tokens(text: str) -> set[str]:
+    """Path-shaped tokens only: dir/file paths or filenames with a code/doc extension."""
+    text = re.sub(r"https?://\S+", " ", text)
+    tokens = (match.strip(".,;:()[]`'\"").casefold() for match in PATH_TOKEN.findall(text))
+    return {token for token in tokens if len(token) > 2}
+
+
+def issue_topics(issue: dict[str, object]) -> set[str]:
+    topics = set()
+    for label in issue.get("labels") or []:
+        name = label.get("name") if isinstance(label, dict) else label
+        if isinstance(name, str) and name.casefold().startswith("topic:"):
+            topics.add(name.split(":", 1)[1].casefold())
+    return topics
+
+
 def duplicate_result_matches(
     issue: dict[str, object], title: str, topic: str, where: str
 ) -> bool:
-    if normalized_title(str(issue.get("title", ""))) == normalized_title(title):
+    if normalized_title(str(issue.get("title", ""))) == normalized_title(strip_qualifiers(title)):
         return True
-    issue_title = str(issue.get("title", ""))
-    text = " ".join(
-        str(issue.get(field, ""))
-        for field in ("title", "body")
-    ).casefold()
-    if topic and topic.casefold() in issue_title.casefold():
+    if topic and topic.strip().casefold() in issue_topics(issue):
         return True
-    path_terms = []
-    for token in where.split():
-        cleaned = token.strip(".,;()[]")
-        if ("/" in cleaned or "." in cleaned) and len(cleaned) > 2:
-            path_terms.append(cleaned)
-    return any(term.casefold() in text for term in path_terms)
+    text = f"{issue.get('title', '')} {issue.get('body', '')}"
+    return len(path_tokens(where) & path_tokens(text)) >= 2
 
 
 def github_target_from_remote(value: str) -> str | None:
     value = value.strip()
     if value.startswith("git@github.com:"):
-        match = re.fullmatch(r"git@github\.com:([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+?)(?:\.git)?", value)
+        match = re.fullmatch(rf"git@github\.com:({OWNER_NAME}?)(?:\.git)?", value)
         return match.group(1) if match else None
     parsed = urlsplit(value)
     if parsed.scheme not in {"http", "https", "ssh"} or (parsed.hostname or "").lower() != "github.com":
@@ -284,24 +258,10 @@ def github_target_configured(root: Path, project: dict[str, object]) -> bool:
     repository = project.get("repository", {})
     configured = repository.get("github") if isinstance(repository, dict) else None
     if configured is not None and (
-        not isinstance(configured, str)
-        or not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", configured)
+        not isinstance(configured, str) or not re.fullmatch(OWNER_NAME, configured)
     ):
         return False
-    remote_target: str | None = None
-    try:
-        remote = subprocess.run(
-            ["git", "-C", str(root), "remote", "get-url", "origin"],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        remote_target = None
-    else:
-        if remote.returncode == 0:
-            remote_target = github_target_from_remote(remote.stdout)
+    remote_target = origin_target(root)
     if configured and remote_target and configured != remote_target:
         return False
     target = configured or remote_target
@@ -329,18 +289,14 @@ def declared_metadata(project: dict[str, object]) -> dict[str, object]:
 
 def live_metadata(repository: str) -> dict[str, object] | None:
     try:
-        result = subprocess.run(
-            ["gh", "repo", "view", repository, "--json", "description,repositoryTopics,isTemplate"],
-            check=False, capture_output=True, text=True, timeout=30, env=github_environment(),
+        data = _gh_json(
+            None, ["repo", "view", repository, "--json", "description,repositoryTopics,isTemplate"],
+            "repository", dict, 
         )
-    except (FileNotFoundError, subprocess.TimeoutExpired):
+    except RepoctlError as error:
+        if "invalid" in str(error):
+            raise RepoctlError("gh returned invalid repository JSON") from error
         return None
-    if result.returncode != 0:
-        return None
-    try:
-        data = json.loads(result.stdout or "{}")
-    except json.JSONDecodeError as error:
-        raise RepoctlError("gh returned invalid repository JSON") from error
     topics = [item.get("name") for item in (data.get("repositoryTopics") or []) if isinstance(item, dict)]
     return {"description": (data.get("description") or "").strip(), "topics": sorted(topics), "is_template": bool(data.get("isTemplate"))}
 
@@ -373,7 +329,8 @@ def sync_repository_metadata(root: Path) -> list[str]:
     live = live_metadata(repository)
     if live is None:
         raise RepoctlError(f"cannot read {repository} with gh; authenticate the GitHub CLI first")
-    command = ["gh", "repo", "edit", repository]
+    base = ["repo", "edit", repository]
+    command = list(base)
     if declared["description"] and live["description"] != declared["description"]:
         command += ["--description", str(declared["description"])]
     for topic in sorted(set(declared["topics"]) - set(live["topics"])):
@@ -382,9 +339,7 @@ def sync_repository_metadata(root: Path) -> list[str]:
         command += ["--remove-topic", topic]
     if live["is_template"] != declared["is_template"]:
         command += [f"--template={'true' if declared['is_template'] else 'false'}"]
-    if len(command) == 4:
+    if command == base:
         return []
-    result = subprocess.run(command, check=False, capture_output=True, text=True, timeout=60, env=github_environment())
-    if result.returncode != 0:
-        raise RepoctlError(f"gh repo edit failed: {result.stderr.strip()[-300:]}")
-    return [part for part in command[4:] if part.startswith("--")]
+    _gh(root, command)
+    return [part for part in command[len(base):] if part.startswith("--")]

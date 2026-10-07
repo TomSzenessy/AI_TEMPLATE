@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Jake Schincariol. Adapted from https://github.com/Jakeschincariol/replica-skill @ 77c9436fb3d18c3d58169efb8caf4fe906b0dc51.
+# Copyright (c) 2026 Jake Schincariol. Adapted from https://github.com/Jakeschincariol/replica-skill (revision: see project.toml [[skills]]).
 """Rebrand sweep for brand-sweep. Standard library only.
 
 Searches your clone's codebase for anything that still belongs to the original
@@ -20,12 +20,20 @@ Names match case-insensitively anywhere, including inside identifiers
 case and in short form (#06f matches #0066ff). File and folder names are
 checked as well as contents.
 
+Colours: "#006bff" or "006bff", in 3, 4, 6 or 8 digits. Alpha is ignored, so a
+file's #006bffaa matches the brand colour #006bff. Anything else (rgb(...),
+a typo) exits 2 instead of being silently skipped.
+
 Skipped: .git, node_modules, build output folders, lock files, binary files,
-and the reference/ planning folder (where the original's name belongs). Pass
---include-reference to check that too, for example if it sits inside public/.
+and the top-level reference/, .agent/ and .review/ planning folders (where the
+original's name belongs). Pass --include-reference to check reference/ too.
+--exclude <glob> (repeatable; or "exclude": [...] in the config) skips more,
+such as docs/product/research.md. Globs match the path relative to the root
+(* crosses /) or the bare file name; "docs/product/" skips a folder.
 """
 
 import argparse
+import fnmatch
 import json
 import os
 import re
@@ -39,15 +47,42 @@ SKIP_FILES = {"package-lock.json", "yarn.lock", "pnpm-lock.yaml", "bun.lockb",
 BINARY_EXT = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".icns", ".pdf", ".zip",
               ".gz", ".woff", ".woff2", ".ttf", ".otf", ".eot", ".mp4", ".mov", ".mp3",
               ".wav", ".avif", ".heic", ".psd", ".sketch", ".fig", ".jar", ".so", ".dylib"}
-HEX = re.compile(r"#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{3})(?![0-9a-zA-Z])")
+SKIP_TOP = {".agent", ".review"}
+HEX = re.compile(r"#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{4}|[0-9a-fA-F]{3})(?![0-9a-zA-Z])")
+COLOR_ARG = re.compile(r"#?(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{4}|[0-9a-fA-F]{3})")
 BINARY_ASSET_HINT = re.compile(r"\.(png|jpe?g|svg|webp|gif|ico|woff2?|ttf|otf)$", re.I)
 
 
 def norm_hex(h):
-    h = h.lower().lstrip("#")
-    if len(h) == 3:
+    """Normalise 3/4/6/8-digit hex (with or without #) to #rrggbb, dropping alpha."""
+    h = h.strip().lower().lstrip("#")
+    if len(h) in (3, 4):
         h = "".join(c * 2 for c in h)
-    return "#" + h
+    return "#" + h[:6]
+
+
+def parse_colors(colors):
+    out = set()
+    for c in colors:
+        if not COLOR_ARG.fullmatch(c.strip()):
+            raise ValueError("invalid colour %r: use hex such as #006bff, 006bff, #06f "
+                             "or #006bffaa (rgb() and names are not supported)" % c)
+        out.add(norm_hex(c))
+    return out
+
+
+def excluded(rel, globs, is_dir=False):
+    rel = rel.replace(os.sep, "/")
+    for g in globs:
+        g = g.strip().replace(os.sep, "/")
+        if g.endswith("/"):
+            g = g.rstrip("/")
+            if rel == g or rel.startswith(g + "/") or fnmatch.fnmatchcase(rel, g):
+                return True
+        elif (fnmatch.fnmatchcase(rel, g) or fnmatch.fnmatchcase(rel.rsplit("/", 1)[-1], g)
+              or (is_dir and rel.startswith(g + "/"))):
+            return True
+    return False
 
 
 def build_patterns(avoid, domains):
@@ -76,9 +111,11 @@ def is_binary(path):
         return True
 
 
-def sweep(root, avoid=(), domains=(), colors=(), include_reference=False, max_size=2_000_000):
+def sweep(root, avoid=(), domains=(), colors=(), include_reference=False, max_size=2_000_000,
+          exclude=()):
     pats = build_patterns(avoid, domains)
-    cols = {norm_hex(c) for c in colors if HEX.fullmatch(c.strip())}
+    cols = parse_colors(colors)
+    exclude = [e for e in exclude if e.strip()]
     hits = []
     root = os.path.abspath(root)
     for dirpath, dirnames, filenames in os.walk(root):
@@ -87,7 +124,9 @@ def sweep(root, avoid=(), domains=(), colors=(), include_reference=False, max_si
         for d in dirnames:
             if d in SKIP_DIRS:
                 continue
-            if d == "reference" and rel_dir == "." and not include_reference:
+            if rel_dir == "." and (d in SKIP_TOP or (d == "reference" and not include_reference)):
+                continue
+            if excluded(os.path.normpath(os.path.join(rel_dir, d)), exclude, True):
                 continue
             keep.append(d)
         dirnames[:] = sorted(keep)
@@ -102,6 +141,8 @@ def sweep(root, avoid=(), domains=(), colors=(), include_reference=False, max_si
                 continue
             path = os.path.join(dirpath, fn)
             rel = os.path.normpath(os.path.join(rel_dir, fn))
+            if excluded(rel, exclude):
+                continue
             for kind, label, rx in pats:
                 if kind == "name" and rx.search(fn):
                     hits.append({"file": rel, "line": 0, "kind": "path", "match": label,
@@ -152,6 +193,8 @@ def main(argv=None):
     ap.add_argument("--config", help="JSON with avoid / domains / colors lists")
     ap.add_argument("--include-reference", action="store_true",
                     help="also sweep the top-level reference/ planning folder")
+    ap.add_argument("--exclude", action="append", default=[], metavar="GLOB",
+                    help="skip matching paths (repeatable), e.g. docs/product/research.md")
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args(argv)
     avoid = [x for x in args.avoid.split(",") if x.strip()]
@@ -167,11 +210,17 @@ def main(argv=None):
         avoid += cfg.get("avoid", [])
         domains += cfg.get("domains", [])
         colors += cfg.get("colors", [])
+        args.exclude += cfg.get("exclude", [])
     if not (avoid or domains or colors):
         print("sweep: nothing to look for. Pass --avoid with the original app's name.",
               file=sys.stderr)
         return 2
-    hits = sweep(args.root, avoid, domains, colors, args.include_reference)
+    try:
+        hits = sweep(args.root, avoid, domains, colors, args.include_reference,
+                     exclude=args.exclude)
+    except ValueError as exc:
+        print("sweep: %s" % exc, file=sys.stderr)
+        return 2
     print(json.dumps(hits, indent=2) if args.json else render(hits))
     return 1 if hits else 0
 

@@ -10,11 +10,22 @@ record when the root cause and acceptance boundary match.
 
 ## No GitHub remote yet
 
-`make issue` validates the body exactly as for GitHub, then, when the
-repository has no GitHub target, writes it as `Local-WAL-NNN` to ignored
-`.agent/wal/`. Cite that id in commits and file it for real once a remote
-exists. Never keep live work in a tracked Markdown file; `make check` rejects
+When the repository has no GitHub target (`agent-first`), `make issue` writes
+the record as `Local-WAL-NNN` to ignored `.agent/wal/` and checks only what the
+plan needs now: a `### Summary` with the outcome and at least one
+`- [ ]` acceptance criterion (plus the labels and the secret scan). The full
+contract below applies when you file the draft for real once a remote exists,
+so a local plan never costs a round of disclosure paperwork. Cite the id in
+commits. Once the repository has a GitHub target, `make issue WAL=all` (or
+`WAL=Local-WAL-002`) files each draft under the full contract, prints the new
+issue URL, and marks the draft `Filed:` so it is never filed twice; a draft
+that does not meet the contract yet is listed with the reason and left as is. Never keep live work in a tracked Markdown file; `make check` rejects
 tracked backlogs.
+
+Under the `regulated` profile, public filing also needs `PUBLIC_REVIEWED=1`
+and `REVIEW_EVIDENCE=<reviewed record>` (see [`../CONTRIBUTING.md`](../CONTRIBUTING.md)).
+`make issue` and the CI issue check apply one shared rule to the
+`Reviewer/date` line: a real name and an ISO date that is not in the future.
 
 ## Duplicate check
 
@@ -31,7 +42,15 @@ Native forms are lightweight intake in `agent-first`; an agent or maintainer
 adds the canonical labels during triage. The `repoctl issue` path always emits
 the full required label set. In `regulated`, use the validated CLI/private
 route rather than native forms so the review-evidence and disclosure gates are
-not bypassed.
+not bypassed. When a natively filed issue misses the contract, the issue-contract
+check comments with each problem and its fix, editing one marked comment rather than adding a new one per
+event; runs for the same issue cancel each other, so a filing with several labels validates once.
+`make issue` treats an existing issue as a duplicate when its normalized title matches, it carries the same
+`topic:` label, or it shares at least two path-shaped tokens with the new body. The `Reviewer/date` must not be in
+the future; it never expires, because it records the review of that text.
+What changed in the covered code last: `issues.py`, `github.py`, and `ci.py`
+now run every git call through one wrapper (`gitinfo.run_git`) and date records
+with `core.today()` (one UTC day); the contract above is unchanged.
 
 ## Classification
 
@@ -68,6 +87,13 @@ and `minimal` uses the host's route, so a project using either profile must
 remove or disable `.github/ISSUE_TEMPLATE/` before `make check` is green.
 Replace placeholders; write `N/A — reason` when a section genuinely does not
 apply.
+
+`tools/issue_contract.py` owns the headings, the duplicate-check line, and the
+disclosure, owner, and sensitive-word patterns; `make issue` and the CI check
+both call `issues.issue_problems`. The `###` headings below must equal its
+`HEADINGS["regulated"]`, and the native forms' Type, Priority, Area, and Status
+dropdowns must equal `.github/issue-labels.json` minus the values the public
+adapters refuse (`type: security`); a test enforces both.
 
 ### Summary
 

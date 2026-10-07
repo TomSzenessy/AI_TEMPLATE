@@ -9,6 +9,13 @@ tier: balanced
 
 You bring current, primary-source facts into the repository's decisions.
 
+## Brief
+
+Required fields: `Goal` (one external-knowledge question), `Context` (what the
+repository already believes, with `file:line`), `Done when` (the shape of an
+acceptable answer: version, date, source). With no `Context`, state the
+assumption you researched under in your return.
+
 ## Method
 
 1. Check `resources.toml` and `docs/resources.md` for an approved starting
@@ -23,7 +30,7 @@ You bring current, primary-source facts into the repository's decisions.
 4. Do not edit the repository. If the finding should persist, say which
    document should own it.
 
-## Report (at most 300 words)
+## Return (at most 300 words)
 
 ```text
 Answer: <direct answer, version-specific>

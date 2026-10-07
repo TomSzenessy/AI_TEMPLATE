@@ -2,8 +2,8 @@
 
 <!-- index: design | STRIDE threat model and accepted trust boundaries | A security-sensitive tool, CI path, or agent permission is reviewed. -->
 
-**Last Updated:** 2026-09-25
-**Version:** 1.2.0
+**Last Updated:** 2026-10-07
+**Version:** 1.3.0
 **Methodology:** STRIDE + natural-language analysis
 
 ## 1. System overview
@@ -23,6 +23,10 @@ backend, native, media, 3D, data, or document surfaces.
 | `tools/repoctl.py` | Validate structure/docs, run declared checks, create incidents, and file issues | High | Local CLI, Make, CI |
 | GitHub issue adapter | Search duplicates and create classified issues through `gh` | High | Local CLI, `gh` |
 | CI workflow | Run `make verify` with a read-only token | High | GitHub Actions |
+| Issue-contract workflow (`issue-contract.yml`) | Validate issue text against the issue contract and comment on the issue | High | GitHub issue events; untrusted issue text |
+| `kit-update` / `adopt` | Replace kit code (`tools/`, `.githooks/`, workflows) in a project from a template checkout or clone | High | Local CLI, Make; the template source |
+| Network-calling checks | `git ls-remote` (is the template ahead) and `npm view` (package pins) | Medium | `repoctl` garden and check paths |
+| Project plugins (`.agents/checks`, `.agents/commands`) | Add checks and commands to `repoctl` | High | Run on every `repoctl` start |
 | Documentation/legal templates | Durable engineering and launch boundaries | Medium | Agent and humans |
 | Host/sandbox policy | Enforce filesystem, network, identity, and approval boundaries | Critical | Agent host |
 
@@ -38,7 +42,11 @@ backend, native, media, 3D, data, or document surfaces.
    GitHub becomes the live task/evidence register.
 5. CI checks out a revision and runs the same verification path with a
    least-privilege, non-persisted `GITHUB_TOKEN`.
-6. A fresh reviewer or human validates the real artifact, security/privacy
+6. The issue-contract workflow receives issue text from any GitHub user and runs
+   the shared validator over it with `issues: write`.
+7. `kit-update` reads a template checkout (or clones `[template].source`) and
+   overwrites unchanged kit files; `KIT_REF` pins it to one commit.
+8. A fresh reviewer or human validates the real artifact, security/privacy
    impact, and issue acceptance criteria.
 
 ## 2. Trust boundaries and security zones
@@ -68,18 +76,38 @@ replace repository permissions or human review.
 
 ### Zone D — CI and external providers
 
-GitHub Actions receives repository code from the event ref. The workflow uses
-`contents: read`, an ephemeral hosted runner, a pinned checkout action, and
-`persist-credentials: false`; untrusted pull requests receive no repository
-secrets. A future deployment workflow must add separate environments, OIDC or
+GitHub Actions receives repository code from the event ref. The verification
+workflow uses `contents: read`, an ephemeral hosted runner, a pinned checkout
+action, and `persist-credentials: false`; untrusted pull requests receive no
+repository secrets. The issue-contract workflow is the exception: it holds
+`issues: write` alongside `contents: read` (never `contents: write`) and
+processes untrusted issue text. The job receives only the issue number in its
+environment, fetches the text through the API as data for the validator, never
+interpolates it into a shell, and runs the default branch's code on issue
+events, never code from the issue. Its write authority is limited to issues. A future deployment workflow must add separate environments, OIDC or
 short-lived credentials, protected refs, and human approval.
 
 ## 3. Attack surface and assets
 
 ### Local command surface
 
-- `repoctl init` writes three bounded manifest fields after validating the name
-  and refusing a second initialization.
+- `repoctl init` validates the name, refuses a second initialization, and
+  rewrites the manifest (identity, surfaces, vision, packs), the README and
+  other localized docs, and prunes template-only files; it records
+  `tools/kit-lock.json`. It runs on a fresh copy the operator chose to
+  initialize, and the result is reviewed as one change.
+- `repoctl kit-update` and `adopt` replace kit code with a template's version.
+  Files the project changed are kept and the template's version is staged for a
+  manual merge. The template source is therefore a code supply chain: a
+  compromised or moving source changes code that runs locally and in CI.
+  `KIT_REF=<sha>` pins an update to a reviewed commit, and the commit range
+  being applied is printed; the diff is reviewed before commit.
+- Network calls are limited to `git ls-remote` against `[template].source` and
+  `npm view` for package pins; they send no repository content and failures are
+  advisory.
+- `.agents/checks/*.py` and `.agents/commands/*.py` execute on every `repoctl`
+  start, and `make new` (pre-approved for agents) creates such files; new
+  plugin files are reviewed like code.
 - `repoctl incident` writes a new file under `docs/incidents` and refuses an
   existing path; title/summary are local operator input and must be redacted.
 - `repoctl issue` reads a body file, searches GitHub, and creates an issue with
@@ -105,6 +133,8 @@ short-lived credentials, protected refs, and human approval.
   license secret where applicable.
 - Dependabot watches GitHub Actions; projects add language ecosystems when they
   add lockfiles.
+- Local MCP routes must pin a package version; unpinned `npx`, `uvx`, and `pipx`
+  routes are rejected by `make check`.
 - The template has no application dependency manifest or runtime service.
 
 ### Critical assets
@@ -216,7 +246,7 @@ skill or command, and ask for human authorization for high-impact effects.
 
 | Check | Frequency | Evidence |
 |---|---|---|
-| `python3 -m unittest discover -s tools/tests -p 'test_*.py'` | Every change | 38 CLI/profile/form/security behavior tests |
+| `python3 -m unittest discover -s tools/tests -p 'test_*.py'` | Every change | CLI/profile/form/security behavior tests |
 | `make check` | Every change/CI | Manifest, index, links, skill provenance, hygiene |
 | `make verify` | Before completion/CI | Declared surface commands and real checks |
 | YAML/JSON parsing | Configuration change | Parser output and CI review |
@@ -239,6 +269,13 @@ skill or command, and ask for human authorization for high-impact effects.
 6. Legal/privacy templates are drafting aids and never establish compliance.
 
 ## 8. Changelog
+
+### 1.3.0 — 2026-10-07
+
+- Added the issue-contract workflow (`issues: write` over untrusted issue
+  text), `kit-update`/`adopt` code replacement with `KIT_REF` pinning, the
+  network-calling checks, and project plugins to the component and attack
+  surface sections; corrected `init`'s behavior and removed hard-coded counts.
 
 ### 1.2.0 — 2026-09-25
 
