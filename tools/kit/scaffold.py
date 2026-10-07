@@ -11,6 +11,8 @@ content is real.
 from __future__ import annotations
 
 import re
+import shutil
+import tomllib
 from pathlib import Path
 
 from . import derive
@@ -29,15 +31,69 @@ def _title(name: str) -> str:
     return name.replace("-", " ").capitalize()
 
 
-def _register_local_skill(root: Path, name: str) -> None:
-    manifest = root / "project.toml"
-    text = manifest.read_text(encoding="utf-8")
-    match = re.search(r"(?m)^local_skills\s*=\s*\[([^\]]*)\]", text)
-    if not match:
+def _array_end(text: str, start: int) -> tuple[int, int]:
+    """Scan a TOML array opened at text[start] == "[": return (index of its closing bracket, end of its last value or comma).
+
+    Strings and comments are skipped, so a `]` or a `,` inside either never ends the scan.
+    """
+    depth, last, i = 0, start, start
+    while i < len(text):
+        char = text[i]
+        if char in "\"'":
+            end = i + 1
+            while end < len(text) and text[end] != char:
+                end += 2 if char == '"' and text[end] == "\\" else 1
+            i = last = end
+        elif char == "#":
+            while i < len(text) and text[i] != "\n":
+                i += 1
+            continue
+        elif char == "[":
+            depth += 1
+        elif char == "]":
+            depth -= 1
+            if depth == 0:
+                return i, last
+        elif not char.isspace():
+            last = i
+        i += 1
+    raise RepoctlError("project.toml local_skills array is not closed")
+
+
+def _local_skills(text: str) -> list[str] | None:
+    try:
+        value = tomllib.loads(text).get("capabilities", {}).get("local_skills")
+    except tomllib.TOMLDecodeError as error:
+        raise RepoctlError(f"project.toml is invalid: {error}") from error
+    return value if isinstance(value, list) else None
+
+
+def plan_local_skill(text: str, name: str) -> str:
+    """Return project.toml text with `name` added to [capabilities] local_skills; comments and layout stay."""
+    names = _local_skills(text)
+    if names is None:
         raise RepoctlError("project.toml needs [capabilities] local_skills = [] to register a first-party skill")
-    names = [item.strip().strip('"') for item in match.group(1).split(",") if item.strip()]
-    rendered = "local_skills = [" + ", ".join(f'"{item}"' for item in sorted({*names, name})) + "]"
-    manifest.write_text(text[: match.start()] + rendered + text[match.end() :], encoding="utf-8")
+    if name in names:
+        return text
+    match = re.search(r"(?m)^local_skills\s*=\s*\[", text)
+    if not match:
+        raise RepoctlError("project.toml needs local_skills written as one `local_skills = [...]` array to register a skill")
+    open_at = match.end() - 1
+    close_at, last = _array_end(text, open_at)
+    item = f'"{name}"'
+    if last == open_at:  # empty array
+        edited = text[: open_at + 1] + item + text[open_at + 1 :]
+    elif "\n" in text[open_at:close_at]:
+        line_start = text.rfind("\n", 0, last) + 1
+        indent = re.match(r"[ \t]*", text[line_start:]).group(0) or "    "
+        comma = "" if text[last] == "," else ","
+        edited = text[: last + 1] + comma + f"\n{indent}{item}," + text[last + 1 :]
+    else:
+        joiner = " " if text[last] == "," else ", "
+        edited = text[: last + 1] + joiner + item + text[last + 1 :]
+    if name not in (_local_skills(edited) or []):
+        raise RepoctlError("could not register the skill in project.toml local_skills; add it by hand")
+    return edited
 
 
 def create(
@@ -165,11 +221,28 @@ def create(
     target = ensure_inside_root(root, target, f"new {kind}")
     if target.exists():
         raise RepoctlError(f"{target.relative_to(root).as_posix()} already exists; edit it instead")
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(body, encoding="utf-8")
-    if kind == "skill":
-        _register_local_skill(root, name)
-    changed = derive.sync(root)
+    manifest = root / "project.toml"
+    original = manifest.read_bytes() if kind == "skill" else b""
+    # Validate and compute the manifest edit before anything is written.
+    edited = plan_local_skill(original.decode("utf-8"), name) if kind == "skill" else ""
+    new_dir = None  # topmost directory this call creates, removed on failure
+    probe = target.parent
+    while not probe.exists():
+        new_dir, probe = probe, probe.parent
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(body, encoding="utf-8")
+        if kind == "skill" and edited != original.decode("utf-8"):
+            manifest.write_bytes(edited.encode("utf-8"))
+        changed = derive.sync(root)
+    except BaseException:
+        if kind == "skill":
+            manifest.write_bytes(original)
+        if new_dir is not None:
+            shutil.rmtree(new_dir, ignore_errors=True)
+        else:
+            target.unlink(missing_ok=True)
+        raise
     messages.append(f"created {target.relative_to(root).as_posix()}")
     if changed:
         messages.append("integrated: " + ", ".join(changed))
