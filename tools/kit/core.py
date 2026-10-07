@@ -175,11 +175,11 @@ def ensure_inside_root(root: Path, path: Path, label: str) -> Path:
 
 def normalized_relative_path(value: object, field: str) -> str:
     if not isinstance(value, str) or not value.strip():
-        raise RepoctlError(f"surface {field} must be a non-empty string")
+        raise RepoctlError(f"{field} must be a non-empty string")
     path = Path(value)
     windows_path = PureWindowsPath(value)
     if path.is_absolute() or bool(windows_path.drive) or "\\" in value or ".." in path.parts:
-        raise RepoctlError(f"surface {field} must stay inside the repository: {value}")
+        raise RepoctlError(f"{field} must stay inside the repository: {value}")
     normalized = Path(value.replace("\\", "/")).as_posix().rstrip("/")
     return normalized or "."
 

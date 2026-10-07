@@ -240,7 +240,10 @@ def skill_review_age(context) -> list[str]:
             continue
         age = (today() - reviewed_date).days
         if age > int(setting(context.root, "skill_review_days")):
-            findings.append(f"skill review older than a year: {entry.get('package')} (reviewed {reviewed})")
+            findings.append(
+                f"skill review older than {setting(context.root, 'skill_review_days')} days: "
+                f"{entry.get('package')} (reviewed {reviewed})"
+            )
     return findings
 
 

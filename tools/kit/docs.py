@@ -12,6 +12,7 @@ from .docsync import INDEX_SKIP
 from .core import (
     RepoctlError,
     check_failed,
+    INLINE_CODE,
     ensure_inside_root,
     has_link_component,
     is_link_like,
@@ -25,17 +26,17 @@ from .core import (
 
 def check_markdown_links(root: Path) -> None:
     errors: list[str] = []
-    link_pattern = re.compile(r"!?\[[^\]]*\]\(([^)]+)\)")
+    link_pattern = re.compile(r"!?\[[^\]]*\]\(((?:[^()]|\([^()]*\))+)\)")  # one level of () inside a target
     documents = sorted(
         path for path in worktree_files(root) if path.suffix.lower() == ".md"
     )
     for document in documents:
         document_label = document.relative_to(root).as_posix()
-        if is_link_like(document) or has_link_component(root, document):
+        if has_link_component(root, document):  # includes the document itself
             errors.append(f"unsafe Markdown document symlink or reparse point: {document_label}")
             continue
         try:
-            markdown = markdown_without_fenced_code(document.read_text(encoding="utf-8"))
+            markdown = INLINE_CODE.sub("", markdown_without_fenced_code(document.read_text(encoding="utf-8")))
         except UnicodeDecodeError:
             errors.append(f"not valid UTF-8: {document_label}")
             continue

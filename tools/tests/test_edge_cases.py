@@ -91,5 +91,62 @@ class LaunchRouteTests(unittest.TestCase):
         self.assertTrue(launch.valid_private_route("https://attacker.io/report"))
 
 
+class SecondPassTests(Scratch):
+    def test_skill_review_message_names_the_configured_window(self) -> None:
+        from types import SimpleNamespace
+        from kit import checks
+        self.write("project.toml", MANIFEST + "[kit]\nskill_review_days = 30\n")
+        project = {"skills": [{"package": "p", "reviewed_on": "2000-01-01"}]}
+        findings = checks.skill_review_age(SimpleNamespace(project=project, root=self.root))
+        self.assertTrue(findings and "30 days" in findings[0], findings)
+
+    def test_infrastructure_path_message_does_not_say_surface(self) -> None:
+        from kit import core
+        with self.assertRaisesRegex(RepoctlError, r"^infrastructure path must stay"):
+            core.normalized_relative_path("../x", "infrastructure path")
+
+    def test_links_in_inline_code_are_not_links_and_parens_in_targets_work(self) -> None:
+        from kit import docs
+        self.write("project.toml", MANIFEST)
+        self.write("docs/real(1).md", "# Real\n")
+        self.write("docs/a.md", "# A\nUse `[x](nowhere.md)` here, and [y](real(1).md).\n")
+        git_in(self.root, "init", "-q")
+        docs.check_markdown_links(self.root)
+
+    def test_malformed_doc_meta_cache_is_recomputed(self) -> None:
+        import json
+        from kit import docsync
+        self.write("docs/a.md", "# A\n<!-- covers: tools/** -->\n")
+        path = self.root / docsync.META_CACHE
+        status = (self.root / "docs/a.md").stat()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        stamp = [status.st_mtime_ns, status.st_size]
+        path.write_text(json.dumps({"version": 3, "entries": {"docs/a.md": [stamp, {"index": None}]}}))
+        meta = docsync.doc_meta(self.root, ["docs/a.md"])
+        self.assertEqual(meta["docs/a.md"]["covers"], ["tools/**"])
+
+    def test_doc_name_collisions_are_reported(self) -> None:
+        from kit import docsync
+        self.write("project.toml", MANIFEST)
+        line = "<!-- index: design | owns | when -->"
+        self.write("docs/a-b.md", f"# One\n{line}\n")
+        self.write("docs/a/b.md", f"# Two\n{line}\n")
+        errors = docsync.index_errors(self.root, ["docs/a-b.md", "docs/a/b.md"])
+        self.assertTrue(any("collides" in item for item in errors), errors)
+
+    def test_adopt_reports_renamed_workflow_and_copied_license(self) -> None:
+        import contextlib
+        import io
+        git_in(self.root, "init", "-q")
+        self.write("src/app.py", "print(1)\n")
+        self.write(".github/workflows/ci.yml", "name: ci\non: push\njobs: {}\n")
+        self.commit("init")
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            adopt.adopt(self.root, TOOLS.parent, "demo", "web", None)
+        self.assertTrue((self.root / ".github/workflows/kit-ci.yml").is_file())
+        self.assertIn("no LICENSE of yours", out.getvalue())
+
+
 if __name__ == "__main__":
     unittest.main()

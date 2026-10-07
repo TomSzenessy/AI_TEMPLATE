@@ -213,7 +213,7 @@ def check_structure(root: Path, project: dict[str, object]) -> None:
             surface_ids.add(identifier)
 
         try:
-            path_value = normalized_relative_path(surface.get("path"), "path")
+            path_value = normalized_relative_path(surface.get("path"), "surface path")
             surface_path = ensure_inside_root(
                 root, root / path_value, f"surface {identifier or position} path"
             )
@@ -273,6 +273,8 @@ def check_structure(root: Path, project: dict[str, object]) -> None:
             errors.append("multi-surface project requires docs/architecture/README.md")
         else:
             for surface in surfaces:
+                if surface.get("status", "active") not in {"active", "planned"}:
+                    continue  # a retired surface needs no architecture row
                 identifier = str(surface.get("id", ""))
                 if identifier and not re.search(rf"(?m)^\|\s*`?{re.escape(identifier)}`?\s*\|", architecture_text):
                     errors.append(f"architecture map is missing declared surface: {identifier}")
