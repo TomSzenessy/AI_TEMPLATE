@@ -143,7 +143,7 @@ def check_skill_provenance(project: dict[str, object], release_gate: bool = Fals
                 errors.append(f"skill #{position} permissions must use only read-only/project-local/host-adapter")
         rollback = skill.get("rollback")
         if isinstance(rollback, str):
-            if re.search(r"(?i)unknown|unclear|none|tbd|pending|never", rollback) or not re.search(
+            if re.search(r"(?i)\b(?:unknown|unclear|none|tbd|pending|never)\b", rollback) or not re.search(
                 r"(?i)\b(remove|revoke|restore|delete|uninstall|pin)\b", rollback
             ):
                 errors.append(f"skill #{position} rollback must name a concrete removal/revocation action")

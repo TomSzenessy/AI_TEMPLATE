@@ -27,7 +27,7 @@ from .core import KEBAB, RepoctlError, check_failed, load_project, package_skill
 
 KINDS = ("skill", "agent", "doc", "rule", "check", "command", "mcp", "pack")  # the one list of capability kinds
 CORE = "core"
-FRONTMATTER = re.compile(r"\A---\n(.*?)\n---\n", re.DOTALL)
+FRONTMATTER = re.compile(r"\A﻿?---\r?\n(.*?)\r?\n---(?:\r?\n|\Z)", re.DOTALL)  # tolerates a BOM and CRLF
 BLOCK_SCALAR = re.compile(r"[>|][+-]?")
 MAX_DESCRIPTION = 1024  # host skill catalogs truncate or reject longer descriptions
 ROLE_ACCESS = {"read-only", "docs-only", "web", "full"}
@@ -76,12 +76,24 @@ def frontmatter(text: str) -> dict[str, str]:
             values[key] = joiner.join(part for part in block if part).strip()
             continue
         if value[:1] in {"'", '"'}:
-            values[key] = value[1:-1] if len(value) > 1 and value[-1] == value[0] else value
+            values[key] = _unquote(value)
             continue
         if ": " in value:
             raise RepoctlError(f"frontmatter value for {key} contains ': '; quote it so every host parses it as YAML")
         values[key] = value
     return values
+
+
+def _unquote(value: str) -> str:
+    """A quoted YAML scalar without its quotes; double-quoted escapes and doubled single quotes are decoded."""
+    if len(value) < 2 or value[-1] != value[0]:
+        return value
+    if value[0] == '"':
+        try:
+            return str(json.loads(value))
+        except ValueError:
+            return value[1:-1]
+    return value[1:-1].replace("''", "'")
 
 
 def yaml_string(value: str) -> str:
@@ -90,7 +102,10 @@ def yaml_string(value: str) -> str:
 
 
 def _markdown(root: Path, kind: str, relative: str, name: str) -> Capability:
-    values = frontmatter(read_utf8(root / relative))
+    try:
+        values = frontmatter(read_utf8(root / relative))
+    except RepoctlError as error:
+        raise RepoctlError(f"{relative}: {error}") from error
     if values.get("name") != name or not values.get("description"):
         raise RepoctlError(f"{relative} needs name: {name} and a description")
     if len(values["description"]) > MAX_DESCRIPTION:

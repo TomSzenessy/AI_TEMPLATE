@@ -88,7 +88,7 @@ def budget_errors(root: Path, project: dict[str, object], files: list[str]) -> l
         raise RepoctlError("budgets must be a table of glob = max_bytes")
     errors = []
     for pattern, limit in budgets.items():
-        if not isinstance(limit, int) or limit <= 0:
+        if isinstance(limit, bool) or not isinstance(limit, int) or limit <= 0:
             errors.append(f"budget for {pattern} must be a positive integer byte count")
             continue
         for relative in files:

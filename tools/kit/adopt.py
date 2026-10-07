@@ -92,7 +92,10 @@ def index_existing_docs(target: Path, before: set[str]) -> list[str]:
         if not (relative.startswith("docs/") and relative.endswith(".md")) or relative == "docs/README.md":
             continue
         path = target / relative
-        text = path.read_text(encoding="utf-8", errors="replace")
+        try:
+            text = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            continue  # not UTF-8: leave the project's document byte-for-byte unchanged
         if INDEX_LINE.search(text):
             continue
         title_match = H1.search(text)
@@ -127,7 +130,7 @@ def adopt(target: Path, kit: Path, name: str, kind: str, owner: str | None) -> N
     target, kit = target.resolve(), kit.resolve()
     if target == kit:
         raise RepoctlError("run adopt from the existing repository, with --from pointing at the kit")
-    if (target / "tools" / "kit").exists() or (target / "AGENTS.md").exists() and (target / "project.toml").exists():
+    if (target / "tools" / "kit").exists() or ((target / "AGENTS.md").exists() and (target / "project.toml").exists()):
         raise RepoctlError("this repository already has the agent kit (AGENTS.md and project.toml); edit it instead")
     if git(target, "rev-parse", "--git-dir") is None:
         raise RepoctlError("adopt needs a git repository (git init and commit the existing code first)")

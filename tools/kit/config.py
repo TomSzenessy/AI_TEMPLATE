@@ -45,7 +45,9 @@ def project_setting(project: dict[str, object], key: str) -> object:
     if not isinstance(kit, dict):
         raise RepoctlError("[kit] must be a table")
     value = kit.get(key, DEFAULTS[key])
-    if type(value) is not type(DEFAULTS[key]) and not (isinstance(value, (int, float)) and isinstance(DEFAULTS[key], (int, float))):
+    default = DEFAULTS[key]
+    is_number = isinstance(value, (int, float)) and not isinstance(value, bool)  # bool is an int in Python
+    if type(value) is not type(default) and not (is_number and isinstance(default, (int, float))):
         raise RepoctlError(f"[kit].{key} must be a {type(DEFAULTS[key]).__name__}")
     return value
 

@@ -33,6 +33,10 @@ from .structure import (
 )
 
 
+# A private reporting route must be a real, public host: these names and everything under them are not.
+NON_ROUTABLE_HOSTS = ("localhost", "example.com", "example.org", "example.net", "local", "internal", "test", "invalid")
+
+
 def valid_private_route(value: str) -> bool:
     if re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", value):
         return True
@@ -40,7 +44,7 @@ def valid_private_route(value: str) -> bool:
         return False
     parsed = urlsplit(value)
     hostname = (parsed.hostname or "").lower()
-    if not hostname or hostname in {"localhost", "example.com", "attacker"} or hostname.endswith((".local", ".internal")):
+    if not hostname or any(hostname == name or hostname.endswith("." + name) for name in NON_ROUTABLE_HOSTS):
         return False
     try:
         address = ipaddress.ip_address(hostname)
