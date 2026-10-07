@@ -659,6 +659,16 @@ class UiReviewTests(KitRepository):
         self.assertIn("never had a UI review", str(raised.exception))
 
 
+class DecisionAgeTests(unittest.TestCase):
+    def test_old_decision_only_matters_at_the_release_gate(self) -> None:
+        from datetime import timedelta
+        from kit import structure
+        old, future = date.today() - timedelta(days=500), date.today() + timedelta(days=2)
+        self.assertFalse(structure._too_old_or_future(old, release_gate=False), "make check must not rot with the calendar")
+        self.assertTrue(structure._too_old_or_future(old, release_gate=True))
+        self.assertTrue(structure._too_old_or_future(future, release_gate=False), "a future date is a typo")
+
+
 class DerivedContentTests(KitRepository):
     def test_index_is_generated_from_declarations(self) -> None:
         self.write("docs/README.md", "# Index\n\n<!-- repoctl:index -->\n<!-- /repoctl:index -->\n")

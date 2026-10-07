@@ -32,6 +32,9 @@ Otherwise it is **advisory** (`make garden`, the session brief) or an
   or per screenshot.
 - **Ceremony scales with risk.** `make risk` decides; a `low` change never
   inherits `high` ceremony.
+- **No calendar rot.** A check must not start failing on an unchanged
+  repository because time passed. Record age (vision, stack decision) is
+  checked only by `make readiness`; `make check` fails only on a future date.
 - **Retire what never fires usefully.** A check that only ever produces
   bypasses, trailers, or ritual compliance is demoted to advisory or deleted
   in the next trial review.
