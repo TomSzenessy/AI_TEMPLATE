@@ -177,26 +177,69 @@ def message_trailers(root: Path, message: str) -> list[str]:
     return values
 
 
-def _history(root: Path, revisions: str | None = None) -> list[tuple[str, set[str] | None, set[str]]]:
-    """Newest-first (commit, Docs-Unaffected scope, paths); scope None = no trailer."""
+BOT_EMAILS = {"49699333+dependabot[bot]@users.noreply.github.com"}
+BOT_NAMES = {"dependabot[bot]"}
+PIN_LINE = re.compile(r"^[+-]\s*-?\s*uses:\s")
+DIFF_FRAMING = ("diff --git ", "index ", "@@", "--- ", "+++ ")
+
+
+def pin_only_diff(diff: str) -> bool:
+    """True when every changed line of a diff is a workflow `uses:` pin (and something changed)."""
+    changed = False
+    for line in diff.splitlines():
+        if not line or line.startswith(DIFF_FRAMING):
+            continue
+        if not PIN_LINE.match(line):
+            return False  # a run: edit, a mode change, a rename, a binary file ...
+        changed = True
+    return changed
+
+
+def _is_pin_bump(root: Path, commit: str, email: str, name: str) -> bool:
+    """A Dependabot-authored commit that changes only `uses:` pins (one git call, bot commits only)."""
+    if email.strip().lower() not in BOT_EMAILS and name.strip().lower() not in BOT_NAMES:
+        return False
+    diff = git(root, "-c", "core.quotepath=false", "show", "--format=", "-U0", "--no-color", commit, timeout=60)
+    return diff is not None and pin_only_diff(diff)
+
+
+def history_read(
+    root: Path, revisions: str | None = None
+) -> list[tuple[str, set[str] | None, set[str]]] | None:
+    """Newest-first (commit, Docs-Unaffected scope, paths); scope None = no trailer.
+
+    None means the read failed or timed out; an empty list is a genuinely empty
+    history. A pin-only Dependabot commit gets the all-docs scope (not stale).
+    """
     output = git(
         root,
+        "-c",
+        "core.quotepath=false",  # keep non-ASCII paths unquoted so they match covers globs
         "log",
         *([revisions] if revisions else []),
         f"-n{HISTORY_LIMIT}",
         "--no-merges",
         "--name-only",
-        f"--format=%x1e%h%x1f%(trailers:key={UNAFFECTED_TRAILER},valueonly,separator=%x1d)%x1f",
+        f"--format=%x1e%h%x1f%(trailers:key={UNAFFECTED_TRAILER},valueonly,separator=%x1d)%x1f%ae%x1f%an%x1f",
         timeout=60,
     )
+    if output is None:
+        return None
     commits = []
-    for record in (output or "").split("\x1e"):
+    for record in output.split("\x1e"):
         if not record.strip():
             continue
-        commit, trailer, names = (record.split("\x1f") + ["", ""])[:3]
+        commit, trailer, email, name, names = (record.split("\x1f") + ["", "", "", ""])[:5]
         scope = exemption_scope([value for value in trailer.split("\x1d") if value.strip()])
+        if scope is None and _is_pin_bump(root, commit.strip(), email, name):
+            scope = {"*"}
         commits.append((commit.strip(), scope, {line for line in names.splitlines() if line}))
     return commits
+
+
+def _history(root: Path, revisions: str | None = None) -> list[tuple[str, set[str] | None, set[str]]]:
+    """history_read for callers that treat a failed read as no findings (use history_read to tell)."""
+    return history_read(root, revisions) or []
 
 
 def stale_documents(

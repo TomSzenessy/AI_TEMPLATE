@@ -75,7 +75,8 @@ A document declares what it describes with one comment near its top, such as
 - **Dead binding** (a glob matches no file): the code moved or died, so
   `make check` fails until the binding follows it.
 - **Stale document**: a commit newer than the document's last commit touched
-  covered paths. `make check` fails. If a change truly does not affect the doc,
+  covered paths. `make check` fails. A commit authored by `dependabot[bot]` whose diff changes only
+  `uses:` lines is ignored (a bot cannot add a trailer); any other change is not. If a change truly does not affect the doc,
   record that in the commit with a trailer, `Docs-Unaffected: docs/x.md <reason>`
   (a reason with no path exempts all documents; a value that starts with a
   non-document path or glob, such as `tools/** untouched`, exempts nothing). Git's own trailer parsing is
