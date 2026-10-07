@@ -1,7 +1,7 @@
 # Project adaptation
 
 <!-- index: operate | Lean core, artifact lifecycle, and capability-pack selection | Turning the template into a project without generating unnecessary structure. -->
-<!-- covers: tools/kit/bootstrap.py -->
+<!-- covers: tools/kit/bootstrap.py tools/kit/adopt.py -->
 
 The template is a small kernel plus capability packs, not a universal
 application scaffold. The kernel stays responsible for navigation, the project
@@ -32,6 +32,29 @@ a project small:
 
 A project should be able to remove unused optional material without removing
 its operating contract, history, or evidence.
+
+## Adopting an existing repository
+
+`make -f <kit>/Makefile adopt NAME=... KIND=... OWNER=...`, run from a clean
+working tree of the existing repository, copies the kit in and then runs the
+same initialization as `make init`. It never overwrites a file the project
+owns:
+
+| Collision | What adopt does |
+|---|---|
+| `Makefile` | Kit targets go to `kit.mk`, included at the end of your Makefile so your default goal stays; a kit target you already define is renamed `kit-<name>` (for example `kit-test`) everywhere in `kit.mk`. |
+| `.gitignore` | Missing kit lines are appended under `# Agent kit`. |
+| `README.md` | Your README stays; the project identity block is appended. |
+| `docs/README.md` | Your page stays; the generated documentation index is appended. |
+| `.github/workflows/<name>` | The kit's workflow is written beside yours as `kit-<name>`. |
+| `LICENSE` and anything else | Yours is kept; the manifest's `license` label follows your LICENSE. |
+
+Your existing `docs/*.md` get an `<!-- index: -->` line from their title (edit
+the wording). Afterwards `make check` lists your code as unregistered surfaces:
+declare each one in `project.toml` (or list support folders such as tests in
+`[repository].infrastructure_paths`), then follow `make next`. A document's
+`make <target>` references resolve to the nearest Makefile above it, so
+subprojects keep their own targets.
 
 ## Adaptation loop
 

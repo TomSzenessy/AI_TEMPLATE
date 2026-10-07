@@ -1,0 +1,20 @@
+# Not a web app: a command-line tool with file import, rules, and reports.
+id = "ledger-cli"
+kind = "cli"
+mode = "new"
+budget_usd = 30
+prompt = '''
+I want "ledger", a command-line tool that turns my bank exports into a monthly picture of where my money goes.
+
+I won't be available to answer questions during this run. My answers to what you'd ask at kickoff; for anything else, use your recommendation and write down what you chose:
+
+- Users: me and a few friends who are comfortable in a terminal, on macOS and Linux. Success = after importing a month of transactions, I can see spending per category and against my budget in under a minute.
+- Import CSV exports from different banks (column names, date formats, decimal commas, and debit/credit conventions differ), skipping duplicates when the same file or overlapping months are imported twice.
+- Categorize with rules I can edit (a plain text or TOML file: match on payee or description, regex allowed), plus a way to categorize what is left interactively.
+- Monthly budgets per category, and reports: per month, per category, over budget, and a trend over the last months, readable in a terminal (and CSV/JSON output for scripts).
+- Data stays local in one file I can back up; nothing leaves my machine.
+- Stack: your call, but it must be easy to install for my friends (one command).
+- Not now: syncing with banks, a GUI, multi-currency conversion.
+
+Build it in this repository as far as you can toward something my friends could install and use next week.
+'''

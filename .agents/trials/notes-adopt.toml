@@ -1,0 +1,17 @@
+# Brownfield: an existing Flask API with its own Makefile, README, docs, CI,
+# and license adopts the kit (make adopt), then the owner asks for a feature.
+id = "notes-adopt"
+kind = "api"
+mode = "adopt"
+seed = "seeds/notes-api"
+budget_usd = 30
+prompt = '''
+This repository is our team's notes API. It is in production: our Slack bot posts to POST /notes, so the existing request and response shapes must keep working. We just added the agent kit to it (make adopt).
+
+Please add three things:
+1. Tags on notes: a note can have several tags; create and update accept them, list can filter by tag.
+2. Full-text search over title and body, ranked, with highlighted snippets.
+3. A small read-only web page at / where the team can browse, filter by tag, and search notes. It should look tidy on a laptop and a phone; nothing fancy.
+
+I won't be around to answer questions during this run. My answers to what you'd ask at kickoff: users are our 12-person team; keep Flask and SQLite (no new services); no auth changes (it runs on our VPN); keep the dependency list short. For anything else, use your recommendation and write down what you chose. Leave the codebase in a state the next person (or agent) can pick up.
+'''

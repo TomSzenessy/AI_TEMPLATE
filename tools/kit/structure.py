@@ -263,7 +263,11 @@ def check_structure(root: Path, project: dict[str, object]) -> None:
 
     for candidate in discover_candidate_surfaces(root, project):
         if candidate not in declared_paths:
-            errors.append(f"unregistered product surface: {candidate}")
+            errors.append(
+                f"unregistered product surface: {candidate} (declare it as a [[surfaces]] entry in project.toml with "
+                f'path = "{candidate}", kind, owner, quality_oracle, and verification commands; or, when it only '
+                "supports another surface such as its tests, add it to [repository].infrastructure_paths)"
+            )
 
     if len([surface for surface in surfaces if surface.get("status", "active") in {"active", "planned"}]) > 1:
         architecture_path = root / "docs" / "architecture" / "README.md"

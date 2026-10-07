@@ -28,7 +28,7 @@ whose imports point toward `core`:
 | Concern | Modules | Owner doc |
 |---|---|---|
 | Manifest, paths, worktree, text primitives | `core`, `gitinfo` | this page |
-| Surfaces, vision, inventory, declared verification | `structure`, `bootstrap` | [`../ADAPTATION.md`](../ADAPTATION.md) |
+| Surfaces, vision, inventory, declared verification, adoption | `structure`, `bootstrap`, `adopt` | [`../ADAPTATION.md`](../ADAPTATION.md) |
 | Issues, review packets, incidents, GitHub CLI, CI checks | `issues`, `github`, `ci` | [`../ISSUE_TEMPLATE.md`](../ISSUE_TEMPLATE.md) |
 | Skills provenance, resource registry | `skills` | [`../skills.md`](../skills.md) |
 | Links, index, file hygiene | `docs` | [`../security.md`](../security.md) |

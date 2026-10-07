@@ -44,6 +44,20 @@ strict types, lint, tests, CI, previews, and error tracking; UI work follows the
 `ux-quality` skill and gets screenshot reviews. `make init` itself never invents
 folders or picks a framework for you.
 
+### Already have a codebase?
+
+Bring the kit to it instead of starting from the template:
+
+```bash
+git clone https://github.com/TomSzenessy/AI_TEMPLATE ../agent-kit
+make -f ../agent-kit/Makefile adopt NAME=my-app KIND=web OWNER=your-handle
+```
+
+`make adopt` never overwrites your files: kit targets go to `kit.mk` (included
+from your Makefile, with any target you already define renamed `kit-<name>`),
+your README, licence, docs, and workflows stay yours, and the kit's pieces are
+merged in beside them ([`docs/ADAPTATION.md`](./docs/ADAPTATION.md#adopting-an-existing-repository)).
+
 <!-- repoctl:project-readme -->
 > Project initialized: **AI_TEMPLATE** (`template`). Keep this identity,
 > launch state, and project-specific quick start current.

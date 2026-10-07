@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -151,6 +152,13 @@ class DocSyncTests(KitRepository):
         self.write("docs/billing.md", "# Billing\n\n<!-- covers: src/billing/** -->\n\nRun `make deploy`.\n")
         errors = docsync.command_reference_errors(self.root, self.files())
         self.assertEqual(errors, ["docs/billing.md: references missing make target: make deploy"])
+
+    def test_make_references_resolve_to_the_nearest_makefile(self) -> None:
+        self.write("services/api/Makefile", "serve:\n\techo serve\n")
+        self.write("services/api/README.md", "# API\n\nRun `make serve`.\n")
+        self.write("docs/billing.md", "# Billing\n\n<!-- covers: src/billing/** -->\n\nRun `make serve`.\n")
+        errors = docsync.command_reference_errors(self.root, self.files())
+        self.assertEqual(errors, ["docs/billing.md: references missing make target: make serve"])
 
 
 class HygieneTests(KitRepository):
@@ -774,6 +782,48 @@ class InitOwnerTests(unittest.TestCase):
             self.assertIn('owners = ["octocat"]', (project / "project.toml").read_text())
             self.assertNotIn("project-owner", (project / "project.toml").read_text())
             self.assertIn("Owner: octocat", (project / "VISION.md").read_text())
+
+
+class AdoptTests(unittest.TestCase):
+    """make adopt brings the kit into an existing repository without overwriting it."""
+
+    def setUp(self) -> None:
+        self.temp = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp.name) / "notes"
+        shutil.copytree(TOOLS.parent / ".agents/trials/seeds/notes-api", self.root)
+        for command in (["init", "-q", "-b", "main"], ["add", "-A"],
+                        ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", "existing"]):
+            subprocess.run(["git", "-C", str(self.root), *command], check=True, capture_output=True)
+
+    def tearDown(self) -> None:
+        self.temp.cleanup()
+
+    def adopt(self) -> subprocess.CompletedProcess[str]:
+        return subprocess.run([sys.executable, str(REPOCTL), "--root", str(self.root), "adopt", "--from", str(TOOLS.parent),
+                               "--name", "notes-api", "--kind", "api", "--owner", "notes-team"], capture_output=True, text=True)
+
+    def test_adopt_merges_instead_of_overwriting(self) -> None:
+        readme_before = (self.root / "README.md").read_text()
+        result = self.adopt()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("renamed: kit-help, kit-test", result.stdout)
+        self.assertTrue((self.root / "README.md").read_text().startswith(readme_before), "the project's README is kept")
+        self.assertIn("Copyright (c) 2025 Notes Team", (self.root / "LICENSE").read_text())
+        self.assertIn('license = "MIT"', (self.root / "project.toml").read_text())
+        self.assertTrue((self.root / ".github/workflows/kit-ci.yml").is_file(), "colliding workflow written beside it")
+        self.assertIn("<!-- index: design | Notes API |", (self.root / "docs/api.md").read_text())
+        make = lambda *args: subprocess.run(["make", "-s", *args], cwd=self.root, capture_output=True, text=True)
+        self.assertIn("make test     run the tests", make().stdout, "the project's default goal stays first")
+        self.assertIn("Next (intake)", make("next").stdout, "kit targets work through include kit.mk")
+        check = subprocess.run([sys.executable, "tools/repoctl.py", "check"], cwd=self.root, capture_output=True, text=True)
+        problems = [line for line in check.stderr.splitlines() if line.startswith("- ")]
+        self.assertTrue(problems and all("unregistered product surface" in line for line in problems), check.stderr)
+        self.assertIn("infrastructure_paths", check.stderr, "the message names the fix")
+        self.assertEqual(self.adopt().returncode, 1, "adopting twice is refused")
+
+    def test_adopt_refuses_uncommitted_work(self) -> None:
+        (self.root / "notes/new.py").write_text("X = 1\n")
+        self.assertIn("commit or stash", self.adopt().stderr)
 
 
 class DecisionAgeTests(unittest.TestCase):

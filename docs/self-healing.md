@@ -81,7 +81,10 @@ A document declares what it describes with one comment near its top, such as
 - **Owed document**: covered paths changed on this branch while the doc did not;
   the stop gate and `make done` report it before history even exists.
 - **Command references**: every backticked `make <target>` or `repoctl <command>`
-  in Markdown, and every `make` line in a code fence, must exist.
+  in Markdown, and every `make` line in a code fence, must exist. A `make`
+  reference resolves to the nearest Makefile above the document (and the
+  files it includes, such as `kit.mk` after `make adopt`), so subprojects and
+  trial seeds keep their own targets.
 
 Bind documents that explain behavior (architecture, module cards, runbooks, API
 notes). Pure policy documents need no binding. Staleness needs full history:

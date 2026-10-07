@@ -23,6 +23,7 @@ from kit.core import RepoctlError, ensure_inside_root, load_project
 from kit.docs import check_docs_index, check_file_hygiene, check_markdown_links
 from kit.evals import run_evals
 from kit.trial import analyze_existing, run_trial
+from kit.adopt import adopt
 from kit.garden import garden_report, self_heal_errors
 from kit.config import setting
 from kit.github import sync_issue_labels, sync_repository_metadata
@@ -145,6 +146,11 @@ def build_parser() -> argparse.ArgumentParser:
     eval_parser.add_argument("--tasks", help="comma-separated task ids")
     eval_parser.add_argument("--timeout", type=int, default=300)
     eval_parser.add_argument("--model", help="model for hosts that accept one (default: [kit].eval_model for claude)")
+    adopt_parser = subparsers.add_parser("adopt", help="bring this kit into an existing repository (--root) without overwriting it")
+    adopt_parser.add_argument("--from", dest="kit", type=Path, required=True, help="the kit (template) checkout")
+    adopt_parser.add_argument("--name", required=True)
+    adopt_parser.add_argument("--kind", required=True)
+    adopt_parser.add_argument("--owner")
     trial_parser = subparsers.add_parser("trial", help="run a build trial from .agents/trials/ and report its friction")
     trial_parser.add_argument("id")
     trial_parser.add_argument("--model", default="sonnet")
@@ -288,6 +294,8 @@ def main(argv: list[str] | None = None) -> int:
             print(runner(arguments.root.resolve()))
         elif arguments.command == "eval":
             return run_evals(arguments.root.resolve(), arguments.host, arguments.tasks, arguments.timeout, arguments.model)
+        elif arguments.command == "adopt":
+            adopt(arguments.root.resolve(), arguments.kit, arguments.name, arguments.kind, arguments.owner)
         elif arguments.command == "trial":
             if arguments.analyze:
                 if not arguments.project:

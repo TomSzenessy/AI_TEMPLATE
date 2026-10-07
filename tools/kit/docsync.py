@@ -277,9 +277,22 @@ REPOCTL_REFERENCE = re.compile(r"`(?:python3 )?(?:tools/)?repoctl(?:\.py)? ([a-z
 FENCE = re.compile(r"```.*?```", re.DOTALL)
 
 
-def makefile_targets(root: Path) -> set[str]:
-    text = read_text_file(root, "Makefile") or ""
+def makefile_targets(root: Path, directory: str = "") -> set[str]:
+    makefile = f"{directory}/Makefile" if directory else "Makefile"
+    text = read_text_file(root, makefile) or ""
+    for included in re.findall(r"(?m)^-?include\s+(\S+)\s*$", text):  # e.g. kit.mk after make adopt
+        text += "\n" + (read_text_file(root, f"{directory}/{included}" if directory else included) or "")
     return set(re.findall(r"(?m)^([A-Za-z0-9][A-Za-z0-9_-]*):", text))
+
+
+def nearest_makefile_dir(files: set[str], relative: str) -> str:
+    """A document's `make X` means the closest Makefile above it (subprojects, fixtures, monorepos)."""
+    directory = str(Path(relative).parent)
+    while directory not in {"", "."}:
+        if f"{directory}/Makefile" in files:
+            return directory
+        directory = str(Path(directory).parent)
+    return ""
 
 
 def repoctl_commands(root: Path) -> set[str]:
@@ -293,6 +306,8 @@ def command_reference_errors(root: Path, files: list[str]) -> list[str]:
     commands = repoctl_commands(root)
     if not targets and not commands:
         return []
+    file_set = set(files)
+    nested: dict[str, set[str]] = {}
     errors = []
     for relative in files:
         if not relative.endswith(".md"):
@@ -303,8 +318,10 @@ def command_reference_errors(root: Path, files: list[str]) -> list[str]:
         references = set(MAKE_REFERENCE.findall(text))
         for fence in FENCE.findall(text):
             references |= set(FENCED_MAKE.findall(fence))
-        if targets:
-            for target in sorted(references - targets):
+        directory = nearest_makefile_dir(file_set, relative)
+        local = targets if not directory else nested.setdefault(directory, makefile_targets(root, directory))
+        if local:
+            for target in sorted(references - local):
                 errors.append(f"{relative}: references missing make target: make {target}")
         if commands:
             for command in sorted(set(REPOCTL_REFERENCE.findall(text)) - commands):

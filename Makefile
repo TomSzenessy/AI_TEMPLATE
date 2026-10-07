@@ -2,12 +2,14 @@
 # tools/repoctl applies the same rule for hooks. Override with PYTHON=...
 PYTHON ?= $(shell for p in python3.14 python3.13 python3.12 python3.11 python3 python; do command -v $$p >/dev/null 2>&1 && $$p -c 'import sys; sys.exit(sys.version_info < (3, 11))' 2>/dev/null && { echo $$p; break; }; done)
 REPOCTL := $(PYTHON) tools/repoctl.py
+# This kit's directory, also when run from another repository with make -f (make adopt).
+KIT_DIR := $(patsubst %/,%,$(dir $(abspath $(firstword $(MAKEFILE_LIST)))))
 SKILL_TEST_SUITES := $(wildcard .agents/skills/*/tests)
 
 .DEFAULT_GOAL := help
 
 .PHONY: help python-check init inventory resources skill-digest check doctor readiness test test-future verify validate incident issue labels review-packet \
-	start next ui-review done new handover map where risk garden capabilities sync github-sync similar eval trial
+	start next ui-review done new handover map where risk garden capabilities sync github-sync similar eval trial adopt
 
 # Export user-supplied values so recipes pass them as data, not as shell source.
 export Q AGENT MODEL TASKS DESC GROUP COVERS ACCESS TIER FORCE NAME KIND OWNER BUDGET TITLE SUMMARY BODY TYPE PRIORITY AREA TOPIC STATUS SURFACE GATE PUBLIC_REVIEWED REVIEW_EVIDENCE ISSUE_FILE PUBLIC_SAFE
@@ -43,6 +45,7 @@ help:
 	  '  make check | verify | doctor | readiness | inventory | resources | labels | github-sync' \
 	  '  make eval AGENT=claude [MODEL=haiku]   Fresh-agent navigation benchmark (cheap model by default)' \
 	  '  make trial NAME=<request> [MODEL=sonnet] [BUDGET=25]   Build trial: an agent builds a product; friction report' \
+	  '  make -f <kit>/Makefile adopt NAME=x KIND=web OWNER=you   Bring this kit into an existing repository' \
 	  '  make validate BODY=path | skill-digest SKILL_PATH=.agents/skills/name'
 
 python-check:
@@ -168,6 +171,11 @@ similar: python-check
 
 eval: python-check
 	$(REPOCTL) eval --host "$${AGENT:-claude}" $(if $(TASKS),--tasks "$${TASKS}",) $(if $(MODEL),--model "$${MODEL}",)
+
+# From an existing repository: make -f <kit>/Makefile adopt NAME=my-app KIND=web OWNER=your-handle
+adopt: python-check
+	$(if $(NAME),,$(error Name the project: make -f <kit>/Makefile adopt NAME=my-app KIND=web OWNER=you))
+	$(PYTHON) "$(KIT_DIR)/tools/repoctl.py" --root "$(CURDIR)" adopt --from "$(KIT_DIR)" --name "$${NAME}" --kind "$${KIND}" $(if $(OWNER),--owner "$${OWNER}",)
 
 trial: python-check
 	$(if $(NAME),,$(error Name a request in .agents/trials/: make trial NAME=waypoint))
