@@ -19,25 +19,26 @@ body:
       description: "Write: Duplicate check: searched title, symptom, and path for <terms>; no duplicate found (or reused #N)."
     validations:
       required: true
-  - type: input
+  - type: dropdown
     id: type
     attributes:
       label: Type
       description: Use `bug`.
+      options: [bug, privacy, compliance, audit, task, operations, documentation, enhancement]
     validations:
       required: true
-  - type: input
+  - type: dropdown
     id: priority
     attributes:
       label: Priority
-      placeholder: P0, P1, P2, or P3
+      options: [P0, P1, P2, P3]
     validations:
       required: true
-  - type: input
+  - type: dropdown
     id: area
     attributes:
       label: Area
-      placeholder: repo, web, game, media, data, security, privacy, legal, operations, platform, documentation
+      options: [security, privacy, legal, operations, platform, documentation, web, game, media, data, repo]
     validations:
       required: true
   - type: input
@@ -51,7 +52,7 @@ body:
     id: status
     attributes:
       label: Status
-      options: [triage, ready, in-progress, blocked]
+      options: [triage, ready, in-progress, blocked, fixed, wont-fix]
     validations:
       required: true
   - type: textarea

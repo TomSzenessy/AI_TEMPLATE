@@ -18,24 +18,13 @@ from datetime import date
 from pathlib import Path
 from typing import Callable
 
-from .github import _gh
-from .core import RepoctlError, load_project, reject_secret_text, reviewer_problem
-from .issues import validate_issue_body, validate_issue_content, validate_issue_state
+from .github import _gh, load_label_registry
+from .core import RepoctlError, load_project, markdown_without_fenced_code, reject_secret_text
+from .issues import contract, issue_problems, parse_sections
 
-try:
-    from issue_contract import disclosure_class, sensitive_issue_content
-except ImportError:  # pragma: no cover - module import from a package context
-    from tools.issue_contract import disclosure_class, sensitive_issue_content
-
-CANONICAL = {
-    "regulated": [
-        "Summary", "What happens", "Where", "When", "Why", "How to reproduce", "Impact and scope",
-        "Acceptance criteria", "Evidence", "Disclosure classification", "Dependencies and handoff",
-    ],
-    "agent-first": ["Summary", "Acceptance criteria", "Evidence", "Disclosure classification", "Dependencies and handoff"],
-}
-REQUIRED_FAMILIES = ("type", "priority", "area", "topic", "status")
-TOPIC = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
+CANONICAL = contract.HEADINGS  # the contract owns the headings; the name stays for callers
+REQUIRED_FAMILIES = contract.REQUIRED_FAMILIES
+TOPIC = contract.TOPIC
 
 
 def profile_of(root: Path) -> str:
@@ -85,9 +74,9 @@ def pr_reference_check(
         if issue.get("state") != "open":
             raise RepoctlError(f"#{number} must be an open issue")
         issue_body = issue.get("body") or ""
-        if not all(re.search(rf"(?m)^### {re.escape(h)}\s*$", issue_body) for h in CANONICAL[profile]):
+        if not all(h in parse_sections(issue_body) for h in contract.required_headings(profile)):
             raise RepoctlError(f"#{number} does not contain the expected canonical issue contract")
-        if not re.search(r"(?im)^Duplicate check:\s*searched\s+title,\s*symptom,\s+and\s+path\s+for\s+.+;", issue_body):
+        if not contract.DUPLICATE_CHECK.search(markdown_without_fenced_code(issue_body)):
             raise RepoctlError(f"#{number} is missing the duplicate-search record")
     return "Validated open issue contracts: " + ", ".join("#" + n for n in closing_references) if closing_references else "Private review attested"
 
@@ -129,30 +118,11 @@ def issue_contract_check(text: str, labels: set[str], profile: str, registry: di
         raise RepoctlError("Minimal profile delegates issue intake to the host organization; remove native forms")
     if profile == "regulated":
         raise RepoctlError("Regulated profile uses the CLI/private issue route; remove native forms")
-    structural = re.sub(r"```.*?```", "", text, flags=re.DOTALL)
+    structural = markdown_without_fenced_code(text)
     status_values = [label.split(":", 1)[1] for label in labels if label.startswith("status:")]
     status = status_values[0] if len(status_values) == 1 else "triage"
     reject_secret_text(text, "issue body")
-    reasons: list[str] = []
-    try:
-        validate_issue_body(text, profile)
-        validate_issue_content(text, status, profile)
-        validate_issue_state(text, status, profile)
-    except RepoctlError as error:
-        reasons.append(str(error))
-
-    missing = [h for h in CANONICAL[profile] if not re.search(rf"^### {re.escape(h)}$", structural, re.MULTILINE)]
-    if missing:
-        reasons.append("missing headings: " + ", ".join(missing))
-    if not re.search(r"(?im)^\s*(?:-\s*)?(?:\*\*)?Public-safe:(?:\*\*)?\s*yes\b", structural):
-        reasons.append("Disclosure classification must say Public-safe: yes")
-    if not re.search(
-        r"(?im)^Duplicate check:\s*searched\s+title,\s*symptom,\s*and\s+path\s+for\s+.+;\s*(?:reused\s+#[0-9]+|no duplicate found)\s*$",
-        structural,
-    ):
-        reasons.append("add the line 'Duplicate check: searched title, symptom, and path for <terms>; no duplicate found'")
-    if disclosure_class(structural) not in {"ordinary", "public-reviewed"}:
-        reasons.append("Disclosure class must be ordinary or public-reviewed (sensitive findings use SECURITY.md)")
+    reasons: list[str] = issue_problems(text, profile, status)
 
     label_values: dict[str, str] = {}
     for label in labels:
@@ -187,7 +157,7 @@ def issue_contract_check(text: str, labels: set[str], profile: str, registry: di
                 reasons.append(f"{family} field ({value}) conflicts with its label ({label_values[family]})")
     elif set(label_values) != set(REQUIRED_FAMILIES):
         reasons.append("needs one label (or form field) each for type, priority, area, topic, and status")
-    if "security" in {label_values.get("type"), field_values.get("type")}:
+    if set(contract.REFUSED_PUBLIC["type"]) & {label_values.get("type"), field_values.get("type")}:
         reasons.append("security issues use the private route in SECURITY.md")
     labels_to_add = [f"{family}:{value}" for family, value in field_values.items()]
     for desired in labels_to_add:
@@ -195,11 +165,6 @@ def issue_contract_check(text: str, labels: set[str], profile: str, registry: di
         if {label for label in labels if label.startswith(family + ":") and label != desired}:
             reasons.append(f"conflicting {family}: labels")
     labels_to_add = [label for label in labels_to_add if label not in labels]
-    if sensitive_issue_content(structural):
-        reasons.append("possible sensitive content: redact it or use the private route in SECURITY.md")
-    problem = reviewer_problem(structural)
-    if problem:
-        reasons.append(problem)
     reasons = list(dict.fromkeys(reasons))
     return not reasons, labels_to_add, reasons
 
@@ -237,12 +202,7 @@ def post_contract_comment(repository: str, number: str, comment: str) -> None:
 def run_issue_contract(root: Path) -> str:
     event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text(encoding="utf-8"))
     issue = event.get("issue", {})
-    governance = load_project(root).get("governance", {})
-    registry_value = governance.get("label_registry", ".github/issue-labels.json") if isinstance(governance, dict) else ".github/issue-labels.json"
-    registry_path = Path(registry_value)
-    if registry_path.is_absolute() or ".." in registry_path.parts:
-        raise RepoctlError("governance.label_registry must stay inside the repository")
-    registry = json.loads((root / registry_path).read_text(encoding="utf-8"))
+    registry = load_label_registry(root)
     valid, labels_to_add, reasons = issue_contract_check(
         issue.get("body") or "", {label.get("name", "") for label in issue.get("labels", [])}, profile_of(root), registry
     )

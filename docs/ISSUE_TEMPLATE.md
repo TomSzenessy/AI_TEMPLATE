@@ -85,6 +85,13 @@ remove or disable `.github/ISSUE_TEMPLATE/` before `make check` is green.
 Replace placeholders; write `N/A — reason` when a section genuinely does not
 apply.
 
+`tools/issue_contract.py` owns the headings, the duplicate-check line, and the
+disclosure, owner, and sensitive-word patterns; `make issue` and the CI check
+both call `issues.issue_problems`. The `###` headings below must equal its
+`HEADINGS["regulated"]`, and the native forms' Type, Priority, Area, and Status
+dropdowns must equal `.github/issue-labels.json` minus the values the public
+adapters refuse (`type: security`); a test enforces both.
+
 ### Summary
 
 One sentence: concrete symptom or outcome and impact.

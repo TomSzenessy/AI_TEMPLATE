@@ -750,12 +750,14 @@ quality_oracle = "human review"
 
     def test_workflow_has_checkout_permissions_and_label_families(self) -> None:
         root = Path(__file__).resolve().parents[2]
-        issue_workflow = kit_workflow(root, "issue-contract.yml").read_text(encoding="utf-8") + (root / "tools/kit/ci.py").read_text(encoding="utf-8")
+        issue_workflow = kit_workflow(root, "issue-contract.yml").read_text(encoding="utf-8") + "".join(
+            (root / name).read_text(encoding="utf-8") for name in ("tools/kit/ci.py", "tools/kit/issues.py", "tools/issue_contract.py")
+        )
         self.assertIn("contents: read", issue_workflow)
         self.assertIn("actions/checkout@", issue_workflow)
         self.assertIn("topic", issue_workflow)
         self.assertIn("cancel-in-progress", issue_workflow)
-        self.assertIn("registry_path", issue_workflow)
+        self.assertIn("load_label_registry", issue_workflow)
         self.assertIn("Disclosure class", issue_workflow)
         reference_workflow = kit_workflow(root, "require-issue-reference.yml").read_text(encoding="utf-8") + (root / "tools/kit/ci.py").read_text(encoding="utf-8")
         self.assertNotIn("security-events: read", reference_workflow)

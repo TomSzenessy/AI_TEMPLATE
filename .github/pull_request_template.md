@@ -2,7 +2,7 @@
 
 <!-- What changed and why? Link the issue. -->
 
-Fixes/Refs/Closes #<number>
+Fixes/Closes #<number>
 
 For a private security fix, do not put a GHSA, private-advisory URL, exploit,
 secret, or personal data in this public PR. Use the private reporting process

@@ -9,9 +9,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 try:
-    from issue_contract import disclosure_class, sensitive_issue_content
+    import issue_contract as contract
 except ImportError:  # pragma: no cover - module import from a package context
-    from tools.issue_contract import disclosure_class, sensitive_issue_content
+    from tools import issue_contract as contract
 
 from .core import (
     RepoctlError,
@@ -105,21 +105,6 @@ def validate_review_evidence(
                 raise RepoctlError(f"review evidence artifact does not exist: {target}")
 
 
-ISSUE_REQUIRED_HEADINGS = (
-    "Summary",
-    "What happens",
-    "Where",
-    "When",
-    "Why",
-    "How to reproduce",
-    "Impact and scope",
-    "Acceptance criteria",
-    "Evidence",
-    "Disclosure classification",
-    "Dependencies and handoff",
-)
-
-
 def issue_labels(
     root: Path,
     issue_type: str,
@@ -140,7 +125,7 @@ def issue_labels(
         allowed = registry.get(family)
         if not isinstance(allowed, list) or value not in allowed:
             raise RepoctlError(f"invalid {family} label: {value}")
-    if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", topic):
+    if not contract.TOPIC.fullmatch(topic):
         raise RepoctlError("topic must be kebab-case")
     labels = [
         f"type:{issue_type}",
@@ -159,85 +144,78 @@ def issue_labels(
     return labels
 
 
-def validate_issue_body(body: str, profile: str = "regulated") -> None:
-    structural_body = markdown_without_fenced_code(body)
-    required = ISSUE_REQUIRED_HEADINGS if profile == "regulated" else (
-        "Summary", "Acceptance criteria", "Evidence", "Disclosure classification", "Dependencies and handoff"
-    )
-    missing = [
-        heading
-        for heading in required
-        if not re.search(rf"^### {re.escape(heading)}$", structural_body, re.MULTILINE)
-    ]
-    if missing:
-        raise RepoctlError("issue body is missing headings: " + ", ".join(missing))
-    if not re.search(
-        r"(?im)^Duplicate check:\s*searched\s+title,\s*symptom,\s*and\s+path\s+for\s+.+;\s*(?:reused\s+#[0-9]+|no duplicate found)\s*$",
-        structural_body,
-    ):
-        raise RepoctlError(
-            "issue body must record a duplicate search on its own line, exactly: 'Duplicate check: searched title, "
-            "symptom, and path for <terms>; no duplicate found' (or '; reused #N')"
-        )
-    disclosure = issue_section(structural_body, "Disclosure classification")
-    public_safe_pattern = (
-        r"(?im)^\s*(?:-\s*)?(?:\*\*)?Public-safe:(?:\*\*)?\s*yes\s*$"
-        if profile == "regulated"
-        else r"(?im)^\s*(?:-\s*)?(?:\*\*)?Public-safe:(?:\*\*)?\s*yes\b"
-    )
-    if not re.search(public_safe_pattern, disclosure):
-        raise RepoctlError("issue body must explicitly declare Public-safe: yes before public filing")
-    problem = reviewer_problem(disclosure)
-    if problem:
-        raise RepoctlError(f"issue body cannot be filed publicly: {problem}")
-    classification = disclosure_class(disclosure)
-    if classification not in {"ordinary", "public-reviewed"}:
-        raise RepoctlError(
-            "issue Disclosure classification must be ordinary or public-reviewed; use private-route for sensitive findings"
-        )
-    privacy_review = re.search(
-        r"(?im)^\s*(?:-\s*)?(?:\*\*)?Security/privacy review:(?:\*\*)?\s*(.+?)\s*$", disclosure
-    )
-    if not privacy_review or is_placeholder(privacy_review.group(1)):
-        raise RepoctlError("issue Disclosure classification must include a security/privacy review value")
-    if sensitive_issue_content(structural_body):
-        raise RepoctlError(
-            "sensitive issue bodies cannot use the public adapter; redact them or use the private security route"
-        )
+def parse_sections(body: str) -> dict[str, str]:
+    """Split an issue body into `### Heading` -> content once; fenced code never counts."""
+    structural = markdown_without_fenced_code(body)
+    heads = list(re.finditer(r"(?m)^### (.+?)[ \t]*$", structural))
+    sections: dict[str, str] = {}
+    for index, head in enumerate(heads):
+        end = heads[index + 1].start() if index + 1 < len(heads) else len(structural)
+        sections.setdefault(head.group(1), structural[head.end():end].strip())
+    return sections
+
+
+def issue_section(body: str, heading: str) -> str:
+    return parse_sections(body).get(heading, "")
 
 
 def validate_local_draft(body: str) -> None:
     """A Local-WAL draft needs a concrete outcome and checkable criteria, nothing more yet."""
-    if len(issue_section(body, "Summary")) < 12:
+    sections = parse_sections(body)
+    if len(sections.get("Summary", "")) < 12:
         raise RepoctlError("issue needs '### Summary' with the intended outcome in a sentence or more")
-    if not re.search(r"(?m)^\s*[-*]\s+\S", issue_section(body, "Acceptance criteria")):
+    if not re.search(r"(?m)^\s*[-*]\s+\S", sections.get("Acceptance criteria", "")):
         raise RepoctlError("issue needs '### Acceptance criteria' with at least one '- [ ] <checkable outcome>' line")
 
 
-def issue_section(body: str, heading: str) -> str:
-    structural_body = markdown_without_fenced_code(body)
-    match = re.search(
-        rf"^### {re.escape(heading)}\s*$\n(.*?)(?=^### |\Z)",
-        structural_body,
-        re.MULTILINE | re.DOTALL,
-    )
-    return match.group(1).strip() if match else ""
+def issue_problems(body: str, profile: str = "regulated", status: str = "triage") -> list[str]:
+    """Every contract problem in a public issue body; `make issue` and the CI check both call this.
+
+    Missing headings stop the check (every later message would only repeat them).
+    """
+    structural = markdown_without_fenced_code(body)
+    sections = parse_sections(body)
+    missing = [h for h in contract.required_headings(profile) if h not in sections]
+    if missing:
+        return ["issue body is missing headings: " + ", ".join(missing)]
+    problems: list[str] = []
+    if not contract.DUPLICATE_CHECK.search(structural):
+        problems.append(
+            "issue body must record a duplicate search on its own line, exactly: 'Duplicate check: searched title, "
+            "symptom, and path for <terms>; no duplicate found' (or '; reused #N')"
+        )
+    disclosure = sections["Disclosure classification"]
+    if not contract.PUBLIC_SAFE[contract.profile_key(profile)].search(disclosure):
+        problems.append("issue body must explicitly declare Public-safe: yes before public filing")
+    reviewer = reviewer_problem(disclosure)
+    if reviewer:
+        problems.append(f"issue body cannot be filed publicly: {reviewer}")
+    if contract.disclosure_class(disclosure) not in {"ordinary", "public-reviewed"}:
+        problems.append(
+            "issue Disclosure classification must be ordinary or public-reviewed; use private-route for sensitive findings"
+        )
+    privacy_review = contract.PRIVACY_REVIEW.search(disclosure)
+    if not privacy_review or is_placeholder(privacy_review.group(1)):
+        problems.append("issue Disclosure classification must include a security/privacy review value")
+    if contract.sensitive_issue_content(structural):
+        problems.append(
+            "sensitive issue bodies cannot use the public adapter; redact them or use the private security route"
+        )
+    problems.extend(_content_problems(body, sections, status, profile))
+    problems.extend(_state_problems(body, sections, status, profile))
+    return problems
 
 
-def validate_issue_content(body: str, status: str, profile: str = "regulated") -> None:
-    summary = issue_section(body, "Summary")
+def _content_problems(body: str, sections: dict[str, str], status: str, profile: str) -> list[str]:
+    problems: list[str] = []
+    summary = sections["Summary"]
     if len(summary) < 12 or re.search(r"\[(?:required|criterion)|tbd|placeholder", summary, re.I):
-        raise RepoctlError("issue Summary must contain a concrete outcome")
-    required_sections = (
-        ("What happens", "Where", "When", "Why", "How to reproduce", "Impact and scope", "Evidence", "Disclosure classification", "Dependencies and handoff")
-        if profile == "regulated"
-        else ("Evidence", "Disclosure classification", "Dependencies and handoff")
-    )
-    for heading in required_sections:
-        content = issue_section(body, heading)
+        problems.append("issue Summary must contain a concrete outcome")
+    for heading in contract.content_headings(profile):
+        content = sections[heading]
         if not content or re.search(r"\[(?:required|criterion)|\bTBD\b|\bplaceholder\b", content, re.I):
-            raise RepoctlError(f"issue section must contain concrete content: {heading}")
-    acceptance = issue_section(body, "Acceptance criteria")
+            problems.append(f"issue section must contain concrete content: {heading}")
+    acceptance = sections["Acceptance criteria"]
     checkboxes = re.findall(r"(?im)^\s*-\s*\[[ xX]\].+$", acceptance)
     if profile != "regulated":
         checkboxes = checkboxes or re.findall(r"(?im)^\s*[-*]\s+\S.+$", acceptance)
@@ -248,47 +226,47 @@ def validate_issue_content(body: str, status: str, profile: str = "regulated") -
         and not re.search(r"(?i)\b(?:test|check|observe|verify|pass|fail|artifact|state|command)\b", item)
         for item in criteria
     ):
-        raise RepoctlError(
+        problems.append(
             "issue acceptance criteria must be concrete and evidence-bearing: at least two '- [ ]' lines; a line mentioning criterion, evidence, or a "
             "bracket must also say how it is checked (test, check, verify, observe, command, artifact)"
         )
-    if not any(
-        re.search(r"(?i)negative|failure|regression|absence|does not|not\b", item)
-        for item in checkboxes
-    ):
-        raise RepoctlError(
+    if not any(re.search(r"(?i)negative|failure|regression|absence|does not|not\b", item) for item in checkboxes):
+        problems.append(
             "issue acceptance criteria need a positive criterion and a negative one "
             "(a line containing 'does not', 'negative', 'failure', or 'regression')"
         )
-    evidence = issue_section(body, "Evidence")
-    if not re.search(r"(?i)\b(?:source|test|deployed|provider|hardware|counsel)\b", evidence):
-        raise RepoctlError("issue Evidence must name at least one evidence type")
-    owner_line = (
-        r"(?im)^\s*(?:-\s*)?(?:\*\*)?Owner / next action:(?:\*\*)?\s*\S+"
-        if profile == "regulated"
-        else r"(?im)^\s*(?:-\s*)?(?:\*\*)?(?:Owner / next action|Owner):(?:\*\*)?\s*\S+"
-    )
-    if not re.search(owner_line, issue_section(body, "Dependencies and handoff")):
-        raise RepoctlError("issue Dependencies and handoff must name an owner/next action")
+    if not re.search(r"(?i)\b(?:source|test|deployed|provider|hardware|counsel)\b", sections["Evidence"]):
+        problems.append("issue Evidence must name at least one evidence type")
+    if not contract.OWNER_LINE[contract.profile_key(profile)].search(sections["Dependencies and handoff"]):
+        problems.append("issue Dependencies and handoff must name an owner/next action")
     if status == "ready" and profile != "minimal":
-        if not re.search(r"(?i)validation|experiment|reproduce|reproduction|test", issue_section(body, "How to reproduce") + issue_section(body, "Evidence")):
-            raise RepoctlError("status=ready requires a runnable validation experiment")
+        if not re.search(r"(?i)validation|experiment|reproduce|reproduction|test", sections.get("How to reproduce", "") + sections["Evidence"]):
+            problems.append("status=ready requires a runnable validation experiment")
     if status == "fixed" and not re.search(r"(?m)^## Resolution record\s*$", body):
-        raise RepoctlError("status=fixed requires a resolution record")
+        problems.append("status=fixed requires a resolution record")
+    return problems
 
 
-def validate_issue_state(body: str, status: str, profile: str = "regulated") -> None:
+def _state_problems(body: str, sections: dict[str, str], status: str, profile: str) -> list[str]:
     if status == "ready" and profile == "regulated" and not re.search(
-        r"(?im)^\s*\d+\.\s+", issue_section(body, "How to reproduce")
+        r"(?im)^\s*\d+\.\s+", sections.get("How to reproduce", "")
     ):
-        raise RepoctlError("status=ready requires numbered deterministic reproduction steps")
+        return ["status=ready requires numbered deterministic reproduction steps"]
     if status == "fixed":
         resolution = re.search(r"(?ms)^## Resolution record\s*$\n(.*?)(?=^## |\Z)", body)
         if not resolution or not re.search(r"(?i)verification|commit|artifact|evidence", resolution.group(1)):
-            raise RepoctlError("status=fixed requires resolution verification evidence")
+            return ["status=fixed requires resolution verification evidence"]
+    return []
 
 
-def check_issue_for_duplicates(
+def validate_issue(body: str, status: str = "triage", profile: str = "regulated") -> None:
+    """Raise one RepoctlError naming every contract problem (the CLI path of `issue_problems`)."""
+    problems = issue_problems(body, profile, status)
+    if problems:
+        raise RepoctlError("; ".join(problems))
+
+
+def file_issue(
     root: Path,
     title: str,
     body_file: Path,
@@ -329,11 +307,9 @@ def check_issue_for_duplicates(
     if local_draft:
         validate_local_draft(body)
     else:
-        validate_issue_body(body, profile)
-        validate_issue_content(body, status, profile)
-        validate_issue_state(body, status, profile)
+        validate_issue(body, status, profile)
     labels = issue_labels(root, issue_type, priority, area, topic, status, surface, gate)
-    if issue_type == "security":
+    if issue_type in contract.REFUSED_PUBLIC["type"]:
         raise RepoctlError(
             "security issues cannot be filed through the public issue adapter; use SECURITY.md"
         )
@@ -373,6 +349,9 @@ def check_issue_for_duplicates(
     print(created)
     return created
 
+
+# DEPRECATED(remove-by=2026-11-07, use=file_issue): kept only until tools/kit/commands.py calls file_issue.
+check_issue_for_duplicates = file_issue
 
 LOCAL_WAL_DIR = ".agent/wal"
 
@@ -422,7 +401,7 @@ def file_local_wal(root: Path, which: str, public_reviewed: bool = False, review
         body_file = Path(LOCAL_WAL_DIR) / ".filing-body.md"
         (root / body_file).write_text(text[header.end():], encoding="utf-8")
         try:
-            url = check_issue_for_duplicates(
+            url = file_issue(
                 root, header.group("title"), body_file, labels.get("type", "task"), labels.get("priority", "P2"),
                 labels.get("area", "repo"), labels.get("topic", "local-draft"), labels.get("status", "triage"),
                 labels.get("surface"), labels.get("gate"), public_reviewed, review_evidence,
@@ -450,9 +429,7 @@ def validate_issue_file(root: Path, body_file: Path, status: str) -> None:
     project = load_project(root)
     profile = governance_profile(project)
     if profile != "minimal":
-        validate_issue_body(body, profile)
-        validate_issue_content(body, status, profile)
-        validate_issue_state(body, status, profile)
+        validate_issue(body, status, profile)
 
 
 def validate_review_issue(issue: str, profile: str = "regulated") -> None:
@@ -460,8 +437,7 @@ def validate_review_issue(issue: str, profile: str = "regulated") -> None:
         if secret_matches(issue):
             raise RepoctlError("review packet input contains possible secret material")
         return
-    validate_issue_body(issue, profile)
-    validate_issue_content(issue, "triage", profile)
+    validate_issue(issue, "triage", profile)
     if profile == "regulated" and not re.search(r"#\d+", issue):
         raise RepoctlError("regulated review packets must reference an issue number")
     if profile != "regulated" and not re.search(r"(?im)^(?:Issue\s*#\d+|Local-WAL:\s*\S+)", issue):
@@ -563,7 +539,7 @@ def create_incident(root: Path, title: str, summary: str, public_safe: bool = Fa
     reject_secret_text(title, "incident title")
     reject_secret_text(summary, "incident summary")
     sensitive_text = f"{title}\n{summary}"
-    if public_safe and re.search(r"(?i)\b(?:unpatched|vulnerability|exploit|personal data|privacy incident|credential|secret)\b", sensitive_text):
+    if public_safe and contract.sensitive_issue_content(sensitive_text):
         raise RepoctlError("sensitive incidents require the private incident draft; omit --public-safe")
     if public_safe:
         validate_review_evidence(root, review_evidence, body=summary, strict=True)
