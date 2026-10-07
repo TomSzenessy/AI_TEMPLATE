@@ -40,7 +40,7 @@ from .config import setting
 from .core import (
     RepoctlError, ensure_inside_root, load_project, normalized_relative_path, read_text_file, repository_files,
 )
-from .product import is_product, is_ui, product_surfaces
+from .surfaces import is_product, is_ui, product_surfaces
 
 SHOTS = ".agent/reviews"
 LOG = "docs/product/ui-reviews.md"

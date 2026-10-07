@@ -33,7 +33,7 @@ if str(TOOLS) not in sys.path:
     sys.path.insert(0, str(TOOLS))
 
 import repoctl  # noqa: E402  the CLI entry point, called in-process
-from kit import derive, docsync, registry  # noqa: E402
+from kit import checkrun, derive, docsync  # noqa: E402
 
 # Fixture dates follow the calendar so the suite never expires (#10).
 RECENT = (date.today() - timedelta(days=30)).isoformat()
@@ -229,7 +229,7 @@ class KitRepository(Scratch):
 
     def self_heal(self) -> str:
         """The self-healing findings `make check` adds on top of the repository-contract checks."""
-        hard, _ = registry.run_checks(self.root, blocking_only=True, skip=self.CONTRACT)
+        hard, _ = checkrun.run_checks(self.root, blocking_only=True, skip=self.CONTRACT)
         return "\n".join(hard + docsync.index_errors(self.root, self.files()))
 
     def files(self) -> list[str]:

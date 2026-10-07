@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import re
 from pathlib import Path
 
@@ -19,6 +18,7 @@ from .core import (
     repository_files,
 )
 from .gitinfo import path_matches
+from .kitlock import localize_text, write_lock
 from .names import STACK_DECISION, VISION
 
 
@@ -189,35 +189,6 @@ def reset_vision_for_project(root: Path, manifest: str, project_name: str, templ
     return manifest
 
 
-COVERS = re.compile(r"<!--\s*covers:([^>]*?)-->")
-LINK = re.compile(r"(\]\()([^)\s]+)(\))")
-
-
-def localize_text(relative: str, text: str, pruned: set[str], prune: list[str], source: str) -> str:
-    """A kit Markdown file as a project should have it: links to pruned template material point at
-    the template source, and covers patterns that only named pruned material are dropped.
-    Used by make init, make adopt, and make kit-update, so all three agree."""
-    def absolute(match: re.Match[str]) -> str:
-        target = match.group(2)
-        if "://" in target or target.startswith("#"):
-            return match.group(0)
-        path, _, anchor = target.partition("#")
-        resolved = os.path.normpath(os.path.join(os.path.dirname(relative), path)).replace(os.sep, "/")
-        if resolved not in pruned or not source:
-            return match.group(0)
-        return f"{match.group(1)}{source}/blob/main/{resolved}{'#' + anchor if anchor else ''}{match.group(3)}"
-
-    text = LINK.sub(absolute, text)
-    prefixes = [pattern.removesuffix("**").rstrip("/") for pattern in prune]
-    covers = COVERS.search(text)
-    if covers:
-        patterns = covers.group(1).split()
-        kept = [p for p in patterns if not any(p == prefix or p.startswith(prefix + "/") for prefix in prefixes)]
-        if kept != patterns:
-            text = text[:covers.start()] + (f"<!-- covers: {' '.join(kept)} -->" if kept else "") + text[covers.end():]
-    return text
-
-
 def prune_template_material(root: Path, project: dict[str, object]) -> list[str]:
     """Remove [template].prune files; localize every remaining Markdown file (links, bindings)."""
     template = project.get("template", {})
@@ -315,8 +286,7 @@ def initialize_project(root: Path, name: str, kind: str, owner: str | None = Non
     manifest_path.write_text(manifest, encoding="utf-8")
     update_readme_identity(root, name, kind, template_name)
     derive.sync(root)
-    from .kitupdate import write_lock  # what this project got from the kit, so make kit-update can tell your edits apart
-    write_lock(root, root)
+    write_lock(root, root)  # what this project got from the kit, so make kit-update can tell your edits apart
     if removed:
         print(f"Removed {len(removed)} template-only file(s); links now point to the template source.")
     print(f"Initialized {name} ({kind}). Declare real surfaces before implementation.")

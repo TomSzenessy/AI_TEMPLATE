@@ -1,7 +1,7 @@
 # Self-healing mechanics
 
 <!-- index: operate | When a check may block, lifecycle hooks, failure output, ceremony by risk, and the gardener | A check fails, a gate blocks, or the kit itself changes. -->
-<!-- covers: tools/kit/checks.py tools/kit/session.py tools/kit/risk.py tools/kit/garden.py tools/kit/navigate.py .githooks/** .github/workflows/garden.yml -->
+<!-- covers: tools/kit/checks.py tools/kit/checkrun.py tools/kit/session.py tools/kit/risk.py tools/kit/garden.py tools/kit/navigate.py .githooks/** .github/workflows/garden.yml -->
 
 Agents follow written rules well at the start of a session and worst at the end,
 after compaction, which is when cleanup and documentation get skipped. So the
@@ -51,7 +51,7 @@ Otherwise it is **advisory** (`make garden`, the session brief) or an
   `make check` fails only on a future date.
   `make test-future` (also in CI, with `KIT_SLOW=1`) runs the whole suite 800 days ahead (`make test-slow` adds the full inner runs), so a
   fixture or check pinned to a date fails now instead of in two years.
-- **One place decides blocking.** `Registry.blocks`, applied by `run_checks`,
+- **One place decides blocking.** `Registry.blocks`, applied by `checkrun.run_checks`,
   is the only mechanism that turns a finding into a block: the check's `blocks=`
   declaration, then the project's downgrade ([`capabilities.md`](./capabilities.md#downgrading-a-check)).
   Each gate (`make check`, the commit and stop gates) names the checks that fit

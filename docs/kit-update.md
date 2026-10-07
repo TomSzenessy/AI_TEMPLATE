@@ -1,7 +1,7 @@
 # Fixes reach every project: `make kit-update`
 
 <!-- index: operate | The kit lock, make kit-update, and the golden-path test | A kit fix must reach projects, or a project updates from the template. -->
-<!-- covers: tools/kit/kitupdate.py -->
+<!-- covers: tools/kit/kitupdate.py tools/kit/kitlock.py -->
 
 A template bug is copied into every project made from it, so fixes flow both
 ways. `make init` and `make adopt` record `tools/kit-lock.json`, the hash of

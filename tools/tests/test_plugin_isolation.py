@@ -15,7 +15,8 @@ from pathlib import Path
 TOOLS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(TOOLS))
 
-from kit.registry import Registry, run_checks  # noqa: E402
+from kit.checkrun import run_checks  # noqa: E402
+from kit.registry import Registry  # noqa: E402
 from kit import session  # noqa: E402
 
 REPOCTL = TOOLS / "repoctl.py"

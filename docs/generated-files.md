@@ -1,7 +1,7 @@
 # Generated files: one source each
 
 <!-- index: operate | Derived files, host adapters, and generated blocks | A generated file looks wrong, or a new agent host is added. -->
-<!-- covers: tools/kit/derive.py tools/kit/adapters.py -->
+<!-- covers: tools/kit/derive.py tools/kit/adapters.py tools/kit/helptext.py -->
 
 Nothing that can be generated is maintained by hand. `make sync` (also run by
 `make done`, the session-start hook, and the after-edit hook) renders:

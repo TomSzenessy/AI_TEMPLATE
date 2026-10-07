@@ -16,7 +16,8 @@ from pathlib import Path
 
 from .config import setting
 from .core import declared_surfaces, ensure_inside_root, load_project, verification_environment
-from .registry import Registry, downgrade_lines, run_checks
+from .checkrun import run_checks
+from .registry import Registry, downgrade_lines
 
 
 

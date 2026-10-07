@@ -1,7 +1,7 @@
 # Documentation that tracks the code
 
 <!-- index: operate | Doc-code bindings, staleness, owed docs, and the Docs-Unaffected trailer | A document and its code drift apart, or a commit must exempt a document. -->
-<!-- covers: tools/kit/docsync.py -->
+<!-- covers: tools/kit/docsync.py tools/kit/docmeta.py -->
 
 A document declares what it describes with one comment near its top, such as
 `<!-- covers: src/billing/** docs/api/billing.yaml -->` (repository globs:

@@ -12,27 +12,14 @@ from pathlib import Path
 
 from . import ci, derive, scaffold, session
 from .core import RepoctlError, check_failed, ensure_inside_root, load_project
+from .helptext import GROUPS, RECIPES, help_text  # noqa: F401  (help_text stays this module's surface)
 from .registry import KINDS, arg, command
-
-# make help groups, in display order.
-GROUPS = {
-    "session": "EVERY SESSION (this is all most tasks need)",
-    "extend": "EXTEND THE SYSTEM (one path for every kind of capability)",
-    "when-needed": "WHEN NEEDED",
-    "setup": "PROJECT SETUP AND MAINTENANCE",
-}
-# Targets the Makefile writes by hand because they chain other targets or run the test suites.
-RECIPES = {
-    "done": ("session", "make done", 'Before saying "done": heal derived files, gates, all tests'),
-    "verify": ("setup", "make verify", "Tests, every surface's verification, and doctor (CI runs this)"),
-    "test": ("setup", "make test", "The kit's and every skill's unit tests"),
-    "test-future": ("setup", "make test-future", "The suite 800 days ahead: catches checks that rot with the calendar"),
-}
 
 
 def _require_self_heal(root: Path) -> None:
     """Run the blocking checks once; print what the project downgraded; raise on a real finding."""
-    from .registry import Context, blocking_reasons, run_checks
+    from .checkrun import Context, run_checks
+    from .registry import blocking_reasons
     context = Context(root)
     errors, advisory = run_checks(root, blocking_only=True, context=context)
     downgraded = [item for item in advisory
@@ -392,27 +379,3 @@ def trial(root: Path, args) -> int:
 def show_help(root: Path, args) -> None:
     from .registry import Registry
     print(help_text(Registry(root)))
-
-
-def help_text(registry) -> str:
-    """`make help`: every command of an enabled pack, grouped; disabled packs are named, not hidden."""
-    rows: dict[str, list[tuple[str, str]]] = {group: [] for group in GROUPS}
-    off: list[str] = []
-    for item in registry.of("command", enabled_only=False):
-        if item.fields["make"] is None or item.name == "help":
-            continue
-        if not registry.enabled(item):
-            off.append(item.name)
-            continue
-        group = item.fields["group"] if item.fields["group"] in GROUPS else "when-needed"
-        rows[group].append((item.fields["usage"] or f"make {item.name}", item.description))
-    for group, usage, text in RECIPES.values():
-        rows[group].append((usage, text))
-    lines = []
-    for group, title in GROUPS.items():
-        lines += ([""] if lines else []) + [title]
-        for usage, text in rows[group]:
-            lines.append(f"  {usage:<34} {text}" if len(usage) <= 34 else f"  {usage}\n  {'':<34} {text}")
-    if off:
-        lines += ["", f"Packs switched off hide: {', '.join(sorted(off))} (make capabilities shows how to enable them)"]
-    return "\n".join(lines)

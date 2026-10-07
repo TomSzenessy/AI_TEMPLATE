@@ -22,6 +22,8 @@ from pathlib import Path
 
 from . import adapters, docsync
 from .core import ensure_inside_root, load_project, read_text_file, repository_files
+from .helptext import help_text
+from .kitlock import rename_kit_targets
 from .registry import Registry
 
 BLOCK = "<!-- repoctl:{name} -->\n{body}\n<!-- /repoctl:{name} -->"
@@ -107,7 +109,6 @@ def description(project: dict[str, object]) -> str:
 
 def render_command_help(registry: Registry) -> str:
     """`make help` verbatim, fenced for Markdown: one declaration set, two surfaces."""
-    from .commands import help_text  # deferred: commands imports this module
     return "```bash\n" + help_text(registry) + "\n```"
 
 
@@ -143,7 +144,6 @@ def render_blocks(root: Path) -> dict[str, str]:
         if text is not None and "# <repoctl:commands>" in text:
             block = render_commands(registry)
             if makefile == "kit.mk":
-                from .adopt import rename_kit_targets
                 block = rename_kit_targets(read_text_file(root, "Makefile") or "", block)
             files[makefile] = replace_make_block(text, "commands", block)
             break

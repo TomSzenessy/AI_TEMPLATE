@@ -23,10 +23,11 @@ from .core import (
 )
 from .garden import self_heal_errors
 from .gitinfo import branch, branch_paths, changed_paths, committed_paths, diff_paths, git, head, path_matches
-from .names import HANDOVER
+from .names import AFTER_EDIT, CHECKPOINT, COMMIT_MSG, CRITIC_RECORD, HANDOVER, PRE_COMPACT, SESSION_START, STOP
 from .navigate import print_map
 from .product import next_step, product_summary
-from .registry import KINDS, Registry, project_plugin_files, run_checks
+from .checkrun import run_checks
+from .registry import KINDS, Registry, project_plugin_files
 from .risk import assess, classify, tier_rules
 from .uireview import review_status
 
@@ -38,11 +39,9 @@ def _product_on(root: Path) -> bool:
         return True  # a broken manifest is reported by the checks; keep the product guidance
 
 HANDOVER_LIMIT = 4000
-CHECKPOINT = ".agent/checkpoint.md"
 MAP_LIMIT = 15
 STATE = ".agent/hook-state.json"
 CANONICAL_INPUTS = (".agents/", "tools/kit/commands.py", "project.toml")
-CRITIC_RECORD = ".agent/critic.md"
 CRITIC_VERDICTS = ("blocker", "ship-with-residuals")
 
 
@@ -410,7 +409,7 @@ def commit_gate(root: Path, message_file: str | None) -> int:
 
 def install_git_hooks(root: Path) -> str | None:
     """Point git at .githooks only when that cannot disable hooks already in use."""
-    if not (root / ".githooks" / "commit-msg").is_file() or git(root, "rev-parse", "--git-dir") is None:
+    if not (root / ".githooks" / COMMIT_MSG).is_file() or git(root, "rev-parse", "--git-dir") is None:
         return None
     if (git(root, "config", "--get", "core.hooksPath") or "").strip():
         return None
@@ -461,11 +460,6 @@ def finish(root: Path) -> int:
     return 0
 
 
-# The one list of hook events: `repoctl hook <event>` and its argument choices, the host
-# adapter wiring (adapters.py), and the dispatcher below all use these names.
-SESSION_START, PRE_COMPACT, AFTER_EDIT, STOP, COMMIT_MSG = (
-    "session-start", "pre-compact", "after-edit", "stop", "commit-msg",
-)
 HANDLERS = {
     SESSION_START: lambda root, event: session_start(root, event),
     PRE_COMPACT: lambda root, event: pre_compact(root),
