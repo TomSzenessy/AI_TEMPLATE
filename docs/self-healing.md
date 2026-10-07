@@ -174,7 +174,7 @@ Nothing that can be generated is maintained by hand. `make sync` (also run by
 | `.mcp.json` | `.agents/mcp/*.toml` routes of enabled packs (servers are still approved per person) |
 | The command block in the `Makefile` (`kit.mk` after `make adopt`) and `make help` | each `@command` declaration in `tools/kit/commands.py` and `.agents/commands/` |
 | The project rules block in `AGENTS.md` | `.agents/rules/*.md` without a `scope` |
-| The tables in [`README.md`](./README.md) | each document's `<!-- index: group \| owns \| read when -->` line |
+| The tables in [`README.md`](./README.md) | each document's `<!-- index: group \| owns \| read when -->` line (transient `docs/handoffs/` records are not indexed) |
 | The role table in [`delegation.md`](./delegation.md) | role frontmatter (`description`, `access`, `tier`) |
 | The description block in the root `README.md` | `project.toml [repository].description` |
 | GitHub description, topics, template flag (`make github-sync`) | `project.toml [repository]`; `make garden` reports drift |

@@ -1,7 +1,5 @@
 # Primary-source hardening delta — 2026-09-25
 
-<!-- index: extend | Hardening and adversarial review pass | Reviewing agent, CI, skill, privacy, or legal-risk controls. -->
-
 **Scope:** fresh, implementation-focused research on skill admission/provenance, issue-backed write-ahead records (WAL) and review evidence, privacy/legal risk framing, and CI/software-supply-chain controls. This supplements—not replaces—the broader [2026-08-25 baseline](./agentic-repository-baselines.md).
 
 **Research/access date:** 2026-09-25 UTC. Sources were limited to official specifications, standards, legal texts, regulator guidance, first-party product documentation/specifications, and project-owned source documentation. No package or third-party skill was installed or executed; no GitHub state was changed.

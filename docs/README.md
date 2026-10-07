@@ -11,6 +11,10 @@ usually faster than this page.
   adapters, launch state, and reviewed skill provenance.
 - [`../resources.toml`](../resources.toml): read-only resource routes.
 - [`../.agents/`](../.agents/): every capability, one file each (`make capabilities` lists them by kind and pack).
+- [`handoffs/`](./handoffs/README.md): continuation records; not indexed below, so link each from there.
+- Dated research notes beside the baseline:
+  [MCP boundaries](./research/mcp-production-boundaries-2026-09-25.md),
+  [hardening](./research/primary-source-hardening-2026-09-25.md).
 
 ## Documents
 
@@ -36,10 +40,6 @@ itself and this table cannot drift. Edit the line in the document, not here.
 | [`production.md`](./production.md) | Production evidence and release boundary | A real project is being prepared for deployment or release. |
 | [`self-healing.md`](./self-healing.md) | When a check may block, hooks, doc-code bindings, deprecation expiry, budgets, generated files, gardener, evals | A check fails, docs drift, a host is added, or the kit itself changes. |
 | [`verification.md`](./verification.md) | Definition of done, evidence ladder, and quality loop | A change is ready for review or a quality claim is made. |
-| [`handoffs/2026-10-07-1200-kit-hardening.md`](./handoffs/2026-10-07-1200-kit-hardening.md) | Continuation record for PR #11 (kit hardening) | Picking up PR #11 or the follow-up issues locally. |
-| [`handoffs/2026-10-07-1500-capability-model.md`](./handoffs/2026-10-07-1500-capability-model.md) | Continuation record for the capability model branch (#14, #15) | Picking up feat/capability-model or reviewing it before a PR. |
-| [`handoffs/README.md`](./handoffs/README.md) | Cross-session continuity rules | Work must be transferred or resumed. |
-| [`handoffs/TEMPLATE.md`](./handoffs/TEMPLATE.md) | Handover record scaffold (local HANDOVER.md or committed handoff) | A fresh actor needs a focused continuation record. |
 | [`incidents/README.md`](./incidents/README.md) | Reviewed public incident record boundary | A public incident is promoted or a regression artifact is reviewed. |
 
 ### Design and engineering
@@ -75,9 +75,7 @@ itself and this table cannot drift. Edit the line in the document, not here.
 | [`adr/0001-issue-backed-write-ahead.md`](./adr/0001-issue-backed-write-ahead.md) | Accepted write-ahead and documentation-boundary decision | You need the rationale for issue-backed continuity. |
 | [`adr/0002-one-capability-model.md`](./adr/0002-one-capability-model.md) | The capability model: kinds, declaration fields, discovery, packs, and what is out of scope | You add, find, or switch off a skill, role, doc, rule, check, command, MCP route, or pack. |
 | [`adr/README.md`](./adr/README.md) | Architecture decision record rules | A hard-to-reverse, surprising trade-off is made. |
-| [`research/agentic-repository-baselines.md`](./research/agentic-repository-baselines.md) | Primary-source research behind the template | Guidance, legal boundaries, or external references need provenance. |
-| [`research/mcp-production-boundaries-2026-09-25.md`](./research/mcp-production-boundaries-2026-09-25.md) | MCP/resource and production-evidence boundaries | Adding a documentation provider or preparing a real release. |
-| [`research/primary-source-hardening-2026-09-25.md`](./research/primary-source-hardening-2026-09-25.md) | Hardening and adversarial review pass | Reviewing agent, CI, skill, privacy, or legal-risk controls. |
+| [`research/agentic-repository-baselines.md`](./research/agentic-repository-baselines.md) | Primary-source research behind the template; dated notes on MCP boundaries and hardening sit beside it | Guidance, legal boundaries, or external references need provenance. |
 <!-- /repoctl:index -->
 
 ## Durable knowledge versus live work
@@ -93,19 +91,6 @@ Keep these in GitHub Issues, with links to the durable artifacts they affect:
 Keep only stable architecture, rationale, runbooks, legal/privacy inventories,
 and reusable instructions in this tree. When a document becomes a status board,
 move the status to an issue and reduce the document to its durable owner.
-
-## Navigation recipes
-
-- **“Where does this belong?”** Run `make where Q="<term or path>"`; it names
-  paths, symbols, owning documents, and past failures. Then use
-  [`../project.toml`](../project.toml), this index, and the nearest scoped `AGENTS.md`.
-- **“What is broken?”** Read [`operations.md`](./operations.md), reproduce, and
-  update or file an issue using [`ISSUE_TEMPLATE.md`](./ISSUE_TEMPLATE.md).
-- **“Can this be removed?”** Prove callers/owners are gone, run the affected
-  checks, and file an independent residual instead of deleting a live contract.
-- **“Is it ready to ship?”** Read [`verification.md`](./verification.md) and
-  [`production.md`](./production.md), run `make done`, obtain a fresh-agent
-  critique, and inspect the real artifact.
 
 ## Incident index
 

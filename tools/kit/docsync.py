@@ -97,6 +97,10 @@ def index_errors(root: Path, files: list[str]) -> list[str]:
     return errors
 
 
+# Handoffs are transient continuation records; docs/README.md links the folder instead of listing each.
+INDEX_SKIP = ("docs/handoffs/",)
+
+
 def render_index(root: Path, files: list[str], index_doc: str = "docs/README.md") -> str:
     """Markdown tables for every document that declares `<!-- index: -->`."""
     base = Path(index_doc).parent
@@ -104,7 +108,7 @@ def render_index(root: Path, files: list[str], index_doc: str = "docs/README.md"
     groups: dict[str, list[str]] = {key: [] for key in titles}
     for path, meta in sorted(doc_meta(root, files).items(), key=lambda item: (item[0].count("/"), item[0])):
         entry = meta["index"]
-        if not entry or len(entry) != 3 or entry[0] not in titles or path == index_doc:
+        if not entry or len(entry) != 3 or entry[0] not in titles or path == index_doc or path.startswith(INDEX_SKIP):
             continue
         link = Path(os.path.relpath(path, base)).as_posix()
         link = link if link.startswith("../") else f"./{link}"

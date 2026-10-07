@@ -71,7 +71,8 @@ command block and `make help` are generated from those declarations, so a
 project command in `.agents/commands/` becomes `make <name>` after `make sync`.
 
 **Packs switch groups off without deleting them.** `project.toml`
-`[packs] enabled = [...]` overrides each pack's `default`. A disabled pack's
+`[packs]` maps a pack name to `true` or `false` and overrides that pack's
+`default` (mechanics: [`self-healing.md`](../self-healing.md)). A disabled pack's
 skills and roles are not rendered into host adapters, its rules are not
 rendered, its checks do not run, and its commands refuse with the line that
 enables them. It still appears in `make capabilities`, `make where`, and

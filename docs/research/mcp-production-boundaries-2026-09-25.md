@@ -1,7 +1,5 @@
 # MCP and production boundaries — 2026-09-25
 
-<!-- index: extend | MCP/resource and production-evidence boundaries | Adding a documentation provider or preparing a real release. -->
-
 **Research/access date:** 2026-09-25 UTC
 **Scope:** optional MCP, documentation, and resource providers (especially Context7-style library-documentation retrieval), plus the evidence a generic production-readiness gate should require for web, native, backend, and media projects.
 **Method:** current protocol specifications, official standards/guidance, and first-party provider/platform documentation. `[Fact]` means the cited source states the point. `[Template inference]` means this note recommends it for `AGENT_TEMPLATE`; it is not a universal standard or a product-specific finding.

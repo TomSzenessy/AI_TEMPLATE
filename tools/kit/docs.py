@@ -7,6 +7,7 @@ import re
 from pathlib import Path, PureWindowsPath
 from urllib.parse import unquote, urlsplit
 
+from .docsync import INDEX_SKIP
 from .core import (
     RepoctlError,
     ensure_inside_root,
@@ -93,6 +94,8 @@ def check_docs_index(root: Path) -> None:
         if document == index:
             continue
         relative = document.relative_to(docs).as_posix()
+        if f"docs/{relative}".startswith(INDEX_SKIP):
+            continue
         link = re.compile(rf"\]\((?:\./)?{re.escape(relative)}(?:#[^)]+)?\)")
         if not link.search(index_content):
             errors.append(
