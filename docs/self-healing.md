@@ -72,7 +72,8 @@ A document declares what it describes with one comment near its top, such as
 - **Stale document**: a commit newer than the document's last commit touched
   covered paths. `make check` fails. If a change truly does not affect the doc,
   record that in the commit with a trailer, `Docs-Unaffected: docs/x.md <reason>`
-  (a reason with no path exempts all documents). Git's own trailer parsing is
+  (a reason with no path exempts all documents; a value that starts with a
+  non-document path or glob, such as `tools/** untouched`, exempts nothing). Git's own trailer parsing is
   used everywhere: trailers belong in the message's last paragraph, and a
   trailer without a reason exempts nothing.
 - **Owed document**: covered paths changed on this branch while the doc did not;
@@ -224,6 +225,20 @@ trial built a working prototype for $1.74 but skipped the design record, the
 owning doc, and the UI review; those became the product guardrails above. A
 second run told only to "run make done and fix what it reports" repaired all
 five findings for $0.70. Visual review still needs a browser in the run.
+
+The third trial (2026-10-07, issue #9) asked Sonnet for an ambitious product, a
+collaborative offline-first trip planner, with the owner's answers up front. In
+36 minutes and $22.81 it researched (marking unreachable pages
+`[unverified]` instead of inventing quotes), wrote 28 feature rows, built a
+4,300-line TypeScript app with 39 unit, API, and end-to-end tests, judged 32
+screenshots, ran a critic, and fixed its blockers; `make done` was green. The
+friction it hit became fixes, not new rules: five failed `make issue` runs on a
+local draft (local drafts now need only an outcome and criteria), a review log
+that failed the docs index until `make sync` (the review now syncs), and a
+preemptive `Docs-Unaffected: tools/** untouched` that silently exempted every
+doc (non-document scopes now exempt nothing). It never bypassed a gate. It
+stopped with a stale UI review after its final fix, which `make next` reports
+and `make readiness` enforces before release.
 
 A host-side failure, such as an expired login, is recorded as an error rather
 than as a wrong answer. Runs drop the launching session's host variables, so a

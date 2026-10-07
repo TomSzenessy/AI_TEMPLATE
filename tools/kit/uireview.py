@@ -35,6 +35,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from . import derive
 from .config import setting
 from .core import RepoctlError, ensure_inside_root, load_project, read_text_file, repository_files
 from .product import is_product, is_ui, product_surfaces
@@ -248,6 +249,7 @@ def run_review(root: Path) -> int:
     log = ensure_inside_root(root, root / LOG, "review log")
     log.parent.mkdir(parents=True, exist_ok=True)
     log.write_text((read_text_file(root, LOG) or LOG_HEADER) + entry, encoding="utf-8")
+    derive.sync(root)  # a new log must appear in the docs index, or make check fails on the review itself
     print(f"{len(shots)} screenshot(s) in {SHOTS}/{stamp}/; review entry appended to {LOG}.")
     print("Open each image, record findings, and set `Verdict: pass` or `Verdict: fix`; fix and re-run until pass.")
     print(f"Cite `{LOG}` as evidence in docs/product/features.csv once the verdict is pass.")

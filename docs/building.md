@@ -95,4 +95,6 @@ The review gates outcomes, not commits ([when a check may block](./self-healing.
 - **Per change:** `make done` only *mentions* a stale review, so a one-line CSS
   fix does not need a screenshot run.
 
-Because the record is tracked, every clone and CI sees the same review state.
+Because the record is tracked, every clone and CI sees the same review state;
+the review regenerates the docs index itself, so a first review never fails
+`make check`.

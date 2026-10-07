@@ -138,7 +138,8 @@ def exemption_scope(values: list[str]) -> set[str] | None:
     """Docs exempted by Docs-Unaffected trailer values; None when nothing valid.
 
     Each value is `<doc.md ...> <reason>` (named docs only) or `<reason>` (all
-    docs). A value without a reason exempts nothing, so an empty or bare trailer
+    docs). A value without a reason, or one that starts with a non-document path
+    or glob, exempts nothing, so an empty or bare trailer
     cannot silence the gate. The commit gate and the history check share this.
     """
     scope: set[str] = set()
@@ -146,6 +147,10 @@ def exemption_scope(values: list[str]) -> set[str] | None:
         tokens = value.split()
         docs = {token.rstrip(".,;:") for token in tokens if token.rstrip(".,;:").endswith(".md")}
         reason = [token for token in tokens if token.rstrip(".,;:") not in docs]
+        # "tools/** untouched" names a scope that is not a document: in the build trial it
+        # silently exempted every doc in a 15k-line commit. Name the doc instead.
+        if not docs and tokens and re.search(r"[/*]", tokens[0]):
+            continue
         if reason:
             scope |= docs or {"*"}
     return scope or None

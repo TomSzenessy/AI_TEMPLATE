@@ -401,6 +401,13 @@ class CriticRegressionTests(KitRepository):
         self.git("commit", "-q", "-m", "change\n\nDocs-Unaffected:")
         self.assertIn("docs/billing.md: stale since", self.self_heal())
 
+    def test_non_document_scope_exempts_nothing(self) -> None:
+        # Build trial: a preemptive "tools/** untouched" silently exempted every doc.
+        self.stage_billing_change()
+        self.assertEqual(self.gate("change\n\nDocs-Unaffected: tools/** untouched\n"), 3)
+        self.assertEqual(self.gate("change\n\nDocs-Unaffected: src/billing renamed only\n"), 3)
+        self.assertEqual(self.gate("change\n\nDocs-Unaffected: rename only, no behavior change\n"), 0)
+
     def test_trailer_with_trailing_period_names_only_that_doc(self) -> None:
         self.stage_billing_change()
         self.assertEqual(self.gate("change\n\nDocs-Unaffected: docs/billing.md. cosmetic rename\n"), 0)
@@ -636,6 +643,8 @@ class UiReviewTests(KitRepository):
         self.assertIn("exited with code 7", result.stderr)
 
     def test_review_captures_sizes_and_schemes_then_needs_verdict_and_freshness(self) -> None:
+        self.write("docs/README.md", "# Index\n\n<!-- repoctl:index -->\n<!-- /repoctl:index -->\n")
+        derive.sync(self.root)
         self.assertIn("never had a UI review", " ".join(uireview.review_status(self.root)))
         result = self.review()
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -650,6 +659,7 @@ class UiReviewTests(KitRepository):
         log.write_text(log.read_text().replace("Verdict: fix - contrast", "Verdict: pass"))
         self.assertEqual(uireview.review_status(self.root), [])
         self.assertIn("<!-- index:", log.read_text(), "the tracked log indexes itself")
+        self.assertEqual(derive.drift(self.root), [], "the review regenerates the docs index it changed")
         self.write("src/billing/invoice.py", "def render_invoice():\n    return 42\n")
         self.assertIn("changed since UI review", " ".join(uireview.review_status(self.root)))
 
