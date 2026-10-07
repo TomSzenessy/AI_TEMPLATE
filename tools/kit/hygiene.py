@@ -127,3 +127,31 @@ def duplicate_paragraphs(root: Path, files: list[str], min_words: int = 40, thre
             if path_a != path_b and len(grams_a & grams_b) / min(len(grams_a), len(grams_b)) >= threshold:
                 findings.append(f"{path_a} and {path_b} repeat a paragraph (\"{head_a}…\"); keep it in one owner and link")
     return findings
+
+
+RUN_BLOCK = re.compile(r"^(\s*)(?:-\s+)?run:\s*[|>][+-]?\s*$")
+
+
+def workflow_errors(root: Path, files: list[str], max_lines: int = 10) -> list[str]:
+    """Long inline `run:` blocks hide untested logic in CI YAML; keep it in tools/."""
+    errors = []
+    for relative in files:
+        if not (relative.startswith(".github/workflows/") and relative.endswith((".yml", ".yaml"))):
+            continue
+        lines = (read_text_file(root, relative) or "").splitlines()
+        for number, line in enumerate(lines, start=1):
+            match = RUN_BLOCK.match(line)
+            if not match:
+                continue
+            indent = len(match.group(1))
+            body = 0
+            for following in lines[number:]:
+                if following.strip() and len(following) - len(following.lstrip()) <= indent:
+                    break
+                body += bool(following.strip())
+            if body > max_lines:
+                errors.append(
+                    f"{relative}:{number}: inline run block of {body} lines; move the logic into tools/ "
+                    "(unit-tested, runnable locally) and call it from the workflow"
+                )
+    return errors

@@ -19,15 +19,16 @@ is the human navigation view, not a second command catalog.
 
 ## Repository kit
 
-`tools/repoctl.py` is only the command router; the `Makefile` exposes it as
-`make` targets. Behavior lives in standard-library modules under `tools/kit/`
+`tools/repoctl.py` is only the command router; the `tools/repoctl` launcher
+picks Python 3.11+ for hooks and the git gate, and the `Makefile` exposes the
+commands as `make` targets. Behavior lives in standard-library modules under `tools/kit/`
 whose imports point toward `core`:
 
 | Concern | Modules | Owner doc |
 |---|---|---|
 | Manifest, paths, worktree, text primitives | `core`, `gitinfo` | this page |
 | Surfaces, vision, inventory, declared verification | `structure`, `bootstrap` | [`../ADAPTATION.md`](../ADAPTATION.md) |
-| Issues, review packets, incidents, GitHub CLI | `issues`, `github` | [`../ISSUE_TEMPLATE.md`](../ISSUE_TEMPLATE.md) |
+| Issues, review packets, incidents, GitHub CLI, CI checks | `issues`, `github`, `ci` | [`../ISSUE_TEMPLATE.md`](../ISSUE_TEMPLATE.md) |
 | Skills provenance, resource registry | `skills` | [`../skills.md`](../skills.md) |
 | Links, index, file hygiene | `docs` | [`../security.md`](../security.md) |
 | Launch evidence | `launch` | [`../production.md`](../production.md) |

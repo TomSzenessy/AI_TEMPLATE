@@ -1,4 +1,6 @@
-PYTHON ?= python3
+# Newest Python >= 3.11 on PATH (an older system python3 may come first);
+# tools/repoctl applies the same rule for hooks. Override with PYTHON=...
+PYTHON ?= $(shell for p in python3.14 python3.13 python3.12 python3.11 python3 python; do command -v $$p >/dev/null 2>&1 && $$p -c 'import sys; sys.exit(sys.version_info < (3, 11))' 2>/dev/null && { echo $$p; break; }; done)
 REPOCTL := $(PYTHON) tools/repoctl.py
 SKILL_TEST_SUITES := $(wildcard .agents/skills/*/tests)
 
@@ -41,7 +43,7 @@ help:
 	  '  make validate BODY=path | skill-digest SKILL_PATH=.agents/skills/name'
 
 python-check:
-	@$(PYTHON) -c 'import sys; assert sys.version_info >= (3, 11), "repoctl requires Python 3.11+"'
+	@test -n "$(PYTHON)" || { echo "Needs Python 3.11+ on PATH (python3.11 or newer); or run: make PYTHON=/path/to/python3.11 ..." >&2; exit 1; }
 
 init: python-check
 	$(REPOCTL) init --name "$${NAME}" --kind "$${KIND}"

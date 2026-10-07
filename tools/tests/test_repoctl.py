@@ -461,7 +461,7 @@ rollback = "none"
             self.assertIn("Disclosure classification", content)
             self.assertIn("public-safe", content)
         self.assertIn("[enhancement/P2]", (root / ".github/ISSUE_TEMPLATE/feature.yml").read_text(encoding="utf-8"))
-        workflow = (root / ".github/workflows/require-issue-reference.yml").read_text(encoding="utf-8")
+        workflow = (root / ".github/workflows/require-issue-reference.yml").read_text(encoding="utf-8") + (root / "tools/kit/ci.py").read_text(encoding="utf-8")
         self.assertIn("Fixes", workflow)
         self.assertIn("Security-Reference", workflow)
 
@@ -490,7 +490,7 @@ stack_decision = "docs/STACK-DECISION.md"
             self.assertIn("Disclosure classification", content)
             self.assertIn("public-safe", content)
         self.assertIn("[enhancement/P2]", (root / ".github/ISSUE_TEMPLATE/feature.yml").read_text(encoding="utf-8"))
-        workflow = (root / ".github/workflows/require-issue-reference.yml").read_text(encoding="utf-8")
+        workflow = (root / ".github/workflows/require-issue-reference.yml").read_text(encoding="utf-8") + (root / "tools/kit/ci.py").read_text(encoding="utf-8")
         self.assertIn("Fixes", workflow)
         self.assertIn("Security-Reference", workflow)
 
@@ -722,14 +722,14 @@ quality_oracle = "human review"
 
     def test_workflow_has_checkout_permissions_and_label_families(self) -> None:
         root = Path(__file__).resolve().parents[2]
-        issue_workflow = (root / ".github/workflows/issue-contract.yml").read_text(encoding="utf-8")
+        issue_workflow = (root / ".github/workflows/issue-contract.yml").read_text(encoding="utf-8") + (root / "tools/kit/ci.py").read_text(encoding="utf-8")
         self.assertIn("contents: read", issue_workflow)
         self.assertIn("actions/checkout@", issue_workflow)
         self.assertIn("topic", issue_workflow)
         self.assertIn("labeled", issue_workflow)
         self.assertIn("registry_path", issue_workflow)
         self.assertIn("Disclosure class", issue_workflow)
-        reference_workflow = (root / ".github/workflows/require-issue-reference.yml").read_text(encoding="utf-8")
+        reference_workflow = (root / ".github/workflows/require-issue-reference.yml").read_text(encoding="utf-8") + (root / "tools/kit/ci.py").read_text(encoding="utf-8")
         self.assertNotIn("security-events: read", reference_workflow)
         self.assertNotIn("security-advisories/", reference_workflow)
         self.assertIn("maintainer-attested", reference_workflow)
@@ -740,6 +740,11 @@ quality_oracle = "human review"
         self.assertIn("canonical issue contract", reference_workflow)
         self.assertIn("PR_AUTHOR_ASSOCIATION", reference_workflow)
         self.assertIn("private security prs require", reference_workflow.casefold())
+        for workflow_name, check in (("require-issue-reference.yml", "pr-reference"), ("issue-contract.yml", "issue-contract")):
+            text = (root / ".github/workflows" / workflow_name).read_text(encoding="utf-8")
+            # Logic lives in tested repository code; the workflow checks out, then calls it.
+            self.assertLess(text.index("actions/checkout@"), text.index(f"ci {check}"))
+            self.assertNotIn("python3 - <<", text)
         ci_workflow = (root / ".github/workflows/ci.yml").read_text(encoding="utf-8")
         self.assertNotIn("GH_TOKEN", ci_workflow)
         self.assertIn("permissions: {}", ci_workflow)
@@ -822,10 +827,10 @@ verification = [["python3", "-c", "print('ok')"]]
             self.assertIn("Disclosure class", content)
             self.assertIn("public-safe", content)
         self.assertIn("[enhancement/P2]", (root / ".github/ISSUE_TEMPLATE/feature.yml").read_text(encoding="utf-8"))
-        issue_workflow = (root / ".github/workflows/issue-contract.yml").read_text(encoding="utf-8")
+        issue_workflow = (root / ".github/workflows/issue-contract.yml").read_text(encoding="utf-8") + (root / "tools/kit/ci.py").read_text(encoding="utf-8")
         self.assertIn("Regulated profile uses the CLI/private issue route", issue_workflow)
         self.assertIn("Minimal profile delegates issue intake", issue_workflow)
-        workflow = (root / ".github/workflows/require-issue-reference.yml").read_text(encoding="utf-8")
+        workflow = (root / ".github/workflows/require-issue-reference.yml").read_text(encoding="utf-8") + (root / "tools/kit/ci.py").read_text(encoding="utf-8")
         self.assertIn("Fixes", workflow)
         self.assertIn("private security prs require", workflow.casefold())
     def test_incident_updates_empty_docs_marker_and_passes_check(self) -> None:

@@ -30,6 +30,7 @@ def self_heal_errors(root: Path, project: dict[str, object] | None = None) -> li
     errors += docsync.command_reference_errors(root, files)
     errors += hygiene.scan_markers(root, files).errors
     errors += hygiene.budget_errors(root, project, files)
+    errors += hygiene.workflow_errors(root, files)
     return errors
 
 

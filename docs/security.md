@@ -3,6 +3,11 @@
 <!-- index: design | Secure implementation baseline | Auth, secrets, CI, dependencies, deployment, or untrusted input changes. -->
 <!-- covers: .github/workflows/ci.yml .github/workflows/specialist-scans.yml .github/dependabot.yml .security/config.json tools/kit/docs.py -->
 
+CI logic lives in tested repository code, not in workflow YAML: workflows
+check out the repository and call `make verify` or `repoctl ci <check>`
+(`tools/kit/ci.py`), and `make check` rejects long inline `run:` blocks. Pushes
+run CI on the default branch; pull requests run it for their commits.
+
 Security is a property of the whole path, not a dependency scan. Start with a
 small threat model and make the safe path the default.
 
@@ -51,7 +56,10 @@ these tools additive: their output and failures are evidence, while
 `repoctl` remains the zero-dependency contract and path-safety check. The
 bundled specialist workflow runs Gitleaks on trusted pushes/manual runs (its
 organization license is not exposed to fork PRs) and credential-free Lychee for
-Markdown links on pull requests, trusted pushes, and manual runs;
+Markdown links: pull requests scan only the Markdown they add or change (file
+names filtered to a safe character set, since they are untrusted input), and a
+weekly schedule or manual run scans everything, so third-party outages and link
+rot surface as gardener findings instead of failing unrelated changes;
 organization-owned repositories must provide the trusted `GITLEAKS_LICENSE`
 secret for the pinned action. Enable the provider's fork-PR secret scanning as
 well. The link job accepts only successful response classes and excludes the

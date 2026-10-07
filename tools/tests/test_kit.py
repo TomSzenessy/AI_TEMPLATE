@@ -15,7 +15,7 @@ TOOLS = Path(__file__).resolve().parents[1]
 REPOCTL = TOOLS / "repoctl.py"
 sys.path.insert(0, str(TOOLS))
 
-from kit import adapters, derive, docsync, evals, garden, hygiene, navigate, risk  # noqa: E402
+from kit import adapters, ci, derive, docsync, evals, garden, hygiene, navigate, risk  # noqa: E402
 from kit.gitinfo import path_matches  # noqa: E402
 
 # Built by concatenation so this test file never trips the marker scanner itself.
@@ -176,6 +176,13 @@ class HygieneTests(KitRepository):
         findings = hygiene.duplicate_paragraphs(self.root, ["docs/a.md", "docs/b.md", "docs/billing.md"])
         self.assertEqual(len(findings), 1)
         self.assertIn("docs/a.md and docs/b.md repeat a paragraph", findings[0])
+
+    def test_long_inline_workflow_script_is_a_finding(self) -> None:
+        script = "\n".join(f"          echo step {index}" for index in range(12))
+        self.write(".github/workflows/x.yml", f"jobs:\n  a:\n    steps:\n      - name: s\n        run: |\n{script}\n      - name: t\n        run: make verify\n")
+        findings = hygiene.workflow_errors(self.root, [".github/workflows/x.yml"])
+        self.assertEqual(len(findings), 1)
+        self.assertIn("x.yml:5: inline run block of 12 lines", findings[0])
 
     def test_budget_is_a_finding(self) -> None:
         self.write("AGENTS.md", "# Agents\n" + "x" * 400)
@@ -487,6 +494,64 @@ class ScaffoldTests(KitRepository):
         index = (self.root / "docs/README.md").read_text()
         self.assertIn("### Miscellany", index)
         self.assertIn("| [`pricing.md`](./pricing.md) | Pricing rules | when prices change |", index)
+
+
+CONTRACT_HEADINGS = "".join(f"### {heading}\nx\n" for heading in ci.CANONICAL["agent-first"])
+DUPLICATE_LINE = "Duplicate check: searched title, symptom, and path for x; no duplicate found\n"
+
+
+class CiCheckTests(unittest.TestCase):
+    """The logic GitHub Actions runs, tested locally (tools/kit/ci.py)."""
+
+    def issue(self, **overrides: object) -> dict:
+        return {"state": "open", "body": DUPLICATE_LINE + CONTRACT_HEADINGS, **overrides}
+
+    def test_pr_reference_accepts_open_canonical_issue(self) -> None:
+        message = ci.pr_reference_check("Closes #6", set(), "OWNER", "agent-first", lambda number: self.issue())
+        self.assertIn("#6", message)
+
+    def test_pr_reference_rejections(self) -> None:
+        cases = {
+            "must include Closes/Fixes": ("Refs #6", set(), self.issue()),
+            "must be an open issue": ("Fixes #6", set(), self.issue(state="closed")),
+            "is a pull request": ("Fixes #6", set(), self.issue(pull_request={})),
+            "canonical issue contract": ("Fixes #6", set(), self.issue(body=DUPLICATE_LINE)),
+            "duplicate-search record": ("Fixes #6", set(), self.issue(body=CONTRACT_HEADINGS)),
+            "requires the trusted private-review": ("Fixes #6", {"security-reviewed"}, self.issue()),
+        }
+        for expected, (body, labels, issue) in cases.items():
+            with self.subTest(expected=expected), self.assertRaisesRegex(Exception, expected):
+                ci.pr_reference_check(body, labels, "OWNER", "agent-first", lambda number, issue=issue: issue)
+
+    def test_minimal_profile_delegates(self) -> None:
+        self.assertIn("Minimal", ci.pr_reference_check("", set(), "", "minimal", lambda number: {}))
+
+    def test_issue_contract_accepts_complete_form_and_adds_labels(self) -> None:
+        registry = json.loads((TOOLS.parent / ".github/issue-labels.json").read_text())
+        body = (
+            DUPLICATE_LINE
+            + "### Summary\nA concrete outcome for the issue contract test.\n"
+            + "### Acceptance criteria\n- The positive test passes.\n- A negative test does not pass.\n"
+            + "### Evidence\nTest evidence: unit output\n"
+            + "### Disclosure classification\n- **Disclosure class:** ordinary\n- **Public-safe:** yes\n"
+            + "- **Security/privacy review:** not applicable\n- **Reviewer/date:** tester 2026-10-01\n"
+            + "### Dependencies and handoff\n- **Owner / next action:** maintainer\n"
+            + "### Type\nbug\n### Priority\nP2\n### Area\nrepo\n### Topic\nci-checks\n### Status\ntriage\n"
+        )
+        valid, labels = ci.issue_contract_check(body, set(), "agent-first", registry, today=date(2026, 10, 7))
+        self.assertTrue(valid)
+        self.assertIn("topic:ci-checks", labels)
+        def rejected(text: str) -> bool:
+            try:
+                return not ci.issue_contract_check(text, set(), "agent-first", registry, today=date(2026, 10, 7))[0]
+            except Exception:  # noqa: BLE001 - an early validator raising is also a rejection
+                return True
+
+        self.assertTrue(rejected(body.replace("2026-10-01", "2024-01-01")))
+        self.assertTrue(rejected(body.replace("ordinary", "unclassified")))
+        self.assertTrue(rejected(body.replace("### Topic\nci-checks", "### Topic\nNot Kebab")))
+        with self.assertRaisesRegex(Exception, "Regulated profile uses the CLI"):
+            ci.issue_contract_check(body, set(), "regulated", registry)
 
 
 class EvalCommandTests(unittest.TestCase):

@@ -2,7 +2,7 @@
 
 Module map (dependencies point downward; core imports nothing local):
 
-- governance: core, github, docs, skills, structure, issues, launch, bootstrap
+- governance: core, github, docs, skills, structure, issues, ci, launch, bootstrap
 - self-healing: config, docsync, hygiene, adapters, derive, scaffold, navigate, risk,
   session, garden, capabilities, evals
 

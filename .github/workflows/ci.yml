@@ -1,7 +1,10 @@
 name: ci
 
 on:
+  # Pull requests run the full path; pushes only on the default branch, so a
+  # pull request's commits are not verified twice.
   push:
+    branches: [main]
   pull_request:
 
 permissions: {}

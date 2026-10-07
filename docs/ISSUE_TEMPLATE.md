@@ -1,7 +1,7 @@
 # Canonical issue record
 
 <!-- index: operate | Canonical issue shape and labels | Filing or materially updating an issue. -->
-<!-- covers: tools/kit/issues.py tools/kit/github.py tools/issue_contract.py .github/ISSUE_TEMPLATE/** .github/issue-labels.json .github/workflows/issue-contract.yml .github/workflows/require-issue-reference.yml -->
+<!-- covers: tools/kit/issues.py tools/kit/github.py tools/issue_contract.py tools/kit/ci.py .github/ISSUE_TEMPLATE/** .github/issue-labels.json .github/workflows/issue-contract.yml .github/workflows/require-issue-reference.yml -->
 
 GitHub Issues are the live task, status, and evidence register. This file defines
 the minimum shape for a new or materially updated issue. Search open and closed

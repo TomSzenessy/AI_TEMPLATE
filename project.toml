@@ -138,7 +138,7 @@ kind = "template"
 owner = "TomSzenessy"
 status = "active"
 quality_oracle = "Fresh-agent navigation, contract checks, and bounded review packet inspection"
-verification = [["python3", "tools/repoctl.py", "check"]]
+verification = [["tools/repoctl", "check"]]
 
 # Reviewed capability pack adapted from Jakeschincariol/replica-skill (MIT).
 # `purpose` names the upstream skill each local skill adapts, because adapted

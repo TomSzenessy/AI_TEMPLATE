@@ -67,6 +67,8 @@ Markers are plain comments and work in any language:
   because open work lives in the issue register, not in comments.
 - `FILL-IN:` placeholders left by `make new` fail until replaced, so a
   half-written skill, role, or doc cannot rot unnoticed.
+- A workflow `run:` block longer than 10 lines fails: CI logic belongs in
+  `tools/` where it is unit-tested and runs locally (`repoctl ci <check>`).
 
 ## Context budgets
 
@@ -155,8 +157,10 @@ findings, one root cause per change (see [`delegation.md`](./delegation.md)).
   committed before that window is not judged.
 - The stop gate judges the whole branch, so an unresolved finding is raised
   once per turn until it is fixed or exempted by a trailer.
-- Generated hooks call `python3` via `$CLAUDE_PROJECT_DIR`, so Windows hosts
-  need Python 3.11+ on `PATH` under that name (Git Bash or WSL).
+- Hooks, the git gate, and `make` run through `tools/repoctl`, which picks the
+  newest Python 3.11+ on `PATH` even when `python3` is an older system
+  interpreter (override with `REPOCTL_PYTHON` or `make PYTHON=...`). Windows
+  hosts run it from Git Bash or WSL.
 
 ## Measuring the kit: fresh-agent evals
 

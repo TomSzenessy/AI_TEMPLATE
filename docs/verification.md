@@ -34,7 +34,8 @@ Use the smallest sufficient evidence, then escalate:
    local binding check; live API/advisory verification belongs to a separately
    authorized evidence record, not general repository verification.
 
-The pull-request issue-reference workflow requires a closing keyword, an open
+The pull-request issue-reference check (`repoctl ci pr-reference`, run by the
+workflow and testable locally) requires a closing keyword, an open
 issue rather than a pull request, and the profile's canonical issue headings and
 duplicate-search record. GitHub issues are editable, so this is not by itself
 proof that the acceptance contract predated implementation or remained

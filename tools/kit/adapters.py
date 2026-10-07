@@ -154,7 +154,7 @@ CLAUDE_TOOLS = {
     "docs-only": "Read, Grep, Glob, Bash, Edit, Write",
     # web and full roles inherit every tool, including configured MCP servers.
 }
-HOOK = 'python3 "$CLAUDE_PROJECT_DIR/tools/repoctl.py" hook {event}'
+HOOK = '"$CLAUDE_PROJECT_DIR/tools/repoctl" hook {event}'  # launcher picks Python 3.11+
 CLAUDE_ALLOWED_COMMANDS = [
     "make start", "make done", "make check", "make test", "make verify", "make map",
     "make where:*", "make garden", "make risk", "make capabilities", "make sync", "make handover",

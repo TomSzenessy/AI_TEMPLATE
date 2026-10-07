@@ -16,7 +16,7 @@ try:
 except ModuleNotFoundError as error:  # pragma: no cover - exercised on Python 3.10
     raise SystemExit("repoctl requires Python 3.11 or newer") from error
 
-from kit import derive, scaffold, session
+from kit import ci, derive, scaffold, session
 from kit.bootstrap import initialize_project
 from kit.capabilities import print_capabilities
 from kit.core import RepoctlError, ensure_inside_root, load_project
@@ -132,6 +132,8 @@ def build_parser() -> argparse.ArgumentParser:
     garden_parser.add_argument("--output", type=Path, help="also write the Markdown report to this path")
     overlap_parser = subparsers.add_parser("similar", help="find existing skills/roles similar to a proposed capability")
     overlap_parser.add_argument("description", nargs="+")
+    ci_parser = subparsers.add_parser("ci", help="run a CI check (the same tested code GitHub Actions runs)")
+    ci_parser.add_argument("check", choices=["pr-reference", "issue-contract"])
     eval_parser = subparsers.add_parser("eval", help="run the fresh-agent navigation benchmark")
     eval_parser.add_argument("--host", default="claude")
     eval_parser.add_argument("--tasks", help="comma-separated task ids")
@@ -264,6 +266,9 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"Verdict: read {matches[0][1]} first; extend it if it covers the need, otherwise create a new one with make new.")
             else:
                 print('Verdict: nothing similar. Create it: make new KIND=skill|agent|doc NAME=... DESC="...; ..."')
+        elif arguments.command == "ci":
+            runner = ci.run_pr_reference if arguments.check == "pr-reference" else ci.run_issue_contract
+            print(runner(arguments.root.resolve()))
         elif arguments.command == "eval":
             return run_evals(arguments.root.resolve(), arguments.host, arguments.tasks, arguments.timeout, arguments.model)
     except (OSError, RepoctlError) as error:
