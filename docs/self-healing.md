@@ -325,8 +325,11 @@ findings, one root cause per change (see [`delegation.md`](./delegation.md)).
   in ignored `.agent/cache/`, so the per-edit hook does not re-read every doc.
 - Staleness inspects the newest 2000 non-merge commits; a document last
   committed before that window is not judged.
-- The stop gate judges the whole branch, so an unresolved finding is raised
-  once per turn until it is fixed or exempted by a trailer.
+- The stop gate judges only what this session changed: `session-start` records the dirty paths with
+  content hashes and the current commit in `.agent/hook-state.json`, and `stop` judges the paths whose
+  content differs plus the paths committed since that commit (no snapshot, or a start commit that is no
+  longer an ancestor, means the whole tree). An unresolved finding is raised once per turn until it is fixed or exempted by a
+  trailer; `make done` still judges the whole branch.
 - Hooks, the git gate, and `make` run through `tools/repoctl`, which picks the
   newest Python 3.11+ on `PATH` even when `python3` is an older system
   interpreter (override with `REPOCTL_PYTHON` or `make PYTHON=...`). Windows
