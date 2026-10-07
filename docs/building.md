@@ -19,7 +19,7 @@ order:
 
 | Phase | Done when |
 |---|---|
-| intake | `VISION.md` is accepted after the `product-kickoff` questions |
+| intake | `VISION.md` is accepted after the `product-kickoff` questions; `docs/design.md`, `docs/product/research.md`, and `docs/product/features.csv` are created by `product-kickoff` |
 | research | `docs/product/research.md` cites at least three sources |
 | features | `docs/product/features.csv` exists with must rows |
 | design (UI) | `docs/design.md` records the chosen mockup direction |

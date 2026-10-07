@@ -38,7 +38,7 @@ Then tell your agent what to build. It runs the `product-kickoff` skill first:
 one round of questions with recommendations (users, platforms, stack such as
 Next.js + Tailwind, Expo, Flutter, or SwiftUI, visual style), two or three
 mockup directions to choose from, and the decisions recorded in `VISION.md`,
-`docs/STACK-DECISION.md`, and `docs/design.md`, plus a list of issues, each one
+`docs/STACK-DECISION.md`, and `docs/design.md` (all created by `product-kickoff`), plus a list of issues, each one
 a slice of the product that runs end to end. The `stack-foundation` skill then
 builds a deployed minimal version that runs (a *walking skeleton*: the thinnest
 thing that works) with strict types, lint, tests, CI, previews, and error

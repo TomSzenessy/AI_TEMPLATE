@@ -85,6 +85,7 @@ rather than a large prompt collection:
 
 They are first-party bundled skills: they are source-controlled with the
 repository and do not belong in the third-party `[[skills]]` provenance ledger.
+`tools/kit/skills.py:BUNDLED_SKILLS` lists the template's defaults; `project.toml [capabilities].local_skills` declares which first-party skills the project actually uses.
 Third-party skills added later must include exact package/source match, an
 immutable revision, a matching whole-tree `content_digest`, a real review date,
 least-privilege permissions, and a rollback action. Add a new skill only when

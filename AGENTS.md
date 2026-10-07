@@ -4,7 +4,7 @@
 
 The router for every coding agent. These rules always apply; detail lives in
 the linked owner documents. **Golden path:** `make start`, `make next` (the next
-step), `make where Q="..."`, and `make done` before you call any work complete.
+step), `make where Q="..."`, `make capabilities`, and `make done` before you call any work complete.
 
 ## Session protocol
 

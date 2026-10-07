@@ -16,7 +16,7 @@ The plan is frozen in [`../adr/0002-one-capability-model.md`](../adr/0002-one-ca
 
 ## Current state
 
-- **Committed baseline:** local branch `feat/capability-model` (not pushed), on
+- **Committed baseline:** branch `feat/capability-model` (pushed to origin), on
   top of `claude/funny-ritchie-if635h` (PR #11): `5456732` (ADR), `28950a2`
   (implementation, closes #15), plus this record.
 - **Done (verified):** `make done` green; `make test-future` green; 142 kit

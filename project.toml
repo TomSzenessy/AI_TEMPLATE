@@ -61,6 +61,9 @@ hosts = ["claude"]
 # overlap_limit = 0.30
 # deprecation_warning_days = 30
 # skill_review_days = 365
+# ui_kinds = ["web", "app", "site", "pwa", "mobile", "ios", "android", "desktop", "game"]
+# preview_kinds = ["web", "app", "site", "pwa"]
+# playwright_version = "1.63.0"
 # eval_model = "haiku"   # model for `make eval` on Claude (cheap by default)
 
 [packs]

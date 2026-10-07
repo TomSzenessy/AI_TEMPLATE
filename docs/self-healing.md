@@ -430,25 +430,9 @@ spend, turns, kit commands, every gate block, failed kit command, bypass, and
 `Docs-Unaffected` trailer, and the product's final `make next` phase and
 `make done` result. Judge each friction item with the blocking rule above: fix
 the kit, make the check advisory, or justify it. `--analyze <transcript>
---project <dir>` reports on a run made by hand or with another host. The first
-trial built a working prototype for $1.74 but skipped the design record, the
-owning doc, and the UI review; those became the product guardrails above. A
-second run told only to "run make done and fix what it reports" repaired all
-five findings for $0.70. Visual review still needs a browser in the run.
-
-The third trial (2026-10-07, issue #9) asked Sonnet for an ambitious product, a
-collaborative offline-first trip planner, with the owner's answers up front. In
-36 minutes and $22.81 it researched (marking unreachable pages
-`[unverified]` instead of inventing quotes), wrote 28 feature rows, built a
-4,300-line TypeScript app with 39 unit, API, and end-to-end tests, judged 32
-screenshots, ran a critic, and fixed its blockers; `make done` was green. The
-friction it hit became fixes, not new rules: five failed `make issue` runs on a
-local draft (local drafts now need only an outcome and criteria), a review log
-that failed the docs index until `make sync` (the review now syncs), and a
-preemptive `Docs-Unaffected: tools/** untouched` that silently exempted every
-doc (non-document scopes now exempt nothing). It never bypassed a gate. It
-stopped with a stale UI review after its final fix, which `make next` reports
-and `make readiness` enforces before release.
+--project <dir>` reports on a run made by hand or with another host. Trial
+evidence and friction findings are recorded under [`docs/`](./building.md)
+and linked issues, e.g., [`#9`](https://github.com/TomSzenessy/AI_TEMPLATE/issues/9).
 
 A host-side failure, such as an expired login, is recorded as an error rather
 than as a wrong answer. Evals and trials start agents through one launcher
