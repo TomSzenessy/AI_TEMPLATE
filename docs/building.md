@@ -1,7 +1,7 @@
 # Building a product
 
 <!-- index: operate | Product driver: feature list, research record, make next phases, product done, UI review | building or judging a product -->
-<!-- covers: tools/kit/product.py tools/kit/uireview.py .agents/skills/product-kickoff/production-features.csv -->
+<!-- covers: tools/kit/product.py tools/kit/surfaces.py tools/kit/uireview.py .agents/skills/product-kickoff/production-features.csv -->
 
 Repository hygiene checks prove the code is tidy; they cannot prove the product
 is complete or good. Everything on this page is the `product` pack

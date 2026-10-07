@@ -12,7 +12,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from fixtures import Scratch  # noqa: E402
 
 from kit.core import RepoctlError  # noqa: E402
-from kit.registry import Registry, run_checks  # noqa: E402
+from kit.checkrun import run_checks  # noqa: E402
+from kit.registry import Registry  # noqa: E402
 
 MANIFEST = 'schema = 1\nname = "Demo"\nkind = "template"\nphase = "bootstrap"\nlicense = "UNSELECTED"\nowners = []\n' \
            '[governance]\nprofile = "regulated"\n'

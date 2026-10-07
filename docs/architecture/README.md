@@ -34,28 +34,30 @@ The seams tightened last: `core` owns the shared primitives (one
 `today`, `default_branch`, `package_skill`), `gitinfo.run_git` is the one git
 entry point (unquoted paths, a timeout) and `core.today` computes one UTC day
 so every freshness rule agrees across machines (a "not in the future" rule
-compares with `core.latest_today`, UTC+14, so a local date always passes; `core.date_out_of_policy` is the one staleness policy), `registry.run_checks` is the one place a finding becomes blocking (gates name checks; a project may downgrade one in `[checks]`), `registry.KINDS` and
+compares with `core.latest_today`, UTC+14, so a local date always passes; `core.date_out_of_policy` is the one staleness policy), `checkrun.run_checks` is the one place a finding becomes blocking (gates name checks; a project may downgrade one in `[checks]`), `registry.KINDS` and
 `session.HOOK_EVENTS` are the single lists their users derive from, and
 `structure` validates the vision and stack-decision records through one
 `_check_record`. Behavior lives in standard-library modules under `tools/kit/`
-whose imports point toward `core`:
+whose imports point toward the leaves (`gitinfo`, `names`, `helptext`) and never form a cycle:
+`tools/tests/test_import_graph.py` fails on any, function-local imports included. Only the lazy
+dispatch imports in `commands` are exempt, kept so `repoctl help` starts fast:
 
 | Concern | Modules | Owner doc |
 |---|---|---|
-| Manifest, paths, worktree, text primitives, the shared Reviewer/date rule, conventional file names | `core`, `gitinfo`, `names` | this page |
-| Capability model: loader, packs, command and check declarations | `registry`, `commands`, `checks` | this page and [ADR 0002](../adr/0002-one-capability-model.md) |
-| Surfaces, vision, inventory, declared verification, adoption | `structure`, `bootstrap`, `adopt` | [`../ADAPTATION.md`](../ADAPTATION.md) |
+| Manifest, paths, worktree, text primitives, the shared Reviewer/date rule, conventional file names, hook events | `core`, `gitinfo`, `names` | this page |
+| Capability model: loader, packs, command and check declarations, the check context, `make help` | `registry`, `checkrun`, `commands`, `checks`, `helptext` | this page and [ADR 0002](../adr/0002-one-capability-model.md) |
+| Surfaces, vision, inventory, declared verification, adoption | `structure`, `surfaces`, `bootstrap`, `adopt` | [`../ADAPTATION.md`](../ADAPTATION.md) |
 | Issues, review packets, incidents, GitHub CLI, CI checks | `issues`, `github`, `ci` | [`../ISSUE_TEMPLATE.md`](../ISSUE_TEMPLATE.md) |
 | Skills provenance, resource registry | `skills` | [`../skills.md`](../skills.md) |
 | Links, index, file hygiene | `docs` | [`../security.md`](../security.md) |
 | Launch evidence | `launch` | [`../production.md`](../production.md) |
 | Product driver: feature list, research, `make next`, UI review | `product`, `uireview` | [`../building.md`](../building.md) |
 | Check blocking rule, hooks, failure output, ceremony by risk, garden report, navigation | `checks`, `session`, `garden`, `navigate`, `risk` | [`../self-healing.md`](../self-healing.md) |
-| Doc-code bindings and staleness | `docsync` | [`../bindings.md`](../bindings.md) |
+| Doc-code bindings and staleness | `docmeta`, `docsync` | [`../bindings.md`](../bindings.md) |
 | Markers, orphan files, change coupling | `hygiene`, `reachability`, `coupling` | [`../hygiene.md`](../hygiene.md) |
 | Derived files and host adapters | `derive`, `adapters` | [`../generated-files.md`](../generated-files.md) |
 | Capability mechanics, scaffolding, configuration | `capabilities`, `scaffold`, `config` | [`../capabilities.md`](../capabilities.md) |
-| Kit updates and the golden-path test | `kitupdate` | [`../kit-update.md`](../kit-update.md) |
+| Kit updates, the kit lock, and the golden-path test | `kitlock`, `kitupdate` | [`../kit-update.md`](../kit-update.md) |
 | Evals and build trials (one headless launcher) | `evals`, `trial` | [`../evals.md`](../evals.md) |
 | Failure signatures | `signatures` | [`../operations.md`](../operations.md) |
 

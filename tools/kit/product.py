@@ -20,8 +20,9 @@ import re
 from pathlib import Path
 
 from .config import setting
-from .core import RepoctlError, declared_surfaces, load_project, read_text_file
+from .core import RepoctlError, load_project, read_text_file
 from .names import DESIGN, STACK_DECISION
+from .surfaces import is_product, is_ui, product_surfaces  # noqa: F401  (still this module's surface)
 
 FEATURES = "docs/product/features.csv"
 RESEARCH = "docs/product/research.md"
@@ -29,21 +30,6 @@ WEIGHT = {"must": 3, "should": 2, "could": 1}
 CREDIT = {"yes": 1.0, "partial": 0.5, "no": 0.0}
 STATUSES = {"yes", "partial", "no", "skip"}
 URL = re.compile(r"https?://[^\s)>\]]+")
-
-
-def is_product(project: dict[str, object]) -> bool:
-    return project.get("kind") != "template"
-
-
-def is_ui(root: Path, project: dict[str, object]) -> bool:
-    return project.get("kind") in setting(root, "ui_kinds")
-
-
-def product_surfaces(project: dict[str, object]) -> list[dict[str, object]]:
-    return [
-        surface for surface in declared_surfaces(project)
-        if surface.get("status", "active") == "active" and surface.get("kind") != "template"
-    ]
 
 
 def load_features(root: Path) -> list[dict[str, str]]:

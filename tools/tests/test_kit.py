@@ -21,7 +21,7 @@ from fixtures import (RECENT, TOOLS, KitRepository, Scratch,  # noqa: E402  shar
                       clean_env, fake_gh, git_in, http_server, run_cli, template_only)
 
 from kit import (  # noqa: E402
-    core, ci, commands, coupling, derive, docsync, evals, garden, hygiene, navigate, product,
+    checkrun, core, ci, commands, coupling, derive, docsync, evals, garden, hygiene, navigate, product,
     reachability, registry, risk, session, signatures, structure, uireview,
 )
 from kit.core import load_project  # noqa: E402
@@ -1372,7 +1372,7 @@ class ReachabilityAdvisoryTests(Scratch):
         self.write("docs/api.md", body)
 
     def advisories(self) -> tuple[dict[str, str], dict[str, str]]:
-        unreferenced, host_read = reachability.advisories(registry.Context(self.root))
+        unreferenced, host_read = reachability.advisories(checkrun.Context(self.root))
         return ({item.split(":")[0]: item for item in unreferenced},
                 {item.split(":")[0]: item for item in host_read})
 
@@ -1446,7 +1446,7 @@ class ReachabilityAdvisoryTests(Scratch):
 
     @template_only
     def test_this_repository_reports_no_module_of_its_own(self) -> None:
-        unreferenced, _ = reachability.advisories(registry.Context(TOOLS.parent))
+        unreferenced, _ = reachability.advisories(checkrun.Context(TOOLS.parent))
         modules = [item.split(":")[0] for item in unreferenced if item.split(":")[0].startswith("tools/")]
         self.assertEqual(modules, [], "every module of the kit is reachable from something in the tree")
 
@@ -1498,7 +1498,7 @@ class ChangeCouplingTests(Scratch):
         self.assertIsNotNone(declared, "the check is declared")
         self.assertFalse(declared.fields["blocks"], "coupling is a judgement, so it never blocks")
         self.write_manifest()
-        hard, advisory = registry.run_checks(self.root, blocking_only=False)
+        hard, advisory = checkrun.run_checks(self.root, blocking_only=False)
         self.assertNotIn("co-change", "\n".join(hard), "make check never reports coupling")
         self.assertIn("co-change", "\n".join(advisory), "make garden reports it")
 
@@ -1560,7 +1560,7 @@ class FailureSignatureTests(Scratch):
         self.ledger()
         (self.root / "docs").mkdir(exist_ok=True)
         (self.root / "docs" / "api.md").write_text("# API\n\n<!-- covers: legacy/** -->\n", encoding="utf-8")
-        hard, _ = registry.run_checks(self.root, blocking_only=True)
+        hard, _ = checkrun.run_checks(self.root, blocking_only=True)
         findings = "\n".join(hard)
         self.assertIn("covers pattern matches no file: legacy/**", findings)
         self.assertIn("known failure EL-001", findings, "a repeat reports its key and fix")
@@ -1569,7 +1569,7 @@ class FailureSignatureTests(Scratch):
     def test_no_ledger_means_no_matching_and_no_crash(self) -> None:
         self.assertEqual(signatures.signatures(self.root), ())
         self.assertIsNone(signatures.match("anything at all", ()))
-        hard, _ = registry.run_checks(self.root, blocking_only=True, skip=KitRepository.CONTRACT)
+        hard, _ = checkrun.run_checks(self.root, blocking_only=True, skip=KitRepository.CONTRACT)
         self.assertNotIn("known failure", "\n".join(hard))
 
     def test_columns_are_read_from_the_header(self) -> None:
@@ -1735,7 +1735,7 @@ class ReferenceShapesTests(Scratch):
         self.write("docs/api.md", "# API\n")
 
     def reported(self) -> set[str]:
-        unreferenced, host_read = reachability.advisories(registry.Context(self.root))
+        unreferenced, host_read = reachability.advisories(checkrun.Context(self.root))
         return {item.split(":")[0] for item in (*unreferenced, *host_read)}
 
     def test_a_procfile_callable_names_its_module(self) -> None:
@@ -1777,7 +1777,7 @@ class ReferenceShapesTests(Scratch):
         """
         self.write("apps/store/migrations/0002_add_email.py", "def upgrade():\n    pass\n")
         self.write("apps/store/management/commands/reindex.py", "def handle():\n    pass\n")
-        unreferenced, _ = reachability.advisories(registry.Context(self.root))
+        unreferenced, _ = reachability.advisories(checkrun.Context(self.root))
         message = {item.split(":")[0]: item for item in unreferenced}
         self.assertIn("a framework tree a tool walks by convention", message["apps/store/migrations/0002_add_email.py"])
         self.assertIn("a framework tree a tool walks by convention", message["apps/store/management/commands/reindex.py"])

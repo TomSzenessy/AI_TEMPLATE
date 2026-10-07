@@ -19,117 +19,25 @@ the kit Makefile includes, so the Makefile itself stays kit-owned.
 
 from __future__ import annotations
 
-import hashlib
-import json
 import re
 import tempfile
 from pathlib import Path
 
 from . import derive
-from .core import RepoctlError, load_project, repository_files
-from .gitinfo import git, path_matches, run_git
-from .names import DESIGN, ERROR_LOG, HANDOVER, STACK_DECISION, VISION
-
-LOCK = "tools/kit-lock.json"
-STAGING = ".agent/kit-update"
-# Never kit files: the project's identity, decisions, product docs, and generated output.
-PROJECT_OWNED = (
-    LOCK, "project.toml", VISION, "README.md", "LICENSE", "CONTEXT.md", ".gitignore", "project.mk",
-    STACK_DECISION, "docs/README.md", DESIGN, ERROR_LOG,
-    "docs/architecture/**", "docs/product/**", "docs/adr/**", "docs/incidents/**", ".security/**",
-    ".claude/**", ".mcp.json", HANDOVER,
+from .core import RepoctlError, load_project
+from .gitinfo import git, run_git
+from .kitlock import (
+    _kit_version,
+    _new_content,
+    _save_lock,
+    digest,
+    digest_bytes,
+    kit_paths,
+    project_path,
+    read_lock,
 )
 
-
-DERIVED_BLOCK = re.compile(rb"(?s)(<!-- repoctl:([a-z-]+) -->).*?(<!-- /repoctl:\2 -->)")
-MAKE_BLOCK = re.compile(rb"(?ms)(^# <repoctl:([a-z-]+)>\n).*?(^# </repoctl:\2>)")
-
-
-def normalized(content: bytes) -> bytes:
-    """Content without generated blocks (make sync owns those), so regenerated tables are not your edits."""
-    return MAKE_BLOCK.sub(rb"\1\3", DERIVED_BLOCK.sub(rb"\1\3", content))
-
-
-def digest_bytes(content: bytes) -> str:
-    return hashlib.sha256(normalized(content)).hexdigest()
-
-
-def digest(path: Path) -> str:
-    return digest_bytes(path.read_bytes())
-
-
-def kit_paths(kit: Path) -> list[str]:
-    """Files the template ships as kit, excluding project-owned and template-only material."""
-    template = load_project(kit).get("template", {})
-    prune = list(template.get("prune", [])) if isinstance(template, dict) else []
-    return [path for path in repository_files(kit) if (kit / path).is_file()
-            and not any(path_matches(path, pattern) for pattern in (*PROJECT_OWNED, *prune))]
-
-
-def _kit_version(kit: Path) -> str:
-    return (git(kit, "rev-parse", "HEAD") or "").strip() or "unknown"
-
-
-def project_path(root: Path, path: str) -> str:
-    """Where a kit file lives in this project: adopted projects keep the kit Makefile as kit.mk and
-    colliding workflows as kit-<name>."""
-    if path == "Makefile" and (root / "kit.mk").is_file():
-        return "kit.mk"
-    if path.startswith(".github/workflows/"):
-        renamed = str(Path(path).with_name("kit-" + Path(path).name))
-        if (root / renamed).is_file():
-            return renamed
-    return path
-
-
-def write_lock(root: Path, kit: Path, paths: list[str] | None = None, kept: list[str] = ()) -> None:
-    """Record what the project now has from the kit (init and adopt). `kept` are the project's own files
-    at kit paths (make adopt never overwrites them); only the kit's version of those is remembered."""
-    shipped = paths if paths is not None else kit_paths(kit)
-    files = {path: digest(root / project_path(root, path)) for path in shipped if (root / project_path(root, path)).is_file()}
-    _save_lock(root, _kit_version(kit), files, {path: digest_bytes(_new_content(kit, root, path)) for path in kept})
-
-
-def _save_lock(root: Path, version: str, files: dict[str, str], kept: dict[str, str],
-               bases: dict[str, str] | None = None) -> None:
-    previous = read_lock(root) if (root / LOCK).is_file() else {}
-    if version == "unknown" and previous.get("kit_version") not in (None, "none", "unknown"):
-        version = str(previous["kit_version"])  # a non-git kit checkout does not erase a known version
-    data: dict[str, object] = {"kit_version": version, "files": dict(sorted(files.items()))}
-    if kept:
-        data["kept"] = dict(sorted(kept.items()))
-    if bases:  # conflicted files: the version they had from the kit before the project's edit
-        data["bases"] = dict(sorted(bases.items()))
-    (root / LOCK).parent.mkdir(parents=True, exist_ok=True)
-    (root / LOCK).write_text(json.dumps(data, indent=1) + "\n", encoding="utf-8")
-
-
-def read_lock(root: Path) -> dict[str, object]:
-    try:
-        data = json.loads((root / LOCK).read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        return {"kit_version": "none", "files": {}}
-    except json.JSONDecodeError as error:
-        raise RepoctlError(f"{LOCK} is not valid JSON: {error}") from error
-    if not isinstance(data.get("files"), dict):
-        raise RepoctlError(f"{LOCK} needs a files table")
-    return data
-
-
-def _new_content(kit: Path, root: Path, path: str) -> bytes:
-    """The kit file as this project should have it (kit.mk is regenerated with the project's renames)."""
-    if path == "Makefile" and project_path(root, path) == "kit.mk":
-        from .adopt import render_kit_makefile
-        ours = (root / "Makefile").read_text(encoding="utf-8") if (root / "Makefile").is_file() else ""
-        return render_kit_makefile(ours, (kit / path).read_text(encoding="utf-8")).encode()
-    if path.endswith(".md"):  # the same localization make init applied when the project was made
-        from .bootstrap import localize_text
-        template = load_project(kit).get("template", {})
-        prune = list(template.get("prune", [])) if isinstance(template, dict) else []
-        pruned = {file for file in repository_files(kit) if any(path_matches(file, pattern) for pattern in prune)}
-        source = str(template.get("source", "")).rstrip("/") if isinstance(template, dict) else ""
-        return localize_text(path, (kit / path).read_text(encoding="utf-8"), pruned, prune, source).encode()
-    return (kit / path).read_bytes()
+STAGING = ".agent/kit-update"
 
 
 def _stage(root: Path, local: str, content: bytes) -> str:

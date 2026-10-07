@@ -34,7 +34,7 @@ if str(TOOLS) not in sys.path:
     sys.path.insert(0, str(TOOLS))
 
 import repoctl  # noqa: E402  the CLI entry point, called in-process
-from kit import derive, docsync, registry  # noqa: E402
+from kit import checkrun, derive, docsync  # noqa: E402
 
 # Template maintenance tests (they read the template's own history, Makefile wiring or
 # release material) run in the template checkout only, never in a project's copy of the suite.
@@ -251,7 +251,7 @@ class KitRepository(Scratch):
 
     def self_heal(self) -> str:
         """The self-healing findings `make check` adds on top of the repository-contract checks."""
-        hard, _ = registry.run_checks(self.root, blocking_only=True, skip=self.CONTRACT)
+        hard, _ = checkrun.run_checks(self.root, blocking_only=True, skip=self.CONTRACT)
         return "\n".join(hard + docsync.index_errors(self.root, self.files()))
 
     def files(self) -> list[str]:

@@ -17,7 +17,7 @@ from fixtures import Scratch  # noqa: E402  shared builders, in-process CLI, iso
 
 from kit import docsync  # noqa: E402
 from kit.core import RepoctlError, markdown_link_target  # noqa: E402
-from kit.registry import run_checks  # noqa: E402
+from kit.checkrun import run_checks  # noqa: E402
 
 REPOCTL = TOOLS / "repoctl.py"
 MANIFEST = 'schema = 1\nname = "Demo"\nkind = "template"\nphase = "bootstrap"\nlicense = "UNSELECTED"\nowners = []\n' \

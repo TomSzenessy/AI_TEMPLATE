@@ -303,7 +303,7 @@ def check_readiness(root: Path, *, checks_done: bool = False) -> None:
     except RepoctlError as error:
         errors.append(str(error))
     if not checks_done:
-        from .registry import run_checks  # the registry owns the blocking-check list; doctor adds only what it alone knows
+        from .checkrun import run_checks  # the registry owns the blocking-check list; doctor adds only what it alone knows
         errors += run_checks(root, blocking_only=True)[0]
     try:
         check_skill_provenance(project, release_gate=releasing)  # the release-gated variant of a registry check

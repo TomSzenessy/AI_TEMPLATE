@@ -48,12 +48,12 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from . import config, navigate, session
+from . import config, navigate
 from .core import IGNORED_WALK_DIRECTORIES, REPOSITORY_INFRASTRUCTURE_DIRECTORIES, read_text_file
 from .derive import DELEGATION_DOC, INDEX_DOC
 from .gitinfo import path_matches
-from .kitupdate import LOCK
-from .names import DESIGN, HANDOVER, STACK_DECISION, VISION
+from .kitlock import LOCK
+from .names import CHECKPOINT, CRITIC_RECORD, DESIGN, HANDOVER, STACK_DECISION, VISION
 
 # A path-like run: a name, a relative path, a directory, or `module:callable`. Starts
 # with a word character so prose ("3 days") never looks like a path. The colon keeps
@@ -78,7 +78,7 @@ KIT_OWNED = frozenset({
     LOCK,  # make init / make kit-update
     INDEX_DOC, DELEGATION_DOC, "AGENTS.md", "README.md", "Makefile", "kit.mk",  # derive.render_blocks
     VISION, STACK_DECISION, DESIGN,  # make init intake, the design-record check
-    HANDOVER, session.CRITIC_RECORD, session.CHECKPOINT,  # make handover, make done
+    HANDOVER, CRITIC_RECORD, CHECKPOINT,  # make handover, make done
     "review.md",  # the critic's record; a surface names it later in critic_evidence
     *navigate.MEMORY_FILES,  # the failure ledger `where` searches
 })
