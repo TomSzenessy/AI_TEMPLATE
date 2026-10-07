@@ -344,10 +344,10 @@ def check_readiness(root: Path) -> None:
         errors.extend(review_status(root))  # one fresh, passing UI review before anyone outside uses it
 
     launch = project.get("launch", {})
-    if not isinstance(launch, dict):
+    if project.get("phase") == "public-launch":
+        errors.extend(check_public_launch_evidence(root, project))  # reports a non-table launch itself
+    elif not isinstance(launch, dict):
         errors.append("launch must be a table")
-    elif project.get("phase") == "public-launch":
-        errors.extend(check_public_launch_evidence(root, project))
 
     if errors:
         raise check_failed("readiness", errors)

@@ -188,7 +188,7 @@ def arg(*flags: str, var: str | None = None, hint: str | None = None, **options:
     return Arg(tuple(flags), var, hint, options)
 
 
-def command(name: str, description: str, *, group: str = "more", pack: str = CORE, args: tuple[Arg, ...] = (),
+def command(name: str, description: str, *, group: str = "when-needed", pack: str = CORE, args: tuple[Arg, ...] = (),
             usage: str = "", make: str | None = "", make_extra: str = "", target: str = "") -> Callable:
     """Declare a `repoctl` command. `make=None` means no make target; `make` set to a
     string overrides the generated recipe (adopt runs from the kit's own Makefile);
@@ -319,6 +319,7 @@ class Registry:
 
     def __init__(self, root: Path) -> None:
         self.root = root
+        self._kinds: dict[str, list[Capability]] = {}
 
     @cached_property
     def project(self) -> dict[str, object]:
@@ -370,10 +371,6 @@ class Registry:
     def plugin_errors(self) -> list[tuple[str, str]]:
         """(file, one-line error) for each project plugin that failed to load; those plugins are skipped."""
         return self._plugin_load[1]
-
-    @cached_property
-    def _kinds(self) -> dict[str, list[Capability]]:
-        return {}
 
     @property
     def items(self) -> list[Capability]:

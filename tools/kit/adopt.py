@@ -33,12 +33,6 @@ H1 = re.compile(r"(?m)^# (.+)$")
 INDEX_LINE = re.compile(r"<!--\s*index:")
 
 
-def kit_files(kit: Path) -> list[str]:
-    """Every kit file. Template-only material is copied too, so init prunes it the same way it does for
-    `make init`: links to it are rewritten to the template source and bindings to it are dropped."""
-    return repository_files(kit, walk=False)
-
-
 def colliding_targets(project_makefile: str, kit_makefile: str) -> list[str]:
     ours = set(MAKE_TARGET.findall(project_makefile)) - {".PHONY"}
     return sorted(name for name in set(MAKE_TARGET.findall(kit_makefile)) & ours if not name.startswith("."))
@@ -142,7 +136,7 @@ def adopt(target: Path, kit: Path, name: str, kind: str, owner: str | None) -> N
     before = set((git(target, "ls-files", "-z") or "").split("\0")) - {""}
     copied, kept, merged = [], [], []
     renamed: list[str] = []
-    for relative in kit_files(kit):
+    for relative in repository_files(kit, walk=False):  # template-only material too; init prunes it as make init does
         source, destination = kit / relative, target / relative
         if relative.startswith(".github/workflows/") and destination.exists():
             destination = destination.with_name("kit-" + destination.name)

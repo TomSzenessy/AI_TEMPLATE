@@ -236,9 +236,6 @@ def worktree_files(root: Path, *, walk: bool = True) -> list[Path]:
 
         for file_name in sorted(file_names):
             path = current_root / file_name
-            relative_parts = path.relative_to(root).parts
-            if any(part in IGNORED_WALK_DIRECTORIES for part in relative_parts[:-1]):
-                continue
             try:
                 file_stat = os.lstat(path)
             except OSError:

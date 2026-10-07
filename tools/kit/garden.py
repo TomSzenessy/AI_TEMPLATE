@@ -20,7 +20,7 @@ from .registry import Registry, run_checks
 
 
 
-def self_heal_errors(root: Path, project: dict[str, object] | None = None) -> list[str]:
+def self_heal_errors(root: Path) -> list[str]:
     """Findings of every blocking check in an enabled pack: the hard gate behind make check."""
     return run_checks(root, blocking_only=True)[0]
 

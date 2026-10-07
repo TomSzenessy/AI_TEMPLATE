@@ -137,7 +137,7 @@ def session_start(root: Path, event: dict[str, object] | None = None) -> None:
     print()
     print_map(root, limit=MAP_LIMIT)
     try:
-        findings = self_heal_errors(root, project)
+        findings = self_heal_errors(root)
     except Exception as error:  # noqa: BLE001 - the brief must survive a broken manifest
         findings = [str(error)]
     if healed:

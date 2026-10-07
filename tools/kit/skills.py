@@ -193,11 +193,8 @@ def check_skill_admission(root: Path, project: dict[str, object]) -> None:
         if not skill_directory.is_dir() or skill_directory.name.startswith("."):
             continue
         skill_file = skill_directory / "SKILL.md"
-        try:
-            skill_directory = ensure_inside_root(root, skill_directory, "skill directory")
-            skill_file = ensure_inside_root(root, skill_file, "bundled skill")
-        except RepoctlError as error:
-            raise RepoctlError(str(error)) from error
+        skill_directory = ensure_inside_root(root, skill_directory, "skill directory")
+        skill_file = ensure_inside_root(root, skill_file, "bundled skill")
         if not skill_file.is_file():
             raise RepoctlError(f"skill directory is missing SKILL.md: {skill_directory.relative_to(root).as_posix()}")
         name = skill_directory.name
