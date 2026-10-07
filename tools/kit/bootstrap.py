@@ -21,13 +21,14 @@ from .core import (
 from .gitinfo import path_matches
 
 
-def update_readme_identity(root: Path, name: str, kind: str) -> None:
+def update_readme_identity(root: Path, name: str, kind: str, old_name: str) -> None:
     readme = ensure_inside_root(root, root / "README.md", "project README")
     try:
         content = readme.read_text(encoding="utf-8")
     except FileNotFoundError:
         return
-    content = re.sub(r"^\s*# (?:Agent Template|AI_TEMPLATE)\s*$", f"# {name}", content, count=1, flags=re.MULTILINE)
+    heading = rf"^\s*# (?:Agent Template|{re.escape(old_name)})\s*$"
+    content = re.sub(heading, lambda _: f"# {name}", content, count=1, flags=re.MULTILINE)
     marker = "<!-- repoctl:project-readme -->"
     replacement = (
         f"{marker}\n> Project initialized: **{name}** (`{kind}`). Keep this identity,\n"
@@ -162,16 +163,16 @@ accepting.
 """
 
 
-def _template_record(path: Path) -> bool:
+def _template_record(path: Path, template_name: str) -> bool:
     """True for a missing record or the template's own one; a project's own record is never replaced."""
     try:
         text = path.read_text(encoding="utf-8")
     except FileNotFoundError:
         return True
-    return bool(re.search(r"(?m)^Project:\s*(AI_TEMPLATE|REPLACE_WITH_PROJECT_NAME)\s*$", text))
+    return bool(re.search(rf"(?m)^Project:\s*({re.escape(template_name)}|REPLACE_WITH_PROJECT_NAME)\s*$", text))
 
 
-def reset_vision_for_project(root: Path, manifest: str, project_name: str) -> str:
+def reset_vision_for_project(root: Path, manifest: str, project_name: str, template_name: str) -> str:
     """Pending intake records for the new project, never the template's own vision and stack text."""
     manifest = re.sub(
         r'(?ms)(\[vision\]\s*\n\s*status\s*=\s*)"[^"]+"',
@@ -181,12 +182,13 @@ def reset_vision_for_project(root: Path, manifest: str, project_name: str) -> st
     )
     for relative, skeleton in (("VISION.md", VISION_SKELETON), ("docs/STACK-DECISION.md", STACK_SKELETON)):
         path = ensure_inside_root(root, root / relative, "intake record")
-        if _template_record(path):
+        if _template_record(path, template_name):
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(skeleton.format(name=project_name), encoding="utf-8")
     return manifest
 
 
+COVERS = re.compile(r"<!--\s*covers:([^>]*?)-->")
 LINK = re.compile(r"(\]\()([^)\s]+)(\))")
 
 
@@ -244,11 +246,6 @@ def prune_template_material(root: Path, project: dict[str, object]) -> list[str]
     return removed
 
 
-COVERS = re.compile(r"<!--\s*covers:([^>]*?)-->")
-
-
-
-
 PACKS_TABLE = re.compile(r"(?ms)^\[packs\]\n.*?(?=^\[)")
 
 
@@ -289,17 +286,21 @@ def initialize_project(root: Path, name: str, kind: str, owner: str | None = Non
     current_name = re.search(r'^name = "([^"]*)"$', manifest, re.MULTILINE)
     if not current_name:
         raise RepoctlError("project.toml must contain a name field")
-    if current_name.group(1) not in {"REPLACE_WITH_PROJECT_NAME", "AI_TEMPLATE"}:
+    template_name = current_name.group(1)
+    current = load_project(root)
+    if template_name != "REPLACE_WITH_PROJECT_NAME" and current.get("kind") != "template":
         raise RepoctlError("project is already initialized; edit project.toml deliberately")
+    old_owners = [str(o) for o in current.get("owners", []) if isinstance(o, str)]
 
     manifest = replace_manifest_field(manifest, "name", name)
     manifest = replace_manifest_field(manifest, "kind", kind)
     manifest = replace_manifest_field(manifest, "phase", "development")
     manifest = re.sub(r'(?m)^github\s*=\s*"[^"]*"$', 'github = ""', manifest, count=1)
     manifest = re.sub(r'(?m)^owners\s*=\s*\[[^\]]*\]', 'owners = ["project-owner"]', manifest, count=1)
-    manifest = manifest.replace('owner = "TomSzenessy"', 'owner = "project-owner"')
+    for old_owner in old_owners:
+        manifest = manifest.replace(f'owner = "{old_owner}"', 'owner = "project-owner"')
     manifest = reset_template_surface(manifest)
-    manifest = reset_vision_for_project(root, manifest, name)
+    manifest = reset_vision_for_project(root, manifest, name, template_name)
     removed = prune_template_material(root, load_project(root))
     manifest = reset_repository_metadata(manifest)
     manifest = reset_packs(manifest)
@@ -311,7 +312,7 @@ def initialize_project(root: Path, name: str, kind: str, owner: str | None = Non
             if path.is_file():
                 path.write_text(path.read_text(encoding="utf-8").replace("Owner: project-owner", f"Owner: {owner}"), encoding="utf-8")
     manifest_path.write_text(manifest, encoding="utf-8")
-    update_readme_identity(root, name, kind)
+    update_readme_identity(root, name, kind, template_name)
     derive.sync(root)
     from .kitupdate import write_lock  # what this project got from the kit, so make kit-update can tell your edits apart
     write_lock(root, root)
