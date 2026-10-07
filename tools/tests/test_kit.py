@@ -808,6 +808,10 @@ class TrialTests(unittest.TestCase):
             for command in ("check", "finish"):  # a fresh project starts green, so its first gate failure is the agent's
                 result = subprocess.run([sys.executable, "tools/repoctl.py", command], cwd=project, capture_output=True, text=True)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            # The kit's own tests must pass in every project made from the template (two trials hit this).
+            suite = subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "tools/tests", "-p", "test_*.py"],
+                                   cwd=project, capture_output=True, text=True, timeout=900)
+            self.assertEqual(suite.returncode, 0, suite.stderr[-2000:])
 
 
 @template_only
