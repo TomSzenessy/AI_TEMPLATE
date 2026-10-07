@@ -858,6 +858,17 @@ class AdoptTests(unittest.TestCase):
         self.assertIn("commit or stash", self.adopt().stderr)
 
 
+class PinDriftTests(KitRepository):
+    def test_behind_pins_are_advisory_findings(self) -> None:
+        self.write("resources.toml", '[[mcp]]\nid = "pw"\ncommand = ["npx", "-y", "@playwright/mcp@0.0.83"]\n')
+        from kit.config import setting
+        latest = {"playwright": str(setting(self.root, "playwright_version")), "@playwright/mcp": "0.0.90"}
+        findings = garden.pin_drift(self.root, view=latest.get)
+        self.assertEqual(len(findings), 1)
+        self.assertIn("@playwright/mcp@0.0.83 (resources.toml) is behind 0.0.90", findings[0])
+        self.assertEqual(garden.pin_drift(self.root, view=lambda package: None), [], "offline: no finding")
+
+
 class DecisionAgeTests(unittest.TestCase):
     def test_old_decision_only_matters_at_the_release_gate(self) -> None:
         from datetime import timedelta

@@ -33,7 +33,7 @@ DEFAULTS: dict[str, object] = {
     # kinds (ios, android, desktop, game) are reviewed in a simulator instead.
     "preview_kinds": ["web", "app", "site", "pwa"],
     # Pinned Playwright for make ui-review (1.57 still supports Node 18).
-    "playwright_version": "1.57.0",
+    "playwright_version": "1.63.0",
     # Model for headless eval runs on hosts that accept one; cheap by default.
     "eval_model": "haiku",
 }

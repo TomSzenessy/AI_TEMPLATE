@@ -187,7 +187,7 @@ independent critic. Tune the globs per project. Never widen `low` to dodge a gat
 
 `make garden` aggregates every finding above plus advisory items (upcoming
 deprecations, paragraphs repeated across documents, unbound docs, skill
-reviews older than a year, GitHub metadata drift) and runs each
+reviews older than a year, GitHub metadata drift, npm pins behind their latest release) and runs each
 surface's own `garden` commands, for example a dead-code finder:
 
 ```toml

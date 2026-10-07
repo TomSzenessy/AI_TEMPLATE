@@ -9,6 +9,7 @@ renders Markdown suitable for a CI job summary or a gardener agent's brief.
 from __future__ import annotations
 
 import re
+import shutil
 import subprocess
 from datetime import date
 from pathlib import Path
@@ -81,6 +82,40 @@ def project_errors(root: Path, project: dict[str, object], files: list[str], doc
     return errors
 
 
+NPM_PIN = re.compile(r"^(@?[a-z0-9][\w.-]*(?:/[\w.-]+)?)@(\d+\.\d+\.\d+[\w.-]*)$")
+
+
+def npm_pins(root: Path) -> list[tuple[str, str, str]]:
+    """(package, pinned version, where) for npm pins the kit itself chooses."""
+    pins = [("playwright", str(setting(root, "playwright_version")), "[kit].playwright_version")]
+    text = (root / "resources.toml").read_text(encoding="utf-8") if (root / "resources.toml").is_file() else ""
+    for token in re.findall(r'"([^"\s]+@\d[^"\s]*)"', text):
+        match = NPM_PIN.match(token)
+        if match:
+            pins.append((match.group(1), match.group(2), "resources.toml"))
+    return pins
+
+
+def pin_drift(root: Path, view=None) -> list[str]:
+    """Advisory: a pinned tool behind its latest release. Bump deliberately, never automatically."""
+    if view is None:
+        if shutil.which("npm") is None:
+            return []
+
+        def view(package: str) -> str | None:
+            try:
+                result = subprocess.run(["npm", "view", package, "version"], capture_output=True, text=True, timeout=30, check=False)
+            except (OSError, subprocess.TimeoutExpired):
+                return None
+            return result.stdout.strip() if result.returncode == 0 else None
+    findings = []
+    for package, pinned, where in npm_pins(root):
+        latest = view(package)
+        if latest and latest != pinned:
+            findings.append(f"pin {package}@{pinned} ({where}) is behind {latest}: check its changelog, then bump and re-run the affected checks")
+    return findings
+
+
 def surface_garden_commands(project: dict[str, object]) -> list[tuple[str, list[str], str]]:
     commands = []
     for surface in declared_surfaces(project):
@@ -120,6 +155,7 @@ def garden_report(root: Path) -> tuple[str, int]:
         advisory += github.metadata_drift(root)
     except Exception as error:  # noqa: BLE001 - metadata drift is advisory only
         advisory.append(f"GitHub metadata check skipped: {error}")
+    advisory += pin_drift(root)
     if not has_history(root):
         advisory.append("git history unavailable or shallow: stale-document detection skipped (use fetch-depth: 0 in CI)")
 
