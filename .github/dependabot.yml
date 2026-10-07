@@ -5,7 +5,16 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    # Wait before proposing a fresh release; majors wait longer.
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
+    commit-message:
+      prefix: "build(deps)"
     groups:
-      github-actions:
-        patterns:
-          - "*"
+      # Minor and patch bumps share one pull request; major bumps are not
+      # grouped, so each arrives separately and is reviewed on its own.
+      github-actions-minor-patch:
+        update-types:
+          - minor
+          - patch

@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   issue-reference:
-    if: github.actor != 'dependabot[bot]'
+    if: github.event.pull_request.user.login != 'dependabot[bot]'
     name: issue reference
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -25,7 +25,5 @@ jobs:
       - name: Validate linked issues
         env:
           GH_TOKEN: ${{ github.token }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          GITHUB_API_URL: ${{ github.api_url }}
           PR_AUTHOR_ASSOCIATION: ${{ github.event.pull_request.author_association }}
         run: python3 tools/repoctl.py --root . ci pr-reference
