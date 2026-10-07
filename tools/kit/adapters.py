@@ -28,7 +28,9 @@ CLAUDE_MODELS = {"fast": "haiku", "balanced": "sonnet", "deep": "opus", "inherit
 CLAUDE_TOOLS = {
     "read-only": "Read, Grep, Glob, Bash",
     "docs-only": "Read, Grep, Glob, Bash, Edit, Write",
-    # web and full roles inherit every tool, including configured MCP servers.
+    # web: no Edit, Write, or Bash; the enabled MCP servers are appended per route (mcp_tool_names).
+    "web": "Read, Grep, Glob, WebSearch, WebFetch",
+    # full roles inherit every tool, including configured MCP servers.
 }
 HOOK = '"$CLAUDE_PROJECT_DIR/tools/repoctl" hook {event}'  # launcher picks Python 3.11+
 CLAUDE_ALLOWED_COMMANDS = [
@@ -49,10 +51,16 @@ def claude_settings(root: Path) -> tuple[dict[str, str], dict[str, str], list[st
     return models, tools, allow
 
 
+def mcp_tool_names(routes) -> list[str]:
+    """Server-level tool names (`mcp__<server>`) that let a restricted role reach enabled MCP routes."""
+    return [f"mcp__{route.name}" for route in routes]
+
+
 def render_claude(root: Path) -> dict[str, str]:
     files: dict[str, str] = {}
     models, tools, allow = claude_settings(root)
     registry = Registry(root)
+    routes = [route for route in registry.of("mcp") if route.fields.get("enabled", False)]
     for skill in registry.of("skill"):
         source = skill.path
         files[f".claude/skills/{skill.name}/SKILL.md"] = (
@@ -66,7 +74,10 @@ def render_claude(root: Path) -> dict[str, str]:
         access, tier = role.fields["access"], role.fields["tier"]
         header = [f"name: {role.name}", f"description: {yaml_string(role.description)}"]
         if access in tools:
-            header.append(f"tools: {tools[access]}")
+            listed = [name.strip() for name in tools[access].split(",") if name.strip()]
+            if access == "web":
+                listed += [name for name in mcp_tool_names(routes) if name not in listed]
+            header.append(f"tools: {', '.join(listed)}")
         header.append(f"model: {models[tier]}")
         files[f".claude/agents/{role.name}.md"] = (
             "---\n" + "\n".join(header) + "\n---\n"
@@ -75,7 +86,6 @@ def render_claude(root: Path) -> dict[str, str]:
             "`docs/delegation.md` (the brief and report contract) before acting, then do the "
             "task in your brief and answer only in the report format they define.\n"
         )
-    routes = [route for route in registry.of("mcp") if route.fields.get("enabled", False)]
     settings = {
         "$schema": "https://json.schemastore.org/claude-code-settings.json",
         "hooks": {

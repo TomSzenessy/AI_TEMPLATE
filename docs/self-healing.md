@@ -38,7 +38,7 @@ Otherwise it is **advisory** (`make garden`, the session brief) or an
   `private-preview` on; an issue's reviewer date never ages, because it
   belongs to the text it reviewed; during development `make garden` reports them and
   `make check` fails only on a future date.
-  `make test-future` (also in CI) runs the whole suite 800 days ahead, so a
+  `make test-future` (also in CI, with `KIT_SLOW=1`) runs the whole suite 800 days ahead (`make test-slow` adds the full inner runs), so a
   fixture or check pinned to a date fails now instead of in two years.
 - **Retire what never fires usefully.** A check that only ever produces
   bypasses, trailers, or ritual compliance is demoted to advisory or deleted
@@ -398,8 +398,9 @@ template's CI before it reaches a project.
 `.agents/evals/*.toml` holds navigation tasks with an expected-answer regex.
 `make eval AGENT=claude` (or `codex`, `gemini`; `MODEL=` overrides, and Claude
 defaults to the cheap `[kit].eval_model`, Haiku) runs each task in a fresh,
-read-only headless session (without MCP servers, so runs stay fast and
-deterministic) and records pass rate, turns, time, and cost under
+read-only headless session that cannot read `.agents/evals/` (its own answer key;
+expectations are anchored regexes that reject negated answers) and has no MCP
+servers, so runs stay fast and deterministic and records pass rate, turns, time, and cost under
 `.agent/evals/`. Re-run it after changing `AGENTS.md`, the map, or the docs.
 A change to the kit that lowers the pass rate or raises cost is a regression.
 For changes to the skills or gates, also run a **build trial**:

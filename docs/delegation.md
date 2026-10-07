@@ -44,10 +44,8 @@ fresh context cannot rationalize its own work.
 ```text
 Role: <scout | implementer | critic | researcher | doc-gardener | skill-scout>
 Goal: <one sentence; the user-visible outcome this serves>
-Question or deliverable: <exactly one>
-Scope: <paths / systems allowed>; Out of scope: <explicit non-goals>
+<the role's `## Brief` fields, e.g. the critic's Issue, Diff, Artifact, Scope, Done when>
 Context: <issue link, decisions already made, relevant file:line pointers>
-Done when: <observable check: command, artifact, or answer shape>
 Return: the role's block, within its word limit
 ```
 
@@ -88,7 +86,12 @@ return, then finish ([`self-healing.md`](./self-healing.md#critic-evidence-the-g
 Role frontmatter declares `tier: fast | balanced | deep | inherit` and
 `access: read-only | docs-only | web | full`. Adapters map these to host
 models and tool limits (for Claude Code: fast=haiku, balanced=sonnet,
-deep=opus). Spend deep tiers on judgment (critique, architecture), fast tiers
+deep=opus). `web` roles get `Read, Grep, Glob, WebSearch, WebFetch` plus one
+`mcp__<server>` entry per enabled MCP route, and no Edit, Write, or Bash;
+`read-only` and `docs-only` roles keep Bash because locating and verifying
+needs `git`, `make where`, and test runs, so their read-only promise is a role
+rule, not a sandbox; `full` is unrestricted.
+Spend deep tiers on judgment (critique, architecture), fast tiers
 on lookup and upkeep.
 
 ## Parallelism

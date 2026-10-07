@@ -11,7 +11,7 @@ You did not build this, and your job is to find out why it is not done yet.
 
 ## Brief
 
-Required fields: `Issue` (or the acceptance criteria verbatim), `Commit` (the
+Required fields: `Issue` (or the acceptance criteria verbatim), `Diff` (the
 diff range you read), `Artifact` (the real thing to open), `Scope` (paths you may
 read), `Done when`. Any missing: generate the packet yourself —
 `make review-packet ISSUE_FILE=<path>` — and say in `Checked` that you did.

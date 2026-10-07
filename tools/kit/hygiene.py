@@ -155,3 +155,33 @@ def workflow_errors(root: Path, files: list[str], max_lines: int = 10) -> list[s
                     "(unit-tested, runnable locally) and call it from the workflow"
                 )
     return errors
+
+
+# --- Final newline and host-twin drift ------------------------------------------------
+
+NEWLINE_SUFFIXES = {".md", ".py", ".toml", ".json", ".yml", ".yaml", ".txt", ".sh", ".cfg"}
+
+
+def final_newline_errors(root: Path, files: list[str]) -> list[str]:
+    """Tracked text files (known suffixes) must end with a newline: a lost one is silent corruption."""
+    errors = []
+    for relative in files:
+        if Path(relative).suffix.lower() not in NEWLINE_SUFFIXES:
+            continue
+        text = read_text_file(root, relative)
+        if text and not text.endswith("\n"):
+            errors.append(f"missing final newline: {relative} (append one)")
+    return errors
+
+
+def host_twin_errors(root: Path, first: str = "CLAUDE.md", second: str = "GEMINI.md") -> list[str]:
+    """The host entry files are twins: identical apart from the first heading line that names the host."""
+    bodies = []
+    for name in (first, second):
+        text = read_text_file(root, name)
+        if text is None:
+            return []  # a project without both twins has nothing to drift
+        bodies.append(text.split("\n", 1)[1] if "\n" in text else "")
+    if bodies[0] != bodies[1]:
+        return [f"{first} and {second} differ beyond the host name on line 1: make them identical (edit one, copy the body)"]
+    return []

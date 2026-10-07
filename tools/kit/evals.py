@@ -27,12 +27,17 @@ from .config import setting
 from .core import RepoctlError
 
 READ_ONLY_TOOLS = "Read Grep Glob Bash(make where:*) Bash(make map) Bash(git log:*) Bash(git status)"
+# The agent under test must not read its own answer key (.agents/evals/**), so the
+# claude command denies reads of it. Deny rules win over allow rules.
+EVAL_KEY = ".agents/evals"
+DENIED_READS = [f"{tool}({pattern})" for tool in ("Read", "Grep", "Glob") for pattern in (f"{EVAL_KEY}/**", f"**/{EVAL_KEY}/**")]
 HOST_COMMANDS = {
     # Navigation needs no MCP servers; an empty strict config keeps runs fast and deterministic.
     "claude": lambda prompt, model: [
         "claude", "-p", prompt, "--output-format", "json", "--strict-mcp-config",
         "--mcp-config", '{"mcpServers": {}}', *(["--model", model] if model else []),
         "--allowedTools", *READ_ONLY_TOOLS.split(" "),
+        "--disallowedTools", *DENIED_READS,
     ],
     "codex": lambda prompt, model: ["codex", "exec", "--sandbox", "read-only", *(["--model", model] if model else []), prompt],
     "gemini": lambda prompt, model: ["gemini", *(["--model", model] if model else []), "-p", prompt],
@@ -102,6 +107,10 @@ def load_tasks(root: Path, only: str | None = None) -> list[dict[str, str]]:
     return tasks
 
 
+def answer_matches(task: dict[str, str], answer: str) -> bool:
+    return bool(re.search(task["expect"], answer, re.IGNORECASE))
+
+
 def run_task(root: Path, host: str, task: dict[str, str], timeout: int, model: str = "") -> dict[str, object]:
     command = HOST_COMMANDS[host](PREFIX + task["prompt"], model)
     started = time.monotonic()
@@ -121,7 +130,7 @@ def run_task(root: Path, host: str, task: dict[str, str], timeout: int, model: s
                 return {**record, "passed": False, "error": answer[:300]}
         except json.JSONDecodeError:
             pass
-    record["passed"] = bool(re.search(task["expect"], answer, re.IGNORECASE))
+    record["passed"] = answer_matches(task, answer)
     record["answer"] = " ".join(answer.split())[:240]
     if result.returncode != 0 and not record["passed"]:
         record["error"] = (result.stderr or "").strip()[-300:]

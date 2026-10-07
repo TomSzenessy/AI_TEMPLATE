@@ -22,7 +22,7 @@ expect = "make where"
 [[tasks]]
 id = "canonical-skills"
 prompt = "Where do the canonical (non-generated) skill definitions live? Reply with the directory path only."
-expect = "\\.agents/skills"
+expect = '''^[\s`'"*]*(\./)?\.agents/skills/?[\s`'"*.]*$'''
 
 [[tasks]]
 id = "stale-doc-escape"
@@ -37,7 +37,7 @@ expect = "make new"
 [[tasks]]
 id = "generated-files"
 prompt = "A file under .claude/ looks wrong. Where do you make the fix so it sticks? Reply with the directory or file path only."
-expect = "\\.agents|resources\\.toml"
+expect = '''^[\s`'"*]*(\./)?(\.agents(/\S*)?|resources\.toml)[\s`'"*.]*$'''
 
 [[tasks]]
 id = "new-product-start"
@@ -52,7 +52,7 @@ expect = "stack-foundation"
 [[tasks]]
 id = "kickoff-without-owner"
 prompt = "You are running product-kickoff headless and cannot ask the owner anything. What do you do? Reply in one sentence."
-expect = "(write|print|list|post).{0,40}question|stop"
+expect = '''(?is)\A(?!.*(?:\bnot|\bnever|n't)\s+(?:\w+\s+){0,2}(?:write|print|list|post)).*(?:write|print|list|post)\w*\b.{0,40}question'''
 
 [[tasks]]
 id = "add-a-check"
@@ -62,7 +62,7 @@ expect = "make new KIND=check"
 [[tasks]]
 id = "add-an-mcp-server"
 prompt = "Where does a new MCP server route go in this repository? Reply with the repository-relative directory only."
-expect = "\\.agents/mcp/?"
+expect = '''^[\s`'"*]*(\./)?\.agents/mcp/?[\s`'"*.]*$'''
 
 [[tasks]]
 id = "switch-off-a-pack"
