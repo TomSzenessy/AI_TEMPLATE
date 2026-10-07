@@ -13,10 +13,8 @@ import os
 import sys
 from pathlib import Path
 
-try:
-    import tomllib  # noqa: F401 - fail fast with a clear message on old Pythons
-except ModuleNotFoundError as error:  # pragma: no cover - exercised on Python 3.10
-    raise SystemExit("repoctl requires Python 3.11 or newer") from error
+if sys.version_info < (3, 11):  # pragma: no cover - fail fast with a clear message on old Pythons
+    raise SystemExit("repoctl requires Python 3.11 or newer")
 
 from kit.core import RepoctlError
 from kit.registry import CORE, Registry

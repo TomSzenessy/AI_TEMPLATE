@@ -17,7 +17,7 @@ from pathlib import Path
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # `fixtures`, however this file is invoked (#33)
-from fixtures import (RECENT, REPOCTL, TOOLS, KitRepository, Scratch,  # noqa: E402  shared builders, in-process CLI, isolated git (#43)
+from fixtures import (RECENT, TOOLS, KitRepository, Scratch,  # noqa: E402  shared builders, in-process CLI, isolated git (#43)
                       clean_env, fake_gh, git_in, http_server, run_cli)
 
 from kit import (  # noqa: E402
@@ -984,7 +984,6 @@ class PinDriftTests(KitRepository):
 class DecisionAgeTests(unittest.TestCase):
     def test_old_decision_only_matters_at_the_release_gate(self) -> None:
         from datetime import timedelta
-        from kit import structure
         old, future = date.today() - timedelta(days=500), date.today() + timedelta(days=2)
         self.assertFalse(core.date_out_of_policy(old, release_gate=False), "make check must not rot with the calendar")
         self.assertTrue(core.date_out_of_policy(old, release_gate=True))
