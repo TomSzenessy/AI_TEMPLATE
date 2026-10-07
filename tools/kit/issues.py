@@ -175,7 +175,10 @@ def validate_issue_body(body: str, profile: str = "regulated") -> None:
         r"(?im)^Duplicate check:\s*searched\s+title,\s*symptom,\s*and\s+path\s+for\s+.+;\s*(?:reused\s+#[0-9]+|no duplicate found)\s*$",
         structural_body,
     ):
-        raise RepoctlError("issue body must record a duplicate search and result")
+        raise RepoctlError(
+            "issue body must record a duplicate search on its own line, exactly: 'Duplicate check: searched title, "
+            "symptom, and path for <terms>; no duplicate found' (or '; reused #N')"
+        )
     disclosure = issue_section(structural_body, "Disclosure classification")
     public_safe_pattern = (
         r"(?im)^\s*(?:-\s*)?(?:\*\*)?Public-safe:(?:\*\*)?\s*yes\s*$"
@@ -194,10 +197,10 @@ def validate_issue_body(body: str, profile: str = "regulated") -> None:
         raise RepoctlError("issue body requires a real reviewer/date for public filing")
     reviewer_name = re.split(r"\s+\d{4}-\d{2}-\d{2}\b", reviewer.group(1).strip(), maxsplit=1)[0].strip(" *_`")
     if is_placeholder(reviewer_name) or len(reviewer_name) < 3:
-        raise RepoctlError("issue reviewer/date must name a real reviewer")
+        raise RepoctlError("issue reviewer/date must name a real reviewer, e.g. '- **Reviewer/date:** octocat 2026-10-07'")
     reviewer_date = re.search(r"\b(\d{4}-\d{2}-\d{2})\b", reviewer.group(1))
     if not reviewer_date:
-        raise RepoctlError("issue reviewer/date must include an ISO date")
+        raise RepoctlError("issue reviewer/date must include an ISO date, e.g. '- **Reviewer/date:** octocat 2026-10-07'")
     try:
         parsed_reviewer_date = datetime.strptime(reviewer_date.group(1), "%Y-%m-%d").date()
     except ValueError as error:
@@ -218,6 +221,14 @@ def validate_issue_body(body: str, profile: str = "regulated") -> None:
         raise RepoctlError(
             "sensitive issue bodies cannot use the public adapter; redact them or use the private security route"
         )
+
+
+def validate_local_draft(body: str) -> None:
+    """A Local-WAL draft needs a concrete outcome and checkable criteria, nothing more yet."""
+    if len(issue_section(body, "Summary")) < 12:
+        raise RepoctlError("issue needs '### Summary' with the intended outcome in a sentence or more")
+    if not re.search(r"(?m)^\s*[-*]\s+\S", issue_section(body, "Acceptance criteria")):
+        raise RepoctlError("issue needs '### Acceptance criteria' with at least one '- [ ] <checkable outcome>' line")
 
 
 def issue_section(body: str, heading: str) -> str:
@@ -254,13 +265,17 @@ def validate_issue_content(body: str, status: str, profile: str = "regulated") -
         and not re.search(r"(?i)\b(?:test|check|observe|verify|pass|fail|artifact|state|command)\b", item)
         for item in criteria
     ):
-        raise RepoctlError("issue acceptance criteria must be concrete and evidence-bearing")
+        raise RepoctlError(
+            "issue acceptance criteria must be concrete and evidence-bearing: at least two '- [ ]' lines; a line mentioning criterion, evidence, or a "
+            "bracket must also say how it is checked (test, check, verify, observe, command, artifact)"
+        )
     if not any(
         re.search(r"(?i)negative|failure|regression|absence|does not|not\b", item)
         for item in checkboxes
     ):
         raise RepoctlError(
-            "issue acceptance criteria need a positive criterion and a negative/regression criterion"
+            "issue acceptance criteria need a positive criterion and a negative one "
+            "(a line containing 'does not', 'negative', 'failure', or 'regression')"
         )
     evidence = issue_section(body, "Evidence")
     if not re.search(r"(?i)\b(?:source|test|deployed|provider|hardware|counsel)\b", evidence):
@@ -322,12 +337,17 @@ def check_issue_for_duplicates(
         raise RepoctlError("issue body contains possible secret material: " + ", ".join(secret_labels))
     project = load_project(root)
     profile = governance_profile(project)
-    if profile != "minimal":
+    # Without a GitHub target the record is an ignored local draft: only its plan must be
+    # usable now. The full public contract applies when the draft is actually filed.
+    local_draft = profile == "agent-first" and not github_target_configured(root, project)
+    if profile == "minimal":
+        raise RepoctlError("minimal profile delegates issue filing and labels to the host organization")
+    if local_draft:
+        validate_local_draft(body)
+    else:
         validate_issue_body(body, profile)
         validate_issue_content(body, status, profile)
         validate_issue_state(body, status, profile)
-    else:
-        raise RepoctlError("minimal profile delegates issue filing and labels to the host organization")
     labels = issue_labels(root, issue_type, priority, area, topic, status, surface, gate)
     if issue_type == "security":
         raise RepoctlError(

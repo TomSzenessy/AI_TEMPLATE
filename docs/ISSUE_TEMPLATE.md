@@ -10,10 +10,13 @@ record when the root cause and acceptance boundary match.
 
 ## No GitHub remote yet
 
-`make issue` validates the body exactly as for GitHub, then, when the
-repository has no GitHub target, writes it as `Local-WAL-NNN` to ignored
-`.agent/wal/`. Cite that id in commits and file it for real once a remote
-exists. Never keep live work in a tracked Markdown file; `make check` rejects
+When the repository has no GitHub target (`agent-first`), `make issue` writes
+the record as `Local-WAL-NNN` to ignored `.agent/wal/` and checks only what the
+plan needs now: a `### Summary` with the outcome and at least one
+`- [ ]` acceptance criterion (plus the labels and the secret scan). The full
+contract below applies when you file the draft for real once a remote exists,
+so a local plan never costs a round of disclosure paperwork. Cite the id in
+commits. Never keep live work in a tracked Markdown file; `make check` rejects
 tracked backlogs.
 
 ## Duplicate check

@@ -485,6 +485,20 @@ verification = [["true"]]
         self.assertIn("Local-WAL-001", result.stdout)
         self.assertTrue((self.root / ".agent/wal/001-first-slice.md").is_file())
 
+    def test_local_draft_needs_only_outcome_and_criteria(self) -> None:
+        self.write(".github/issue-labels.json", (TOOLS.parent / ".github/issue-labels.json").read_text())
+        arguments = ("issue", "--title", "Second slice", "--body-file", "draft.md", "--type", "task",
+                     "--priority", "P2", "--area", "web", "--topic", "second-slice", "--status", "triage")
+        self.write("draft.md", "### Summary\nShare a trip by link.\n### Acceptance criteria\n- [ ] A second browser sees the trip.\n")
+        result = self.cli(*arguments)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Local-WAL-001", result.stdout)
+        self.write("draft.md", "### Summary\nShare a trip by link.\n")
+        self.assertIn("at least one '- [ ]", self.cli(*arguments).stderr)
+        self.write("project.toml", (self.root / "project.toml").read_text().replace("[adapters]", '[repository]\ngithub = "example/demo"\n\n[adapters]', 1))
+        self.write("draft.md", "### Summary\nShare a trip by link.\n### Acceptance criteria\n- [ ] A second browser sees the trip.\n")
+        self.assertIn("missing headings", self.cli(*arguments).stderr, "the full contract applies when filing for real")
+
 
 class ProductDriverTests(KitRepository):
     """make next walks a UI product from intake to launch; done means features evidenced."""
