@@ -351,6 +351,10 @@ class CommitGateTests(KitRepository):
         self.git("commit", "-q", "-m", "other")
         self.git("merge", "-q", "--no-commit", "--no-ff", "side")
         self.assertEqual(self.cli("hook", "commit-msg", self.message("Merge side\n")).returncode, 0)
+        # Code staged on top of the merge is not covered by the merged commits' decisions.
+        self.write("src/billing/extra.py", "X = 1\n")
+        self.git("add", "src/billing/extra.py")
+        self.assertEqual(self.cli("hook", "commit-msg", self.message("Merge side\n")).returncode, 3)
 
     def test_installed_git_hook_blocks_commit(self) -> None:
         hooks = self.root / ".githooks"
@@ -405,7 +409,9 @@ class CriticRegressionTests(KitRepository):
         # Build trial: a preemptive "tools/** untouched" silently exempted every doc.
         self.stage_billing_change()
         self.assertEqual(self.gate("change\n\nDocs-Unaffected: tools/** untouched\n"), 3)
-        self.assertEqual(self.gate("change\n\nDocs-Unaffected: src/billing renamed only\n"), 3)
+        self.assertEqual(self.gate("change\n\nDocs-Unaffected: src/billing/** renamed only\n"), 3)
+        self.assertEqual(self.gate("change\n\nDocs-Unaffected: src/billing/invoice.py renamed only\n"), 3)
+        self.assertEqual(self.gate("change\n\nDocs-Unaffected: UI/UX wording only\n"), 0, "prose stays a reason")
         self.assertEqual(self.gate("change\n\nDocs-Unaffected: rename only, no behavior change\n"), 0)
 
     def test_trailer_with_trailing_period_names_only_that_doc(self) -> None:

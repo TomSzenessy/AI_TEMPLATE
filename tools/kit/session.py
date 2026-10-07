@@ -229,10 +229,12 @@ def commit_gate(root: Path, message_file: str | None) -> int:
     # A merge commit brings in commits that already passed this gate or recorded a
     # Docs-Unaffected decision; re-asking would re-litigate it. make done and CI's
     # stale-document check still read those commits' trailers.
-    merging = git(root, "rev-parse", "-q", "--verify", "MERGE_HEAD") is not None
-    findings = [] if merging else [
+    merged_in: set[str] = set()
+    if git(root, "rev-parse", "-q", "--verify", "MERGE_HEAD") is not None:
+        merged_in = set((git(root, "diff", "--name-only", "HEAD...MERGE_HEAD") or "").split())
+    findings = [
         f"{doc} covers staged {', '.join(paths[:4])} but is not staged"
-        for doc, paths in docsync.pending_documents(doc_bindings, staged).items()
+        for doc, paths in docsync.pending_documents(doc_bindings, [p for p in staged if p not in merged_in]).items()
         if "*" not in exempt and doc not in exempt
     ]
     # Derived drift only matters when this commit touches a source of derived files.
@@ -244,7 +246,8 @@ def commit_gate(root: Path, message_file: str | None) -> int:
     print("Commit blocked by the self-healing gate (docs/self-healing.md):", file=sys.stderr)
     print("\n".join(f"- {item}" for item in findings[:15]), file=sys.stderr)
     print(
-        "Owed doc: update and stage it, or add the trailer 'Docs-Unaffected: <doc> <reason>'\n"
+        "Owed doc: update and stage it, or add the trailer 'Docs-Unaffected: <doc.md> <reason>'\n"
+        "  (name the doc itself; a code path or glob such as 'tools/** untouched' exempts nothing)\n"
         "  in the message's LAST paragraph (with any Co-Authored-By lines), as git requires.\n"
         "Derived file: run make sync and stage the result. Marker: fix the named line.",
         file=sys.stderr,

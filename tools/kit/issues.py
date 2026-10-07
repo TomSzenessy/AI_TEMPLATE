@@ -339,9 +339,9 @@ def check_issue_for_duplicates(
     profile = governance_profile(project)
     # Without a GitHub target the record is an ignored local draft: only its plan must be
     # usable now. The full public contract applies when the draft is actually filed.
-    local_draft = profile == "agent-first" and not github_target_configured(root, project)
     if profile == "minimal":
         raise RepoctlError("minimal profile delegates issue filing and labels to the host organization")
+    local_draft = profile == "agent-first" and not github_target_configured(root, project)
     if local_draft:
         validate_local_draft(body)
     else:

@@ -26,8 +26,7 @@ is not a diagnosis.
 
 You keep the goal, acceptance bar, and decisions. Hand bounded work to the
 roles in [`.agents/agents/`](./.agents/agents/) using the brief and the role
-table in [`docs/delegation.md`](./docs/delegation.md) (scout, implementer,
-critic, researcher, doc-gardener, skill-scout, plus any the project adds).
+table in [`docs/delegation.md`](./docs/delegation.md).
 Reports cite `path:line`; keep raw dumps out of your context.
 
 ## Extend the system
@@ -67,7 +66,7 @@ issues). Never change it silently; record the reason in the issue.
 
 [`docs/README.md`](./docs/README.md) lists every document and when to read it. Never skip:
 
-- **New product:** `product-kickoff`, then `stack-foundation`, then `make next` until launch ([`docs/building.md`](./docs/building.md)). **Anything users see:** `ux-quality` and `make ui-review`.
+- **New product:** `product-kickoff` (headless with no owner answers: write the questions with your picks, then stop), then `stack-foundation`, then `make next` until launch ([`docs/building.md`](./docs/building.md)). **Anything users see:** `ux-quality` and `make ui-review`.
 - **Vocabulary, architecture, seams:** [`CONTEXT.md`](./CONTEXT.md), [`docs/architecture/README.md`](./docs/architecture/README.md).
 - **Bug or incident:** [`docs/operations.md`](./docs/operations.md); reproduce first. **Release or quality claim:** [`docs/verification.md`](./docs/verification.md), [`docs/production.md`](./docs/production.md).
 - **Auth, secrets, dependencies, CI, untrusted input:** [`docs/security.md`](./docs/security.md).

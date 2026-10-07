@@ -134,6 +134,10 @@ def dead_bindings(doc_bindings: dict[str, list[str]], files: list[str]) -> list[
     return errors
 
 
+# A glob, a trailing slash, or a file-like path; prose such as "UI/UX" or "and/or" stays a reason.
+NON_DOC_SCOPE = re.compile(r"\*|/$|/.*/|/[^/]*[._]")
+
+
 def exemption_scope(values: list[str]) -> set[str] | None:
     """Docs exempted by Docs-Unaffected trailer values; None when nothing valid.
 
@@ -149,7 +153,7 @@ def exemption_scope(values: list[str]) -> set[str] | None:
         reason = [token for token in tokens if token.rstrip(".,;:") not in docs]
         # "tools/** untouched" names a scope that is not a document: in the build trial it
         # silently exempted every doc in a 15k-line commit. Name the doc instead.
-        if not docs and tokens and re.search(r"[/*]", tokens[0]):
+        if not docs and tokens and NON_DOC_SCOPE.search(tokens[0]):
             continue
         if reason:
             scope |= docs or {"*"}
