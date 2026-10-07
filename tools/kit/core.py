@@ -197,11 +197,19 @@ def markdown_link_target(raw_target: str) -> str:
 
 
 SENSITIVE_CONTENT_PATTERNS = {
-    "private key": re.compile(r"-----BEGIN (?:[A-Z0-9 ]*PRIVATE KEY|PGP PRIVATE KEY BLOCK)-----.*?-----END (?:[A-Z0-9 ]*PRIVATE KEY|PGP PRIVATE KEY BLOCK)-----", re.DOTALL),
+    "private key": re.compile(
+        r"-----BEGIN (?:[A-Z0-9 ]*PRIVATE KEY|PGP PRIVATE KEY BLOCK)-----"
+        r".*?"
+        r"-----END (?:[A-Z0-9 ]*PRIVATE KEY|PGP PRIVATE KEY BLOCK)-----",
+        re.DOTALL,
+    ),
     "GitHub token": re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b"),
     "AWS access key": re.compile(r"\bAKIA[0-9A-Z]{16}\b"),
     "authorization credential": re.compile(r"(?i)\b(?:authorization|proxy-authorization)\s*:\s*(?:bearer|basic)\s+[^\s]+"),
-    "credential assignment": re.compile(r"(?i)\b(?:api[_-]?key|password|passwd|access[_-]?token|client[_-]?secret|token|secret)\s*[:=]\s*[^\s]{12,}"),
+    "credential assignment": re.compile(
+        r"(?i)\b(?:api[_-]?key|password|passwd|access[_-]?token|client[_-]?secret|token|secret)"
+        r"\s*[:=]\s*[^\s]{12,}"
+    ),
 }
 
 
@@ -236,9 +244,6 @@ def worktree_files(root: Path, *, walk: bool = True) -> list[Path]:
 
         for file_name in sorted(file_names):
             path = current_root / file_name
-            relative_parts = path.relative_to(root).parts
-            if any(part in IGNORED_WALK_DIRECTORIES for part in relative_parts[:-1]):
-                continue
             try:
                 file_stat = os.lstat(path)
             except OSError:
@@ -269,12 +274,21 @@ def today() -> date:
     return datetime.now(timezone.utc).date()
 
 
-def date_is_future(value: "date") -> bool:
-    return value > today()
+def latest_today() -> date:
+    """The latest calendar day anywhere on Earth (UTC+14).
+
+    People write their local date. East of UTC, after local midnight, that date is
+    already ahead of `today()`; a "not in the future" rule must still accept it.
+    """
+    return (datetime.now(timezone.utc) + timedelta(hours=14)).date()
 
 
-def date_is_stale(value: "date") -> bool:
-    return value > today() or value < today() - timedelta(days=365)
+def date_is_future(value: date) -> bool:
+    return value > latest_today()
+
+
+def date_is_stale(value: date) -> bool:
+    return date_is_future(value) or value < today() - timedelta(days=365)
 
 
 def date_problem(value: str | None, stale: str, invalid: str) -> str | None:

@@ -160,7 +160,8 @@ findings, one root cause per change (see [`delegation.md`](./delegation.md)).
 - The stop gate judges only what this session changed: `session-start` records the dirty paths with
   content hashes and the current commit in `.agent/hook-state.json`, and `stop` judges the paths whose
   content differs plus the paths committed since that commit (no snapshot, or a start commit that is no
-  longer an ancestor, means the whole tree). An unresolved finding is raised once per turn until it is fixed or exempted by a
+  longer an ancestor, means the whole tree). The session's commits are judged with their
+  `Docs-Unaffected` trailers ([`bindings.md`](./bindings.md)), as `make done` judges them. An unresolved finding is raised once per turn until it is fixed or exempted by a
   trailer; `make done` still judges the whole branch.
 - Hooks, the git gate, and `make` run through `tools/repoctl`, which picks the
   newest Python 3.11+ on `PATH` even when `python3` is an older system

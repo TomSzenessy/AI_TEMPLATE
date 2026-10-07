@@ -143,7 +143,7 @@ def check_skill_provenance(project: dict[str, object], release_gate: bool = Fals
                 errors.append(f"skill #{position} permissions must use only read-only/project-local/host-adapter")
         rollback = skill.get("rollback")
         if isinstance(rollback, str):
-            if re.search(r"(?i)unknown|unclear|none|tbd|pending|never", rollback) or not re.search(
+            if re.search(r"(?i)\b(?:unknown|unclear|none|tbd|pending|never)\b", rollback) or not re.search(
                 r"(?i)\b(remove|revoke|restore|delete|uninstall|pin)\b", rollback
             ):
                 errors.append(f"skill #{position} rollback must name a concrete removal/revocation action")
@@ -193,11 +193,8 @@ def check_skill_admission(root: Path, project: dict[str, object]) -> None:
         if not skill_directory.is_dir() or skill_directory.name.startswith("."):
             continue
         skill_file = skill_directory / "SKILL.md"
-        try:
-            skill_directory = ensure_inside_root(root, skill_directory, "skill directory")
-            skill_file = ensure_inside_root(root, skill_file, "bundled skill")
-        except RepoctlError as error:
-            raise RepoctlError(str(error)) from error
+        skill_directory = ensure_inside_root(root, skill_directory, "skill directory")
+        skill_file = ensure_inside_root(root, skill_file, "bundled skill")
         if not skill_file.is_file():
             raise RepoctlError(f"skill directory is missing SKILL.md: {skill_directory.relative_to(root).as_posix()}")
         name = skill_directory.name

@@ -160,6 +160,13 @@ def next_step(root: Path) -> dict[str, str]:
                 "guide": "docs/self-healing.md", "verify": "make done"}
     vision = project.get("vision", {})
     ui = is_ui(root, project)
+    try:
+        has_must = any(row["priority"] == "must" for row in load_features(root))
+    except RepoctlError as error:  # a malformed features.csv must not hide the earlier steps
+        malformed = str(error)
+        has_must = False
+    else:
+        malformed = ""
     steps = [
         (not (isinstance(vision, dict) and vision.get("status") == "accepted"), "intake",
          "Ask the owner the kickoff questions (one round, with recommendations) and record VISION.md as accepted.",
@@ -169,8 +176,8 @@ def next_step(root: Path) -> dict[str, str]:
          "(first line under the title: <!-- index: extend | Comparable products and our angle | Scoping features -->).",
          "researcher role; product-recon and review-mining skills; browse the web",
          f"{RESEARCH} cites at least three sources"),
-        (not any(row["priority"] == "must" for row in load_features(root)), "features",
-         f"Write {FEATURES} from the research and owner answers, then append the relevant production rows "
+        (not has_must, "features",
+         (f"Fix {malformed} before anything else. " if malformed else "") + f"Write {FEATURES} from the research and owner answers, then append the relevant production rows "
          "(.agents/skills/product-kickoff/production-features.csv). Every must row gets an acceptance criterion.",
          "product-kickoff skill, step 4", "make next shows the build phase"),
         (ui and len(read_text_file(root, DESIGN) or "") < 300, "design",

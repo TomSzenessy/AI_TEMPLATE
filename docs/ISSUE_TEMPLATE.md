@@ -54,7 +54,8 @@ check comments with each problem and its fix, editing one marked comment rather 
 event; runs for the same issue cancel each other, so a filing with several labels validates once.
 `make issue` treats an existing issue as a duplicate when its normalized title matches, it carries the same
 `topic:` label, or it shares at least two path-shaped tokens with the new body. The `Reviewer/date` must not be in
-the future; it never expires, because it records the review of that text.
+the future, judged against the latest calendar day anywhere (UTC+14), so a reviewer's local date always passes;
+it never expires, because it records the review of that text.
 What changed in the covered code last: `issues.py`, `github.py`, and `ci.py`
 now run every git call through one wrapper (`gitinfo.run_git`) and date records
 with `core.today()` (one UTC day); the contract above is unchanged.

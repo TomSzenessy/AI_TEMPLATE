@@ -19,7 +19,8 @@ A document declares what it describes with one comment near its top, such as
   used everywhere: trailers belong in the message's last paragraph, and a
   trailer without a reason exempts nothing.
 - **Owed document**: covered paths changed on this branch while the doc did not;
-  the stop gate and `make done` report it before history even exists.
+  the stop gate and `make done` report it before history even exists. Both honour
+  the trailers on the commits they judge (`docsync.owed_since`).
 - **Command references**: every backticked `make <target>` or `repoctl <command>`
   in Markdown, and every `make` line in a code fence, must exist. A `make`
   reference resolves to the nearest Makefile above the document (and the

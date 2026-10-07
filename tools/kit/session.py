@@ -137,7 +137,7 @@ def session_start(root: Path, event: dict[str, object] | None = None) -> None:
     print()
     print_map(root, limit=MAP_LIMIT)
     try:
-        findings = self_heal_errors(root, project)
+        findings = self_heal_errors(root)
     except Exception as error:  # noqa: BLE001 - the brief must survive a broken manifest
         findings = [str(error)]
     if healed:
@@ -297,11 +297,13 @@ def critic_findings(root: Path, project: dict[str, object], base: str, only: lis
     return []
 
 
-def finish_findings(root: Path, session_paths: list[str] | None = None) -> list[str]:
+def finish_findings(root: Path, session_paths: list[str] | None = None, since: str | None = None) -> list[str]:
     """Fast completion gate over this branch's change set (commits since the base plus uncommitted).
 
-    `session_paths` narrows it to the uncommitted paths one session changed (the stop hook);
-    None judges the whole change set (`finish`, `make done`).
+    `session_paths` narrows it to the paths one session changed (the stop hook), and
+    `since` is the commit that session started at: its commits are judged with their
+    Docs-Unaffected trailers, as `make done` judges them. None judges the whole change
+    set (`finish`, `make done`).
     """
     project = load_project(root)
     base = default_branch(project)
@@ -312,8 +314,13 @@ def finish_findings(root: Path, session_paths: list[str] | None = None) -> list[
     files = repository_files(root)
     file_set = set(files)
     doc_bindings = docsync.bindings(root, files)
-    uncommitted = changed if scoped else changed_paths(root)
-    owed = {} if scoped else docsync.owed_documents(root, doc_bindings, base, uncommitted)
+    if scoped:
+        dirty = set(changed_paths(root))
+        uncommitted = [path for path in changed if path in dirty]
+        owed = docsync.owed_since(root, doc_bindings, f"{since}..HEAD", uncommitted) if since else {}
+    else:
+        uncommitted = changed_paths(root)
+        owed = docsync.owed_documents(root, doc_bindings, base, uncommitted)
     # Predict the commit gate too: it asks per commit, so a doc touched earlier on the
     # branch does not cover uncommitted code. Two gates that disagree cost a round trip.
     for doc, paths in docsync.pending_documents(doc_bindings, uncommitted).items():
@@ -416,7 +423,10 @@ def install_git_hooks(root: Path) -> str | None:
 def stop(root: Path, event: dict[str, object]) -> None:
     if event.get("stop_hook_active"):
         return  # the agent already continued once because of this gate
-    findings = finish_findings(root, session_changes(root, str(event.get("session_id", "local"))))
+    session = str(event.get("session_id", "local"))
+    paths = session_changes(root, session)
+    since = str(_load_state(root, session).get("snapshot_head", "")) or None if paths is not None else None
+    findings = finish_findings(root, paths, since)
     if findings:
         reason = f"{GATE_STOP_BLOCKED}:\n" + "\n".join(f"- {item}" for item in findings[:12])
         reason += "\nFix these (delegate doc work to the doc-gardener role if large), or explain to the user why they stay."

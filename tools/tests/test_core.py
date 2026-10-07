@@ -167,13 +167,14 @@ class DateHelperTests(unittest.TestCase):
 
     def test_future_and_stale(self) -> None:
         today = datetime.now(timezone.utc).date()
+        latest = core.latest_today()  # the latest local date anywhere: never "future" (test_local_dates.py)
         day = timedelta(days=1)
-        future = [(today, False), (today + day, True), (today - day, False)]
+        future = [(today, False), (latest, False), (latest + day, True), (today - day, False)]
         for value, expected in future:
             with self.subTest(value=str(value)):
                 self.assertIs(core.date_is_future(value), expected)
         stale = [(today, False), (today - timedelta(days=364), False), (today - timedelta(days=366), True),
-                 (today + day, True)]
+                 (latest + day, True)]
         for value, expected in stale:
             with self.subTest(value=str(value)):
                 self.assertIs(core.date_is_stale(value), expected)

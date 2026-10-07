@@ -36,7 +36,7 @@ def doc_meta(root: Path, files: list[str]) -> dict[str, dict[str, object]]:
     cache_path = root / META_CACHE
     try:
         cache = json.loads(cache_path.read_text(encoding="utf-8"))
-        cache = cache if isinstance(cache, dict) and cache.get("version") == 2 else {}
+        cache = cache if isinstance(cache, dict) and cache.get("version") == 3 else {}
     except (OSError, ValueError):
         cache = {}
     entries = cache.get("entries", {}) if isinstance(cache.get("entries"), dict) else {}
@@ -56,18 +56,16 @@ def doc_meta(root: Path, files: list[str]) -> dict[str, dict[str, object]]:
         else:
             text = INLINE_CODE.sub("", markdown_without_fenced_code(read_text_file(root, relative) or ""))
             index = INDEX_PATTERN.search(text)
-            title = re.search(r"(?m)^# (.+)$", text)
             meta = {
                 "covers": [p for match in COVERS_PATTERN.finditer(text) for p in match.group(1).split()],
                 "index": [part.strip() for part in index.group(1).split("|")] if index else None,
-                "title": title.group(1).strip() if title else relative,
             }
         fresh[relative] = [stamp, meta]
         result[relative] = meta
     if fresh != entries:
         try:
             cache_path.parent.mkdir(parents=True, exist_ok=True)
-            cache_path.write_text(json.dumps({"version": 2, "entries": fresh}), encoding="utf-8")
+            cache_path.write_text(json.dumps({"version": 3, "entries": fresh}), encoding="utf-8")
         except OSError:
             pass  # the cache is an optimization only
     return result
@@ -91,7 +89,10 @@ def index_errors(root: Path, files: list[str]) -> list[str]:
     for path, meta in sorted(doc_meta(root, files).items()):
         entry = meta["index"]
         if entry is not None and (len(entry) != 3 or entry[0] not in groups or not all(entry)):
-            errors.append(f"{path}: index declaration must be '<!-- index: {'|'.join(groups)} | owns | read when -->' (groups: project.toml [kit].doc_groups)")
+            errors.append(
+                f"{path}: index declaration must be '<!-- index: {'|'.join(groups)} | owns | read when -->' "
+                "(groups: project.toml [kit].doc_groups)"
+            )
     return errors
 
 
@@ -280,7 +281,14 @@ def owed_documents(
     Branch commits carrying a matching Docs-Unaffected trailer do not create debt.
     """
     merge_base = (git(root, "merge-base", "HEAD", base) or "").strip()
-    branch_commits = _history(root, f"{merge_base}..HEAD") if merge_base else []
+    return owed_since(root, doc_bindings, f"{merge_base}..HEAD" if merge_base else None, uncommitted)
+
+
+def owed_since(
+    root: Path, doc_bindings: dict[str, list[str]], revisions: str | None, uncommitted: list[str]
+) -> dict[str, list[str]]:
+    """Covered paths changed in `revisions` or uncommitted, per untouched doc (trailers honoured)."""
+    branch_commits = _history(root, revisions) if revisions else []
     touched_docs = set(uncommitted) | {path for _, _, paths in branch_commits for path in paths}
     owed: dict[str, list[str]] = {}
     for doc, patterns in sorted(doc_bindings.items()):
