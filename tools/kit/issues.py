@@ -359,8 +359,7 @@ def check_issue_for_duplicates(
         print(f"(GitHub target unavailable: {error})")
         return notice
     where = issue_section(body, "Where")
-    search_terms = tuple(term for term in (topic, where) if term.strip())
-    duplicate_results = check_github_duplicates(root, title, repository, search_terms)
+    duplicate_results = check_github_duplicates(root, title, repository)
     duplicates = [
         issue
         for issue in duplicate_results

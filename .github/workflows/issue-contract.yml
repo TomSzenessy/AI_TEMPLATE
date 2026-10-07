@@ -4,6 +4,10 @@ on:
   issues:
     types: [opened, edited, reopened, labeled, unlabeled, transferred]
 
+concurrency:
+  group: issue-contract-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   issues: write

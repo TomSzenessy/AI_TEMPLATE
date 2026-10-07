@@ -43,7 +43,10 @@ adds the canonical labels during triage. The `repoctl issue` path always emits
 the full required label set. In `regulated`, use the validated CLI/private
 route rather than native forms so the review-evidence and disclosure gates are
 not bypassed. When a natively filed issue misses the contract, the issue-contract
-check comments with each problem and its fix. The `Reviewer/date` must not be in
+check comments with each problem and its fix, editing one marked comment rather than adding a new one per
+event; runs for the same issue cancel each other, so a filing with several labels validates once.
+`make issue` treats an existing issue as a duplicate when its normalized title matches, it carries the same
+`topic:` label, or it shares at least two path-shaped tokens with the new body. The `Reviewer/date` must not be in
 the future; it never expires, because it records the review of that text.
 
 ## Classification

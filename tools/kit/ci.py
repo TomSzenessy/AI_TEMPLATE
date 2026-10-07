@@ -12,11 +12,13 @@ import json
 import os
 import re
 import subprocess
+import urllib.error
 import urllib.request
 from datetime import date
 from pathlib import Path
 from typing import Callable
 
+from .github import _gh
 from .core import RepoctlError, load_project, reject_secret_text, reviewer_problem
 from .issues import validate_issue_body, validate_issue_content, validate_issue_state
 
@@ -96,8 +98,11 @@ def github_issue_fetcher(repository: str, api_root: str, token: str) -> Callable
             f"{api_root.rstrip('/')}/repos/{repository}/issues/{number}",
             headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"},
         )
-        with urllib.request.urlopen(request, timeout=15) as response:
-            return json.load(response)
+        try:
+            with urllib.request.urlopen(request, timeout=15) as response:
+                return json.load(response)
+        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as error:
+            raise RepoctlError(f"could not fetch issue #{number} from {repository}: {error}") from error
 
     return fetch
 
@@ -205,6 +210,30 @@ INCOMPLETE = (
 )
 
 
+CONTRACT_MARKER = "<!-- issue-contract -->"
+
+
+def strip_mentions(value: str) -> str:
+    """Echoed issue text must not ping anyone: drop the @ of every mention."""
+    return re.sub(r"@(?=[\w-])", "", value)
+
+
+def post_contract_comment(repository: str, number: str, comment: str) -> None:
+    """Keep exactly one marker comment per issue: edit it if present, else create it."""
+    body = f"{CONTRACT_MARKER}\n{comment}"
+    found = _gh(
+        None,
+        [
+            "api", f"repos/{repository}/issues/{number}/comments", "--paginate",
+            "--jq", f'.[] | select(.body | contains("{CONTRACT_MARKER}")) | .id',
+        ],
+    ).split()
+    if found:
+        _gh(None, ["api", "-X", "PATCH", f"repos/{repository}/issues/comments/{found[0]}", "-f", f"body={body}"])
+    else:
+        _gh(None, ["api", "-X", "POST", f"repos/{repository}/issues/{number}/comments", "-f", f"body={body}"])
+
+
 def run_issue_contract(root: Path) -> str:
     event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text(encoding="utf-8"))
     issue = event.get("issue", {})
@@ -219,8 +248,8 @@ def run_issue_contract(root: Path) -> str:
     )
     number, repository = os.environ["ISSUE_NUMBER"], os.environ["GH_REPOSITORY"]
     if not valid:
-        comment = INCOMPLETE + "\n\nTo fix:\n" + "\n".join(f"- {reason}" for reason in reasons)
-        subprocess.run(["gh", "issue", "comment", number, "--repo", repository, "--body", comment], check=True)
+        comment = INCOMPLETE + "\n\nTo fix:\n" + "\n".join(f"- {strip_mentions(reason)}" for reason in reasons)
+        post_contract_comment(repository, number, comment)
         raise RepoctlError("Issue contract validation failed")
     if labels_to_add:
         subprocess.run(

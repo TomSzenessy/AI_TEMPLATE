@@ -385,7 +385,7 @@ critic_evidence = ["review.md"]
         github, log = self.github(results=unrelated)
         result = self.cli(*args, env={"PATH": f"{github}:{os.environ['PATH']}", "GH_LOG": str(log)})
         self.assertEqual(result.returncode, 0, result.stderr)
-        same_path = [{"number": 13, "title": "Different title", "body": "Authentication adapter and session refresh route (src/auth/session.ts)", "url": "u", "state": "OPEN"}]
+        same_path = [{"number": 13, "title": "Different title", "body": "Authentication adapter and session refresh route (src/auth/session.ts)", "labels": [{"name": "topic:session-refresh"}], "url": "u", "state": "OPEN"}]
         self.github(results=same_path)
         result = self.cli(*args, env={"PATH": f"{github}:{os.environ['PATH']}", "GH_LOG": str(log)})
         self.assertEqual(result.returncode, 1)
@@ -754,7 +754,7 @@ quality_oracle = "human review"
         self.assertIn("contents: read", issue_workflow)
         self.assertIn("actions/checkout@", issue_workflow)
         self.assertIn("topic", issue_workflow)
-        self.assertIn("labeled", issue_workflow)
+        self.assertIn("cancel-in-progress", issue_workflow)
         self.assertIn("registry_path", issue_workflow)
         self.assertIn("Disclosure class", issue_workflow)
         reference_workflow = kit_workflow(root, "require-issue-reference.yml").read_text(encoding="utf-8") + (root / "tools/kit/ci.py").read_text(encoding="utf-8")
