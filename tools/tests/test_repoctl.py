@@ -1,15 +1,11 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import os
 import re
-import subprocess
 import sys
-import tempfile
 import textwrap
 import unittest
-from datetime import date, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # `fixtures`, however this file is invoked (#33)
@@ -800,6 +796,7 @@ verification = [["python3", "-c", "print('ok')"]]
         self.assertIn("Minimal profile delegates issue intake", issue_workflow)
         workflow = kit_workflow(root, "require-issue-reference.yml").read_text(encoding="utf-8") + (root / "tools/kit/ci.py").read_text(encoding="utf-8")
         self.assertIn("Fixes", workflow)
+        self.assertIn("Security-Reference", workflow)
         self.assertIn("private security prs require", workflow.casefold())
     def test_incident_updates_empty_docs_marker_and_passes_check(self) -> None:
         result = self.cli("incident", "--title", "Probe failure", "--summary", "A reproducible probe")

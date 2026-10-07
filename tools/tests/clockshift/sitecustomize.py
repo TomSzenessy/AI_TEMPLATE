@@ -3,6 +3,12 @@
 Loaded through PYTHONPATH, so the kit subprocesses the tests start are shifted
 too. A suite that passes today but fails in two years has calendar rot (#10):
 fixtures and checks must follow the calendar, never a fixed date.
+
+Limits (#43 T-15): this shifts `date.today()`, `datetime.now()` and
+`datetime.date()` only. It does NOT shift git dates (author/committer dates in
+history stay real) and it does NOT touch `time.time()`/`time.monotonic()`.
+Tests must therefore never derive expectations from git history dates or epoch
+seconds; those stay real-time and unshifted even under `make test-future`.
 """
 
 import datetime as _dt

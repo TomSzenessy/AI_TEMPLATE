@@ -16,8 +16,8 @@ from datetime import date, timedelta
 from pathlib import Path
 from unittest import mock
 
-import fixtures  # noqa: E402  shared builders, in-process CLI, isolated git (#43)
-from fixtures import (RECENT, REPOCTL, TOOLS, KitRepository, Scratch,  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # `fixtures`, however this file is invoked (#33)
+from fixtures import (RECENT, REPOCTL, TOOLS, KitRepository, Scratch,  # noqa: E402  shared builders, in-process CLI, isolated git (#43)
                       clean_env, fake_gh, git_in, http_server, run_cli)
 
 from kit import (  # noqa: E402
