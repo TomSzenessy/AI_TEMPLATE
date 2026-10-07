@@ -278,8 +278,12 @@ def check_public_launch_evidence(root: Path, project: dict[str, object]) -> list
     return errors
 
 
+RELEASE_PHASES = {"private-preview", "public-launch"}
+
+
 def check_readiness(root: Path) -> None:
     project = load_project(root)
+    releasing = project.get("phase") in RELEASE_PHASES  # record ages and UI reviews gate releases, not development
     errors: list[str] = []
     try:
         profile = governance_profile(project)
@@ -288,7 +292,7 @@ def check_readiness(root: Path) -> None:
         errors.append(str(error))
 
     try:
-        check_vision(root, project)
+        check_vision(root, project, release_gate=releasing)
     except RepoctlError as error:
         errors.append(str(error))
     for check in (check_structure, check_docs_index, check_markdown_links, check_file_hygiene):
@@ -297,7 +301,7 @@ def check_readiness(root: Path) -> None:
         except RepoctlError as error:
             errors.append(str(error))
     try:
-        check_skill_provenance(project)
+        check_skill_provenance(project, release_gate=releasing)
         check_readme_identity(root, project)
     except RepoctlError as error:
         errors.append(str(error))
@@ -342,7 +346,7 @@ def check_readiness(root: Path) -> None:
                 validate_critic_evidence(root, surface)
             except RepoctlError as error:
                 errors.append(str(error))
-    if project.get("phase") in {"private-preview", "public-launch"}:
+    if releasing:
         errors.extend(review_status(root))  # one fresh, passing UI review before anyone outside uses it
 
     launch = project.get("launch", {})

@@ -883,6 +883,17 @@ class DecisionAgeTests(unittest.TestCase):
         self.assertTrue(structure._too_old_or_future(old, release_gate=True))
         self.assertTrue(structure._too_old_or_future(future, release_gate=False), "a future date is a typo")
 
+    def test_skill_review_age_gates_release_only(self) -> None:
+        import tomllib
+        from datetime import timedelta
+        from kit import skills
+        project = tomllib.loads((TOOLS.parent / "project.toml").read_text())
+        for skill in project.get("skills", []):
+            skill["reviewed_on"] = (date.today() - timedelta(days=500)).isoformat()
+        skills.check_skill_provenance(project)  # development: make garden reports the age instead
+        with self.assertRaisesRegex(Exception, "older than a year"):
+            skills.check_skill_provenance(project, release_gate=True)
+
 
 class DerivedContentTests(KitRepository):
     def test_index_is_generated_from_declarations(self) -> None:

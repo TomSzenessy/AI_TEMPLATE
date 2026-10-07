@@ -289,13 +289,14 @@ def check_structure(root: Path, project: dict[str, object]) -> None:
 def _too_old_or_future(value: date, release_gate: bool) -> bool:
     """A future date is always a typo; age only matters at the release gate (make readiness).
 
-    A vision accepted 13 months ago is not wrong, so `make check` never fails on age alone:
+    A vision accepted 13 months ago is not wrong, so `make check` and `make done` never fail on age alone
+    during development; from private-preview on, `make readiness` asks for a fresh confirmation:
     re-dating a file to satisfy a clock is ritual, not evidence.
     """
     return date_is_stale(value) if release_gate else value > datetime.now(timezone.utc).date()
 
 
-def check_vision(root: Path, project: dict[str, object], enforce: bool = True) -> None:
+def check_vision(root: Path, project: dict[str, object], enforce: bool = True, release_gate: bool = False) -> None:
     if "vision" not in project:
         raise RepoctlError("project.toml must declare the vision intake record")
     vision = project.get("vision", {})
@@ -325,7 +326,7 @@ def check_vision(root: Path, project: dict[str, object], enforce: bool = True) -
     if not vision_owner or is_placeholder(vision_owner.group(1)) or not vision_date:
         raise RepoctlError("accepted vision record must name an owner and valid date")
     try:
-        if _too_old_or_future(datetime.strptime(vision_date.group(1), "%Y-%m-%d").date(), enforce):
+        if _too_old_or_future(datetime.strptime(vision_date.group(1), "%Y-%m-%d").date(), release_gate):
             raise RepoctlError("accepted vision record date is stale or future-dated")
     except ValueError as error:
         raise RepoctlError("accepted vision record date is invalid") from error
@@ -347,7 +348,7 @@ def check_vision(root: Path, project: dict[str, object], enforce: bool = True) -
         if not stack_owner or is_placeholder(stack_owner.group(1)) or not stack_date:
             raise RepoctlError("project stack decision must name an owner and valid date")
         try:
-            if _too_old_or_future(datetime.strptime(stack_date.group(1), "%Y-%m-%d").date(), enforce):
+            if _too_old_or_future(datetime.strptime(stack_date.group(1), "%Y-%m-%d").date(), release_gate):
                 raise RepoctlError("project stack decision date is stale or future-dated")
         except ValueError as error:
             raise RepoctlError("project stack decision date is invalid") from error

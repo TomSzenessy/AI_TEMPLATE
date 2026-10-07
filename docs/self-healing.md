@@ -33,8 +33,10 @@ Otherwise it is **advisory** (`make garden`, the session brief) or an
 - **Ceremony scales with risk.** `make risk` decides; a `low` change never
   inherits `high` ceremony.
 - **No calendar rot.** A check must not start failing on an unchanged
-  repository because time passed. Record age (vision, stack decision) is
-  checked only by `make readiness`; `make check` fails only on a future date.
+  repository because time passed. Record and review ages (vision, stack
+  decision, skill provenance) fail only `make readiness` from
+  `private-preview` on; during development `make garden` reports them and
+  `make check` fails only on a future date.
   `make test-future` (also in CI) runs the whole suite 800 days ahead, so a
   fixture or check pinned to a date fails now instead of in two years.
 - **Retire what never fires usefully.** A check that only ever produces

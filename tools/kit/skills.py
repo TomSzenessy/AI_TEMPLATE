@@ -81,7 +81,8 @@ def load_resource_registry(root: Path, project: dict[str, object] | None = None)
     return entries
 
 
-def check_skill_provenance(project: dict[str, object]) -> None:
+def check_skill_provenance(project: dict[str, object], release_gate: bool = False) -> None:
+    """Provenance must be complete. Review age is a release gate; make garden reports it earlier."""
     skills = project.get("skills", [])
     if not isinstance(skills, list) or not all(isinstance(skill, dict) for skill in skills):
         raise RepoctlError("project.toml skills must be an array of tables")
@@ -129,8 +130,10 @@ def check_skill_provenance(project: dict[str, object]) -> None:
             try:
                 reviewed_date = datetime.strptime(reviewed_on, "%Y-%m-%d").date()
                 today = datetime.now(timezone.utc).date()
-                if reviewed_date > today or reviewed_date < today - timedelta(days=365):
-                    errors.append(f"skill #{position} reviewed_on is stale or in the future")
+                if reviewed_date > today:
+                    errors.append(f"skill #{position} reviewed_on is in the future")
+                elif release_gate and reviewed_date < today - timedelta(days=365):
+                    errors.append(f"skill #{position} reviewed_on is older than a year: re-review it before release")
             except ValueError:
                 errors.append(f"skill #{position} reviewed_on must be YYYY-MM-DD")
         permissions = skill.get("permissions")
