@@ -931,7 +931,17 @@ class AdoptTests(Scratch):
         self.assertIn("infrastructure_paths", check.stderr, "the message names the fix")
         from kit import docs
         docs.check_markdown_links(self.root)  # links to pruned template material point at the template source
-        self.assertNotIn(".agents/trials", (self.root / "docs/self-healing.md").read_text().split("-->")[1])
+        # Trial specs have exactly one owner doc (docs/evals.md binds .agents/trials/**). An adopted
+        # project prunes the specs, so every binding to them must go with them (EL-002): nothing in
+        # the project may claim them any more, and in the template they are claimed exactly once.
+        def trial_binders(root: Path, files: list[str]) -> set[str]:
+            bindings = docsync.bindings(root, files)
+            return {doc for doc, globs in bindings.items() if any(".agents/trials" in glob for glob in globs)}
+
+        self.assertEqual(trial_binders(self.root, core.repository_files(self.root)), set(),
+                         "a binding to pruned trial specs must be dropped, or check reports it dead")
+        self.assertEqual(trial_binders(TOOLS.parent, core.repository_files(TOOLS.parent)),
+                         {"docs/evals.md"}, "the evals owner doc binds trial specs, and it alone")
         finish = self.cli("finish")
         self.assertEqual(finish.returncode, 0, finish.stdout)
         self.assertEqual(self.adopt().returncode, 1, "adopting twice is refused")
