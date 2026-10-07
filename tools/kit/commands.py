@@ -236,9 +236,12 @@ def init(root: Path, args) -> None:
 
 @command("adopt", "Bring this kit into an existing repository (--root) without overwriting it", group="setup",
          usage="make -f <kit>/Makefile adopt NAME=x KIND=web OWNER=you",
-         make=('$(if $(NAME),,$(error Name the project: make -f <kit>/Makefile adopt NAME=my-app KIND=web OWNER=you))\n'
-               '\t$(PYTHON) "$(KIT_DIR)/tools/repoctl.py" --root "$(CURDIR)" adopt --from "$(KIT_DIR)" --name "$${NAME}" '
-               '--kind "$${KIND}" $(if $(OWNER),--owner "$${OWNER}",)'),
+         make=('$(if $(KIT_IN_NAME),,$(error Name the project: make -f <kit>/Makefile adopt NAME=my-app KIND=web OWNER=you; '
+               'if the kit path is not found add KIT_DIR=<kit>))\n'
+               '\t$(if $(shell test -f "$(KIT_DIR)/tools/repoctl.py" && echo ok),,$(error KIT_DIR is not a kit checkout: '
+               'pass KIT_DIR=<kit> (the directory holding tools/repoctl.py)))\n'
+               '\t$(PYTHON) "$${KIT_DIR}/tools/repoctl.py" --root "$(CURDIR)" adopt --from "$${KIT_DIR}" --name "$${KIT_IN_NAME}" '
+               '--kind "$${KIT_IN_KIND}" $(if $(KIT_IN_OWNER),--owner "$${KIT_IN_OWNER}",)'),
          args=(
     arg("--from", dest="kit", type=Path, required=True, help="the kit (template) checkout"),
     arg("--name", required=True),

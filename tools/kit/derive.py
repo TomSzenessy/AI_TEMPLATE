@@ -44,18 +44,31 @@ def render_rules(registry: Registry) -> str:
     return "\n".join(lines) or "- none yet (`make new KIND=rule`)"
 
 
+def _input(var: str) -> str:
+    """The make variable holding what the user typed for `var` on the command line."""
+    return f"KIT_IN_{var}"
+
+
 def _make_argument(argument) -> str:
+    var = _input(argument.var)
     if argument.boolean:
-        return f"$(if $(filter 1 yes true,$({argument.var})),{argument.flags[0]},)"
+        return f"$(if $(filter 1 yes true,$({var})),{argument.flags[0]},)"
     if argument.positional:
-        return f'"$${{{argument.var}}}"'
-    return f'$(if $({argument.var}),{argument.flags[0]} "$${{{argument.var}}}",)'
+        return f'"$${{{var}}}"'
+    return f'$(if $({var}),{argument.flags[0]} "$${{{var}}}",)'
+
+
+def render_inputs(commands) -> list[str]:
+    """One exported variable per input: only a value given on the make command line, taken
+    verbatim with $(value) so `$` is data (not make syntax) and ambient environment is ignored."""
+    names = sorted({argument.var for item in commands for argument in item.fields["args"] if argument.var})
+    return [f"export {_input(name)} = $(if $(filter command line,$(origin {name})),$(value {name}))" for name in names]
 
 
 def render_commands(registry: Registry) -> str:
     """Make targets for every command: recipes pass make variables as data, never as shell source."""
     commands = [item for item in registry.of("command", enabled_only=False) if item.fields["make"] is not None]
-    lines = [".PHONY: " + " ".join(item.fields["target"] for item in commands)]
+    lines = [".PHONY: " + " ".join(item.fields["target"] for item in commands), "", *render_inputs(commands)]
     for item in commands:
         lines += ["", f"{item.fields['target']}: python-check"]
         if item.fields["make"]:
@@ -64,8 +77,12 @@ def render_commands(registry: Registry) -> str:
         arguments = [argument for argument in item.fields["args"] if argument.var]
         for argument in arguments:
             if argument.hint:
-                lines.append(f"\t$(if $({argument.var}),,$(error {argument.hint}))")
-        parts = ["@$(REPOCTL)", item.name, *(_make_argument(argument) for argument in arguments)]
+                lines.append(f"\t$(if $({_input(argument.var)}),,$(error {argument.hint}))")
+        flags = [argument for argument in arguments if not argument.positional]
+        positionals = [argument for argument in arguments if argument.positional]
+        parts = ["@$(REPOCTL)", item.name, *(_make_argument(argument) for argument in flags)]
+        if positionals:
+            parts += ["--", *(_make_argument(argument) for argument in positionals)]
         if item.fields["make_extra"]:
             parts.append(item.fields["make_extra"])
         lines.append("\t" + " ".join(parts))

@@ -1351,7 +1351,7 @@ class CapabilityModelTests(KitRepository):
 
     def test_makefile_commands_are_generated_and_drift_fails(self) -> None:
         makefile = (self.root / "Makefile").read_text()
-        self.assertIn('@$(REPOCTL) where "$${Q}"', makefile)
+        self.assertIn('@$(REPOCTL) where -- "$${KIT_IN_Q}"', makefile)
         self.assertIn("$(error Add what to look for", makefile)
         self.write("Makefile", makefile.replace("@$(REPOCTL) where", "@$(REPOCTL) wherever"))
         self.assertIn("derived file out of date: Makefile", self.self_heal())

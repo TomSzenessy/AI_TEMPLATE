@@ -3,7 +3,12 @@
 PYTHON ?= $(shell for p in python3.14 python3.13 python3.12 python3.11 python3 python; do command -v $$p >/dev/null 2>&1 && $$p -c 'import sys; sys.exit(sys.version_info < (3, 11))' 2>/dev/null && { echo $$p; break; }; done)
 REPOCTL := $(PYTHON) tools/repoctl.py
 # This kit's directory, also when run from another repository with make -f (make adopt).
-KIT_DIR := $(patsubst %/,%,$(dir $(abspath $(firstword $(MAKEFILE_LIST)))))
+# Read from the single MAKEFILE_LIST entry through the shell so a path with spaces survives;
+# override with KIT_DIR=<kit> (adopt fails fast, naming KIT_DIR, when this is not a kit).
+ifndef KIT_DIR
+KIT_DIR := $(shell cd "$$(dirname "$(strip $(MAKEFILE_LIST))")" 2>/dev/null && pwd)
+endif
+export KIT_DIR
 SKILL_TEST_SUITES := $(wildcard .agents/skills/*/tests)
 
 .DEFAULT_GOAL := help
@@ -22,10 +27,10 @@ test: python-check
 
 # The same suite 800 days ahead: fails when a fixture or check rots with the calendar (#10).
 test-future: python-check
-	PYTHONPATH="$(CURDIR)/tools/tests/clockshift" SHIFT_DAYS=800 $(MAKE) test
+	PYTHONPATH="$(CURDIR)/tools/tests/clockshift" SHIFT_DAYS=800 $(MAKE) --no-print-directory test
 
 verify: python-check
-	$(MAKE) test
+	$(MAKE) --no-print-directory test
 	$(REPOCTL) verify
 	$(REPOCTL) doctor
 
@@ -43,6 +48,39 @@ done: python-check
 # <repoctl:commands>
 .PHONY: start next where ui-review new similar capabilities risk handover map garden sync issue review-packet incident init adopt kit-update check doctor readiness inventory resources skill-digest validate labels github-sync eval trial help
 
+export KIT_IN_ACCESS = $(if $(filter command line,$(origin ACCESS)),$(value ACCESS))
+export KIT_IN_AGENT = $(if $(filter command line,$(origin AGENT)),$(value AGENT))
+export KIT_IN_AREA = $(if $(filter command line,$(origin AREA)),$(value AREA))
+export KIT_IN_BODY = $(if $(filter command line,$(origin BODY)),$(value BODY))
+export KIT_IN_BUDGET = $(if $(filter command line,$(origin BUDGET)),$(value BUDGET))
+export KIT_IN_COVERS = $(if $(filter command line,$(origin COVERS)),$(value COVERS))
+export KIT_IN_DESC = $(if $(filter command line,$(origin DESC)),$(value DESC))
+export KIT_IN_FORCE = $(if $(filter command line,$(origin FORCE)),$(value FORCE))
+export KIT_IN_GATE = $(if $(filter command line,$(origin GATE)),$(value GATE))
+export KIT_IN_GROUP = $(if $(filter command line,$(origin GROUP)),$(value GROUP))
+export KIT_IN_ISSUE_FILE = $(if $(filter command line,$(origin ISSUE_FILE)),$(value ISSUE_FILE))
+export KIT_IN_KIND = $(if $(filter command line,$(origin KIND)),$(value KIND))
+export KIT_IN_KIT = $(if $(filter command line,$(origin KIT)),$(value KIT))
+export KIT_IN_MODEL = $(if $(filter command line,$(origin MODEL)),$(value MODEL))
+export KIT_IN_NAME = $(if $(filter command line,$(origin NAME)),$(value NAME))
+export KIT_IN_OWNER = $(if $(filter command line,$(origin OWNER)),$(value OWNER))
+export KIT_IN_PACK = $(if $(filter command line,$(origin PACK)),$(value PACK))
+export KIT_IN_PRIORITY = $(if $(filter command line,$(origin PRIORITY)),$(value PRIORITY))
+export KIT_IN_PUBLIC_REVIEWED = $(if $(filter command line,$(origin PUBLIC_REVIEWED)),$(value PUBLIC_REVIEWED))
+export KIT_IN_PUBLIC_SAFE = $(if $(filter command line,$(origin PUBLIC_SAFE)),$(value PUBLIC_SAFE))
+export KIT_IN_Q = $(if $(filter command line,$(origin Q)),$(value Q))
+export KIT_IN_REVIEW_EVIDENCE = $(if $(filter command line,$(origin REVIEW_EVIDENCE)),$(value REVIEW_EVIDENCE))
+export KIT_IN_SKILL_PATH = $(if $(filter command line,$(origin SKILL_PATH)),$(value SKILL_PATH))
+export KIT_IN_STATUS = $(if $(filter command line,$(origin STATUS)),$(value STATUS))
+export KIT_IN_SUMMARY = $(if $(filter command line,$(origin SUMMARY)),$(value SUMMARY))
+export KIT_IN_SURFACE = $(if $(filter command line,$(origin SURFACE)),$(value SURFACE))
+export KIT_IN_TASKS = $(if $(filter command line,$(origin TASKS)),$(value TASKS))
+export KIT_IN_TIER = $(if $(filter command line,$(origin TIER)),$(value TIER))
+export KIT_IN_TITLE = $(if $(filter command line,$(origin TITLE)),$(value TITLE))
+export KIT_IN_TOPIC = $(if $(filter command line,$(origin TOPIC)),$(value TOPIC))
+export KIT_IN_TYPE = $(if $(filter command line,$(origin TYPE)),$(value TYPE))
+export KIT_IN_WAL = $(if $(filter command line,$(origin WAL)),$(value WAL))
+
 start: python-check
 	@$(REPOCTL) start
 
@@ -50,21 +88,21 @@ next: python-check
 	@$(REPOCTL) next
 
 where: python-check
-	$(if $(Q),,$(error Add what to look for: make where Q="login form"))
-	@$(REPOCTL) where "$${Q}"
+	$(if $(KIT_IN_Q),,$(error Add what to look for: make where Q="login form"))
+	@$(REPOCTL) where -- "$${KIT_IN_Q}"
 
 ui-review: python-check
 	@$(REPOCTL) ui-review
 
 new: python-check
-	$(if $(KIND),,$(error Choose what to create: make new KIND=skill|agent|doc|rule|check|command|mcp|pack NAME=my-name DESC="what it does; when to use it"))
-	$(if $(NAME),,$(error Name it: NAME=kebab-case-name))
-	$(if $(DESC),,$(error Describe it: DESC="what it does; when to use it"))
-	@$(REPOCTL) new $(if $(KIND),--kind "$${KIND}",) $(if $(NAME),--name "$${NAME}",) $(if $(DESC),--description "$${DESC}",) $(if $(PACK),--pack "$${PACK}",) $(if $(GROUP),--group "$${GROUP}",) $(if $(COVERS),--covers "$${COVERS}",) $(if $(ACCESS),--access "$${ACCESS}",) $(if $(TIER),--tier "$${TIER}",) $(if $(filter 1 yes true,$(FORCE)),--force,)
+	$(if $(KIT_IN_KIND),,$(error Choose what to create: make new KIND=skill|agent|doc|rule|check|command|mcp|pack NAME=my-name DESC="what it does; when to use it"))
+	$(if $(KIT_IN_NAME),,$(error Name it: NAME=kebab-case-name))
+	$(if $(KIT_IN_DESC),,$(error Describe it: DESC="what it does; when to use it"))
+	@$(REPOCTL) new $(if $(KIT_IN_KIND),--kind "$${KIT_IN_KIND}",) $(if $(KIT_IN_NAME),--name "$${KIT_IN_NAME}",) $(if $(KIT_IN_DESC),--description "$${KIT_IN_DESC}",) $(if $(KIT_IN_PACK),--pack "$${KIT_IN_PACK}",) $(if $(KIT_IN_GROUP),--group "$${KIT_IN_GROUP}",) $(if $(KIT_IN_COVERS),--covers "$${KIT_IN_COVERS}",) $(if $(KIT_IN_ACCESS),--access "$${KIT_IN_ACCESS}",) $(if $(KIT_IN_TIER),--tier "$${KIT_IN_TIER}",) $(if $(filter 1 yes true,$(KIT_IN_FORCE)),--force,)
 
 similar: python-check
-	$(if $(Q),,$(error Describe the capability: make similar Q="draft release notes"))
-	@$(REPOCTL) similar "$${Q}"
+	$(if $(KIT_IN_Q),,$(error Describe the capability: make similar Q="draft release notes"))
+	@$(REPOCTL) similar -- "$${KIT_IN_Q}"
 
 capabilities: python-check
 	@$(REPOCTL) capabilities
@@ -85,28 +123,29 @@ sync: python-check
 	@$(REPOCTL) sync
 
 issue: python-check
-	@$(REPOCTL) issue $(if $(WAL),--wal "$${WAL}",) $(if $(TITLE),--title "$${TITLE}",) $(if $(BODY),--body-file "$${BODY}",) $(if $(TYPE),--type "$${TYPE}",) $(if $(PRIORITY),--priority "$${PRIORITY}",) $(if $(AREA),--area "$${AREA}",) $(if $(TOPIC),--topic "$${TOPIC}",) $(if $(STATUS),--status "$${STATUS}",) $(if $(SURFACE),--surface "$${SURFACE}",) $(if $(GATE),--gate "$${GATE}",) $(if $(filter 1 yes true,$(PUBLIC_REVIEWED)),--public-reviewed,) $(if $(REVIEW_EVIDENCE),--review-evidence "$${REVIEW_EVIDENCE}",)
+	@$(REPOCTL) issue $(if $(KIT_IN_WAL),--wal "$${KIT_IN_WAL}",) $(if $(KIT_IN_TITLE),--title "$${KIT_IN_TITLE}",) $(if $(KIT_IN_BODY),--body-file "$${KIT_IN_BODY}",) $(if $(KIT_IN_TYPE),--type "$${KIT_IN_TYPE}",) $(if $(KIT_IN_PRIORITY),--priority "$${KIT_IN_PRIORITY}",) $(if $(KIT_IN_AREA),--area "$${KIT_IN_AREA}",) $(if $(KIT_IN_TOPIC),--topic "$${KIT_IN_TOPIC}",) $(if $(KIT_IN_STATUS),--status "$${KIT_IN_STATUS}",) $(if $(KIT_IN_SURFACE),--surface "$${KIT_IN_SURFACE}",) $(if $(KIT_IN_GATE),--gate "$${KIT_IN_GATE}",) $(if $(filter 1 yes true,$(KIT_IN_PUBLIC_REVIEWED)),--public-reviewed,) $(if $(KIT_IN_REVIEW_EVIDENCE),--review-evidence "$${KIT_IN_REVIEW_EVIDENCE}",)
 
 review-packet: python-check
-	$(if $(ISSUE_FILE),,$(error Name the issue: ISSUE_FILE=path))
-	@$(REPOCTL) review-packet $(if $(ISSUE_FILE),--issue-file "$${ISSUE_FILE}",)
+	$(if $(KIT_IN_ISSUE_FILE),,$(error Name the issue: ISSUE_FILE=path))
+	@$(REPOCTL) review-packet $(if $(KIT_IN_ISSUE_FILE),--issue-file "$${KIT_IN_ISSUE_FILE}",)
 
 incident: python-check
-	$(if $(TITLE),,$(error Title it: make incident TITLE="..." SUMMARY="..."))
-	$(if $(SUMMARY),,$(error Summarize it: SUMMARY="..."))
-	@$(REPOCTL) incident $(if $(TITLE),--title "$${TITLE}",) $(if $(SUMMARY),--summary "$${SUMMARY}",) $(if $(filter 1 yes true,$(PUBLIC_SAFE)),--public-safe,) $(if $(REVIEW_EVIDENCE),--review-evidence "$${REVIEW_EVIDENCE}",)
+	$(if $(KIT_IN_TITLE),,$(error Title it: make incident TITLE="..." SUMMARY="..."))
+	$(if $(KIT_IN_SUMMARY),,$(error Summarize it: SUMMARY="..."))
+	@$(REPOCTL) incident $(if $(KIT_IN_TITLE),--title "$${KIT_IN_TITLE}",) $(if $(KIT_IN_SUMMARY),--summary "$${KIT_IN_SUMMARY}",) $(if $(filter 1 yes true,$(KIT_IN_PUBLIC_SAFE)),--public-safe,) $(if $(KIT_IN_REVIEW_EVIDENCE),--review-evidence "$${KIT_IN_REVIEW_EVIDENCE}",)
 
 init: python-check
-	$(if $(NAME),,$(error Name the project: make init NAME=my-project KIND=web))
-	$(if $(KIND),,$(error Give its kind: make init NAME=my-project KIND=web))
-	@$(REPOCTL) init $(if $(NAME),--name "$${NAME}",) $(if $(KIND),--kind "$${KIND}",) $(if $(OWNER),--owner "$${OWNER}",)
+	$(if $(KIT_IN_NAME),,$(error Name the project: make init NAME=my-project KIND=web))
+	$(if $(KIT_IN_KIND),,$(error Give its kind: make init NAME=my-project KIND=web))
+	@$(REPOCTL) init $(if $(KIT_IN_NAME),--name "$${KIT_IN_NAME}",) $(if $(KIT_IN_KIND),--kind "$${KIT_IN_KIND}",) $(if $(KIT_IN_OWNER),--owner "$${KIT_IN_OWNER}",)
 
 adopt: python-check
-	$(if $(NAME),,$(error Name the project: make -f <kit>/Makefile adopt NAME=my-app KIND=web OWNER=you))
-	$(PYTHON) "$(KIT_DIR)/tools/repoctl.py" --root "$(CURDIR)" adopt --from "$(KIT_DIR)" --name "$${NAME}" --kind "$${KIND}" $(if $(OWNER),--owner "$${OWNER}",)
+	$(if $(KIT_IN_NAME),,$(error Name the project: make -f <kit>/Makefile adopt NAME=my-app KIND=web OWNER=you; if the kit path is not found add KIT_DIR=<kit>))
+	$(if $(shell test -f "$(KIT_DIR)/tools/repoctl.py" && echo ok),,$(error KIT_DIR is not a kit checkout: pass KIT_DIR=<kit> (the directory holding tools/repoctl.py)))
+	$(PYTHON) "$${KIT_DIR}/tools/repoctl.py" --root "$(CURDIR)" adopt --from "$${KIT_DIR}" --name "$${KIT_IN_NAME}" --kind "$${KIT_IN_KIND}" $(if $(KIT_IN_OWNER),--owner "$${KIT_IN_OWNER}",)
 
 kit-update: python-check
-	@$(REPOCTL) kit-update $(if $(KIT),--kit "$${KIT}",)
+	@$(REPOCTL) kit-update $(if $(KIT_IN_KIT),--kit "$${KIT_IN_KIT}",)
 
 check: python-check
 	@$(REPOCTL) check
@@ -124,12 +163,12 @@ resources: python-check
 	@$(REPOCTL) resources
 
 skill-digest: python-check
-	$(if $(SKILL_PATH),,$(error Name the skill: SKILL_PATH=.agents/skills/name))
-	@$(REPOCTL) skill-digest "$${SKILL_PATH}"
+	$(if $(KIT_IN_SKILL_PATH),,$(error Name the skill: SKILL_PATH=.agents/skills/name))
+	@$(REPOCTL) skill-digest -- "$${KIT_IN_SKILL_PATH}"
 
 validate: python-check
-	$(if $(BODY),,$(error Name the body: BODY=path))
-	@$(REPOCTL) validate-issue $(if $(BODY),--body-file "$${BODY}",) $(if $(STATUS),--status "$${STATUS}",)
+	$(if $(KIT_IN_BODY),,$(error Name the body: BODY=path))
+	@$(REPOCTL) validate-issue $(if $(KIT_IN_BODY),--body-file "$${KIT_IN_BODY}",) $(if $(KIT_IN_STATUS),--status "$${KIT_IN_STATUS}",)
 
 labels: python-check
 	@$(REPOCTL) labels --sync
@@ -138,11 +177,11 @@ github-sync: python-check
 	@$(REPOCTL) github-sync
 
 eval: python-check
-	@$(REPOCTL) eval $(if $(AGENT),--host "$${AGENT}",) $(if $(TASKS),--tasks "$${TASKS}",) $(if $(MODEL),--model "$${MODEL}",)
+	@$(REPOCTL) eval $(if $(KIT_IN_AGENT),--host "$${KIT_IN_AGENT}",) $(if $(KIT_IN_TASKS),--tasks "$${KIT_IN_TASKS}",) $(if $(KIT_IN_MODEL),--model "$${KIT_IN_MODEL}",)
 
 trial: python-check
-	$(if $(NAME),,$(error Name a request in .agents/trials/: make trial NAME=waypoint))
-	@$(REPOCTL) trial "$${NAME}" $(if $(MODEL),--model "$${MODEL}",) $(if $(BUDGET),--budget "$${BUDGET}",)
+	$(if $(KIT_IN_NAME),,$(error Name a request in .agents/trials/: make trial NAME=waypoint))
+	@$(REPOCTL) trial $(if $(KIT_IN_MODEL),--model "$${KIT_IN_MODEL}",) $(if $(KIT_IN_BUDGET),--budget "$${KIT_IN_BUDGET}",) -- "$${KIT_IN_NAME}"
 
 help: python-check
 	@$(REPOCTL) help
