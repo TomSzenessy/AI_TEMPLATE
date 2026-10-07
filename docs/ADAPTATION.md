@@ -36,6 +36,8 @@ its operating contract, history, or evidence.
 ## Adaptation loop
 
 1. Read `VISION.md`, `docs/STACK-DECISION.md`, and the active surfaces.
+   Name the accountable owner at init (`make init ... OWNER=<handle>`) or in
+   `project.toml` `owners`; the `project-owner` placeholder fails `make check`.
 2. If `make init` created `template-bootstrap`, replace it with the first real
    surface before treating verification as product evidence.
 3. Run `make inventory` and classify each candidate as product, infrastructure,

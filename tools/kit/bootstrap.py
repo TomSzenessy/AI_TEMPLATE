@@ -12,6 +12,7 @@ from .core import (
     PROJECT_NAME_PATTERN,
     RepoctlError,
     ensure_inside_root,
+    is_placeholder,
     load_project,
     read_text_file,
     replace_manifest_field,
@@ -179,13 +180,18 @@ def reset_repository_metadata(manifest: str) -> str:
     return re.sub(r"(?m)^prune\s*=\s*\[[^\]]*\]", "prune = []", manifest, count=1)
 
 
-def initialize_project(root: Path, name: str, kind: str) -> None:
+OWNER_HANDLE = re.compile(r"@?[A-Za-z0-9][A-Za-z0-9_.-]*(?:/[A-Za-z0-9_.-]+)?")
+
+
+def initialize_project(root: Path, name: str, kind: str, owner: str | None = None) -> None:
     if not PROJECT_NAME_PATTERN.fullmatch(name):
         raise RepoctlError(
             "project name must be 1-64 characters using letters, digits, '.', '_' or '-'"
         )
     if not PROJECT_KIND_PATTERN.fullmatch(kind):
         raise RepoctlError("project kind must be lowercase kebab-case")
+    if owner is not None and (not OWNER_HANDLE.fullmatch(owner) or is_placeholder(owner)):
+        raise RepoctlError("owner must be a handle or team name such as octocat or acme/web-team, not an email")
 
     manifest_path = ensure_inside_root(root, root / "project.toml", "project manifest")
     try:
@@ -209,9 +215,18 @@ def initialize_project(root: Path, name: str, kind: str) -> None:
     manifest = reset_vision_for_project(root, manifest, name)
     removed = prune_template_material(root, load_project(root))
     manifest = reset_repository_metadata(manifest)
+    if owner:
+        # Name the accountable owner once here instead of failing later checks on a placeholder.
+        manifest = manifest.replace('"project-owner"', f'"{owner}"')
+        for record in ("VISION.md", "docs/STACK-DECISION.md"):
+            path = root / record
+            if path.is_file():
+                path.write_text(path.read_text(encoding="utf-8").replace("Owner: project-owner", f"Owner: {owner}"), encoding="utf-8")
     manifest_path.write_text(manifest, encoding="utf-8")
     update_readme_identity(root, name, kind)
     derive.sync(root)
     if removed:
         print(f"Removed {len(removed)} template-only file(s); links now point to the template source.")
     print(f"Initialized {name} ({kind}). Declare real surfaces before implementation.")
+    if not owner:
+        print('Owner is the placeholder "project-owner": set owners = ["<handle>"] in project.toml (or init with OWNER=<handle>).')

@@ -321,7 +321,7 @@ def check_readiness(root: Path) -> None:
         or not owners
         or not all(isinstance(owner, str) and owner.strip() and not is_placeholder(owner) for owner in owners)
     ):
-        errors.append("at least one accountable owner is required")
+        errors.append('at least one accountable owner is required: set owners = ["<handle>"] in project.toml (a handle or team, not an email)')
 
     surfaces = declared_surfaces(project)
     active_surfaces = [surface for surface in surfaces if surface.get("status", "active") == "active"]

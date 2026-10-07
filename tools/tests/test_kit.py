@@ -702,6 +702,80 @@ class UiReviewTests(KitRepository):
         self.assertIn("never had a UI review", str(raised.exception))
 
 
+class TrialTests(unittest.TestCase):
+    """make trial: the build-trial request format, setup, and friction analysis."""
+
+    def test_analysis_counts_spend_commands_and_friction(self) -> None:
+        from kit import trial
+        events = [
+            {"type": "assistant", "message": {"content": [
+                {"type": "tool_use", "id": "a", "name": "Bash", "input": {"command": "make next && make done"}},
+                {"type": "tool_use", "id": "b", "name": "Bash", "input": {"command": "git commit --no-verify -m x"}},
+                {"type": "tool_use", "id": "c", "name": "Bash", "input": {"command": "make issue BODY=x"}}]}},
+            {"type": "user", "message": {"content": [
+                {"type": "tool_result", "tool_use_id": "a", "content": "Not finished:\n- docs/a.md covers src/a.py"},
+                {"type": "tool_result", "tool_use_id": "c", "is_error": True, "content": "repoctl: issue needs Summary"}]}},
+            {"type": "result", "subtype": "success", "num_turns": 7, "total_cost_usd": 1.5, "duration_ms": 120000, "result": "Done."},
+            {"type": "result", "subtype": "success", "num_turns": 2, "total_cost_usd": 0.25, "duration_ms": 60000, "result": "Fixed."},
+        ]
+        with tempfile.TemporaryDirectory() as folder:
+            transcript = Path(folder) / "t.jsonl"
+            transcript.write_text("\n".join(json.dumps(e) for e in events) + "\nnot json\n")
+            analysis = trial.analyze_transcript(transcript)
+        self.assertEqual((analysis["cost_usd"], analysis["turns"], analysis["minutes"]), (1.75, 9, 3.0))
+        self.assertEqual(analysis["make_targets"], {"next": 1, "done": 1, "issue": 1})
+        self.assertEqual(len(analysis["gate_blocks"]), 1)
+        self.assertIn("docs/a.md", analysis["gate_blocks"][0]["message"])
+        self.assertEqual(len(analysis["failed_make"]), 1)
+        self.assertEqual(len(analysis["bypasses"]), 1)
+        self.assertEqual(analysis["final_message"], "Fixed.")
+
+    def test_request_validation(self) -> None:
+        from kit import trial
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / trial.TRIALS).mkdir(parents=True)
+            (root / trial.TRIALS / "x.toml").write_text('id = "x"\nkind = "web"\nprompt = "Build it."\n')
+            self.assertEqual(trial.load_trial(root, "x")["mode"], "new")
+            (root / trial.TRIALS / "y.toml").write_text('id = "y"\nkind = "cli"\nmode = "adopt"\nprompt = "Go."\n')
+            with self.assertRaisesRegex(Exception, "adopt mode needs seed"):
+                trial.load_trial(root, "y")
+            with self.assertRaisesRegex(Exception, "known: x, y"):
+                trial.load_trial(root, "z")
+
+    def test_every_shipped_request_loads(self) -> None:
+        from kit import trial
+        for path in sorted((TOOLS.parent / trial.TRIALS).glob("*.toml")):
+            self.assertEqual(trial.load_trial(TOOLS.parent, path.stem)["id"], path.stem)
+
+    def test_new_mode_prepares_an_initialized_copy(self) -> None:
+        from kit import trial
+        with tempfile.TemporaryDirectory() as folder:
+            project = Path(folder) / "demo"
+            trial.prepare(TOOLS.parent, {"id": "demo", "kind": "web", "mode": "new", "prompt": "x"}, project)
+            self.assertIn('name = "demo"', (project / "project.toml").read_text())
+            self.assertEqual(subprocess.run(["git", "-C", str(project), "status", "--porcelain"],
+                                            capture_output=True, text=True).stdout, "")
+            self.assertIn("intake", subprocess.run([sys.executable, "tools/repoctl.py", "next"], cwd=project,
+                                                   capture_output=True, text=True).stdout)
+
+
+class InitOwnerTests(unittest.TestCase):
+    def test_init_names_the_owner_everywhere_and_refuses_emails(self) -> None:
+        from kit import trial
+        with tempfile.TemporaryDirectory() as folder:
+            project = Path(folder)
+            trial._copy(TOOLS.parent, trial._kit_files(TOOLS.parent), project)
+            def init(owner: str) -> subprocess.CompletedProcess[str]:
+                return subprocess.run([sys.executable, "tools/repoctl.py", "init", "--name", "demo", "--kind", "web",
+                                       "--owner", owner], cwd=project, capture_output=True, text=True)
+            self.assertIn("not an email", init("me@example.com").stderr)
+            self.assertEqual(init("octocat").returncode, 0)
+            self.assertIn('owners = ["octocat"]', (project / "project.toml").read_text())
+            self.assertNotIn("project-owner", (project / "project.toml").read_text())
+            self.assertIn("Owner: octocat", (project / "VISION.md").read_text())
+
+
 class DecisionAgeTests(unittest.TestCase):
     def test_old_decision_only_matters_at_the_release_gate(self) -> None:
         from datetime import timedelta

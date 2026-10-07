@@ -7,10 +7,10 @@ SKILL_TEST_SUITES := $(wildcard .agents/skills/*/tests)
 .DEFAULT_GOAL := help
 
 .PHONY: help python-check init inventory resources skill-digest check doctor readiness test test-future verify validate incident issue labels review-packet \
-	start next ui-review done new handover map where risk garden capabilities sync github-sync similar eval
+	start next ui-review done new handover map where risk garden capabilities sync github-sync similar eval trial
 
 # Export user-supplied values so recipes pass them as data, not as shell source.
-export Q AGENT MODEL TASKS DESC GROUP COVERS ACCESS TIER FORCE NAME KIND TITLE SUMMARY BODY TYPE PRIORITY AREA TOPIC STATUS SURFACE GATE PUBLIC_REVIEWED REVIEW_EVIDENCE ISSUE_FILE PUBLIC_SAFE
+export Q AGENT MODEL TASKS DESC GROUP COVERS ACCESS TIER FORCE NAME KIND OWNER BUDGET TITLE SUMMARY BODY TYPE PRIORITY AREA TOPIC STATUS SURFACE GATE PUBLIC_REVIEWED REVIEW_EVIDENCE ISSUE_FILE PUBLIC_SAFE
 
 help:
 	@printf '%s\n' \
@@ -42,13 +42,14 @@ help:
 	  '  make init NAME=my-project KIND=web   Turn the template into your project' \
 	  '  make check | verify | doctor | readiness | inventory | resources | labels | github-sync' \
 	  '  make eval AGENT=claude [MODEL=haiku]   Fresh-agent navigation benchmark (cheap model by default)' \
+	  '  make trial NAME=<request> [MODEL=sonnet] [BUDGET=25]   Build trial: an agent builds a product; friction report' \
 	  '  make validate BODY=path | skill-digest SKILL_PATH=.agents/skills/name'
 
 python-check:
 	@test -n "$(PYTHON)" && $(PYTHON) -c 'import sys; sys.exit(sys.version_info < (3, 11))' 2>/dev/null || { echo "Needs Python 3.11+ (found: '$(PYTHON)'); install python3.11 or newer, or run: make PYTHON=/path/to/python3.11 ..." >&2; exit 1; }
 
 init: python-check
-	$(REPOCTL) init --name "$${NAME}" --kind "$${KIND}"
+	$(REPOCTL) init --name "$${NAME}" --kind "$${KIND}" $(if $(OWNER),--owner "$${OWNER}",)
 
 inventory:
 	$(REPOCTL) inventory
@@ -167,3 +168,7 @@ similar: python-check
 
 eval: python-check
 	$(REPOCTL) eval --host "$${AGENT:-claude}" $(if $(TASKS),--tasks "$${TASKS}",) $(if $(MODEL),--model "$${MODEL}",)
+
+trial: python-check
+	$(if $(NAME),,$(error Name a request in .agents/trials/: make trial NAME=waypoint))
+	$(REPOCTL) trial "$${NAME}" $(if $(MODEL),--model "$${MODEL}",) $(if $(BUDGET),--budget "$${BUDGET}",)

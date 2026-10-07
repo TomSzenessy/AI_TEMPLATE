@@ -1,0 +1,25 @@
+# Ambitious web product: real-time collaboration, offline, money, drag and drop.
+# First run 2026-10-07 (Sonnet): 36 min, $22.81, make done green; see docs/self-healing.md.
+id = "waypoint"
+kind = "web"
+mode = "new"
+budget_usd = 40
+prompt = '''
+I want to build "Waypoint", a web app where a group of friends plans a trip together.
+
+The idea: one person creates a trip and shares a link; everyone who opens it can add places, drag them into days, vote on options, and see a shared budget split between travellers. It should feel calm and beautiful, more like a travel journal than a spreadsheet, and it should still be usable on a phone at the airport with bad signal.
+
+I won't be available to answer questions during this run, so here are my answers to whatever you would ask me at kickoff. For anything not covered, go with your own recommendation and write down what you chose.
+
+- Users: groups of 2-8 friends planning a 2-14 day trip. Success = a group goes from "we should go to Lisbon" to an agreed day-by-day plan in one evening.
+- Platforms: responsive web first (phone and desktop). Installable as a PWA would be nice. No native apps now.
+- Collaboration: several people editing the same trip at the same time must work, with changes appearing for the others within a few seconds. A small self-hosted backend is fine; no paid services, no accounts with email/password for now (a display name per device is enough). Anyone with the trip link can edit.
+- Must have: create a trip with dates; add places (name, note, link, rough cost, category); a day-by-day timeline where places are dragged between days and reordered; voting on undecided places; a budget view that splits shared costs between travellers and shows who owes whom; offline viewing of a trip you opened before, with edits syncing when back online.
+- Nice to have: a map view of the places (use a free tile source, no API key), trip templates for a quick start, export the plan to a printable page.
+- Visual style: warm and editorial, think paper, ink and a single accent colour; light and dark mode. Pick the direction you think is best.
+- Stack: your call; I'm comfortable with TypeScript.
+- Data: trips live on the backend; nothing sensitive beyond display names and trip content. No analytics.
+- Not now: payments, real accounts, native apps, deployment to production.
+
+Build it in this repository as far as you can toward something I could actually hand to my friends next weekend.
+'''

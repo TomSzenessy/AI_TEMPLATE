@@ -34,7 +34,7 @@ whose imports point toward `core`:
 | Links, index, file hygiene | `docs` | [`../security.md`](../security.md) |
 | Launch evidence | `launch` | [`../production.md`](../production.md) |
 | Product driver: feature list, research, `make next`, UI review | `product`, `uireview` | [`../building.md`](../building.md) |
-| Self-healing: bindings, markers, derived files, scaffolding, hooks, garden, map, risk, config, evals | `docsync`, `hygiene`, `adapters`, `derive`, `scaffold`, `session`, `garden`, `navigate`, `risk`, `config`, `capabilities`, `evals` | [`../self-healing.md`](../self-healing.md) |
+| Self-healing: bindings, markers, derived files, scaffolding, hooks, garden, map, risk, config, evals, build trials | `docsync`, `hygiene`, `adapters`, `derive`, `scaffold`, `session`, `garden`, `navigate`, `risk`, `config`, `capabilities`, `evals`, `trial` | [`../self-healing.md`](../self-healing.md) |
 
 For a copied project, replace the template row above with the real surfaces
 and keep this section only while the kit is part of the repository.

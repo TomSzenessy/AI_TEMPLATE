@@ -1,7 +1,7 @@
 # Self-healing mechanics
 
 <!-- index: operate | When a check may block, hooks, doc-code bindings, deprecation expiry, budgets, generated files, gardener, evals | A check fails, docs drift, a host is added, or the kit itself changes. -->
-<!-- covers: tools/kit/docsync.py tools/kit/hygiene.py tools/kit/adapters.py tools/kit/session.py tools/kit/garden.py tools/kit/navigate.py tools/kit/risk.py tools/kit/capabilities.py tools/kit/evals.py tools/kit/gitinfo.py tools/kit/derive.py tools/kit/scaffold.py tools/kit/config.py .githooks/** .github/workflows/garden.yml .agents/evals/** -->
+<!-- covers: tools/kit/docsync.py tools/kit/hygiene.py tools/kit/adapters.py tools/kit/session.py tools/kit/garden.py tools/kit/navigate.py tools/kit/risk.py tools/kit/capabilities.py tools/kit/evals.py tools/kit/trial.py .agents/trials/** tools/kit/gitinfo.py tools/kit/derive.py tools/kit/scaffold.py tools/kit/config.py .githooks/** .github/workflows/garden.yml .agents/evals/** -->
 
 Agents follow written rules well at the start of a session and worst at the end,
 after compaction, which is when cleanup and documentation get skipped. So the
@@ -220,9 +220,17 @@ read-only headless session (without MCP servers, so runs stay fast and
 deterministic) and records pass rate, turns, time, and cost under
 `.agent/evals/`. Re-run it after changing `AGENTS.md`, the map, or the docs.
 A change to the kit that lowers the pass rate or raises cost is a regression.
-For changes to the skills or gates, also run a **build trial**: give a
-cheap model (`claude -p --model sonnet`) a product request with the owner's
-answers in a fresh `make init` copy, then audit what it skipped. The first
+For changes to the skills or gates, also run a **build trial**:
+`make trial NAME=<request>` copies this working tree into a fresh `make init`
+project outside the repository (or, for `mode = "adopt"`, an existing codebase
+from `seed` that then runs `make adopt`), gives `claude -p` (Sonnet by
+default, `BUDGET=` caps spend) the owner's request from
+`.agents/trials/<request>.toml`, and writes `.agent/trials/<run>/report.md`:
+spend, turns, kit commands, every gate block, failed kit command, bypass, and
+`Docs-Unaffected` trailer, and the product's final `make next` phase and
+`make done` result. Judge each friction item with the blocking rule above: fix
+the kit, make the check advisory, or justify it. `--analyze <transcript>
+--project <dir>` reports on a run made by hand or with another host. The first
 trial built a working prototype for $1.74 but skipped the design record, the
 owning doc, and the UI review; those became the product guardrails above. A
 second run told only to "run make done and fix what it reports" repaired all

@@ -243,7 +243,7 @@ def check_structure(root: Path, project: dict[str, object]) -> None:
         if status == "active" and (
             is_placeholder(surface.get("owner"))
         ):
-            errors.append(f"active surface {identifier or position} needs an owner")
+            errors.append(f'active surface {identifier or position} needs an owner: owner = "<handle>" in its [[surfaces]] table')
         if status == "active" and (
             is_placeholder(surface.get("quality_oracle"))
         ):

@@ -165,7 +165,8 @@ def next_step(root: Path) -> dict[str, str]:
          "Ask the owner the kickoff questions (one round, with recommendations) and record VISION.md as accepted.",
          "product-kickoff skill, steps 1-2", "VISION.md Status: accepted"),
         (len(set(URL.findall(read_text_file(root, RESEARCH) or ""))) < 3, "research",
-         f"Research comparable products, real user complaints, and design references; write {RESEARCH} with cited URLs.",
+         f"Research comparable products, real user complaints, and design references; write {RESEARCH} with cited URLs "
+         "(first line under the title: <!-- index: extend | Comparable products and our angle | Scoping features -->).",
          "researcher role; product-recon and review-mining skills; browse the web",
          f"{RESEARCH} cites at least three sources"),
         (not any(row["priority"] == "must" for row in load_features(root)), "features",

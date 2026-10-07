@@ -22,6 +22,7 @@ from kit.capabilities import print_capabilities
 from kit.core import RepoctlError, ensure_inside_root, load_project
 from kit.docs import check_docs_index, check_file_hygiene, check_markdown_links
 from kit.evals import run_evals
+from kit.trial import analyze_existing, run_trial
 from kit.garden import garden_report, self_heal_errors
 from kit.config import setting
 from kit.github import sync_issue_labels, sync_repository_metadata
@@ -53,6 +54,7 @@ def build_parser() -> argparse.ArgumentParser:
     init_parser = subparsers.add_parser("init", help="set project identity")
     init_parser.add_argument("--name", required=True)
     init_parser.add_argument("--kind", required=True, help="lowercase kebab-case project kind")
+    init_parser.add_argument("--owner", help="accountable owner handle or team (replaces the project-owner placeholder)")
 
     subparsers.add_parser("inventory", help="show detected and declared product surfaces")
     subparsers.add_parser("resources", help="show the validated read-only resource router")
@@ -143,6 +145,13 @@ def build_parser() -> argparse.ArgumentParser:
     eval_parser.add_argument("--tasks", help="comma-separated task ids")
     eval_parser.add_argument("--timeout", type=int, default=300)
     eval_parser.add_argument("--model", help="model for hosts that accept one (default: [kit].eval_model for claude)")
+    trial_parser = subparsers.add_parser("trial", help="run a build trial from .agents/trials/ and report its friction")
+    trial_parser.add_argument("id")
+    trial_parser.add_argument("--model", default="sonnet")
+    trial_parser.add_argument("--budget", type=float, help="spend cap in USD (default: the request's budget_usd)")
+    trial_parser.add_argument("--dir", help="project directory (default: a new temporary directory)")
+    trial_parser.add_argument("--analyze", metavar="TRANSCRIPT", help="only report on an existing stream-json transcript")
+    trial_parser.add_argument("--project", help="with --analyze: the project directory the run used")
 
     return parser
 
@@ -158,7 +167,7 @@ def main(argv: list[str] | None = None) -> int:
     arguments = parser.parse_args(argv)
     try:
         if arguments.command == "init":
-            initialize_project(arguments.root.resolve(), arguments.name, arguments.kind)
+            initialize_project(arguments.root.resolve(), arguments.name, arguments.kind, arguments.owner)
         elif arguments.command == "inventory":
             print_inventory(arguments.root.resolve())
         elif arguments.command == "resources":
@@ -279,6 +288,12 @@ def main(argv: list[str] | None = None) -> int:
             print(runner(arguments.root.resolve()))
         elif arguments.command == "eval":
             return run_evals(arguments.root.resolve(), arguments.host, arguments.tasks, arguments.timeout, arguments.model)
+        elif arguments.command == "trial":
+            if arguments.analyze:
+                if not arguments.project:
+                    raise RepoctlError("--analyze needs --project (the directory the run built in)")
+                return analyze_existing(arguments.root.resolve(), arguments.id, arguments.analyze, arguments.project, arguments.model)
+            return run_trial(arguments.root.resolve(), arguments.id, arguments.model, arguments.budget, arguments.dir)
     except (OSError, RepoctlError) as error:
         print(f"repoctl: {error}", file=sys.stderr)
         return 1

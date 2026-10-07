@@ -28,7 +28,7 @@ any agent can pick it up cold.
 <!-- repoctl:quickstart -->
 ```bash
 # Click "Use this template" on GitHub (or clone), then in the new repository:
-make init NAME=my-project KIND=web   # identity, pending vision, prunes template-only files
+make init NAME=my-project KIND=web OWNER=your-handle   # identity, owner, pending vision; prunes template-only files
 make start                            # session brief; installs the git commit gate
 make check                            # everything green before the first change
 ```
