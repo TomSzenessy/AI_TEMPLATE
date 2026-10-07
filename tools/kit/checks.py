@@ -111,7 +111,7 @@ def command_references(context) -> list[str]:
 @check("markers", "Deprecations carry a remove-by date, task markers an issue, and FILL-IN placeholders are replaced",
        blocks=True, reason="Undated deprecations and orphan task markers are how duplicate paths rot silently.")
 def markers(context) -> list[str]:
-    return hygiene.scan_markers(context.root, context.files).errors
+    return hygiene.scan_markers(context.root, context.scoped_files).errors
 
 
 @check("budgets", "Files agents load often stay within project.toml [budgets]; when the router or a skill grows",

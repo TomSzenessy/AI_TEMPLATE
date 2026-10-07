@@ -283,7 +283,12 @@ def check_public_launch_evidence(root: Path, project: dict[str, object]) -> list
 RELEASE_PHASES = {"private-preview", "public-launch"}
 
 
-def check_readiness(root: Path) -> None:
+def check_readiness(root: Path, *, checks_done: bool = False) -> None:
+    """Doctor: the registry's blocking checks plus what only readiness knows.
+
+    `checks_done` says a gate in this same run (`make verify` runs `repoctl verify` first) already ran
+    the registry's blocking checks, so they are not run a second time.
+    """
     project = load_project(root)
     releasing = project.get("phase") in RELEASE_PHASES  # record ages and UI reviews gate releases, not development
     errors: list[str] = []
@@ -297,8 +302,9 @@ def check_readiness(root: Path) -> None:
         check_vision(root, project, release_gate=releasing)
     except RepoctlError as error:
         errors.append(str(error))
-    from .registry import run_checks  # the registry owns the blocking-check list; doctor adds only what it alone knows
-    errors += run_checks(root, blocking_only=True)[0]
+    if not checks_done:
+        from .registry import run_checks  # the registry owns the blocking-check list; doctor adds only what it alone knows
+        errors += run_checks(root, blocking_only=True)[0]
     try:
         check_skill_provenance(project, release_gate=releasing)  # the release-gated variant of a registry check
     except RepoctlError as error:

@@ -16,7 +16,7 @@ from pathlib import Path
 
 from .config import setting
 from .core import declared_surfaces, ensure_inside_root, load_project, verification_environment
-from .registry import Registry, run_checks
+from .registry import Registry, downgrade_lines, run_checks
 
 
 
@@ -101,6 +101,10 @@ def garden_report(root: Path) -> tuple[str, int]:
     )
     for title, items in (("Hard findings", hard), ("Advisory", advisory)):
         lines += ["", f"## {title}", ""] + ([f"- {item}" for item in items] or ["- none"])
+    downgraded = downgrade_lines(project)
+    if downgraded:
+        lines += ["", "## Downgraded checks (project.toml [checks]; delete the entry to block again)", ""]
+        lines += [f"- {item}" for item in downgraded]
     if surface_results:
         lines += ["", "## Surface garden commands", ""]
         for identifier, command, status, output in surface_results:

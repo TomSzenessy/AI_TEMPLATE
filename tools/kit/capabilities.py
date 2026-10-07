@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 
 from .adapters import configured_hosts
-from .registry import KINDS, Registry
+from .registry import KINDS, Registry, downgrade_lines
 
 TOOLS = {
     "git": "version control",
@@ -38,6 +38,14 @@ def _gh_authenticated() -> bool:
         return False
 
 
+def print_downgraded_checks(registry: Registry) -> None:
+    registry.check_overrides  # noqa: B018 - validates the table; a bad entry is an error, not a quiet omission
+    lines = downgrade_lines(registry.project)
+    if lines:
+        print("\n## Checks this project downgraded to advisory (project.toml [checks]; delete the entry to block again)")
+        print("\n".join(f"- {line}" for line in lines))
+
+
 def print_capabilities(root: Path) -> None:
     registry = Registry(root)
     print("## Packs (project.toml [packs] overrides each default)")
@@ -51,6 +59,7 @@ def print_capabilities(root: Path) -> None:
         names = [item.name + ("" if registry.enabled(item) else f" (off: {item.pack})") for item in registry.of(kind, enabled_only=False)]
         print(f"- {kind} ({len(names)}): {', '.join(names) or 'none'}")
     print(f"- doc ({len(registry.of('doc'))}): indexed in docs/README.md")
+    print_downgraded_checks(registry)
     print(f"\npython: {sys.version.split()[0]} ({'ok' if sys.version_info >= (3, 11) else 'needs 3.11+'})")
     print("\n## Tools on PATH")
     for tool, purpose in TOOLS.items():

@@ -51,7 +51,27 @@ when a key is absent: `[packs]` (switch packs on or off), `[kit]` (docs index gr
 overlap limit, deprecation warning window, skill review age, UI project kinds,
 eval model, Playwright version and previewable kinds for `make ui-review`), `[adapters.claude]`
 (tier-to-model and access-to-tools maps, pre-approved commands), `[risk]`
-(tier globs and optional ceremony text), and `[budgets]` (byte limits for any
+(tier globs and optional ceremony text), and `[checks.<name>]` (downgrade one blocking check to
+`severity = "advisory"` with a required `reason`; rules in
+[downgrading a check](#downgrading-a-check)), and `[budgets]` (byte limits for any
 glob, including product code). `[budgets]` keeps the files agents load often
 within a byte limit (about 4 bytes per token); an over-budget file fails
 `make check`, so detail belongs in a linked owner document, not in the router.
+
+### Downgrading a check
+
+A check that misfires in one repository is made advisory in `project.toml`, not
+edited out of the kit (so `make kit-update` still applies):
+
+```toml
+[checks.markdown-links]
+severity = "advisory"
+reason = "generated docs link to build output that exists only in CI"
+```
+
+The check still runs and its findings print as advisory (`make check`,
+`make garden`); `make capabilities` and `make garden` list every downgrade with
+its reason. `advisory` is the only accepted value, the reason is required, an
+unknown or already-advisory check name is an error, and nothing removes or skips
+a check. Deleting the entry restores blocking. Blocking rules:
+[`self-healing.md`](./self-healing.md#when-a-check-may-block).

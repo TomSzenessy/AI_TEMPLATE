@@ -31,11 +31,16 @@ RECIPES = {
 
 
 def _require_self_heal(root: Path) -> None:
-    from .garden import self_heal_errors
-    errors = self_heal_errors(root)
+    """Run the blocking checks once; print what the project downgraded; raise on a real finding."""
+    from .registry import Context, blocking_reasons, run_checks
+    context = Context(root)
+    errors, advisory = run_checks(root, blocking_only=True, context=context)
+    downgraded = [item for item in advisory
+                  if any(item.startswith(f"[{name}] ") for name in context.registry.check_overrides)]
+    for line in downgraded:
+        print(f"advisory (downgraded in project.toml [checks]): {line}")
     if errors:
-        from .registry import Registry, blocking_reasons
-        reasons = blocking_reasons(Registry(root), errors)
+        reasons = blocking_reasons(context.registry, errors)
         raise check_failed("self-healing", errors,
                            "\nWhy these block:\n  " + "\n  ".join(reasons) if reasons else "")
 
@@ -281,10 +286,12 @@ def verify(root: Path, args) -> None:
     run_verification(root)
 
 
-@command("doctor", "Check initialization and the readiness of the declared phase", group="setup", usage="make doctor")
+@command("doctor", "Check initialization and the readiness of the declared phase", group="setup", usage="make doctor",
+         args=(arg("--checks-done", action="store_true",
+                   help="the blocking checks already ran in this gate (make verify); do not run them again"),))
 def doctor(root: Path, args) -> None:
     from .launch import check_readiness
-    check_readiness(root)
+    check_readiness(root, checks_done=args.checks_done)
 
 
 @command("readiness", "Enforce public-launch evidence gates", group="setup", usage="make readiness")

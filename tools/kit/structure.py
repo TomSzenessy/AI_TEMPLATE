@@ -5,7 +5,6 @@ from __future__ import annotations
 import os
 import re
 import subprocess
-from datetime import date
 from pathlib import Path
 
 from .core import (
@@ -16,8 +15,7 @@ from .core import (
     REPOSITORY_INFRASTRUCTURE_DIRECTORIES,
     RepoctlError,
     check_failed,
-    date_is_future,
-    date_is_stale,
+    date_out_of_policy,
     read_utf8,
     declared_surfaces,
     ensure_inside_root,
@@ -152,7 +150,7 @@ def validate_critic_evidence(root: Path, surface: dict[str, object], release_gat
             reviewed_date = parse_iso_date(reviewed.group(1))
             if reviewed_date is None:
                 raise RepoctlError(f"critic evidence has an invalid date: {value}")
-            if _too_old_or_future(reviewed_date, release_gate):
+            if date_out_of_policy(reviewed_date, release_gate):
                 raise RepoctlError(f"critic evidence is {'stale or ' if release_gate else ''}future-dated: {value}")
         commit = re.search(r"(?im)^Commit:\s*([0-9a-f]{40})\b", content)
         if commit:
@@ -281,16 +279,6 @@ def check_structure(root: Path, project: dict[str, object]) -> None:
         raise check_failed("structure", errors)
 
 
-def _too_old_or_future(value: date, release_gate: bool) -> bool:
-    """A future date is always a typo; age only matters at the release gate (make readiness).
-
-    A vision accepted 13 months ago is not wrong, so `make check` and `make done` never fail on age alone
-    during development; from private-preview on, `make readiness` asks for a fresh confirmation:
-    re-dating a file to satisfy a clock is ritual, not evidence.
-    """
-    return date_is_stale(value) if release_gate else date_is_future(value)
-
-
 def check_vision(root: Path, project: dict[str, object], enforce: bool = True, release_gate: bool = False) -> None:
     if "vision" not in project:
         raise RepoctlError("project.toml must declare the vision intake record")
@@ -350,7 +338,7 @@ def _check_record(root: Path, project: dict[str, object], relative: str, label: 
     recorded = parse_iso_date(found.group(1))
     if recorded is None:
         raise RepoctlError(f"{noun} date is invalid")
-    if _too_old_or_future(recorded, release_gate):
+    if date_out_of_policy(recorded, release_gate):
         raise RepoctlError(f"{noun} date is stale or future-dated")
 
 

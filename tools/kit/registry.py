@@ -408,6 +408,38 @@ class Registry:
     def enabled(self, item: Capability) -> bool:
         return self.pack_state.get(item.pack, True)
 
+    @cached_property
+    def check_overrides(self) -> dict[str, str]:
+        """check name -> the project's reason, for each check `project.toml [checks]` downgrades to advisory.
+
+        The only supported value is severity = "advisory" with a reason: nothing here removes or skips a check
+        (docs/capabilities.md#configuration). A malformed entry is an error naming the line to fix.
+        """
+        table = self.project.get("checks", {})
+        if not isinstance(table, dict):
+            raise RepoctlError('project.toml [checks] must map a check name to {severity = "advisory", reason = "..."}')
+        known = {item.name: item for item in self.of("check", enabled_only=False)}
+        overrides: dict[str, str] = {}
+        for name, entry in table.items():
+            where = f"project.toml [checks.{name}]"
+            if name not in known:
+                raise RepoctlError(f"{where} names no check (known: {', '.join(sorted(known))})")
+            if not isinstance(entry, dict) or set(entry) - {"severity", "reason"}:
+                raise RepoctlError(f'{where} must be a table with only severity = "advisory" and reason = "..."')
+            if entry.get("severity") != "advisory":
+                raise RepoctlError(f'{where}: severity must be "advisory"; a check can be downgraded, never removed or skipped')
+            reason = entry.get("reason")
+            if not isinstance(reason, str) or len(reason.strip()) < 10:
+                raise RepoctlError(f"{where}: a reason is required (10+ characters): why this repository disagrees with the check")
+            if not known[name].fields["blocks"]:
+                raise RepoctlError(f"{where}: {name} is already advisory; delete the entry")
+            overrides[name] = " ".join(reason.split())
+        return overrides
+
+    def blocks(self, item: Capability) -> bool:
+        """Whether a check blocks here: its declaration, unless this project downgraded it. The one resolver."""
+        return bool(item.fields["blocks"]) and item.name not in self.check_overrides
+
     def of(self, kind: str, *, enabled_only: bool = True) -> list[Capability]:
         if kind not in self._kinds:
             self._kinds[kind] = self._load(kind)
@@ -423,9 +455,18 @@ class Registry:
 class Context:
     """What a check sees: the repository root plus shared, lazily computed facts."""
 
-    def __init__(self, root: Path, registry: Registry | None = None) -> None:
+    def __init__(self, root: Path, registry: Registry | None = None, scope: list[str] | None = None) -> None:
         self.root = root
         self.registry = registry or Registry(root)
+        self.scope = scope  # the paths a gate is judging; None means the whole repository
+
+    @cached_property
+    def scoped_files(self) -> list[str]:
+        """Tracked files a scope-aware check inspects: the gate's scope, else every file."""
+        if self.scope is None:
+            return self.files
+        wanted = set(self.scope)
+        return [path for path in self.files if path in wanted]
 
     @property
     def project(self) -> dict[str, object]:
@@ -459,6 +500,15 @@ class Context:
         return signatures(self.root)
 
 
+def downgrade_lines(project: dict[str, object]) -> list[str]:
+    """`name: reason` for each check `project.toml [checks]` downgrades (validated by Registry.check_overrides)."""
+    table = project.get("checks")
+    if not isinstance(table, dict):
+        return []
+    return [f"{name}: {' '.join(str(entry.get('reason', '')).split())}"
+            for name, entry in sorted(table.items()) if isinstance(entry, dict)]
+
+
 FINDING_PREFIX = re.compile(r"^\[([a-z0-9-]+)\] ")
 
 
@@ -468,26 +518,35 @@ def blocking_reasons(registry: "Registry", findings: list[str]) -> list[str]:
     for finding in findings:
         match = FINDING_PREFIX.match(finding)
         item = registry.get("check", match.group(1)) if match else None
-        if item is not None and item.fields["blocks"] and item.name not in seen:
+        if item is not None and registry.blocks(item) and item.name not in seen:
             seen.add(item.name)
             lines.append(f"[{item.name}] why it blocks: {' '.join(item.fields['reason'].split())}")
     return lines
 
 
 def run_checks(root: Path, *, blocking_only: bool, context: Context | None = None,
-               skip: frozenset[str] = frozenset()) -> tuple[list[str], list[str]]:
+               skip: frozenset[str] = frozenset(), only: frozenset[str] | None = None,
+               scope: list[str] | None = None) -> tuple[list[str], list[str]]:
     """(blocking findings, advisory findings) from every check of an enabled pack, minus `skip`.
+
+    This is the one place a finding becomes blocking: gates (`make check`, the commit gate, the
+    stop gate) name the checks they want in `only` and `scope` the files a change touches, so no
+    gate keeps a rule of its own. A check the project downgraded in `project.toml [checks]`
+    still runs, and its findings land in the advisory list.
 
     Each finding is prefixed `[check-name] ` so the reader knows its source.
     A finding that repeats a signature already in docs/ERROR_LOG.md is followed by that
     signature's key and permanent fix, so a known failure is recognised rather than
     diagnosed again.
     """
-    context = context or Context(root)
+    context = context or Context(root, scope=scope)
+    registry = context.registry
     hard: list[str] = []
     advisory: list[str] = []
-    for item in context.registry.of("check"):
-        if (blocking_only and not item.fields["blocks"]) or item.name in skip:
+    for item in registry.of("check"):
+        blocks = registry.blocks(item)
+        downgraded = item.name in registry.check_overrides
+        if (blocking_only and not blocks and not downgraded) or item.name in skip or (only is not None and item.name not in only):
             continue
         try:
             findings = list(item.fields["run"](context))
@@ -496,7 +555,7 @@ def run_checks(root: Path, *, blocking_only: bool, context: Context | None = Non
         except Exception as error:  # noqa: BLE001 - one broken check must not hide every other check's result
             findings = [f"check {item.name} crashed: {type(error).__name__}: {error} "
                         "(fix the check or the manifest value it reads)"]
-        (hard if item.fields["blocks"] else advisory).extend(f"[{item.name}] {finding}" for finding in findings)
+        (hard if blocks else advisory).extend(f"[{item.name}] {finding}" for finding in findings)
     if hard:
         from .signatures import recognition
         hard += recognition(hard, context.signatures)

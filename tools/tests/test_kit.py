@@ -986,9 +986,9 @@ class DecisionAgeTests(unittest.TestCase):
         from datetime import timedelta
         from kit import structure
         old, future = date.today() - timedelta(days=500), date.today() + timedelta(days=2)
-        self.assertFalse(structure._too_old_or_future(old, release_gate=False), "make check must not rot with the calendar")
-        self.assertTrue(structure._too_old_or_future(old, release_gate=True))
-        self.assertTrue(structure._too_old_or_future(future, release_gate=False), "a future date is a typo")
+        self.assertFalse(core.date_out_of_policy(old, release_gate=False), "make check must not rot with the calendar")
+        self.assertTrue(core.date_out_of_policy(old, release_gate=True))
+        self.assertTrue(core.date_out_of_policy(future, release_gate=False), "a future date is a typo")
 
     def test_critic_evidence_age_gates_release_only(self) -> None:
         from datetime import timedelta

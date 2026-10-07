@@ -51,6 +51,13 @@ Otherwise it is **advisory** (`make garden`, the session brief) or an
   `make check` fails only on a future date.
   `make test-future` (also in CI, with `KIT_SLOW=1`) runs the whole suite 800 days ahead (`make test-slow` adds the full inner runs), so a
   fixture or check pinned to a date fails now instead of in two years.
+- **One place decides blocking.** `Registry.blocks`, applied by `run_checks`,
+  is the only mechanism that turns a finding into a block: the check's `blocks=`
+  declaration, then the project's downgrade ([`capabilities.md`](./capabilities.md#downgrading-a-check)).
+  Each gate (`make check`, the commit and stop gates) names the checks that fit
+  its change set; the commit hook only maps a non-empty result to exit 3, and
+  `make verify` runs `doctor --checks-done` so no blocking check runs twice.
+  Date freshness is one helper, `core.date_out_of_policy`.
 - **Retire what never fires usefully.** A check that only ever produces
   bypasses, trailers, or ritual compliance is demoted to advisory or deleted
   in the next trial review.
