@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import os
 import shutil
 import subprocess
@@ -808,10 +809,51 @@ class TrialTests(unittest.TestCase):
             for command in ("check", "finish"):  # a fresh project starts green, so its first gate failure is the agent's
                 result = subprocess.run([sys.executable, "tools/repoctl.py", command], cwd=project, capture_output=True, text=True)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            # The kit's own tests must pass in every project made from the template (two trials hit this).
-            suite = subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "tools/tests", "-p", "test_*.py"],
-                                   cwd=project, capture_output=True, text=True, timeout=900)
-            self.assertEqual(suite.returncode, 0, suite.stderr[-2000:])
+
+
+@template_only
+class GoldenPathTests(unittest.TestCase):
+    """The promise of the template: an agent that does the intake meets no template bug.
+
+    init -> minimal intake (accepted vision and stack, owner, one real surface) -> make done
+    green -> a commit through the git gate. make done also runs the kit's own suite inside the
+    new project. Any template bug on this path fails here, before it reaches ten projects.
+    """
+
+    def intake(self, project: Path, fill: bool = True) -> None:
+        today = date.today().isoformat()
+        for record in ("VISION.md", "docs/STACK-DECISION.md"):
+            path = project / record
+            text = path.read_text()
+            if fill:
+                text = re.sub(r"\[REQUIRED: ([^\]]+)\]", lambda m: "Decided: " + m.group(1).split(",")[0] + ".", text)
+            path.write_text(text.replace("Status: pending", "Status: accepted").replace("Date: [YYYY-MM-DD]", f"Date: {today}"))
+        manifest = project / "project.toml"
+        text = re.sub(r'(?ms)(\[vision\]\s*\nstatus\s*=\s*)"pending"', r'\1"accepted"', manifest.read_text())
+        text = re.sub(r'(?ms)^\[\[surfaces\]\]\nid = "template-bootstrap".*?verification = \[\]\n',
+                      '[[surfaces]]\nid = "hello"\npath = "hello.py"\nkind = "script"\nstatus = "active"\nowner = "trial-owner"\n'
+                      'quality_oracle = "prints the greeting"\nverification = [["python3", "hello.py"]]\n', text)
+        manifest.write_text(text)
+        (project / "hello.py").write_text('print("hello")\n')
+
+    @template_only
+    def test_init_intake_done_commit(self) -> None:
+        from kit import trial
+        with tempfile.TemporaryDirectory() as folder:
+            project = Path(folder) / "demo"
+            trial.prepare(TOOLS.parent, {"id": "demo", "kind": "cli", "mode": "new", "prompt": "x"}, project)
+            self.assertIn("[REQUIRED:", (project / "VISION.md").read_text(), "init leaves a fresh record, not the template's")
+            self.assertNotIn("AI_TEMPLATE", (project / "VISION.md").read_text())
+            make = lambda *args: subprocess.run(["make", *args], cwd=project, capture_output=True, text=True, timeout=1200)
+            self.intake(project, fill=False)
+            self.assertIn("placeholders", make("check").stderr, "an accepted record with placeholders is refused")
+            self.intake(project)
+            done = make("done")
+            self.assertEqual(done.returncode, 0, (done.stdout + done.stderr)[-3000:])
+            self.assertEqual(make("start").returncode, 0)
+            subprocess.run(["git", "-C", str(project), "add", "-A"], check=True)
+            commit = subprocess.run(["git", "-C", str(project), "commit", "-qm", "feat: hello surface"], capture_output=True, text=True)
+            self.assertEqual(commit.returncode, 0, commit.stderr)
 
 
 @template_only

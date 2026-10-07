@@ -100,33 +100,90 @@ verification = []
     return updated
 
 
+VISION_SKELETON = """# Project vision
+
+<!-- index: operate | Accepted product direction, constraints, and success evidence | Starting a project or making a high-impact scope decision. -->
+
+Status: pending
+Project: {name}
+Owner: project-owner
+Date: [YYYY-MM-DD]
+
+The `product-kickoff` skill fills this in with the owner. Replace every bracketed
+REQUIRED line, then set `Status: accepted` with the owner and today's date, and
+`[vision].status = "accepted"` in `project.toml`. Checks refuse an accepted
+record that still has a placeholder.
+
+## Outcome
+
+[REQUIRED: who it is for, the problem it solves, and what success looks like (one metric)]
+
+## Users and context
+
+[REQUIRED: the people who use it, where, and what they use today]
+
+## Platforms and constraints
+
+[REQUIRED: platforms, offline needs, budget, deadline, data and privacy limits]
+
+## Non-goals
+
+[REQUIRED: what this version deliberately does not do]
+
+## Success evidence
+
+[REQUIRED: how we will know it works: tests, observed real artifacts, the metric]
+"""
+
+STACK_SKELETON = """# Stack decision record
+
+<!-- index: operate | Framework/toolchain decision and rationale | Choosing a project stack or replacing an assumed tool. -->
+
+Status: pending
+Project: {name}
+Owner: project-owner
+Date: [YYYY-MM-DD]
+
+Record the stack after the vision is accepted (`product-kickoff`, then
+`stack-foundation`). Confirm current versions from primary sources before
+accepting.
+
+## Decision
+
+[REQUIRED: language, framework, data store, hosting, with pinned versions]
+
+## Why this, and what else was considered
+
+[REQUIRED: the alternatives and why they lost for this product]
+
+## Verification and rollback
+
+[REQUIRED: the commands that prove it works, and how to back out]
+"""
+
+
+def _template_record(path: Path) -> bool:
+    """True for a missing record or the template's own one; a project's own record is never replaced."""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return True
+    return bool(re.search(r"(?m)^Project:\s*(AI_TEMPLATE|REPLACE_WITH_PROJECT_NAME)\s*$", text))
+
+
 def reset_vision_for_project(root: Path, manifest: str, project_name: str) -> str:
+    """Pending intake records for the new project, never the template's own vision and stack text."""
     manifest = re.sub(
         r'(?ms)(\[vision\]\s*\n\s*status\s*=\s*)"[^"]+"',
         r'\1"pending"',
         manifest,
         count=1,
     )
-    vision_path = ensure_inside_root(root, root / "VISION.md", "vision record")
-    try:
-        content = vision_path.read_text(encoding="utf-8")
-    except FileNotFoundError:
-        content = "# Project vision\n\nStatus: pending\n"
-    content = re.sub(r"(?m)^Status:\s*.*$", "Status: pending", content, count=1)
-    content = re.sub(r"(?m)^Project:\s*.*$", f"Project: {project_name}", content, count=1)
-    content = re.sub(r"(?m)^Owner:\s*.*$", "Owner: project-owner", content, count=1)
-    content = re.sub(r"(?m)^Date:\s*.*$", "Date: [YYYY-MM-DD]", content, count=1)
-    vision_path.write_text(content, encoding="utf-8")
-    stack_path = ensure_inside_root(root, root / "docs" / "STACK-DECISION.md", "stack decision record")
-    try:
-        stack_content = stack_path.read_text(encoding="utf-8")
-        stack_content = re.sub(r"(?m)^Status:\s*.*$", "Status: pending", stack_content, count=1)
-        stack_content = re.sub(r"(?m)^Project:\s*.*$", f"Project: {project_name}", stack_content, count=1)
-        stack_content = re.sub(r"(?m)^Owner:\s*.*$", "Owner: project-owner", stack_content, count=1)
-        stack_content = re.sub(r"(?m)^Date:\s*.*$", "Date: [YYYY-MM-DD]", stack_content, count=1)
-        stack_path.write_text(stack_content, encoding="utf-8")
-    except FileNotFoundError:
-        pass
+    for relative, skeleton in (("VISION.md", VISION_SKELETON), ("docs/STACK-DECISION.md", STACK_SKELETON)):
+        path = ensure_inside_root(root, root / relative, "intake record")
+        if _template_record(path):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(skeleton.format(name=project_name), encoding="utf-8")
     return manifest
 
 

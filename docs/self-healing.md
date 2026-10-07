@@ -217,6 +217,16 @@ findings, one root cause per change (see [`delegation.md`](./delegation.md)).
   interpreter (override with `REPOCTL_PYTHON` or `make PYTHON=...`). Windows
   hosts run it from Git Bash or WSL.
 
+## The golden path is a test
+
+A bug in the template is copied into every project made from it, so the happy
+path is tested end to end in CI (`GoldenPathTests`): `make init`, a scripted
+minimal intake (accepted vision and stack decision, owner, one real surface),
+a fully green `make done` (which runs the kit's own suite inside the new
+project), and a commit through the git gate. An accepted record that still has
+placeholders must be refused. A template change that breaks any step fails the
+template's CI before it reaches a project.
+
 ## Measuring the kit: fresh-agent evals
 
 `.agents/evals/*.toml` holds navigation tasks with an expected-answer regex.

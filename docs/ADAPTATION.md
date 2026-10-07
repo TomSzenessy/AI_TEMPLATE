@@ -16,7 +16,7 @@ a project small:
 
 | Artifact | Keep/update | Replace or remove when |
 |---|---|---|
-| `VISION.md` | Keep as the current product-direction record. | Never remove; revise it when the product direction changes. |
+| `VISION.md` | `make init` writes a fresh pending record whose REQUIRED placeholders block acceptance until the intake fills them. | Never remove; revise it when the product direction changes. |
 | `docs/STACK-DECISION.md` | Keep the accepted decision and its rationale. | Replace a superseded decision with a new record or explicit revision. |
 | `project.toml` example comments | Useful while adapting. | Remove unused examples/comments once the real manifest is understood. |
 | `[[surfaces]] id = "template-bootstrap"` | Created by `make init` as a visible pending declaration, not a product check. | Replace it with the first real surface; never treat its governance check as product evidence. |
