@@ -19,9 +19,9 @@ SKILL_TEST_SUITES := $(wildcard .agents/skills/*/tests)
 python-check:
 	@test -n "$(PYTHON)" && $(PYTHON) -c 'import sys; sys.exit(sys.version_info < (3, 11))' 2>/dev/null || { echo "Needs Python 3.11+ (found: '$(PYTHON)'); install python3.11 or newer, or run: make PYTHON=/path/to/python3.11 ..." >&2; exit 1; }
 
-# KIT_INNER=1 (set for a project's inner suite run) runs a smoke subset; KIT_SLOW=1 keeps the full inner run.
+# KIT_INNER=1 (set for a project's inner suite run) runs a smoke subset; KIT_SLOW=1 keeps the full run.
 test: python-check
-ifeq ($(KIT_INNER)$(KIT_SLOW),1)
+ifeq ($(KIT_INNER):$(KIT_SLOW),1:)
 	$(PYTHON) -m unittest discover -s tools/tests -p 'test_repoctl.py' -k init
 	$(PYTHON) -m unittest discover -s tools/tests -p 'test_kit.py' -k GlobTests -k HygieneTests -k AdapterTests
 else

@@ -1,4 +1,4 @@
-# Fresh-agent navigation benchmark (docs/self-healing.md#measuring-the-kit-fresh-agent-evals).
+# Fresh-agent navigation benchmark (docs/evals.md).
 # Each task runs in a new read-only headless session; `expect` is a
 # case-insensitive regex the answer must contain. Keep tasks about finding
 # and understanding, so the suite measures navigation, not general knowledge.

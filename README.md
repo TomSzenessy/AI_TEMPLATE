@@ -82,8 +82,14 @@ merged in beside them ([`docs/ADAPTATION.md`](./docs/ADAPTATION.md#adopting-an-e
 | The system cannot grow without losing its shape | Each of the eight kinds -- skill, agent role, doc, rule, check, command, MCP route, pack -- is one file added by `make new`, found by `make where` and `make similar`; a pack is a named group of them that stays out of context until it is switched on. |
 | "Done" means "it compiled" | `make risk` says how much review a change needs (see below); an independent critic and the real artifact decide; `make eval` measures whether a fresh agent can still find its way around. |
 
-The mechanics are in [`docs/self-healing.md`](./docs/self-healing.md) and
-[`docs/delegation.md`](./docs/delegation.md).
+The mechanics are in [`docs/self-healing.md`](./docs/self-healing.md) (gates
+and hooks) and in one owner page per concern:
+[`docs/bindings.md`](./docs/bindings.md) (doc-code bindings),
+[`docs/hygiene.md`](./docs/hygiene.md) (markers, orphan files, guardrails),
+[`docs/generated-files.md`](./docs/generated-files.md),
+[`docs/capabilities.md`](./docs/capabilities.md),
+[`docs/kit-update.md`](./docs/kit-update.md), [`docs/evals.md`](./docs/evals.md),
+and [`docs/delegation.md`](./docs/delegation.md).
 
 ## Everyday commands
 

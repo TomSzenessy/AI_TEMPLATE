@@ -166,9 +166,3 @@ findings, one root cause per change (see [`delegation.md`](./delegation.md)).
   newest Python 3.11+ on `PATH` even when `python3` is an older system
   interpreter (override with `REPOCTL_PYTHON` or `make PYTHON=...`). Windows
   hosts run it from Git Bash or WSL.
-
-## Measuring the kit: fresh-agent evals
-
-Fresh-agent evals and scored build trials are documented in
-[`evals.md`](./evals.md). (This heading stays so existing links keep
-resolving.)

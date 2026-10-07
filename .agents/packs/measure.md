@@ -8,4 +8,4 @@ default: off
 
 `make eval` and `make trial` launch headless agents that cost money, so the
 pack is off by default. The template turns it on to prove kit changes
-([`../../docs/self-healing.md`](../../docs/self-healing.md#measuring-the-kit-fresh-agent-evals)).
+([`../../docs/evals.md`](../../docs/evals.md)).

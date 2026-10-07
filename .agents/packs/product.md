@@ -7,7 +7,7 @@ default: on
 # Product pack
 
 Everything that turns "build me an app" into a finished product. The
-mechanics are in [`../../docs/building.md`](../../docs/building.md). Switch it
-off with `product = false` under `[packs]` in `project.toml` for a repository
-that is not a product (a library of scripts, a docs site run by hand); its
-skills, checks, and commands stay findable with `make capabilities`.
+mechanics are in [`../../docs/building.md`](../../docs/building.md). A
+repository that is not a product (a library of scripts, a docs site run by
+hand) switches it off; the switching rules are owned by
+[`../../docs/capabilities.md`](../../docs/capabilities.md).

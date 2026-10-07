@@ -44,7 +44,7 @@ label_registry = ".github/issue-labels.json"
 registry = "resources.toml"
 
 [adapters]
-# Hosts that get generated adapter files (docs/self-healing.md#host-adapters).
+# Hosts that get generated adapter files (docs/generated-files.md).
 # Codex, Copilot, and Cursor read AGENTS.md and .agents/ without adapters.
 hosts = ["claude"]
 
@@ -55,7 +55,7 @@ hosts = ["claude"]
 # allow = ["make start", "make done", "make where:*"]               # pre-approved commands
 
 [kit]
-# Optional tunables (docs/self-healing.md); omitted keys keep the defaults.
+# Optional tunables (docs/capabilities.md#configuration); omitted keys keep the defaults.
 # doc_groups = { operate = "Start and operate", design = "Design and engineering", launch = "Product, privacy, and launch", extend = "Extensibility and evidence" }
 # unbound_docs_ok = ["docs/legal/**", "docs/research/**"]
 # overlap_limit = 0.30
