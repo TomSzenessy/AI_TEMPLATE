@@ -46,6 +46,8 @@ MODES = {"new", "adopt"}
 BLOCK = re.compile("|".join(re.escape(phrase) for phrase in GATE_BLOCK_PHRASES))  # gate phrases live in core
 MAKE = re.compile(r"\bmake\s+([a-z][a-z0-9-]*)")
 PHASE = re.compile(r"\bNext \(([a-z][a-z-]*)\):")  # `make next` names the phase the agent is in
+# Every token the model processed: most input arrives as cache reads in an agent loop.
+TOKEN_FIELDS = ("input_tokens", "output_tokens", "cache_creation_input_tokens", "cache_read_input_tokens")
 GOLDEN_PATH = ("start", "next", "where", "risk", "check", "done", "ui-review", "handover")
 
 
@@ -162,15 +164,20 @@ def analyze_transcript(transcript: Path) -> dict[str, object]:
     blocks, failed_make, bypasses = [], [], []
     results = []
     phases: dict[str, dict[str, int]] = {}
-    phase = "start"
+    phase, counted = "start", set()
     for event in _events(transcript):
         if event.get("type") == "result":
             results.append(event)
-        if event.get("type") == "assistant" and isinstance(event.get("message"), dict):
-            usage = event["message"].get("usage") or {}
-            tally = phases.setdefault(phase, {"turns": 0, "tokens": 0})
-            tally["turns"] += 1
-            tally["tokens"] += sum(int(usage.get(key) or 0) for key in ("input_tokens", "output_tokens"))
+        message = event.get("message")
+        if event.get("type") == "assistant" and isinstance(message, dict):
+            # stream-json repeats one message per content block under the same id; count it once.
+            identifier = message.get("id")
+            if identifier is None or identifier not in counted:
+                counted.add(identifier)
+                usage = message.get("usage") or {}
+                tally = phases.setdefault(phase, {"turns": 0, "tokens": 0})
+                tally["turns"] += 1
+                tally["tokens"] += sum(int(usage.get(key) or 0) for key in TOKEN_FIELDS)
         content = (event.get("message") or {}).get("content") if isinstance(event.get("message"), dict) else None
         for part in content if isinstance(content, list) else []:
             if part.get("type") == "tool_use":

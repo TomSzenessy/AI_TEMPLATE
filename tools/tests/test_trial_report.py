@@ -37,6 +37,12 @@ def analyse(*events: dict) -> dict:
 
 
 class ReportTests(unittest.TestCase):
+    def test_one_message_split_into_blocks_counts_once_with_cache_tokens(self) -> None:
+        usage = {"input_tokens": 2, "output_tokens": 3, "cache_read_input_tokens": 1000, "cache_creation_input_tokens": 5}
+        block = {"type": "assistant", "message": {"id": "m1", "content": [{"type": "text", "text": "."}], "usage": usage}}
+        analysis = analyse(block, block, {**block, "message": {**block["message"], "id": "m2"}})
+        self.assertEqual(analysis["phases"], [{"phase": "start", "turns": 2, "tokens": 2020}])
+
     def test_a_bypass_fails_the_run_even_when_every_check_passes(self) -> None:
         analysis = analyse(tool("a", "git commit --no-verify -m x"))
         self.assertIn("- Verdict: fail (gate bypassed with --no-verify)", trial.render(SPEC, "haiku", analysis, PASSING, Path("p")))
