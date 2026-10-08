@@ -403,17 +403,20 @@ def stop(root: Path, event: dict[str, object]) -> None:
     if reason is None:
         return
     digest = hashlib.sha256(reason.encode("utf-8")).hexdigest()
+    previous = chain.get("count", 0)
+    previous = previous if isinstance(previous, int) and not isinstance(previous, bool) else STOP_REPEATS
     if event.get("stop_hook_active"):
-        if chain.get("last") == digest or int(chain.get("count", 0)) >= STOP_REPEATS:
+        if chain.get("last") == digest or previous >= STOP_REPEATS:
             return  # no progress since the last push, or the cap: the agent may stop and explain
-        count = int(chain.get("count", 0)) + 1
+        count = previous + 1
     else:
         count = 1
     state["stop_chain"] = {"count": count, "last": digest}
     try:
         _save_state(root, state)
     except OSError:
-        pass  # without the record the next stop in this chain is judged as a first push
+        if event.get("stop_hook_active"):
+            return  # unrecorded pushes cannot be counted, so never push twice blind: no endless loop
     print(json.dumps({"decision": "block", "reason": reason}))
 
 

@@ -86,5 +86,29 @@ class StopChainTests(KitRepository):
         self.assertEqual(self.stop(ACTIVE), "", "the cap holds even when findings keep changing")
 
 
+    def test_an_unwritable_state_never_loops(self) -> None:
+        from unittest import mock
+        from kit import session
+        self.cli("hook", "session-start", stdin=SESSION)
+        self.break_link("a")
+        self.assertTrue(self.stop(SESSION))
+        with mock.patch.object(session, "_save_state", side_effect=OSError("read-only")):
+            for name in ("b", "c", "d", "e", "f"):
+                self.break_link(name)
+                self.assertEqual(self.stop(ACTIVE), "", "a push that cannot be recorded is not repeated")
+
+    def test_a_corrupt_chain_count_ends_the_chain(self) -> None:
+        from kit import session
+        self.cli("hook", "session-start", stdin=SESSION)
+        self.break_link("a")
+        self.assertTrue(self.stop(SESSION))
+        path = session.state_path(self.root)
+        state = json.loads(path.read_text())
+        state["stop_chain"]["count"] = "garbage"
+        path.write_text(json.dumps(state))
+        self.break_link("b")
+        self.assertEqual(self.stop(ACTIVE), "")
+
+
 if __name__ == "__main__":
     unittest.main()
