@@ -96,6 +96,47 @@ class GatesTakeBlockingFromTheRegistry(Scratch):
         self.assertEqual(session.commit_gate(self.root, None), 0)
 
 
+class DocCouplingComesFromTheRegistry(Scratch):
+    """The owed-doc rule is a registry check, so a project downgrade reaches both gates too (#22)."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.git("init", "-q", "-b", "main")
+        self.git("config", "user.email", "t@example.com")
+        self.git("config", "user.name", "T")
+        self.write("project.toml", MANIFEST)
+        self.write("docs/README.md", "# Docs\n")
+        self.write("docs/billing.md", "# Billing\n\n<!-- covers: src/billing/** -->\n\nReturns 2.\n")
+        self.write("src/billing/a.py", "x = 1\n")
+        self.commit("base")
+        self.write("src/billing/a.py", "x = 2\n")
+        self.git("add", "-A")
+
+    def owed(self, findings: list[str]) -> bool:
+        return any(item.startswith("[doc-coupling]") and "docs/billing.md" in item for item in findings)
+
+    def downgrade(self) -> None:
+        self.write("project.toml", MANIFEST + '\n[checks.doc-coupling]\nseverity = "advisory"\nreason = "this repository tolerates it"\n')
+        self.git("add", "-A")
+
+    def test_commit_gate_blocks_on_an_owed_doc_then_passes_when_downgraded(self) -> None:
+        self.assertTrue(self.owed(session.commit_findings(self.root, None)))
+        self.assertEqual(session.commit_gate(self.root, None), session.GATE_BLOCKED)
+        self.downgrade()
+        self.assertFalse(self.owed(session.commit_findings(self.root, None)))
+        self.assertEqual(session.commit_gate(self.root, None), 0)
+
+    def test_finish_gate_agrees(self) -> None:
+        self.assertTrue(self.owed(session.finish_findings(self.root)))
+        self.downgrade()
+        self.assertFalse(self.owed(session.finish_findings(self.root)))
+
+    def test_a_docs_unaffected_trailer_still_exempts_the_commit(self) -> None:
+        message = self.root / "msg"
+        message.write_text("fix\n\nDocs-Unaffected: docs/billing.md behaviour unchanged\n", encoding="utf-8")
+        self.assertFalse(self.owed(session.commit_findings(self.root, str(message))))
+
+
 class NoSecondImplementation(unittest.TestCase):
     """Source guards: these fail when a rule the registry owns is written again elsewhere."""
 
@@ -106,6 +147,12 @@ class NoSecondImplementation(unittest.TestCase):
         text = self.source("session.py")
         for needle in ("scan_markers", "derive.drift", "dead_bindings", "plugin_errors"):
             self.assertNotIn(needle, text, f"session.py calls {needle} itself; name the check in registry_findings instead")
+
+    def test_gates_do_not_compute_the_owed_doc_or_critic_findings(self) -> None:
+        text = self.source("session.py")
+        gates = text[text.index("def finish_findings"):text.index("def install_git_hooks")]
+        for needle in ("pending_documents", "owed_since", "owed_documents", "critic_findings"):
+            self.assertNotIn(needle, gates, f"a gate calls {needle} itself; name doc-coupling or critic-evidence in registry_findings")
 
     def test_doctor_does_not_rerun_checks_a_gate_already_ran(self) -> None:
         self.assertIn("doctor --checks-done", kit_makefile(REPO))
