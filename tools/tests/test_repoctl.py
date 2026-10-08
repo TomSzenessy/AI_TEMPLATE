@@ -680,28 +680,21 @@ quality_oracle = "human review"
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("minimal profile", result.stdout)
 
-    def test_workflow_has_checkout_permissions_and_label_families(self) -> None:
+    def test_workflows_check_out_then_call_tested_code_with_least_privilege(self) -> None:
+        """Config-file content (workflow YAML) is the subject here, so it is read as text on purpose.
+
+        The behaviour the workflows delegate to is asserted on the code itself in
+        test_kit_capabilities.CiCheckTests and test_issue_contract_single_source.
+        """
         root = Path(__file__).resolve().parents[2]
-        issue_workflow = kit_workflow(root, "issue-contract.yml").read_text(encoding="utf-8") + "".join(
-            (root / name).read_text(encoding="utf-8") for name in ("tools/kit/ci.py", "tools/kit/issues.py", "tools/issue_contract.py")
-        )
+        issue_workflow = kit_workflow(root, "issue-contract.yml").read_text(encoding="utf-8")
         self.assertIn("contents: read", issue_workflow)
         self.assertIn("actions/checkout@", issue_workflow)
-        self.assertIn("topic", issue_workflow)
         self.assertIn("cancel-in-progress", issue_workflow)
-        self.assertIn("load_label_registry", issue_workflow)
-        self.assertIn("Disclosure class", issue_workflow)
-        reference_workflow = kit_workflow(root, "require-issue-reference.yml").read_text(encoding="utf-8") + (root / "tools/kit/ci.py").read_text(encoding="utf-8")
+        reference_workflow = kit_workflow(root, "require-issue-reference.yml").read_text(encoding="utf-8")
         self.assertNotIn("security-events: read", reference_workflow)
-        self.assertNotIn("security-advisories/", reference_workflow)
-        self.assertIn("maintainer-attested", reference_workflow)
-        self.assertIn("security-reviewed", reference_workflow)
-        self.assertIn("unlabeled", reference_workflow)
-        self.assertIn("closing_references", reference_workflow)
-        self.assertIn("must be an open issue", reference_workflow)
-        self.assertIn("canonical issue contract", reference_workflow)
+        self.assertIn("unlabeled", reference_workflow)  # a removed security-reviewed label re-runs the check
         self.assertIn("PR_AUTHOR_ASSOCIATION", reference_workflow)
-        self.assertIn("private security prs require", reference_workflow.casefold())
         for workflow_name, check in (("require-issue-reference.yml", "pr-reference"), ("issue-contract.yml", "issue-contract")):
             text = kit_workflow(root, workflow_name).read_text(encoding="utf-8")
             # Logic lives in tested repository code; the workflow checks out, then calls it.
@@ -797,7 +790,8 @@ verification = [["python3", "-c", "print('ok')"]]
         self.assertEqual(result.returncode, 1)
         self.assertIn("accountable owner", result.stderr)
 
-    def test_forms_and_pr_workflow_keep_public_contracts(self) -> None:
+    def test_issue_forms_keep_the_disclosure_contract(self) -> None:
+        """Config-file content (issue templates) is the subject, so it is read as text on purpose."""
         root = Path(__file__).resolve().parents[2]
         for name in ("issue-tracker.yml", "bug.yml", "improvement.yml", "feature.yml"):
             content = (root / ".github" / "ISSUE_TEMPLATE" / name).read_text(encoding="utf-8")
@@ -805,13 +799,8 @@ verification = [["python3", "-c", "print('ok')"]]
             self.assertIn("Disclosure class", content)
             self.assertIn("public-safe", content)
         self.assertIn("[enhancement/P2]", (root / ".github/ISSUE_TEMPLATE/feature.yml").read_text(encoding="utf-8"))
-        issue_workflow = kit_workflow(root, "issue-contract.yml").read_text(encoding="utf-8") + (root / "tools/kit/ci.py").read_text(encoding="utf-8")
-        self.assertIn("Regulated profile uses the CLI/private issue route", issue_workflow)
-        self.assertIn("Minimal profile delegates issue intake", issue_workflow)
-        workflow = kit_workflow(root, "require-issue-reference.yml").read_text(encoding="utf-8") + (root / "tools/kit/ci.py").read_text(encoding="utf-8")
-        self.assertIn("Fixes", workflow)
-        self.assertIn("Security-Reference", workflow)
-        self.assertIn("private security prs require", workflow.casefold())
+
+
     def test_incident_updates_empty_docs_marker_and_passes_check(self) -> None:
         result = self.cli("incident", "--title", "Probe failure", "--summary", "A reproducible probe")
         self.assertEqual(result.returncode, 0, result.stderr)
