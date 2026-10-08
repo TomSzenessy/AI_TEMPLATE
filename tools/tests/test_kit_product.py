@@ -27,6 +27,17 @@ class ProductDriverTests(KitRepository):
     def features(self, *rows: str) -> None:
         self.write(product.FEATURES, "feature,area,priority,status,evidence,acceptance,source\n" + "\n".join(rows) + "\n")
 
+    def test_a_missing_evidence_column_is_named_not_reported_per_row(self) -> None:
+        # Haiku ledger-cli trial: no `evidence` column, test paths in `source`; every row then
+        # "cited no evidence" and the agent never learned why.
+        self.write(product.FEATURES, "feature,area,priority,status,acceptance,source\n"
+                                     "Import,core,must,yes,Parses a CSV,tests/test_import.py\n")
+        with self.assertRaisesRegex(Exception, r"header is missing column\(s\) evidence; expected feature,area"):
+            product.load_features(self.root)
+        check = self.cli("check")
+        self.assertIn("missing column(s) evidence", check.stderr)
+        self.assertNotIn("cites no evidence", check.stderr)
+
     def test_phases_in_order(self) -> None:
         self.assertEqual(self.phase(), "intake")
         self.accept_vision()

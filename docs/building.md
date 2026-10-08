@@ -52,7 +52,8 @@ constants in `tools/kit/names.py`; the phases above are unchanged.
 ## Feature list: `docs/product/features.csv`
 
 Columns: `feature, area, priority (must|should|could), status
-(yes|partial|no|skip), evidence, acceptance, source`. Weights match
+(yes|partial|no|skip), evidence, acceptance, source`; a header missing one of
+these is named as such (test files go in `evidence`). Weights match
 `parity-check`: must 3, should 2, could 1; yes counts 1, partial 0.5. This is
 the one matrix: `product-recon` appends the reference product's features and
 `review-mining` its fix-plan rows (`source` names the skill, `status` starts at

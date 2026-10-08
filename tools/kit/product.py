@@ -29,6 +29,8 @@ RESEARCH = "docs/product/research.md"
 WEIGHT = {"must": 3, "should": 2, "could": 1}
 CREDIT = {"yes": 1.0, "partial": 0.5, "no": 0.0}
 STATUSES = {"yes", "partial", "no", "skip"}
+HEADER = "feature,area,priority,status,evidence,acceptance,source"
+REQUIRED_COLUMNS = ("feature", "priority", "status", "evidence", "acceptance")
 URL = re.compile(r"https?://[^\s)>\]]+")
 
 
@@ -36,8 +38,16 @@ def load_features(root: Path) -> list[dict[str, str]]:
     text = read_text_file(root, FEATURES)
     if text is None:
         return []
+    reader = csv.DictReader(text.splitlines())
+    missing = [column for column in REQUIRED_COLUMNS if column not in (reader.fieldnames or [])]
+    if reader.fieldnames and "feature" in reader.fieldnames and missing:  # no header at all is #55's case
+        # A missing column reads as empty in every row: without this, a list with no `evidence`
+        # column told a Haiku trial agent that each feature "cites no evidence" while it put
+        # the test files in `source`, and it never found out why.
+        raise RepoctlError(f"{FEATURES}: header is missing column(s) {', '.join(missing)}; "
+                           f"expected {HEADER} (cite test files in evidence)")
     rows = []
-    for number, row in enumerate(csv.DictReader(text.splitlines()), start=2):
+    for number, row in enumerate(reader, start=2):
         feature = (row.get("feature") or "").strip()
         if not feature:
             continue
