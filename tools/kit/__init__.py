@@ -8,7 +8,7 @@ local):
 
 - leaves and primitives: gitinfo, names, helptext, core, config, surfaces
 - capability model: registry (the one loader), checkrun (the check context and
-  the one blocking rule), commands and checks (the kit's declarations;
+  the one blocking rule), commands and checks (the kit's declarations, gatechecks the gates' rules;
   docs/adr/0002-one-capability-model.md)
 - governance: github, docs, skills, structure, issues, ci, launch
 - project setup: kitlock (what the kit ships and the lock that records it),

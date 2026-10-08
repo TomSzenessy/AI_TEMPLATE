@@ -24,6 +24,7 @@ from kit import (  # noqa: E402
     checkrun, core, ci, commands, coupling, derive, docmeta, docsync, evals, garden, hygiene, navigate, product,
     reachability, registry, risk, session, signatures, structure, uireview,
 )
+from kit.checkrun import Change  # noqa: E402
 from kit.core import load_project  # noqa: E402
 from kit.gitinfo import path_matches  # noqa: E402
 
@@ -1645,7 +1646,8 @@ class CriticRecordGateTests(KitRepository):
         return load_project(self.root)
 
     def findings(self) -> str:
-        return "\n".join(session.critic_findings(self.root, self.project(), "main"))
+        change = Change("finish", [], base="main")
+        return "\n".join(session.registry_findings(self.root, {"critic-evidence"}, None, change))
 
     def head(self) -> str:
         return self.git("rev-parse", "HEAD").strip()
