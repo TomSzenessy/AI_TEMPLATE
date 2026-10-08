@@ -43,7 +43,13 @@ IGNORED_WALK_DIRECTORIES = {name for name, role in DIRECTORY_ROLES.items() if ro
 
 
 class RepoctlError(Exception):
-    """An actionable repository governance failure."""
+    """An actionable repository governance failure.
+
+    `findings` carries the list a gate failed on (see `check_failed`), so a caller
+    that wants the items never parses them back out of the message.
+    """
+
+    findings: tuple[str, ...] = ()
 
 
 # The gate vocabulary: the exact phrases a gate prints when it blocks, defined once so the
@@ -57,7 +63,9 @@ GATE_BLOCK_PHRASES = (GATE_COMMIT_BLOCKED, GATE_NOT_FINISHED, GATE_CHECK_FAILED,
 
 def check_failed(name: str, errors: list[str], note: str = "") -> RepoctlError:
     """The one "check failed" error a gate raises when it lists findings (trial counts its phrase)."""
-    return RepoctlError(f"{name} {GATE_CHECK_FAILED}:\n- " + "\n- ".join(errors) + note)
+    error = RepoctlError(f"{name} {GATE_CHECK_FAILED}:\n- " + "\n- ".join(errors) + note)
+    error.findings = tuple(errors)
+    return error
 
 
 def replace_manifest_field(manifest: str, field: str, value: str) -> str:

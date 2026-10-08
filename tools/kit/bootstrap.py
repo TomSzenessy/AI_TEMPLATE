@@ -64,7 +64,8 @@ make check
     if "<!-- repoctl:quickstart -->" not in content:
         content = re.sub(
             r"(?ms)(^## Start in five minutes\s*\n\s*```bash\s*\n).*?(\n\s*```)",
-            r"\1# This project is initialized. Complete the intake and replace the template-bootstrap surface before treating checks as product evidence.\nmake inventory\nmake check\2",
+            r"\1# This project is initialized. Complete the intake and replace the template-bootstrap surface "
+            r"before treating checks as product evidence.\nmake inventory\nmake check\2",
             content,
             count=1,
         )
@@ -77,7 +78,8 @@ make check
     )
     content = re.sub(
         r"(?ms)^`make init` sets identity and phase only;.*?then rerun the doctor\.",
-        "This project is initialized. Complete `VISION.md`, `docs/STACK-DECISION.md`, the accountable owner, and the first real surface in `project.toml`; rerun `make doctor` when those gates are resolved.",
+        "This project is initialized. Complete `VISION.md`, `docs/STACK-DECISION.md`, the accountable owner, "
+        "and the first real surface in `project.toml`; rerun `make doctor` when those gates are resolved.",
         content,
         count=1,
     )

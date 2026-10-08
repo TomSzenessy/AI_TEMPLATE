@@ -24,8 +24,7 @@ def _raised(function, *arguments) -> list[str]:
     try:
         function(*arguments)
     except RepoctlError as error:
-        header, _, items = str(error).partition("\n- ")
-        return items.split("\n- ") if items and header.rstrip().endswith(":") else [str(error)]
+        return list(error.findings) or [str(error)]
     return []
 
 
@@ -225,6 +224,15 @@ def unbound_docs(context) -> list[str]:
         and not any(path_matches(path, pattern) for pattern in setting(context.root, "unbound_docs_ok"))
     )
     return ["documents without a covers binding (fine for pure policy docs): " + ", ".join(unbound)] if unbound else []
+
+
+@check("skill-folders-without-manifest", "Folders under .agents/skills with no SKILL.md; add it or remove the folder",
+       blocks=False)
+def skill_folders_without_manifest(context) -> list[str]:
+    files = set(context.files)
+    folders = {path.split("/")[2] for path in files if path.startswith(".agents/skills/") and path.count("/") >= 3}
+    return [f".agents/skills/{name}/ has no SKILL.md, so it is not a skill and is ignored; add SKILL.md or delete the folder"
+            for name in sorted(folders) if f".agents/skills/{name}/SKILL.md" not in files]
 
 
 @check("skill-review-age", "Third-party skill reviews older than the review window; re-review before release", blocks=False)

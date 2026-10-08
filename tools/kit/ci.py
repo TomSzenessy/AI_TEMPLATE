@@ -79,7 +79,9 @@ def pr_reference_check(
             raise RepoctlError(f"#{number} does not contain the expected canonical issue contract")
         if not contract.DUPLICATE_CHECK.search(markdown_without_fenced_code(issue_body)):
             raise RepoctlError(f"#{number} is missing the duplicate-search record")
-    return "Validated open issue contracts: " + ", ".join("#" + n for n in closing_references) if closing_references else "Private review attested"
+    if not closing_references:
+        return "Private review attested"
+    return "Validated open issue contracts: " + ", ".join("#" + n for n in closing_references)
 
 
 def github_issue_fetcher(repository: str, api_root: str, token: str) -> Callable[[str], dict]:
@@ -112,7 +114,9 @@ def run_pr_reference(root: Path) -> str:
 # --- issues: native form intake contract -----------------------------------------
 
 
-def issue_contract_check(text: str, labels: set[str], profile: str, registry: dict, today: date | None = None) -> tuple[bool, list[str], list[str]]:
+def issue_contract_check(
+    text: str, labels: set[str], profile: str, registry: dict, today: date | None = None
+) -> tuple[bool, list[str], list[str]]:
     """Return (valid, labels_to_add, reasons) for a natively filed issue body; reasons name each fix."""
     today = today or core_today()
     if profile == "minimal":

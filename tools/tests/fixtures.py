@@ -25,7 +25,7 @@ import tempfile
 import textwrap
 import tomllib
 import unittest
-from datetime import date, timedelta
+from datetime import timedelta
 from pathlib import Path
 
 TOOLS = Path(__file__).resolve().parents[1]
@@ -34,7 +34,7 @@ if str(TOOLS) not in sys.path:
     sys.path.insert(0, str(TOOLS))
 
 import repoctl  # noqa: E402  the CLI entry point, called in-process
-from kit import checkrun, derive, docsync  # noqa: E402
+from kit import checkrun, core, derive, docsync  # noqa: E402
 
 # Template maintenance tests (they read the template's own history, Makefile wiring or
 # release material) run in the template checkout only, never in a project's copy of the suite.
@@ -50,7 +50,7 @@ def kit_makefile(root: Path) -> str:
 
 
 # Fixture dates follow the calendar so the suite never expires (#10).
-RECENT = (date.today() - timedelta(days=30)).isoformat()
+RECENT = (core.today() - timedelta(days=30)).isoformat()
 
 # What the developer's git config must never decide for a fixture (#43, T-09):
 # no global/system config at all, and identity from the environment rather than

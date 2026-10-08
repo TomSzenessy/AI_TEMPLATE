@@ -719,7 +719,7 @@ class GoldenPathTests(Scratch):
     """
 
     def intake(self, project: Path, fill: bool = True) -> None:
-        today = date.today().isoformat()
+        today = core.today().isoformat()
         for record in ("VISION.md", "docs/STACK-DECISION.md"):
             path = project / record
             text = path.read_text()
@@ -980,7 +980,7 @@ class PinDriftTests(KitRepository):
 class DecisionAgeTests(unittest.TestCase):
     def test_old_decision_only_matters_at_the_release_gate(self) -> None:
         from datetime import timedelta
-        old, future = date.today() - timedelta(days=500), date.today() + timedelta(days=2)
+        old, future = core.today() - timedelta(days=500), core.today() + timedelta(days=2)
         self.assertFalse(core.date_out_of_policy(old, release_gate=False), "make check must not rot with the calendar")
         self.assertTrue(core.date_out_of_policy(old, release_gate=True))
         self.assertTrue(core.date_out_of_policy(future, release_gate=False), "a future date is a typo")
@@ -990,7 +990,7 @@ class DecisionAgeTests(unittest.TestCase):
         from kit import structure
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
-            old = (date.today() - timedelta(days=500)).isoformat()
+            old = (core.today() - timedelta(days=500)).isoformat()
             (root / "review.md").write_text(f"Issue: #1\nCommit: {'a' * 40}\nArtifact: review.md\nReviewer: octocat\n"
                                             f"Date: {old}\nResult: pass\n")
             surface = {"id": "app", "critic_evidence": ["review.md"]}
@@ -1004,7 +1004,7 @@ class DecisionAgeTests(unittest.TestCase):
         from kit import skills
         project = tomllib.loads((TOOLS.parent / "project.toml").read_text())
         for skill in project.get("skills", []):
-            skill["reviewed_on"] = (date.today() - timedelta(days=500)).isoformat()
+            skill["reviewed_on"] = (core.today() - timedelta(days=500)).isoformat()
         skills.check_skill_provenance(project)  # development: make garden reports the age instead
         with self.assertRaisesRegex(Exception, "older than a year"):
             skills.check_skill_provenance(project, release_gate=True)
@@ -1293,18 +1293,18 @@ class CiCheckTests(unittest.TestCase):
             + "### Dependencies and handoff\n- **Owner / next action:** maintainer\n"
             + "### Type\nbug\n### Priority\nP2\n### Area\nrepo\n### Topic\nci-checks\n### Status\ntriage\n"
         )
-        valid, labels, reasons = ci.issue_contract_check(body, set(), "agent-first", registry, today=date.today())
+        valid, labels, reasons = ci.issue_contract_check(body, set(), "agent-first", registry, today=core.today())
         self.assertTrue(valid, reasons)
         self.assertIn("topic:ci-checks", labels)
         def rejected(text: str) -> bool:
             try:
-                return not ci.issue_contract_check(text, set(), "agent-first", registry, today=date.today())[0]
+                return not ci.issue_contract_check(text, set(), "agent-first", registry, today=core.today())[0]
             except Exception:  # noqa: BLE001 - an early validator raising is also a rejection
                 return True
 
-        self.assertFalse(rejected(body.replace(RECENT, (date.today() - timedelta(days=500)).isoformat())),
+        self.assertFalse(rejected(body.replace(RECENT, (core.today() - timedelta(days=500)).isoformat())),
                          "a review date belongs to the text it reviewed; it never ages out")
-        self.assertTrue(rejected(body.replace(RECENT, (date.today() + timedelta(days=3)).isoformat())))
+        self.assertTrue(rejected(body.replace(RECENT, (core.today() + timedelta(days=3)).isoformat())))
         reasons = ci.issue_contract_check(body.replace("### Topic\nci-checks", "### Topic\nNot Kebab"), set(),
                                           "agent-first", registry)[2]
         self.assertIn("Topic must be kebab-case: Not Kebab", reasons, "the comment names the fix")

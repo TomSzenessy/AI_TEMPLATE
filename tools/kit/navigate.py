@@ -41,7 +41,8 @@ def print_map(root: Path, limit: int | None = None) -> None:
     surfaces = declared_surfaces(project)
     for surface in surfaces[:limit]:
         commands = [" ".join(command) for command in surface.get("verification", [])]
-        print(f"- {surface.get('id')} [{surface.get('status', 'active')}] {surface.get('path')} — verify: {_short('; '.join(commands) or 'critic evidence', 90)}")
+        verify = _short("; ".join(commands) or "critic evidence", 90)
+        print(f"- {surface.get('id')} [{surface.get('status', 'active')}] {surface.get('path')} — verify: {verify}")
     if limit is not None and len(surfaces) > limit:
         print(f"- … {len(surfaces) - limit} more (make map)")
     doc_bindings = bindings(root, files)
@@ -169,7 +170,10 @@ def _stem(word: str) -> str:
 
 
 def _tokens(text: str) -> set[str]:
-    stop = {"the", "and", "for", "use", "with", "that", "this", "into", "from", "when", "your", "are", "or", "a", "to", "of", "in", "an", "it", "on", "is", "be", "by"}
+    stop = {
+        "the", "and", "for", "use", "with", "that", "this", "into", "from", "when", "your",
+        "are", "or", "a", "to", "of", "in", "an", "it", "on", "is", "be", "by",
+    }
     return {_stem(word) for word in WORD.findall(text.lower()) if word not in stop and len(word) > 2}
 
 

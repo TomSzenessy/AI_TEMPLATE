@@ -114,7 +114,8 @@ def create(
     description = " ".join((description or "").split())
     if len(description) < 20:
         raise RepoctlError(
-            'DESC must say what it does and when to use it (20+ characters), e.g. DESC="Drafts release notes from merged PRs; use before tagging a release."'
+            "DESC must say what it does and when to use it (20+ characters), "
+            'e.g. DESC="Drafts release notes from merged PRs; use before tagging a release."'
         )
     pack = pack.strip() or CORE
     if kind != "pack" and pack != CORE and not Registry(root).get("pack", pack):

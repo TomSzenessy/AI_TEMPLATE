@@ -34,6 +34,12 @@ from .structure import (
 
 
 # A private reporting route must be a real, public host: these names and everything under them are not.
+PLACEHOLDER_TEXT = re.compile(
+    r"\[(?:REQUIRED|pending|TBD|name/team|YYYY-MM-DD)|DRAFT TEMPLATE|REPLACE_WITH|UNSELECTED"
+    r"|^\s*(?:Status|Counsel review|Evidence type|Legal owner|Reviewer|Observed|Date):\s*"
+    r"(?:pending|tbd|required|unknown|none|placeholder)\b",
+    re.I | re.M,
+)
 NON_ROUTABLE_HOSTS = ("localhost", "example.com", "example.org", "example.net", "local", "internal", "test", "invalid")
 
 
@@ -75,7 +81,7 @@ def read_evidence_file(
         for value in re.findall(rf"(?im)^{re.escape(field)}:\s*(.+?)\s*$", content):
             if is_placeholder(value) or re.search(r"[\[\]]", value):
                 return None, f"{label} contains placeholders"
-    if re.search(r"\[(?:REQUIRED|pending|TBD|name/team|YYYY-MM-DD)|DRAFT TEMPLATE|REPLACE_WITH|UNSELECTED|^\s*(?:Status|Counsel review|Evidence type|Legal owner|Reviewer|Observed|Date):\s*(?:pending|tbd|required|unknown|none|placeholder)\b", content, re.I | re.M):
+    if PLACEHOLDER_TEXT.search(content):
         return None, f"{label} contains placeholders"
     for marker in markers:
         if not re.search(marker, content, re.I | re.MULTILINE):
@@ -329,7 +335,9 @@ def check_readiness(root: Path, *, checks_done: bool = False) -> None:
         or not owners
         or not all(isinstance(owner, str) and owner.strip() and not is_placeholder(owner) for owner in owners)
     ):
-        errors.append('at least one accountable owner is required: set owners = ["<handle>"] in project.toml (a handle or team, not an email)')
+        errors.append(
+            'at least one accountable owner is required: set owners = ["<handle>"] in project.toml (a handle or team, not an email)'
+        )
 
     surfaces = declared_surfaces(project)
     active_surfaces = [surface for surface in surfaces if surface.get("status", "active") == "active"]

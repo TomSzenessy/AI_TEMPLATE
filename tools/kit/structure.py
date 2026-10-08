@@ -125,6 +125,8 @@ def validate_critic_evidence(root: Path, surface: dict[str, object], release_gat
             content = read_utf8(path)
         except FileNotFoundError as error:
             raise RepoctlError(f"critic evidence does not exist: {value}") from error
+        except OSError as error:  # a directory, or a file the process cannot read
+            raise RepoctlError(f"critic evidence cannot be read: {value} ({error.strerror})") from error
         if secret_matches(content):
             raise RepoctlError(f"critic evidence contains possible secret material: {value}")
         for pattern, message in (
@@ -433,7 +435,7 @@ def run_verification(root: Path) -> None:
                     timeout=1800,
                     env=command_environment,
                 )
-            except (FileNotFoundError, subprocess.TimeoutExpired) as error:
+            except (OSError, subprocess.TimeoutExpired) as error:  # not found, not executable, ...
                 raise RepoctlError(f"{identifier}: verification command failed to run: {error}") from error
             if result.returncode != 0:
                 raise RepoctlError(

@@ -74,12 +74,16 @@ def render_index(root: Path, files: list[str], index_doc: str = "docs/README.md"
     return "\n\n".join(blocks)
 
 
+GLOB_LITERAL_HINT = " (in a covers glob [ ] and { } are literal characters; only * ? ** are wildcards)"
+
+
 def dead_bindings(doc_bindings: dict[str, list[str]], files: list[str]) -> list[str]:
     errors = []
     for doc, patterns in sorted(doc_bindings.items()):
         for pattern in patterns:
             if not any(path_matches(path, pattern) for path in files):
-                errors.append(f"{doc}: covers pattern matches no file: {pattern}")
+                hint = GLOB_LITERAL_HINT if re.search(r"[\[\]{}]", pattern) else ""
+                errors.append(f"{doc}: covers pattern matches no file: {pattern}{hint}")
     return errors
 
 

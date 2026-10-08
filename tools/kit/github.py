@@ -93,7 +93,8 @@ def resolve_github_repo(root: Path) -> str:
 def load_label_registry(root: Path, project: dict[str, object] | None = None) -> dict[str, list[str]]:
     project = project or load_project(root)
     governance = project.get("governance", {})
-    configured = governance.get("label_registry", ".github/issue-labels.json") if isinstance(governance, dict) else ".github/issue-labels.json"
+    default = ".github/issue-labels.json"
+    configured = governance.get("label_registry", default) if isinstance(governance, dict) else default
     if not isinstance(configured, str) or not configured.strip():
         raise RepoctlError("governance.label_registry must be a repository-relative path")
     registry_path = ensure_inside_root(root, root / configured, "label registry")

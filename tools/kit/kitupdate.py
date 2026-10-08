@@ -136,11 +136,13 @@ def update_from_source(root: Path, kit: str | None, ref: str | None = None) -> i
         cloning = ["clone", "-q", *([] if ref else ["--depth", "1"]), source, folder]
         result = run_git(None, *cloning, timeout=300)
         if result is None or result.returncode != 0:
-            raise RepoctlError(f"could not clone {source}: {result.stderr.strip()[-300:] if result else 'git unavailable'} (or pass KIT=<checkout>)")
+            reason = result.stderr.strip()[-300:] if result else "git unavailable"
+            raise RepoctlError(f"could not clone {source}: {reason} (or pass KIT=<checkout>)")
         if ref:
             checkout = run_git(Path(folder), "checkout", "-q", "--detach", f"{ref}^{{commit}}", timeout=60)
             if checkout is None or checkout.returncode != 0:
-                raise RepoctlError(f"KIT_REF {ref!r} is not a commit of {source}: {checkout.stderr.strip()[-200:] if checkout else 'git unavailable'}")
+                reason = checkout.stderr.strip()[-200:] if checkout else "git unavailable"
+                raise RepoctlError(f"KIT_REF {ref!r} is not a commit of {source}: {reason}")
         before = str(read_lock(root).get("kit_version", "none"))
         print(f"Applying kit commits {before[:12] if before not in ('none', 'unknown') else 'unrecorded'}"
               f"..{_kit_version(Path(folder))[:12]} from {source}")

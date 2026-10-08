@@ -217,7 +217,8 @@ def write_handover(root: Path) -> str:
     for placeholder, value in facts.items():
         text = text.replace(placeholder, value, 1)
     if owed:
-        text += "\n## Documents still owed\n\n" + "\n".join(f"- {doc} (covers {', '.join(paths[:4])})" for doc, paths in owed.items()) + "\n"
+        lines = (f"- {doc} (covers {', '.join(paths[:4])})" for doc, paths in owed.items())
+        text += "\n## Documents still owed\n\n" + "\n".join(lines) + "\n"
     target.write_text(text, encoding="utf-8")
     return "Wrote HANDOVER.md (ignored). Fill in objective, decisions, blockers, and the exact next action."
 
