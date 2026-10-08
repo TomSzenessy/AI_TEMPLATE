@@ -213,6 +213,7 @@ def analyze_transcript(transcript: Path) -> dict[str, object]:
         "failed_make": failed_make,
         "bypasses": bypasses,
         "final_message": str(results[-1].get("result", "")) if results else "",
+        "host_error": bool(results) and bool(results[-1].get("is_error")),
     }
 
 
@@ -253,7 +254,7 @@ def verdict(analysis: dict[str, object], state: dict[str, object]) -> str:
     A bypass fails the run even when every check passes: the benchmark measures the kit's
     gates, and an agent that went around one has not shown they hold.
     """
-    if not analysis.get("cost_usd") and int(analysis.get("turns") or 0) <= 1:
+    if analysis.get("host_error") and not analysis.get("cost_usd"):
         # A host failure (expired login, usage limit) leaves an untouched template that passes
         # every check; that is no evidence about the kit (a 2026-10-08 Sonnet run read "pass").
         final = " ".join(str(analysis.get("final_message", "")).split())[:120]

@@ -44,7 +44,7 @@ class ReportTests(unittest.TestCase):
         self.assertEqual(analysis["phases"], [{"phase": "start", "turns": 2, "tokens": 2020}])
 
     def test_a_run_that_never_started_is_not_a_pass(self) -> None:
-        limit = {"type": "result", "subtype": "success", "num_turns": 1, "total_cost_usd": 0,
+        limit = {"type": "result", "subtype": "success", "is_error": True, "num_turns": 1, "total_cost_usd": 0,
                  "duration_ms": 10, "result": "You've hit your session limit"}
         report = trial.render(SPEC, "sonnet", analyse(limit), PASSING, Path("p"))
         self.assertIn("- Verdict: no run (the agent did not work: You've hit your session limit)", report)
