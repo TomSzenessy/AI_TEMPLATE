@@ -203,6 +203,74 @@ owners = ["team"]
             self.assertNotIn(f"unregistered product surface: {folder}", result.stderr)
         self.assertIn("unregistered product surface: scripts", result.stderr, "ambiguous names still need a declaration")
 
+    def test_a_surface_owns_the_entry_files_its_generator_put_outside_it(self) -> None:
+        """#57: a Vite app keeps code in `src/` and its entry file at the root; before, no
+        declaration could ever claim it, so every web trial ended on an unfixable finding."""
+        manifest = """schema = 1
+name = "Demo"
+kind = "web"
+phase = "development"
+license = "MIT"
+owners = ["team"]
+
+[[surfaces]]
+id = "web"
+path = "src"
+kind = "code"
+owner = "team"
+quality_oracle = "smoke test"
+verification = [["true"]]
+"""
+        self.write("src/main.ts", "console.log(1)\n")
+        self.write("index.html", "<h1>app</h1>\n")
+        self.write("project.toml", manifest)
+        self.write("LICENSE", "MIT")
+        result = self.cli("check")
+        self.assertIn("unregistered product surface: index.html", result.stderr)
+        self.assertIn('extra_paths = ["index.html"]', result.stderr, "the message names the fix an agent can apply")
+
+        self.write("project.toml", manifest + 'extra_paths = ["index.html"]\n')
+        result = self.cli("check")
+        self.assertNotIn("unregistered product surface: index.html", result.stderr)
+        self.assertIn("web: src (+ index.html)", self.cli("inventory").stdout)
+
+    def test_extra_paths_are_validated(self) -> None:
+        header = """schema = 1
+name = "Demo"
+kind = "web"
+phase = "development"
+license = "MIT"
+owners = ["team"]
+"""
+        web = """[[surfaces]]
+id = "web"
+path = "src"
+kind = "code"
+owner = "team"
+quality_oracle = "smoke test"
+verification = [["true"]]
+"""
+        page = '[[surfaces]]\nid = "page"\npath = "index.html"\nkind = "file"\nstatus = "planned"\n'
+        self.write("src/main.ts", "console.log(1)\n")
+        self.write("index.html", "<h1>app</h1>\n")
+        self.write("LICENSE", "MIT")
+        for extra, expected in (
+            ('["gone.html"]', "extra path does not exist: gone.html"),
+            ("[5]", "extra_paths must be an array of relative paths"),
+        ):
+            with self.subTest(extra):
+                self.write("project.toml", header + web + f"extra_paths = {extra}\n")
+                self.assertIn(expected, self.cli("check").stderr)
+        # A path claimed by two surfaces is a duplicate, whichever is declared first.
+        manifests = {
+            "extra first": header + web + 'extra_paths = ["index.html"]\n' + page,
+            "path first": header + page + web + 'extra_paths = ["index.html"]\n',
+        }
+        for label, manifest in manifests.items():
+            with self.subTest(label):
+                self.write("project.toml", manifest)
+                self.assertIn("duplicate surface path: index.html", self.cli("check").stderr)
+
     def test_infrastructure_cannot_hide_container_or_surface(self) -> None:
         self.write("project.toml", """schema = 1
 name = "Demo"

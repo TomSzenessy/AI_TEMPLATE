@@ -97,6 +97,30 @@ class ProductDriverTests(KitRepository):
         self.features("A,core,must,no,,works,owner")
         self.assertIn("NOT done: 1 must feature(s) open (A)", product.product_summary(self.root))
 
+    def test_a_list_with_nothing_countable_is_never_called_complete(self) -> None:
+        """#55: `all()` over an empty list is vacuously true, so 0% read as 'all evidenced'."""
+        # Intake and research come first, so walk the project to the features phase once.
+        self.accept_vision()
+        self.write(product.RESEARCH, "https://a.example https://b.example https://c.example\n")
+        for label, text in (
+            ("header only", "feature,area,priority,status,evidence,acceptance,source\n"),
+            ("every row skipped", "A,core,must,skip,,works,owner\n"),
+        ):
+            with self.subTest(label):
+                self.write(product.FEATURES, text)
+                summary = product.product_summary(self.root)
+                self.assertIn("completeness is unknown", summary)
+                self.assertNotIn("all must features evidenced", summary)
+                self.assertNotIn("0% complete", summary)
+                self.assertIn("countable row", " ".join(product.feature_errors(self.root)))
+                self.assertEqual(product.next_step(self.root)["phase"], "features")
+
+    def test_a_countable_list_still_scores_and_reports(self) -> None:
+        self.features("A,core,must,yes,tests/test_a.py,works,owner", "B,core,could,skip,,works,owner")
+        self.write("tests/test_a.py", "def test_a():\n    assert True\n")
+        self.assertIn("100% complete", product.product_summary(self.root))
+        self.assertEqual(product.feature_errors(self.root), [])
+
 
 class UiReviewTests(KitRepository):
     def setUp(self) -> None:

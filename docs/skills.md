@@ -81,7 +81,9 @@ rather than a large prompt collection:
   states, accessibility, ethical onboarding) and the `make ui-review` loop;
 - [`../.agents/skills/stack-foundation/SKILL.md`](../.agents/skills/stack-foundation/SKILL.md)
   sets up a walking skeleton with strict types, lint, tests, CI, preview
-  deploys, configuration, and error tracking before feature work.
+  deploys, configuration, and error tracking before feature work. Its step 4
+  declares the surface, including `extra_paths` for the entry files a generator
+  writes outside the app directory (Vite keeps `index.html` at the root).
 
 They are first-party bundled skills: they are source-controlled with the
 repository and do not belong in the third-party `[[skills]]` provenance ledger.

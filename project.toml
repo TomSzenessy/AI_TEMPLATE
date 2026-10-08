@@ -129,6 +129,7 @@ legal_document_paths = []
 # critic_evidence = ["artifacts/reviews/app-123.md"]
 # verification = [["npm", "ci"], ["npm", "test"]]
 # garden = [["npx", "knip"]]   # optional rot finders run by `make garden`
+# extra_paths = ["index.html"]  # files this surface owns outside `path` (a Vite entry file)
 #
 # Reviewed third-party skills are recorded as provenance, not installed globally.
 # Retain a verified capability while it remains trusted and useful; update the

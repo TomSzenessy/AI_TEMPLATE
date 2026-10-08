@@ -13,7 +13,14 @@ import re
 
 from . import derive, docs, docsync, gatechecks, github, hygiene, product, skills, structure
 from .config import setting
-from .core import FILE_SURFACE_KINDS, RepoctlError, declared_surfaces, parse_iso_date, today
+from .core import (
+    FILE_SURFACE_KINDS,
+    RepoctlError,
+    declared_surfaces,
+    parse_iso_date,
+    surface_extra_paths,
+    today,
+)
 from .gitinfo import changed_paths, has_history, path_matches
 from .names import DESIGN
 from .registry import check
@@ -151,7 +158,12 @@ def surface_docs(context) -> list[str]:
         if (surface.get("status", "active") != "active" or surface.get("kind") == "template"
                 or surface.get("kind") in FILE_SURFACE_KINDS or path in {".", ""}):
             continue
-        inside = [file for file in context.files if file == path or file.startswith(path.rstrip("/") + "/")]
+        # An entry file the generator put outside the directory belongs to this surface (#57).
+        owned = [path] + surface_extra_paths(surface, str(surface.get("id", "?")))
+        inside = [
+            file for file in context.files
+            if any(file == candidate or file.startswith(candidate.rstrip("/") + "/") for candidate in owned)
+        ]
         if inside and not any(path_matches(file, pattern) for file in inside
                               for patterns in context.bindings.values() for pattern in patterns):
             errors.append(

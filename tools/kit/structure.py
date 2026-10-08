@@ -27,6 +27,8 @@ from .core import (
     parse_iso_date,
     normalized_relative_path,
     secret_matches,
+    surface_extra_paths,
+    surface_owned_paths,
 )
 from .gitinfo import git
 from .names import STACK_DECISION, VISION
@@ -202,6 +204,7 @@ def check_structure(root: Path, project: dict[str, object]) -> None:
     surface_ids: set[str] = set()
     surface_paths_seen: set[str] = set()
     declared_paths: set[str] = set()
+    claimed_by: dict[str, str] = {}
 
     for position, surface in enumerate(surfaces, start=1):
         identifier = surface.get("id")
@@ -221,8 +224,31 @@ def check_structure(root: Path, project: dict[str, object]) -> None:
             errors.append(str(error))
             continue
         declared_paths.add(path_value)
-
         status = surface.get("status", "active")
+
+        # A surface owns its path plus any entry files its generator put outside it (#57).
+        label = str(identifier or f"#{position}")
+        try:
+            extras = surface_extra_paths(surface, label)
+        except RepoctlError as error:
+            errors.append(str(error))
+            extras = []
+        if path_value in claimed_by:
+            errors.append(f"duplicate surface path: {path_value} (already an extra_paths entry of {claimed_by[path_value]})")
+        claimed_by.setdefault(path_value, label)
+        for extra in extras:
+            previous = claimed_by.setdefault(extra, label)
+            if previous != label:
+                errors.append(f"duplicate surface path: {extra} (owned by both {previous} and {label})")
+            declared_paths.add(extra)
+            try:
+                extra_path = ensure_inside_root(root, root / extra, f"surface {label} extra path")
+            except RepoctlError as error:
+                errors.append(str(error))
+                continue
+            if status == "active" and not extra_path.exists():
+                errors.append(f"active surface {label} extra path does not exist: {extra}")
+
         if status in {"active", "planned"} and path_value in surface_paths_seen:
             errors.append(f"duplicate surface path: {path_value}")
         surface_paths_seen.add(path_value)
@@ -259,7 +285,9 @@ def check_structure(root: Path, project: dict[str, object]) -> None:
     for candidate in discover_candidate_surfaces(root, project):
         if candidate not in declared_paths:
             errors.append(
-                f"unregistered product surface: {candidate} (declare it as a [[surfaces]] entry in project.toml with "
+                f"unregistered product surface: {candidate} (if it belongs to an existing surface, such as the root "
+                f"index.html a web generator writes beside the app code, add it to that surface's "
+                f'extra_paths = ["{candidate}"]; or declare it as its own [[surfaces]] entry with '
                 f'path = "{candidate}", kind, owner, quality_oracle, and verification commands; or, when it only '
                 "supports another surface such as its tests, add it to [repository].infrastructure_paths)"
             )
@@ -448,11 +476,8 @@ def print_inventory(root: Path) -> None:
     project = load_project(root)
     candidates = discover_candidate_surfaces(root, project)
     surfaces = declared_surfaces(project)
-    declared_paths = {
-        surface.get("path")
-        for surface in surfaces
-        if isinstance(surface.get("path"), str)
-    }
+    owned = surface_owned_paths(project)
+    declared_paths = {path for paths in owned.values() for path in paths}
 
     print(f"Project: {project['name']} ({project['kind']})")
     print("Infrastructure defaults: " + ", ".join(sorted(REPOSITORY_INFRASTRUCTURE_DIRECTORIES)))
@@ -471,8 +496,10 @@ def print_inventory(root: Path) -> None:
     if surfaces:
         print("Declared surfaces:")
         for surface in surfaces:
+            extras = owned.get(str(surface.get("id", "<missing id>")), [])[1:]
+            tail = f" (+ {', '.join(extras)})" if extras else ""
             print(
-                f"- {surface.get('id', '<missing id>')}: {surface.get('path', '<missing path>')} "
+                f"- {surface.get('id', '<missing id>')}: {surface.get('path', '<missing path>')}{tail} "
                 f"({surface.get('status', 'active')})"
             )
     else:

@@ -35,9 +35,14 @@ Keep looping (`make next`, build, `make done`) until the launch phase. A green
 `make done` with open must features means the slice is done, not the product:
 the stop hook enforces it once per turn when the session changed product-surface
 code ([`self-healing.md`](./self-healing.md#lifecycle-any-host)).
-What changed in `tools/kit/product.py` last: `docs/design.md` and
-`docs/STACK-DECISION.md` are read through the shared name constants in
-`tools/kit/names.py`; the phases above are unchanged.
+What changed in `tools/kit/product.py` last: a list with nothing countable — a
+header alone, or every row `skip` — used to read as "0% complete; all must
+features evidenced", because completeness was judged on the *open* must rows and
+an empty list is vacuously clear. Completeness now needs at least one countable
+row: the summary says it is unknown and names `features.csv`, `make next` returns
+to the `features` phase, and `make check` rejects the file. Earlier:
+`docs/design.md` and `docs/STACK-DECISION.md` are read through the shared name
+constants in `tools/kit/names.py`; the phases above are unchanged.
 
 ## Feature list: `docs/product/features.csv`
 

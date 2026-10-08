@@ -64,6 +64,15 @@ def score(rows: list[dict[str, str]]) -> tuple[float, list[dict[str, str]]]:
     return (100.0 * earned / total if total else 0.0), open_must
 
 
+def countable(rows: list[dict[str, str]]) -> bool:
+    """Whether completeness can be judged at all (a header-only or all-skip list cannot, #55).
+
+    With nothing countable, `all(...)` over the open must rows is vacuously true, so the
+    summary would claim a product is fully evidenced while scoring it 0%.
+    """
+    return any(row["status"] != "skip" for row in rows)
+
+
 REVIEW_LOG = "docs/product/ui-reviews.md"
 TEST_NAME = re.compile(r"(?i)(^|/)(tests?|__tests__|e2e|spec)/|[._-](test|spec)\.")
 
@@ -101,7 +110,12 @@ def feature_errors(root: Path) -> list[str]:
         rows = load_features(root)
     except RepoctlError as error:
         return [str(error)]
-    if rows and not any(row["priority"] == "must" for row in rows):
+    if not countable(rows):
+        errors.append(
+            f"{FEATURES}: needs at least one countable row; a product with only a header (or every row skipped) "
+            "has nothing to judge, so completeness cannot be claimed"
+        )
+    elif not any(row["priority"] == "must" for row in rows):
         errors.append(f"{FEATURES}: needs at least one must row; a product without must features has no definition of done")
     for row in rows:
         problem = _evidence_problem(root, row) if row["status"] in {"yes", "partial"} else None
@@ -147,7 +161,9 @@ def next_step(root: Path) -> dict[str, str]:
     vision = project.get("vision", {})
     ui = is_ui(root, project)
     try:
-        has_must = any(row["priority"] == "must" for row in load_features(root))
+        rows = load_features(root)
+        # A header-only or all-skip list counts for nothing: send the session back to writing rows (#55).
+        has_must = countable(rows) and any(row["priority"] == "must" for row in rows)
     except RepoctlError as error:  # a malformed features.csv must not hide the earlier steps
         malformed = str(error)
         has_must = False
@@ -224,9 +240,13 @@ def product_summary(root: Path) -> str | None:
     if not is_product(project) or read_text_file(root, FEATURES) is None:
         return None
     try:
-        percent, open_must = score(load_features(root))
+        rows = load_features(root)
+        percent, open_must = score(rows)
     except RepoctlError as error:
         return f"Product: {error}"
+    if not countable(rows):
+        return (f"Product completeness is unknown: {FEATURES} has no countable row (a header alone, or every row "
+                f"skipped). Write must features with acceptance criteria before anything reports the product complete.")
     if open_must:
         names = ", ".join(row["feature"] for row in open_must[:3]) + (" …" if len(open_must) > 3 else "")
         return f"Product {percent:.0f}% complete; NOT done: {len(open_must)} must feature(s) open ({names}). Run make next."

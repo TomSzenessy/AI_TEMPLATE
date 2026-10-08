@@ -61,5 +61,25 @@ class HygieneScanTests(unittest.TestCase):
         self.assertFalse(complete)
 
 
+class ShippedGitignoreTests(unittest.TestCase):
+    """#56: a trial committed `.next/` and the scan flagged a string inside a generated chunk.
+
+    The find was the ignore list, not the chunk, so the shipped list names every build
+    directory a supported generator writes at the root.
+    """
+
+    def setUp(self):
+        self.patterns = {
+            line.strip().rstrip("/")
+            for line in (Path(__file__).resolve().parents[2] / ".gitignore").read_text().splitlines()
+            if line.strip() and not line.strip().startswith("#")
+        }
+
+    def test_framework_build_output_is_ignored(self):
+        for pattern in ("build", "dist", "node_modules", ".next", ".nuxt", ".svelte-kit", ".astro", ".vercel", ".turbo"):
+            with self.subTest(pattern):
+                self.assertIn(pattern, self.patterns)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -47,20 +47,20 @@ Otherwise it is **advisory** (`make garden`, the session brief) or an
   repository because time passed. Record and review ages (vision, stack
   decision, skill provenance, critic evidence) fail only `make readiness` from
   `private-preview` on; an issue's reviewer date never ages, because it
-  belongs to the text it reviewed; during development `make garden` reports them and
-  `make check` fails only on a future date.
-  `make test-future` (also in CI, with `KIT_SLOW=1`) runs the whole suite 800 days ahead (`make test-slow` adds the full inner runs), so a
-  fixture or check pinned to a date fails now instead of in two years.
+  belongs to the text it reviewed; during development `make garden` reports
+  them and `make check` fails only on a future date.
+  `make test-future` (also in CI, with `KIT_SLOW=1`) runs the suite 800 days ahead (`make test-slow` adds the full inner runs), so a
+  date-pinned fixture fails now, not in two years.
 - **One place decides blocking.** `Registry.blocks`, applied by `checkrun.run_checks`,
   is the only mechanism that turns a finding into a block: the check's `blocks=`
   declaration, then the project's downgrade ([`capabilities.md`](./capabilities.md#downgrading-a-check)).
   Each gate (`make check`, the commit and stop gates) names the checks that fit
-  its change set; the commit hook only maps a non-empty result to exit 3, and
-  `make verify` runs `doctor --checks-done` so no blocking check runs twice.
-  Date freshness is one helper, `core.date_out_of_policy`.
-- **Retire what never fires usefully.** A check that only ever produces
-  bypasses, trailers, or ritual compliance is demoted to advisory or deleted
-  in the next trial review.
+  its change set; the commit hook maps a non-empty result to exit 3, and
+  `make verify` runs `doctor --checks-done` so no check runs twice. Date
+  freshness is one helper, `core.date_out_of_policy`.
+- **Retire what never fires usefully.** A check that only produces bypasses,
+  trailers, or ritual compliance is demoted to advisory or deleted in the next
+  trial review.
 
 ## Lifecycle (any host)
 
@@ -72,12 +72,14 @@ Otherwise it is **advisory** (`make garden`, the session brief) or an
 | Before declaring done | `repoctl hook stop` | `make done` | Gate over this branch's change set: owed docs, derived-file drift, dead bindings, expired, undated, or unfinished markers, plus critic evidence when committed `high`-risk paths changed (see [Ceremony by risk](#ceremony-by-risk)); `make done` also prints product completeness and, as advice, a stale UI review ([`building.md`](./building.md)). The hook blocks again in the same turn only on changed findings (at most three times); it also holds a session on `make check` findings that were not there when the session started, and a session that changed product-surface code is also held while must features are open or `features.csv` is invalid ([`building.md`](./building.md)); `make done` also runs every test and predicts the commit gate for uncommitted work, so the two never disagree. |
 | Every commit | `.githooks/commit-msg` (any agent or human) | same | Refuses a commit whose staged covered code skips its doc (unless the message carries a `Docs-Unaffected:` trailer), plus marker checks, and derived-file drift when the commit touches a source. In a merge commit, paths the merged branch brought in skip the owed-doc check (already judged); the rest is checked. Exit 3 means blocked; a broken plugin or kit also blocks (see [A broken check](#a-broken-check-is-a-finding-not-a-traceback)). Bypass deliberately with `--no-verify`. |
 
-Owed docs (`doc-coupling`) and critic evidence are registry checks, so `[checks]` downgrades apply.
+Owed docs (`doc-coupling`), critic evidence and `surface-docs` are registry
+checks, so `[checks]` downgrades apply; `surface-docs` counts a surface's
+`extra_paths` as owned.
 
 The commit gate is installed (`core.hooksPath=.githooks`) only when the
-repository has no hooks path and no active hooks in `.git/hooks`; otherwise
-the brief says so and you call `.githooks/commit-msg "$1"` from your existing
-commit-msg hook or hook manager, so nothing already in use is switched off.
+repository has no hooks path and no active hooks in `.git/hooks`; otherwise the
+brief says so and you call `.githooks/commit-msg "$1"` from your existing hook
+or hook manager, so nothing already in use is switched off.
 
 Claude Code receives the hooks through the generated `.claude/settings.json`.
 Other hosts read [`AGENTS.md`](../AGENTS.md), which tells them to run the make

@@ -24,6 +24,14 @@ vendor/
 .venv/
 *.egg-info/
 .DS_Store
+# Framework build directories (Next.js, Nuxt, SvelteKit, Astro, Vercel, Turborepo)
+.next/
+.nuxt/
+.svelte-kit/
+.astro/
+.vercel/
+.turbo/
+*.tsbuildinfo
 
 # Local tool state
 .review/

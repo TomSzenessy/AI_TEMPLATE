@@ -64,6 +64,12 @@ dispatch imports in `commands` are exempt, kept so `repoctl help` starts fast:
 For a copied project, replace the template row above with the real surfaces
 and keep this section only while the kit is part of the repository.
 
+A surface owns its `path` plus any `extra_paths` — the files its generator writes
+outside that directory, such as the root `index.html` a Vite app keeps beside
+`src/`. `core.surface_extra_paths` and `core.surface_owned_paths` are the one
+place that reads the key; `structure` validates it and `checks` counts those
+files as owned, so neither re-derives the rule.
+
 ## Design rules
 
 - A surface is independently owned, deployable or consumable, and verifiable.

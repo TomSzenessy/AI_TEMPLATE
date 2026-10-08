@@ -28,7 +28,10 @@ Scale the setup to the kickoff tier: a `prototype` needs steps 1 to 5; a
 4. **Declare the surface** in `project.toml`: `verification` runs typecheck,
    lint, and tests; `garden` runs a dead-code finder (knip for JS/TS, vulture for
    Python, or the stack's analyzer); add a `[budgets]` glob so files stay agent-sized.
-   Bind the surface's architecture doc with `<!-- covers: -->`.
+   Bind the surface's architecture doc with `<!-- covers: -->`. When the generator
+   writes an entry file outside the app directory — Vite keeps `index.html` at the
+   root beside `src/` — list it in that surface's `extra_paths`, so one declaration
+   owns the whole surface.
 5. **Preview for review (web UIs):** add a `[surfaces.preview]` table with the
    dev command and URL using a `{port}` placeholder, every route, and seeded
    storage `states` for filled screens, then run `make ui-review`. Native apps

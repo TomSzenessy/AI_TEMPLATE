@@ -58,7 +58,11 @@ it point at the template source and doc bindings to it are dropped. Your
 existing `docs/*.md` get an `<!-- index: -->` line from their title (edit
 the wording). Afterwards `make check` lists your code as unregistered surfaces:
 declare each one in `project.toml` (or list support folders such as tests in
-`[repository].infrastructure_paths`), then follow `make next`. A document's
+`[repository].infrastructure_paths`), then follow `make next`. When a file
+belongs to a surface you already declared but sits outside that surface's
+directory — the root `index.html` a Vite app keeps beside its `src/` — list it in
+that surface's `extra_paths` rather than declaring a second surface for one file.
+A document's
 `make <target>` references resolve to the nearest Makefile above it, so
 subprojects keep their own targets. What changed in `bootstrap.py`/`adopt.py`
 last: the kit's file list now comes from `core.repository_files` (git-known

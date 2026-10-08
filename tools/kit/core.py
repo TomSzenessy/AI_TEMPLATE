@@ -116,6 +116,29 @@ def declared_surfaces(project: dict[str, object]) -> list[dict[str, object]]:
     return surfaces
 
 
+def surface_extra_paths(surface: dict[str, object], label: str) -> list[str]:
+    """Files a surface owns outside its `path` (a Vite root `index.html` beside `src/`, #57).
+
+    A web generator writes its entry file at the repository root while the code lives in a
+    subdirectory, so a surface that owns only its directory could never be registered.
+    """
+    value = surface.get("extra_paths", [])
+    if not isinstance(value, list) or not all(isinstance(item, str) and item.strip() for item in value):
+        raise RepoctlError(f"surface {label} extra_paths must be an array of relative paths")
+    return [normalized_relative_path(item, "surface extra path") for item in value]
+
+
+def surface_owned_paths(project: dict[str, object]) -> dict[str, list[str]]:
+    """Every path each declared surface owns: its `path` plus its `extra_paths`, by surface id."""
+    owned: dict[str, list[str]] = {}
+    for position, surface in enumerate(declared_surfaces(project), start=1):
+        identifier = surface.get("id")
+        label = str(identifier) if isinstance(identifier, str) and identifier else f"#{position}"
+        paths = [surface.get("path")] if isinstance(surface.get("path"), str) else []
+        owned[label] = [path for path in paths + surface_extra_paths(surface, label) if isinstance(path, str)]
+    return owned
+
+
 def infrastructure_paths(project: dict[str, object]) -> set[str]:
     configured = project.get("repository", {})
     if not isinstance(configured, dict):
