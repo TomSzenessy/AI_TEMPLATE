@@ -44,7 +44,9 @@ HOST_COMMANDS = {
 }
 # A fresh agent must not inherit the launching session: host session variables
 # would route a nested CLI through the parent's (short-lived) session auth.
-INHERITED_SESSION = ("CLAUDECODE", "CLAUDE_CODE_", "CLAUDE_PID", "CLAUDE_AGENT_SDK", "CLAUDE_EFFORT", "CLAUDE_PREVIEW", "ANTHROPIC_BASE_URL")
+INHERITED_SESSION = (
+    "CLAUDECODE", "CLAUDE_CODE_", "CLAUDE_PID", "CLAUDE_AGENT_SDK", "CLAUDE_EFFORT", "CLAUDE_PREVIEW", "ANTHROPIC_BASE_URL",
+)
 HOST_BINARIES = {"claude": "claude", "codex": "codex", "gemini": "gemini"}
 PREFIX = "You are a fresh agent in this repository. Do not edit files. Answer briefly. Task: "
 

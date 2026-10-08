@@ -231,4 +231,5 @@ def print_resources(root: Path) -> None:
     print(f"Resource registry: {project.get('resources', {}).get('registry', 'resources.toml')}")
     for resource in resources:
         mcp = resource.get("mcp") or "none"
-        print(f"- {resource['id']} [{resource['kind']}; trust={resource['trust']}; scope={resource['scope']}; mcp={mcp}]: {resource['source']}")
+        details = f"{resource['kind']}; trust={resource['trust']}; scope={resource['scope']}; mcp={mcp}"
+        print(f"- {resource['id']} [{details}]: {resource['source']}")

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import subprocess
 import sys
 import unittest
 from pathlib import Path
@@ -10,9 +11,9 @@ TOOLS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(TOOLS))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from fixtures import Scratch, git_in, template_only  # noqa: E402
+from fixtures import Scratch, clean_env, git_in, template_only  # noqa: E402
 
-from kit import adopt, config, hygiene, launch, product, risk  # noqa: E402
+from kit import adopt, config, core, gitinfo, hygiene, launch, product, risk  # noqa: E402
 from kit.core import RepoctlError  # noqa: E402
 from kit.registry import Registry, frontmatter  # noqa: E402
 
@@ -52,6 +53,154 @@ class BoolSettingTests(Scratch):
         self.write("a.md", "x\n")
         errors = hygiene.budget_errors(self.root, {"budgets": {"a.md": True}}, ["a.md"])
         self.assertTrue(any("positive integer" in item for item in errors), errors)
+
+
+class NonUtf8PathTests(Scratch):
+    """K-20: a tracked path that is not UTF-8 must not crash the git readers."""
+
+    BAD = "caf\udce9.txt"  # surrogate-escaped 0xE9, as os.fsdecode returns it
+
+    def _index_bad_path(self) -> None:
+        # Staged by index entry, not on disk: some filesystems (APFS) refuse such names.
+        git_in(self.root, "init", "-q")
+        sha = subprocess.run(["git", "-C", str(self.root), "hash-object", "-w", "--stdin"], input=b"x\n",
+                             capture_output=True, check=True, env=clean_env()).stdout.decode().strip()
+        subprocess.run(["git", "-C", str(self.root), "update-index", "--add", "--cacheinfo", f"100644,{sha},{self.BAD}"],
+                       check=True, capture_output=True, env=clean_env())
+
+    def test_git_output_with_a_non_utf8_path_is_returned_not_raised(self) -> None:
+        self._index_bad_path()
+        listed = gitinfo.git(self.root, "ls-files", "-z")
+        self.assertIsNotNone(listed)
+        self.assertEqual(listed.split("\0")[0], self.BAD)
+
+    def test_worktree_files_survives_a_non_utf8_tracked_path(self) -> None:
+        self._index_bad_path()
+        self.write("ok.txt", "fine\n")
+        names = [path.name for path in core.worktree_files(self.root)]
+        self.assertIn("ok.txt", names)  # the bad path is deleted from the tree, so it is skipped, not fatal
+
+    def test_walk_fallback_differs_from_git_only_by_design(self) -> None:
+        # Outside a repository there is no ignore file to read: the walk lists everything but IGNORED_WALK_DIRECTORIES.
+        self.write("src/a.py", "x = 1\n")
+        self.write("node_modules/dep/index.js", "x\n")
+        self.assertEqual([path.name for path in core.worktree_files(self.root)], ["a.py"])
+        git_in(self.root, "init", "-q")
+        self.write(".gitignore", "build/\n")
+        self.write("build/out.txt", "x\n")
+        names = {path.relative_to(self.root).as_posix() for path in core.worktree_files(self.root)}
+        self.assertIn("node_modules/dep/index.js", names)  # git, not the walk, owns the set inside a repository
+        self.assertNotIn("build/out.txt", names)
+
+
+class RegulatedEvidenceTests(Scratch):
+    """G-22 (refuted): `Commit: <HEAD>` evidence is checkable because it is read from the working tree.
+
+    The evidence file does not have to be committed to be filed; only a commit made *after* writing it
+    moves HEAD and makes it stale, which is the intended "evidence about older work" rejection.
+    """
+
+    def evidence(self, commit: str, body: str) -> None:
+        import hashlib
+        digest = hashlib.sha256(body.encode()).hexdigest()
+        self.write("review.md", f"Issue: #1\nCommit: {commit}\nArtifact: review.md\nReviewer: octocat\n"
+                                f"Date: {core.today().isoformat()}\nResult: pass\nBody-SHA256: {digest}\n")
+
+    def test_uncommitted_evidence_naming_head_is_accepted_and_goes_stale_after_a_commit(self) -> None:
+        from kit import issues
+        git_in(self.root, "init", "-q")
+        self.write("a.txt", "a\n")
+        self.commit("base")
+        head = self.git("rev-parse", "HEAD").strip()
+        self.evidence(head, "body")
+        issues.validate_review_evidence(self.root, "review.md", body="body", strict=True)
+        self.commit("evidence")
+        with self.assertRaisesRegex(RepoctlError, "not bound to current HEAD"):
+            issues.validate_review_evidence(self.root, "review.md", body="body", strict=True)
+
+    def test_a_wrong_commit_is_rejected_and_the_agent_first_profile_does_not_compare(self) -> None:
+        from kit import issues
+        git_in(self.root, "init", "-q")
+        self.write("a.txt", "a\n")
+        self.commit("base")
+        self.evidence("a" * 40, "body")
+        with self.assertRaisesRegex(RepoctlError, "not bound to current HEAD"):
+            issues.validate_review_evidence(self.root, "review.md", body="body", strict=True)
+        issues.validate_review_evidence(self.root, "review.md", body="body", strict=False)
+
+
+class EvidenceReadTests(Scratch):
+    """K-24: any unreadable evidence path is a named finding, not only a missing one."""
+
+    def test_directory_or_binary_review_evidence_is_a_named_error(self) -> None:
+        from kit import issues
+        self.write("evidence/placeholder.txt", "x\n")
+        self.write("binary.md", b"\xff\xfe\x00bad")
+        for name in ("evidence", "binary.md"):
+            with self.assertRaisesRegex(RepoctlError, rf"review evidence cannot be read: {name}"):
+                issues.validate_review_evidence(self.root, name)
+        with self.assertRaisesRegex(RepoctlError, "does not exist"):
+            issues.validate_review_evidence(self.root, "missing.md")
+
+    def test_directory_critic_evidence_is_a_named_error(self) -> None:
+        from kit import structure
+        self.write("evidence/placeholder.txt", "x\n")
+        surface = {"id": "app", "critic_evidence": ["evidence"]}
+        with self.assertRaisesRegex(RepoctlError, "critic evidence cannot be read: evidence"):
+            structure.validate_critic_evidence(self.root, surface)
+
+
+class FollowUpTests(Scratch):
+    """#51 follow-ups: each item is either a behaviour below or a recorded decision in the issue."""
+
+    def test_k21_docs_index_reads_the_tracked_document_set_and_links_with_anchors(self) -> None:
+        from kit import docs
+        git_in(self.root, "init", "-q")
+        self.write(".gitignore", "docs/scratch/\n")
+        self.write("docs/README.md", "# Docs\n- [A](./a.md#top)\n- [B](sub/b.md)\n")
+        self.write("docs/a.md", "# A\n")
+        self.write("docs/sub/b.md", "# B\n")
+        self.write("docs/scratch/ignored.md", "# Ignored\n")  # not part of the repository, so not owed a link
+        docs.check_docs_index(self.root)
+        self.write("docs/sub/c.md", "# C\n")
+        with self.assertRaisesRegex(RepoctlError, r"not linked from docs/README.md: sub/c.md"):
+            docs.check_docs_index(self.root)
+
+    def test_k23_skill_folder_without_skill_md_is_an_advisory_finding(self) -> None:
+        from types import SimpleNamespace
+        from kit import checks
+        files = [".agents/skills/good/SKILL.md", ".agents/skills/good/run.py", ".agents/skills/orphan/notes.md"]
+        findings = checks.skill_folders_without_manifest(SimpleNamespace(files=files))
+        self.assertEqual(len(findings), 1)
+        self.assertIn(".agents/skills/orphan/", findings[0])
+        self.write("project.toml", MANIFEST)
+        by_name = {item.name: item for item in Registry(self.root).of("check", enabled_only=False)}
+        self.assertFalse(by_name["skill-folders-without-manifest"].fields["blocks"])
+
+    def test_k27_glob_brackets_and_braces_are_literal_and_the_dead_binding_says_so(self) -> None:
+        from kit import docsync
+        self.assertTrue(gitinfo.path_matches("app/[id]/page.tsx", "app/[id]/*.tsx"))
+        self.assertFalse(gitinfo.path_matches("app/1/page.tsx", "app/[id]/*.tsx"))
+        self.assertFalse(gitinfo.path_matches("src/a.py", "src/{a,b}.py"))
+        message = docsync.dead_bindings({"docs/x.md": ["src/[ab].py"]}, ["src/a.py"])[0]
+        self.assertIn("covers pattern matches no file: src/[ab].py", message)
+        self.assertIn("literal", message)
+        plain = docsync.dead_bindings({"docs/x.md": ["src/*.js"]}, ["src/a.py"])[0]
+        self.assertNotIn("literal", plain)
+
+    def test_k28_findings_travel_on_the_error_not_in_its_text(self) -> None:
+        from kit import checks
+        awkward = ["first\n- looks like a second item", "second: with colon"]
+
+        def fail():
+            raise core.check_failed("demo", awkward)
+
+        def plain():
+            raise RepoctlError("one problem:\n- not from a gate")
+
+        self.assertEqual(checks._raised(fail), awkward)
+        self.assertEqual(checks._raised(plain), ["one problem:\n- not from a gate"])
+        self.assertEqual(checks._raised(lambda: None), [])
 
 
 class RiskTests(Scratch):

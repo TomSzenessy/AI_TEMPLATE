@@ -46,5 +46,19 @@ class LocalDateTests(unittest.TestCase):
         self.assertTrue(core.date_is_stale(date(2025, 10, 6)))
 
 
+class OneClockTests(unittest.TestCase):
+    def test_no_kit_or_test_module_reads_the_local_calendar_day(self) -> None:
+        """A comparison against the local day is the mixed-clock defect; `core.today()` (UTC) is the one clock."""
+        offenders = []
+        for folder in (Path(__file__).resolve().parents[1] / "kit", Path(__file__).resolve().parent):
+            for path in folder.glob("*.py"):
+                if path.name != Path(__file__).name and "date.today()" in path.read_text(encoding="utf-8"):
+                    offenders.append(path.name)
+        self.assertEqual(offenders, [])
+
+    def test_today_names_its_clock(self) -> None:
+        self.assertIn("UTC", core.today.__doc__)
+
+
 if __name__ == "__main__":
     unittest.main()

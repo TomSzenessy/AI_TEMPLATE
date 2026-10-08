@@ -10,7 +10,6 @@ import json
 import re
 import sys
 import unittest
-from datetime import date
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -19,11 +18,12 @@ sys.path.insert(0, str(ROOT / "tools"))
 import issue_contract as contract  # noqa: E402
 from kit import ci, issues  # noqa: E402
 from kit.core import RepoctlError  # noqa: E402
+from kit.core import today as core_today  # noqa: E402
 
 REGISTRY = json.loads((ROOT / ".github/issue-labels.json").read_text(encoding="utf-8"))
 FORMS = sorted((ROOT / ".github/ISSUE_TEMPLATE").glob("*.yml"))
 FORMS = [path for path in FORMS if path.name != "config.yml"]
-TODAY = date.today().isoformat()
+TODAY = core_today().isoformat()
 
 VALID = f"""### Summary
 A concrete outcome for the single-source contract test.

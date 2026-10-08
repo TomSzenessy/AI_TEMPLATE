@@ -40,7 +40,8 @@ def merge_makefile(target: Path, kit_makefile: str) -> list[str]:
     (target / "kit.mk").write_text(render_kit_makefile(project_makefile, kit_makefile), encoding="utf-8")
     if not re.search(r"(?m)^-?include\s+kit\.mk\s*$", project_makefile):
         separator = "" if project_makefile.endswith("\n") else "\n"
-        (target / "Makefile").write_text(project_makefile + separator + "\n# Agent kit: make start, make next, make done (see AGENTS.md)\ninclude kit.mk\n", encoding="utf-8")
+        include = "\n# Agent kit: make start, make next, make done (see AGENTS.md)\ninclude kit.mk\n"
+        (target / "Makefile").write_text(project_makefile + separator + include, encoding="utf-8")
     return renamed
 
 
@@ -121,7 +122,8 @@ def adopt(target: Path, kit: Path, name: str, kind: str, owner: str | None) -> N
             copied.append(destination.relative_to(target).as_posix())  # a renamed workflow is reported as renamed
         elif relative == "Makefile":
             renamed = merge_makefile(target, source.read_text(encoding="utf-8"))
-            merged.append("Makefile (kit targets in kit.mk" + (f"; renamed: {', '.join('kit-' + n for n in renamed)}" if renamed else "") + ")")
+            note = f"; renamed: {', '.join('kit-' + n for n in renamed)}" if renamed else ""
+            merged.append(f"Makefile (kit targets in kit.mk{note})")
         elif relative == ".gitignore":
             merged.append(f".gitignore ({merge_gitignore(target, source.read_text(encoding='utf-8'))} line(s) added)")
         elif relative == "README.md":
@@ -134,7 +136,8 @@ def adopt(target: Path, kit: Path, name: str, kind: str, owner: str | None) -> N
         elif relative == "docs/README.md":
             text = destination.read_text(encoding="utf-8")
             if "<!-- repoctl:index -->" not in text:
-                destination.write_text(text + "\n## Documentation index\n\n<!-- repoctl:index -->\n<!-- /repoctl:index -->\n", encoding="utf-8")
+                section = "\n## Documentation index\n\n<!-- repoctl:index -->\n<!-- /repoctl:index -->\n"
+                destination.write_text(text + section, encoding="utf-8")
             merged.append("docs/README.md (generated index appended)")
         else:
             kept.append(relative)

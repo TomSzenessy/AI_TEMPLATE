@@ -163,7 +163,8 @@ def next_step(root: Path) -> dict[str, str]:
          "researcher role; product-recon and review-mining skills; browse the web",
          f"{RESEARCH} cites at least three sources"),
         (not has_must, "features",
-         (f"Fix {malformed} before anything else. " if malformed else "") + f"Write {FEATURES} from the research and owner answers, then append the relevant production rows "
+         (f"Fix {malformed} before anything else. " if malformed else "")
+         + f"Write {FEATURES} from the research and owner answers, then append the relevant production rows "
          "(.agents/skills/product-kickoff/production-features.csv). Every must row gets an acceptance criterion.",
          "product-kickoff skill, step 4", "make next shows the build phase"),
         (ui and len(read_text_file(root, DESIGN) or "") < 300, "design",

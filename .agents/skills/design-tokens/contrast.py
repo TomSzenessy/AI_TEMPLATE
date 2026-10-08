@@ -93,6 +93,16 @@ def colours(tokens):
     return {k: v for k, v in flatten(src).items() if is_hex(v)}
 
 
+def validate_pairs(pairs):
+    """Reject a malformed "pairs" value with a message instead of a traceback."""
+    if not isinstance(pairs, list):
+        raise ValueError('"pairs" must be a list of [text, bg] or [text, bg, size] lists')
+    for p in pairs:
+        if not (isinstance(p, list) and 2 <= len(p) <= 3 and all(isinstance(x, str) for x in p)):
+            raise ValueError("bad pair %r: use [text, bg] or [text, bg, size], names as strings" % (p,))
+    return pairs
+
+
 def default_pairs(cols):
     fg = [k for k in cols if re.search(r"(^|-)(text|fg|on)(-|$)", k)]
     bg = [k for k in cols if re.search(r"(^|-)(bg|background|surface)(-|$)", k)]
@@ -149,9 +159,11 @@ def main(argv=None):
         else:
             with open(a.args[0], encoding="utf-8") as fh:
                 tokens = json.load(fh)
+            if not isinstance(tokens, dict):
+                raise ValueError("%s: the token file must be a JSON object" % a.args[0])
             cols = colours(tokens)
-            pairs = tokens.get("pairs") or default_pairs(cols)
-    except (OSError, ValueError) as exc:
+            pairs = validate_pairs(tokens["pairs"]) if tokens.get("pairs") else default_pairs(cols)
+    except (OSError, ValueError, RecursionError) as exc:
         print("contrast: %s" % exc, file=sys.stderr)
         return 2
     if not pairs:

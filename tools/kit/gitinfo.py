@@ -11,13 +11,14 @@ from pathlib import Path
 def run_git(root: Path | None, *arguments: str, timeout: int = 30, input: str | None = None) -> subprocess.CompletedProcess[str] | None:
     """The one place the kit runs git: unquoted paths, a timeout, and None when git cannot run.
 
-    `root=None` runs outside any repository (clone, ls-remote).
+    `root=None` runs outside any repository (clone, ls-remote). Output decodes with
+    `surrogateescape`, so a non-UTF-8 filename round-trips to the filesystem instead of raising.
     """
     where = ["-C", str(root)] if root is not None else []
     try:
         return subprocess.run(
             ["git", *where, "-c", "core.quotepath=false", *arguments],
-            check=False, capture_output=True, text=True, timeout=timeout, input=input,
+            check=False, capture_output=True, text=True, errors="surrogateescape", timeout=timeout, input=input,
         )
     except (OSError, subprocess.TimeoutExpired):
         return None
@@ -89,7 +90,10 @@ def branch_paths(root: Path, base: str) -> list[str]:
 
 @lru_cache(maxsize=512)
 def glob_regex(pattern: str) -> re.Pattern[str]:
-    """Translate a repository glob (`*`, `?`, `**`) into an anchored regex."""
+    """Translate a repository glob (`*`, `?`, `**`) into an anchored regex.
+
+    `[abc]` and `{a,b}` are literal on purpose: paths such as `app/[id]/page.tsx` exist.
+    """
     parts: list[str] = []
     index = 0
     while index < len(pattern):

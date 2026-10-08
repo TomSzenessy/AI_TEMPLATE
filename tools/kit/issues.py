@@ -38,6 +38,11 @@ from .github import (
     resolve_github_repo,
 )
 
+RELATIVE_BODY_FILE = (
+    "issue body file must be repository-relative: write it inside the repository, "
+    "for example .agent/bodies/<name>.md (ignored)"
+)
+
 
 def validate_review_evidence(
     root: Path, value: str | None, body: str | None = None, strict: bool = False
@@ -51,6 +56,8 @@ def validate_review_evidence(
         content = path.read_text(encoding="utf-8")
     except FileNotFoundError as error:
         raise RepoctlError(f"review evidence file does not exist: {value}") from error
+    except (OSError, UnicodeDecodeError) as error:  # a directory, an unreadable file, or not UTF-8
+        raise RepoctlError(f"review evidence cannot be read: {value} ({getattr(error, 'strerror', None) or 'not valid UTF-8'})") from error
     if secret_matches(content):
         raise RepoctlError("review evidence contains possible secret material")
     for pattern, message in (
@@ -217,8 +224,9 @@ def _content_problems(body: str, sections: dict[str, str], status: str, profile:
         for item in criteria
     ):
         problems.append(
-            "issue acceptance criteria must be concrete and evidence-bearing: at least two '- [ ]' lines; a line mentioning criterion, evidence, or a "
-            "bracket must also say how it is checked (test, check, verify, observe, command, artifact)"
+            "issue acceptance criteria must be concrete and evidence-bearing: at least two '- [ ]' lines; "
+            "a line mentioning criterion, evidence, or a bracket must also say how it is checked "
+            "(test, check, verify, observe, command, artifact)"
         )
     if not any(re.search(r"(?i)negative|failure|regression|absence|does not|not\b", item) for item in checkboxes):
         problems.append(
@@ -230,7 +238,8 @@ def _content_problems(body: str, sections: dict[str, str], status: str, profile:
     if not contract.OWNER_LINE[contract.profile_key(profile)].search(sections["Dependencies and handoff"]):
         problems.append("issue Dependencies and handoff must name an owner/next action")
     if status == "ready" and profile != "minimal":
-        if not re.search(r"(?i)validation|experiment|reproduce|reproduction|test", sections.get("How to reproduce", "") + sections["Evidence"]):
+        experiment = sections.get("How to reproduce", "") + sections["Evidence"]
+        if not re.search(r"(?i)validation|experiment|reproduce|reproduction|test", experiment):
             problems.append("status=ready requires a runnable validation experiment")
     if status == "fixed" and not re.search(r"(?m)^## Resolution record\s*$", body):
         problems.append("status=fixed requires a resolution record")
@@ -272,7 +281,7 @@ def file_issue(
 ) -> str:
     """Validate and file (or write a Local-WAL draft); returns the issue URL or the draft notice."""
     if body_file.is_absolute():
-        raise RepoctlError("issue body file must be repository-relative: write it inside the repository, for example .agent/bodies/<name>.md (ignored)")
+        raise RepoctlError(RELATIVE_BODY_FILE)
     body_file = root / body_file
     try:
         body_file = ensure_inside_root(root, body_file, "issue body file")
@@ -406,7 +415,7 @@ def file_local_wal(root: Path, which: str, public_reviewed: bool = False, review
 
 def validate_issue_file(root: Path, body_file: Path, status: str) -> None:
     if body_file.is_absolute():
-        raise RepoctlError("issue body file must be repository-relative: write it inside the repository, for example .agent/bodies/<name>.md (ignored)")
+        raise RepoctlError(RELATIVE_BODY_FILE)
     try:
         safe_path = ensure_inside_root(root, root / body_file, "issue body file")
         body = safe_path.read_text(encoding="utf-8")

@@ -157,6 +157,37 @@ class Sweep(unittest.TestCase):
             self.assertEqual(sweep.main([d, "--avoid", "Calendly",
                                          "--exclude", "docs/product/research.md"]), 1)
 
+    def test_unicode_names_contents_and_folders(self):
+        d = tempfile.mkdtemp()
+        put(d, "src/Café.ts", "const brand = 'Café Calendly ☕ 日本語'\n")
+        put(d, "src/日本語/Calendly.md", "x\n")
+        put(d, "src/latin1.txt", b"caf\xe9 calendly\n", binary=True)  # not UTF-8: still read, never a crash
+        hits = sweep.sweep(d, avoid=["Calendly", "Café"])
+        by_file = {(h["kind"], h["file"]) for h in hits}
+        self.assertIn(("name", os.path.join("src", "Café.ts")), by_file)
+        self.assertIn(("path", os.path.join("src", "Café.ts")), by_file)
+        self.assertIn(("path", os.path.join("src", "日本語", "Calendly.md")), by_file)
+        self.assertIn(("name", os.path.join("src", "latin1.txt")), by_file)
+        out = io.StringIO()
+        with redirect_stdout(out):
+            self.assertEqual(sweep.main([d, "--avoid", "Calendly", "--json"]), 1)
+        self.assertIn("Calendly", json.dumps(json.loads(out.getvalue()), ensure_ascii=False))
+        with redirect_stdout(io.StringIO()):
+            self.assertEqual(sweep.main([d, "--avoid", "Café"]), 1)
+
+    def test_symlinks_are_not_followed_and_never_crash(self):
+        d = tempfile.mkdtemp()
+        outside = tempfile.mkdtemp()
+        put(outside, "secret.md", "Calendly lives only outside the project\n")
+        put(d, "src/ok.ts", "export const x = 1\n")
+        os.symlink(outside, os.path.join(d, "linked-dir"))           # directory link: not descended
+        os.symlink(os.path.join(d, "missing"), os.path.join(d, "src", "broken.ts"))  # dangling
+        os.symlink(d, os.path.join(d, "src", "loop"))                 # cycle back to the root
+        self.assertEqual(sweep.sweep(d, avoid=["Calendly"]), [])
+        os.symlink(outside, os.path.join(d, "calendly-link"))         # its own name is still a brand hit
+        hits = sweep.sweep(d, avoid=["Calendly"])
+        self.assertEqual([(h["kind"], h["file"]) for h in hits], [("path", "calendly-link/")])
+
 
 if __name__ == "__main__":
     unittest.main()

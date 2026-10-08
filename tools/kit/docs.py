@@ -97,15 +97,18 @@ def check_docs_index(root: Path) -> None:
     except FileNotFoundError as error:
         raise RepoctlError("docs/README.md is missing") from error
 
+    linked = set(re.findall(r"\]\((?:\./)?([^)#]+)(?:#[^)]+)?\)", index_content))  # compiled once, not per document
     errors: list[str] = []
-    for document in sorted(docs.rglob("*.md")):
-        if document == index:
+    for document in sorted(worktree_files(root)):  # the same document set every other check reads
+        if document.suffix.lower() != ".md" or document == index:
             continue
-        relative = document.relative_to(docs).as_posix()
+        try:
+            relative = document.relative_to(docs).as_posix()
+        except ValueError:
+            continue
         if f"docs/{relative}".startswith(INDEX_SKIP):
             continue
-        link = re.compile(rf"\]\((?:\./)?{re.escape(relative)}(?:#[^)]+)?\)")
-        if not link.search(index_content):
+        if relative not in linked:
             errors.append(
                 f"document is not linked from docs/README.md: {relative} (add `<!-- index: group | owns | read when -->` "
                 "under its title, then run make sync)"

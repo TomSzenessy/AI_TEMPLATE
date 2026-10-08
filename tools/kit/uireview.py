@@ -162,7 +162,10 @@ def _stop(server: subprocess.Popen) -> None:
         server.wait(timeout=10)
     except (OSError, subprocess.TimeoutExpired):
         try:
-            os.killpg(server.pid, signal.SIGKILL) if hasattr(os, "killpg") else server.kill()
+            if hasattr(os, "killpg"):
+                os.killpg(server.pid, signal.SIGKILL)
+            else:
+                server.kill()
         except OSError:
             pass
 
@@ -208,7 +211,8 @@ def _capture(root: Path, surface: dict[str, object], out: Path, playwright: list
             for state, storage in states.items():
                 for size, viewport in VIEWPORTS.items():
                     for scheme in SCHEMES:
-                        name = "-".join(SAFE.sub("-", part).strip("-") or "home" for part in (identifier, route, state, size, scheme)) + ".png"
+                        parts = (identifier, route, state, size, scheme)
+                        name = "-".join(SAFE.sub("-", part).strip("-") or "home" for part in parts) + ".png"
                         arguments = [*playwright, "screenshot", *_browser_arguments(),
                                      "--viewport-size", viewport, "--color-scheme", scheme,
                                      "--wait-for-timeout", "800", "--full-page"]

@@ -172,5 +172,49 @@ class Score(unittest.TestCase):
             self.assertEqual(parity.main([p]), 0)
 
 
+class BadVisualJson(unittest.TestCase):
+    """--visual files that are not imgdiff.py --json output exit 2 and name the file."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.matrix = write(self.tmp.name, "features.csv", MATRIX)
+
+    def run_with(self, content):
+        path = os.path.join(self.tmp.name, "diff.json")
+        with open(path, "wb") as fh:
+            fh.write(content if isinstance(content, bytes) else content.encode("utf-8"))
+        out, err = io.StringIO(), io.StringIO()
+        with redirect_stdout(out), redirect_stderr(err):
+            code = parity.main([self.matrix, "--visual", path])
+        return code, out.getvalue(), err.getvalue(), path
+
+    def test_malformed_visual_files_exit_2_naming_the_file(self):
+        bad = [b"", b"{not json", b"\xff\xfe\x00", "[]", "[1, 2]", "3", "null", '"score"', "{}",
+               '{"score": null}', '{"score": "high"}', '{"score": [1]}', '{"score": {"a": 1}}',
+               '{"score": NaN}', '{"score": Infinity}', '{"score": -5}', '{"score": 101}', '{"score": true}']
+        for content in bad:
+            code, out, err, path = self.run_with(content)
+            self.assertEqual(code, 2, content)
+            self.assertIn("parity:", err, content)
+            self.assertIn(os.path.basename(path), err, content)
+            self.assertEqual(out, "", content)
+
+    def test_good_visual_file_still_scores_and_unicode_names_survive(self):
+        code, out, _, _ = self.run_with('{"score": 90, "mode": "layout", "files": {"clone": "écran-日本.png"}}')
+        self.assertEqual(code, 0)
+        self.assertIn("écran-日本.png", out)
+
+    def test_odd_file_labels_fall_back_to_the_path(self):
+        for label in ('"clone.png"', '{"clone": 5}', "null"):
+            code, out, _, path = self.run_with('{"score": 90, "files": %s}' % label)
+            self.assertEqual(code, 0, label)
+            self.assertIn(path, out)
+
+    def test_missing_visual_file_exits_2(self):
+        with redirect_stderr(io.StringIO()):
+            self.assertEqual(parity.main([self.matrix, "--visual", os.path.join(self.tmp.name, "nope.json")]), 2)
+
+
 if __name__ == "__main__":
     unittest.main()

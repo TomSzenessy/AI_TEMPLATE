@@ -23,7 +23,7 @@ python-check:
 test: python-check
 ifeq ($(KIT_INNER):$(KIT_SLOW),1:)
 	$(PYTHON) -m unittest discover -s tools/tests -p 'test_repoctl.py' -k init
-	$(PYTHON) -m unittest discover -s tools/tests -p 'test_kit.py' -k GlobTests -k HygieneTests -k AdapterTests
+	$(PYTHON) -m unittest discover -s tools/tests -p 'test_kit_*.py' -k GlobTests -k HygieneTests -k AdapterTests
 else
 	$(PYTHON) -m unittest discover -s tools/tests -p 'test_*.py'
 endif
