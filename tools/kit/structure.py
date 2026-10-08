@@ -30,7 +30,7 @@ from .core import (
     surface_extra_paths,
     surface_owned_paths,
 )
-from .gitinfo import git
+from .gitinfo import git, run_git
 from .names import STACK_DECISION, VISION
 from .skills import check_skill_admission, load_resource_registry
 
@@ -73,7 +73,21 @@ def discover_candidate_surfaces(
                         candidates.add(child_relative)
         else:
             candidates.add(path.relative_to(root).as_posix())
-    return sorted(candidates)
+    return sorted(candidates - _git_ignored(root, candidates))
+
+
+def _git_ignored(root: Path, paths: set[str]) -> set[str]:
+    """The paths git ignores. Build output such as *.egg-info/ or .next/ is never a product surface.
+
+    A round-5 Haiku trial was told to register `ledger_cli.egg-info` as a surface while
+    .gitignore already ignored it. Outside git nothing is known to be ignored.
+    """
+    if not paths:
+        return set()
+    found = run_git(root, "check-ignore", "--stdin", input="\n".join(sorted(paths)) + "\n")
+    if found is None or found.returncode not in (0, 1):
+        return set()
+    return {line.strip().rstrip("/") for line in found.stdout.splitlines() if line.strip()}
 
 
 def validation_commands(surface: dict[str, object]) -> list[list[str]]:
@@ -410,13 +424,15 @@ def check_readme_identity(root: Path, project: dict[str, object]) -> None:
         raise RepoctlError("initialized project README.md is missing") from error
     marker = "<!-- repoctl:project-readme -->"
     if marker not in content:
-        raise RepoctlError("initialized project README.md needs the project identity marker")
+        raise RepoctlError(f"initialized project README.md needs the project identity marker: restore the line "
+                           f"'{marker}' near its top (make init wrote it)")
     identity = re.search(
         r"(?m)^> Project initialized: \*\*(?P<name>[^*]+)\*\* \(`(?P<kind>[^`]+)`\)",
         content,
     )
     if not identity:
-        raise RepoctlError("initialized project README.md needs a project identity marker value")
+        raise RepoctlError("initialized project README.md needs a project identity marker value: the line "
+                           f"'> Project initialized: **{project.get('name')}** (`{project.get('kind')}`)' under the marker")
     if identity.group("name") != project.get("name") or identity.group("kind") != project.get("kind"):
         raise RepoctlError("README project identity does not match project.toml")
     # Column 0 is hand-written quickstart prose; a generated block (the `make help` listing
