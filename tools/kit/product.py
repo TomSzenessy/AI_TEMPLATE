@@ -275,10 +275,15 @@ def drive_reason(root: Path, changed: list[str]) -> str | None:
     if not is_product(project) or not touches_product(project, changed):
         return None
     try:
-        _, open_must = score(load_features(root))
+        rows = load_features(root)
+        _, open_must = score(rows)
         problem = ""
     except RepoctlError as error:
-        open_must, problem = [], str(error)
+        rows, open_must, problem = [], [], str(error)
+    if not rows and not problem:
+        # No countable list means completeness is unknown, not done (#55): round-4 Haiku poster-press
+        # built a whole app with no features.csv and stopped unpushed, because nothing was "open".
+        problem = "it has no countable rows" if (root / FEATURES).is_file() else "it does not exist yet"
     if not open_must and not problem:
         return None
     step = next_step(root)

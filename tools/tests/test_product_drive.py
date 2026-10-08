@@ -69,6 +69,16 @@ class ProductDriveTests(test_kit.KitRepository):
         self.assertIn(MARK, reason)
         self.assertIn("status must be", reason)
 
+    def test_a_missing_feature_list_blocks_after_product_code_edit(self) -> None:
+        # Round-4 Haiku poster-press: a whole app, no features.csv, and no push because nothing was "open".
+        (self.root / "docs/product/features.csv").unlink()
+        self.commit("no list")
+        self.start()
+        self.edit_product_code()
+        reason = self.reason()
+        self.assertIn(MARK, reason)
+        self.assertIn("does not exist yet", reason)
+
     def test_no_product_path_changed_never_blocks(self) -> None:
         self.start()
         self.write("README.md", "# Notes\n")
