@@ -137,6 +137,20 @@ def _text(content: object) -> str:
     return content if isinstance(content, str) else json.dumps(content)
 
 
+TEST_SUMMARY = re.compile(r"(?m)^Ran \d+ tests? in [\d.]+s$")
+
+
+def _after_test_output(text: str) -> int:
+    """Where real gate output can start: after the last unittest summary, if a suite ran.
+
+    `make done` runs the kit's own tests, whose fixtures print gate phrases on purpose.
+    A gate that blocks the run itself stops it before the suite or prints after it, and
+    agents pipe through `| tail`, so the exit status cannot tell the two apart.
+    """
+    summaries = list(TEST_SUMMARY.finditer(text))
+    return summaries[-1].end() if summaries else 0
+
+
 def analyze_transcript(transcript: Path) -> dict[str, object]:
     """Counts from a stream-json transcript: spend, tool use, kit commands, and gate friction."""
     tools: collections.Counter[str] = collections.Counter()
@@ -159,7 +173,7 @@ def analyze_transcript(transcript: Path) -> dict[str, object]:
             elif part.get("type") == "tool_result":
                 command = commands.get(str(part.get("tool_use_id")), "")
                 text = _text(part.get("content"))
-                match = BLOCK.search(text)
+                match = BLOCK.search(text, _after_test_output(text))
                 if match:
                     blocks.append({"command": " ".join(command.split())[:120], "message": " ".join(text[match.start():].split())[:400]})
                 elif part.get("is_error") and MAKE.search(command):
@@ -185,11 +199,14 @@ def project_state(project: Path) -> dict[str, object]:
                               capture_output=True, text=True, check=False, timeout=1800)
     trailers = git(project, "log", "--format=%(trailers:key=Docs-Unaffected,valueonly)") or ""
     finish = repoctl("finish")
+    check = repoctl("check")  # finish is the fast change-set gate; the repository checks are separate
     summary = [line for line in finish.stdout.splitlines() if line.startswith(("Product ", "UI review"))]
     return {
         "commits": len((git(project, "rev-list", "HEAD") or "").split()),
         "next": (repoctl("next").stdout.splitlines() or [""])[0],
         "finish_passed": finish.returncode == 0,
+        "check_passed": check.returncode == 0,
+        "check": [line for line in check.stderr.splitlines() if line.startswith("- ")][:5],
         "finish": summary or (finish.stdout.strip().splitlines() or [""])[-3:],
         "trailers": [line for line in trailers.splitlines() if line.strip()],
     }
@@ -201,7 +218,9 @@ def render(spec: dict[str, object], model: str, analysis: dict[str, object], sta
         f"Project: `{project}`", "",
         f"- Spend: ${analysis['cost_usd']} over {analysis['turns']} turns, {analysis['minutes']} min; "
         f"completed: {analysis['completed']}",
-        f"- Commits: {state['commits']}; `make done` passed: {state['finish_passed']}",
+        f"- Commits: {state['commits']}; change-set gate (`finish`) passed: {state['finish_passed']}; "
+        f"`make check` passed: {state.get('check_passed', 'not measured')}",
+        *(f"  - {line[2:]}" for line in state.get("check", [])),
         f"- Final `make next`: {state['next']}",
         *(f"- {line}" for line in state["finish"]),
         f"- Kit commands: {', '.join(f'{k}×{v}' for k, v in analysis['make_targets'].items()) or 'none'}",
