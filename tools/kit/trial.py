@@ -45,6 +45,8 @@ REPORTS = ".agent/trials"
 MODES = {"new", "adopt"}
 BLOCK = re.compile("|".join(re.escape(phrase) for phrase in GATE_BLOCK_PHRASES))  # gate phrases live in core
 MAKE = re.compile(r"\bmake\s+([a-z][a-z0-9-]*)")
+PHASE = re.compile(r"\bNext \(([a-z][a-z-]*)\):")  # `make next` names the phase the agent is in
+GOLDEN_PATH = ("start", "next", "where", "risk", "check", "done", "ui-review", "handover")
 
 
 def load_trial(root: Path, identifier: str) -> dict[str, object]:
@@ -159,9 +161,16 @@ def analyze_transcript(transcript: Path) -> dict[str, object]:
     commands: dict[str, str] = {}
     blocks, failed_make, bypasses = [], [], []
     results = []
+    phases: dict[str, dict[str, int]] = {}
+    phase = "start"
     for event in _events(transcript):
         if event.get("type") == "result":
             results.append(event)
+        if event.get("type") == "assistant" and isinstance(event.get("message"), dict):
+            usage = event["message"].get("usage") or {}
+            tally = phases.setdefault(phase, {"turns": 0, "tokens": 0})
+            tally["turns"] += 1
+            tally["tokens"] += sum(int(usage.get(key) or 0) for key in ("input_tokens", "output_tokens"))
         content = (event.get("message") or {}).get("content") if isinstance(event.get("message"), dict) else None
         for part in content if isinstance(content, list) else []:
             if part.get("type") == "tool_use":
@@ -177,6 +186,9 @@ def analyze_transcript(transcript: Path) -> dict[str, object]:
             elif part.get("type") == "tool_result":
                 command = commands.get(str(part.get("tool_use_id")), "")
                 text = _text(part.get("content"))
+                seen = PHASE.findall(text)
+                if seen:
+                    phase = seen[-1]
                 match = BLOCK.search(text, _after_test_output(text))
                 if match:
                     blocks.append({"command": " ".join(command.split())[:120], "message": " ".join(text[match.start():].split())[:400]})
@@ -190,6 +202,7 @@ def analyze_transcript(transcript: Path) -> dict[str, object]:
         "tools": dict(tools.most_common()),
         "make_targets": dict(targets.most_common()),
         "gate_blocks": blocks,
+        "phases": [{"phase": name, **tally} for name, tally in phases.items()],
         "failed_make": failed_make,
         "bypasses": bypasses,
         "final_message": str(results[-1].get("result", "")) if results else "",
@@ -227,18 +240,38 @@ def project_state(project: Path) -> dict[str, object]:
     }
 
 
+def verdict(analysis: dict[str, object], state: dict[str, object]) -> str:
+    """Pass only on a green change-set gate and make check with no gate bypassed (#21).
+
+    A bypass fails the run even when every check passes: the benchmark measures the kit's
+    gates, and an agent that went around one has not shown they hold.
+    """
+    reasons = []
+    if analysis.get("bypasses"):
+        reasons.append("gate bypassed with --no-verify")
+    if state.get("check_passed") is not True:
+        reasons.append("make check failed")
+    if state.get("finish_passed") is not True:
+        reasons.append("change-set gate failed")
+    return "pass" if not reasons else f"fail ({', '.join(reasons)})"
+
+
 def render(spec: dict[str, object], model: str, analysis: dict[str, object], state: dict[str, object], project: Path) -> str:
     lines = [
         f"# Build trial: {spec['id']} ({spec['mode']}, {model})", "",
         f"Project: `{project}`", "",
         f"- Spend: ${analysis['cost_usd']} over {analysis['turns']} turns, {analysis['minutes']} min; "
         f"completed: {analysis['completed']}",
+        f"- Verdict: {verdict(analysis, state)}",
         f"- Commits: {state['commits']}; change-set gate (`finish`) passed: {state['finish_passed']}; "
         f"`make check` passed: {state.get('check_passed', 'not measured')}",
         *(f"  - {line[2:]}" for line in state.get("check", [])),
         f"- Final `make next`: {state['next']}",
         *(f"- {line}" for line in state["finish"]),
         f"- Kit commands: {', '.join(f'{k}×{v}' for k, v in analysis['make_targets'].items()) or 'none'}",
+        f"- Kit commands not used: {', '.join(c for c in GOLDEN_PATH if c not in analysis['make_targets']) or 'none'}",
+        "", "## Phases", "",
+        *(f"- {p['phase']}: {p['turns']} turns, {p['tokens']} tokens" for p in analysis.get("phases", [])),
         "", "## Friction", "",
         f"- Gate blocks: {len(analysis['gate_blocks'])}",
         *(f"  - after `{b['command']}`: {b['message']}" for b in analysis["gate_blocks"]),
