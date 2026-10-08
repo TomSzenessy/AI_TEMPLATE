@@ -33,8 +33,8 @@ order:
 
 Keep looping (`make next`, build, `make done`) until the launch phase. A green
 `make done` with open must features, or with no feature list yet, means the slice
-is done, not the product: the stop hook pushes a session that changed
-product-surface code ([`self-healing.md`](./self-healing.md#lifecycle-any-host)).
+is done, not the product (and so is an unreviewed UI): the stop hook pushes a
+session that changed product-surface code ([`self-healing.md`](./self-healing.md#lifecycle-any-host)).
 What changed in `tools/kit/product.py` last: an adopted project (`[kit].project_mode
 = "adopt"`, written by `make adopt`) skips the `research` phase. It already has a
 product and real users, so it scopes a feature delta from its own code; research

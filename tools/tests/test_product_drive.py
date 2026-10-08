@@ -92,6 +92,19 @@ class ProductDriveTests(test_kit.KitRepository):
         self.edit_product_code()
         self.assertNotIn(MARK, self.stop())
 
+    def test_all_musts_done_but_ui_unreviewed_still_pushes_the_review(self) -> None:
+        # Sonnet poster-press trial: 94% complete, every must evidenced, never ran make ui-review.
+        from unittest import mock
+        self.write("tests/test_habits.py", "def test_add():\n    assert True\n")
+        self.write("docs/product/features.csv", HEADER + "Add a habit,core,must,yes,tests/test_habits.py,One tap,owner\n")
+        step = {"phase": "review", "action": "Run the UI review", "guide": "make ui-review", "verify": "Verdict: pass"}
+        with mock.patch.object(product, "next_step", return_value=step):
+            reason = product.drive_reason(self.root, ["src/habits.py"])
+        self.assertIn("has not been reviewed", reason)
+        self.assertIn("make ui-review", reason)
+        with mock.patch.object(product, "next_step", return_value={**step, "phase": "polish"}):
+            self.assertIsNone(product.drive_reason(self.root, ["src/habits.py"]))
+
     def test_product_pack_off_does_not_block(self) -> None:
         self.write("project.toml", (self.root / "project.toml").read_text() + "\n[packs]\nproduct = false\n")
         self.commit("pack off")

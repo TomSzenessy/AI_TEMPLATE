@@ -284,9 +284,14 @@ def drive_reason(root: Path, changed: list[str]) -> str | None:
         # No countable list means completeness is unknown, not done (#55): round-4 Haiku poster-press
         # built a whole app with no features.csv and stopped unpushed, because nothing was "open".
         problem = "it has no countable rows" if (root / FEATURES).is_file() else "it does not exist yet"
-    if not open_must and not problem:
-        return None
     step = next_step(root)
+    if not open_must and not problem:
+        if step["phase"] != "review":
+            return None
+        # Every must is evidenced but the UI was never reviewed (or the review is stale): the
+        # Sonnet poster-press trial built 94% of the product and stopped right here.
+        return (f"Every must feature is evidenced, but the UI has not been reviewed. Run the review before you stop.\n"
+                f"Next ({step['phase']}): {step['action']}\nHow: {step['guide']}\nDone when: {step['verify']}")
     if problem:
         lead = f"{FEATURES} is invalid ({problem}); the product cannot be judged until it is fixed."
     else:
