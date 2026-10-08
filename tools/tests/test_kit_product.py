@@ -121,6 +121,28 @@ class ProductDriverTests(KitRepository):
         self.assertIn("100% complete", product.product_summary(self.root))
         self.assertEqual(product.feature_errors(self.root), [])
 
+    def adopt(self) -> None:
+        """Mark the repository adopted rather than started from scratch (#58)."""
+        self.write("project.toml", (self.root / "project.toml").read_text() + '\n[kit]\nproject_mode = "adopt"\n')
+
+    def test_an_adopted_project_is_not_sent_to_competitor_research(self) -> None:
+        """#58: in the notes-adopt trial the work was finished and `make done` green, yet
+        `make next` still said research — a step no gate enforces and none can satisfy."""
+        self.write(product.RESEARCH, "# Research\nhttps://a.example https://b.example https://c.example\n")
+        self.accept_vision()
+        self.assertEqual(self.phase(), "features", "a new product still researches first")
+        self.features("Add a tag,core,must,no,,One tap,owner")
+        self.assertEqual(self.phase(), "design", "research is satisfied and must features exist")
+        self.adopt()
+        self.assertEqual(self.phase(), "design", "an adopted project skips research entirely")
+
+    def test_project_mode_defaults_to_new_and_can_be_overridden(self) -> None:
+        from kit import config
+        self.assertEqual(config.project_setting({"kit": {}}, "project_mode"), "new")
+        self.assertEqual(config.project_setting({"kit": {"project_mode": "adopt"}}, "project_mode"), "adopt")
+        self.adopt()
+        self.assertEqual(config.setting(self.root, "project_mode"), "adopt")
+
 
 class UiReviewTests(KitRepository):
     def setUp(self) -> None:

@@ -62,12 +62,16 @@ declare each one in `project.toml` (or list support folders such as tests in
 belongs to a surface you already declared but sits outside that surface's
 directory — the root `index.html` a Vite app keeps beside its `src/` — list it in
 that surface's `extra_paths` rather than declaring a second surface for one file.
+`make adopt` also records `[kit].project_mode = "adopt"`, so `make next` scopes a
+feature delta from your code instead of opening with competitor research
+([`building.md`](./building.md)); `make init` records `"new"`.
 A document's
 `make <target>` references resolve to the nearest Makefile above it, so
 subprojects keep their own targets. What changed in `bootstrap.py`/`adopt.py`
 last: the kit's file list now comes from `core.repository_files` (git-known
-files only, links excluded) and `KIND=` validation shares `core`'s kebab-case
-pattern — internal consolidation, same behavior.
+files only, links excluded), `KIND=` validation shares `core`'s kebab-case
+pattern, and `adopt` passes the adopted mode to `initialize_project` —
+internal consolidation and one recorded fact, same gate behaviour.
 
 ## Adaptation loop
 

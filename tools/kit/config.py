@@ -33,6 +33,10 @@ DEFAULTS: dict[str, object] = {
     # UI kinds served from a local URL, so make ui-review can screenshot them; native
     # kinds (ios, android, desktop, game) are reviewed in a simulator instead.
     "preview_kinds": ["web", "app", "site", "pwa"],
+    # "new" for a project started from scratch, "adopt" for one that already had a
+    # product when the kit arrived. An adopted project scopes a feature delta from its
+    # own code, so `make next` does not send it to competitor research (#58).
+    "project_mode": "new",
     # Pinned Playwright for make ui-review (1.57 still supports Node 18).
     "playwright_version": "1.63.0",
     # Model for headless eval runs on hosts that accept one; cheap by default.

@@ -241,13 +241,16 @@ def reset_repository_metadata(manifest: str) -> str:
 OWNER_HANDLE = re.compile(r"@?[A-Za-z0-9][A-Za-z0-9_.-]*(?:/[A-Za-z0-9_.-]+)?")
 
 
-def initialize_project(root: Path, name: str, kind: str, owner: str | None = None) -> None:
+def initialize_project(root: Path, name: str, kind: str, owner: str | None = None,
+                       mode: str = "new") -> None:
     if not PROJECT_NAME_PATTERN.fullmatch(name):
         raise RepoctlError(
             "project name must be 1-64 characters using letters, digits, '.', '_' or '-'"
         )
     if not KEBAB.fullmatch(kind):
         raise RepoctlError("project kind must be lowercase kebab-case")
+    if mode not in {"new", "adopt"}:
+        raise RepoctlError("project mode must be new or adopt")
     if owner is not None and (not OWNER_HANDLE.fullmatch(owner) or is_placeholder(owner)):
         raise RepoctlError("owner must be a handle or team name such as octocat or acme/web-team, not an email")
 
@@ -269,6 +272,10 @@ def initialize_project(root: Path, name: str, kind: str, owner: str | None = Non
     manifest = replace_manifest_field(manifest, "name", name)
     manifest = replace_manifest_field(manifest, "kind", kind)
     manifest = replace_manifest_field(manifest, "phase", "development")
+    # Whether this repository already had a product when the kit arrived (#58).
+    manifest = re.sub(r'(?m)^(# preview_kinds = .*\n)', rf'\1project_mode = "{mode}"\n', manifest, count=1)
+    if f'project_mode = "{mode}"' not in manifest:
+        manifest = re.sub(r"(?m)^\[kit\]\s*$", f'[kit]\nproject_mode = "{mode}"', manifest, count=1)
     manifest = re.sub(r'(?m)^github\s*=\s*"[^"]*"$', 'github = ""', manifest, count=1)
     manifest = re.sub(r'(?m)^owners\s*=\s*\[[^\]]*\]', 'owners = ["project-owner"]', manifest, count=1)
     for old_owner in old_owners:

@@ -19,7 +19,7 @@ import csv
 import re
 from pathlib import Path
 
-from .config import setting
+from .config import project_setting, setting
 from .core import RepoctlError, load_project, read_text_file
 from .names import DESIGN, STACK_DECISION
 from .surfaces import is_product, is_ui, product_surfaces, touches_product  # noqa: F401  (still this module's surface)
@@ -160,6 +160,9 @@ def next_step(root: Path) -> dict[str, str]:
                 "guide": "docs/self-healing.md", "verify": "make done"}
     vision = project.get("vision", {})
     ui = is_ui(root, project)
+    # An adopted project already has a product and real users: it scopes a feature delta
+    # from its own code, so competitor research is not its first step (#58).
+    adopted = project_setting(project, "project_mode") == "adopt"
     try:
         rows = load_features(root)
         # A header-only or all-skip list counts for nothing: send the session back to writing rows (#55).
@@ -173,7 +176,7 @@ def next_step(root: Path) -> dict[str, str]:
         (not (isinstance(vision, dict) and vision.get("status") == "accepted"), "intake",
          "Ask the owner the kickoff questions (one round, with recommendations) and record VISION.md as accepted.",
          "product-kickoff skill, steps 1-2", "VISION.md Status: accepted"),
-        (len(set(URL.findall(read_text_file(root, RESEARCH) or ""))) < 3, "research",
+        (not adopted and len(set(URL.findall(read_text_file(root, RESEARCH) or ""))) < 3, "research",
          f"Research comparable products, real user complaints, and design references; write {RESEARCH} with cited URLs "
          "(first line under the title: <!-- index: extend | Comparable products and our angle | Scoping features -->).",
          "researcher role; product-recon and review-mining skills; browse the web",

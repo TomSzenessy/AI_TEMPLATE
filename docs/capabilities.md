@@ -49,7 +49,9 @@ digest, records its pack in its `[[skills]]` provenance entry.
 Policy a project may change lives in `project.toml`, with built-in defaults
 when a key is absent: `[packs]` (switch packs on or off), `[kit]` (docs index groups, unbound-doc exemptions,
 overlap limit, deprecation warning window, skill review age, UI project kinds,
-eval model, Playwright version and previewable kinds for `make ui-review`), `[adapters.claude]`
+eval model, Playwright version, previewable kinds for `make ui-review`, and
+`project_mode` — `"new"`, or `"adopt"` for a repository that already had a
+product, which `make adopt` records), `[adapters.claude]`
 (tier-to-model and access-to-tools maps, pre-approved commands), `[risk]`
 (tier globs and optional ceremony text), and `[checks.<name>]` (downgrade one blocking check to
 `severity = "advisory"` with a required `reason`; rules in

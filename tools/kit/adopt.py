@@ -142,7 +142,7 @@ def adopt(target: Path, kit: Path, name: str, kind: str, owner: str | None) -> N
         else:
             kept.append(relative)
     indexed = index_existing_docs(target, before)
-    initialize_project(target, name, kind, owner)
+    initialize_project(target, name, kind, owner, mode="adopt")
     license_note = keep_project_license(target, "LICENSE" in kept)
     derive.sync(target)
     shipped = kit_paths(kit)  # your kept files are never kit files; only the kit's version of them is remembered

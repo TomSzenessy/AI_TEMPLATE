@@ -315,6 +315,13 @@ class AdoptTests(Scratch):
         update = self.cli("kit-update", "--kit", str(TOOLS.parent))
         self.assertIn("0 updated, 0 added, 0 removed, 0 to merge", update.stdout, update.stdout + update.stderr)
 
+    def test_adopt_records_that_the_product_existed_already(self) -> None:
+        """#58: `make next` can only skip competitor research for an adopted project if adopt
+        leaves a trace; `make init` must record the opposite, or the step never comes back."""
+        self.assertEqual(self.adopt().returncode, 0)
+        self.assertIn('project_mode = "adopt"', (self.root / "project.toml").read_text())
+        self.assertNotIn("Next (research)", self.cli("next").stdout)
+
     def test_adopted_project_passes_the_kit_suite_and_keeps_its_own_kit_paths_quiet(self) -> None:
         # The project's own ci.yml and a doc at a kit path stay the project's, and the kit suite still passes.
         (self.root / "docs/operations.md").write_text("# How we run it\n\nOur runbook.\n")
