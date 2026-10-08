@@ -34,5 +34,6 @@ than as a wrong answer. Evals and trials start agents through one launcher
 (`run_headless` in `tools/kit/evals.py`): it drops the launching session's host
 variables, so a benchmark started from inside an agent session uses the CLI's
 own login, as a truly fresh agent would, and it ignores `SIGTERM` while the
-agent runs, because agents clean up with `pkill -f <name>`. Both commands
+agent runs, because agents clean up with `pkill -f <name>`. A trial ends a minute after the agent's final result even
+if something it backgrounded is still running. Both commands
 belong to the `measure` pack.

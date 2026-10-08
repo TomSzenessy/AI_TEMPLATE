@@ -51,7 +51,24 @@ HOST_BINARIES = {"claude": "claude", "codex": "codex", "gemini": "gemini"}
 PREFIX = "You are a fresh agent in this repository. Do not edit files. Answer briefly. Task: "
 
 
-def run_headless(command: list[str], cwd: Path, timeout: int, stdout=None) -> subprocess.CompletedProcess[str]:
+FINISHED_GRACE = 60  # seconds a finished agent's process may linger before the runner ends it
+
+
+def _wait_until_finished(process: subprocess.Popen, timeout: int, finished) -> None:
+    started, done_at = time.monotonic(), None
+    while process.poll() is None:
+        now = time.monotonic()
+        if now - started > timeout:
+            raise subprocess.TimeoutExpired(process.args, timeout)
+        if done_at is None and finished():
+            done_at = now
+        if done_at is not None and now - done_at > FINISHED_GRACE:
+            return  # the result is in; whatever still runs is the agent's leftover background work
+        time.sleep(1)
+
+
+def run_headless(command: list[str], cwd: Path, timeout: int, stdout=None,
+                 finished=None) -> subprocess.CompletedProcess[str]:
     """Run a fresh headless agent: the one launcher behind make eval and make trial.
 
     It drops the launching session's host variables (so the CLI uses its own login,
@@ -60,6 +77,11 @@ def run_headless(command: list[str], cwd: Path, timeout: int, stdout=None) -> su
     `pkill -f <name>`, which also matches the runner's command line (a trial killed
     its own runner that way). On timeout (or interrupt) it SIGKILLs the whole process group, then raises
     subprocess.TimeoutExpired like subprocess.run.
+
+    `finished` (with a file `stdout`) says when the agent has delivered its final result. The
+    process is then given FINISHED_GRACE seconds and ended: a round-5 trial agent left a
+    background `until ...; do sleep 2; done` loop that never ended, and `claude -p` waited on
+    it for an hour after its result.
     """
     environment = {key: value for key, value in os.environ.items() if not key.startswith(INHERITED_SESSION)}
     if hasattr(os, "geteuid") and os.geteuid() == 0:
@@ -71,7 +93,11 @@ def run_headless(command: list[str], cwd: Path, timeout: int, stdout=None) -> su
     try:
         process = subprocess.Popen(command, cwd=cwd, env=environment, text=True, start_new_session=True, **streams)
         try:
-            out, err = process.communicate(timeout=timeout)
+            if finished is not None and stdout is not None:
+                out, err = None, None
+                _wait_until_finished(process, timeout, finished)
+            else:
+                out, err = process.communicate(timeout=timeout)
         except BaseException:
             kill_group(process)
             process.communicate()

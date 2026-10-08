@@ -196,6 +196,17 @@ def analyze_transcript(transcript: Path) -> dict[str, object]:
     }
 
 
+def _has_result(transcript: Path) -> bool:
+    """Whether the stream-json transcript already holds the agent's final result event."""
+    try:
+        with transcript.open("rb") as handle:
+            handle.seek(0, 2)
+            handle.seek(max(0, handle.tell() - 65536))
+            return b'"type":"result"' in handle.read()
+    except OSError:
+        return False
+
+
 def project_state(project: Path) -> dict[str, object]:
     """Where the product stands, read with the project's own kit."""
     def repoctl(*arguments: str) -> subprocess.CompletedProcess[str]:
@@ -263,7 +274,8 @@ def run_trial(root: Path, identifier: str, model: str = "sonnet", budget: float 
           f"--analyze {transcript.relative_to(root)} --project {project}")
     with transcript.open("w", encoding="utf-8") as output:
         try:
-            run_headless(host_command(spec, model, budget), project, timeout, stdout=output)
+            run_headless(host_command(spec, model, budget), project, timeout, stdout=output,
+                         finished=lambda: _has_result(transcript))
         except subprocess.TimeoutExpired:
             print(f"trial stopped after {timeout}s")
     print(f"agent finished in {(time.monotonic() - started) / 60:.0f} min; analyzing")
