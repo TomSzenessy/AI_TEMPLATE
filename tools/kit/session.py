@@ -90,6 +90,7 @@ def _record_snapshot(root: Path, session: str, changed: list[str]) -> None:
         return  # a resumed or compacted session keeps its original baseline
     state["snapshot"] = _snapshot(root, changed)
     state["snapshot_head"] = (git(root, "rev-parse", "HEAD") or "").strip()
+    state["check_baseline"] = repository_findings(root)  # the stop gate blocks only on new ones
     (root / STATE).parent.mkdir(parents=True, exist_ok=True)
     (root / STATE).write_text(json.dumps(state), encoding="utf-8")
 
@@ -435,6 +436,10 @@ def stop(root: Path, event: dict[str, object]) -> None:
     paths = session_changes(root, session)
     since = str(_load_state(root, session).get("snapshot_head", "")) or None if paths is not None else None
     findings = finish_findings(root, paths, since)
+    if not findings and paths:
+        baseline = _load_state(root, session).get("check_baseline")
+        if isinstance(baseline, list):
+            findings = [item for item in repository_findings(root) if item not in baseline]
     if findings:
         reason = f"{GATE_STOP_BLOCKED}:\n" + "\n".join(f"- {item}" for item in findings[:12])
         reason += "\nFix these (delegate doc work to the doc-gardener role if large), or explain to the user why they stay."
@@ -443,6 +448,20 @@ def stop(root: Path, event: dict[str, object]) -> None:
     drive = _product_drive(root, paths)
     if drive:
         print(json.dumps({"decision": "block", "reason": drive}))
+
+
+def repository_findings(root: Path) -> list[str]:
+    """`make check`'s blocking findings. The stop gate blocks on those a session added.
+
+    The change-set gate is narrow by design; without this a session could stop on a
+    repository whose `make check` it broke. In the 2026-10-08 Haiku trials, poster-press
+    reported "MVP Complete" with five new blocking check findings and nothing stopped it.
+    Findings that were there when the session started are not this session's to fix.
+    """
+    try:
+        return run_checks(root, blocking_only=True)[0]
+    except Exception as error:  # noqa: BLE001 - an unloadable registry is itself a blocking finding
+        return [f"[registry] the capability registry cannot load: {type(error).__name__}: {error}"]
 
 
 def _product_drive(root: Path, paths: list[str] | None) -> str | None:
