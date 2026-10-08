@@ -22,7 +22,7 @@ from .core import (
     RepoctlError, default_branch, governance_profile, load_project, read_text_file, repository_files,
 )
 from .garden import self_heal_errors
-from .gitinfo import branch, branch_paths, changed_paths, committed_paths, diff_paths, git, head, path_matches
+from .gitinfo import branch, branch_paths, changed_paths, committed_paths, diff_paths, git, head, path_matches, run_git
 from .names import AFTER_EDIT, CHECKPOINT, COMMIT_MSG, CRITIC_RECORD, HANDOVER, PRE_COMPACT, SESSION_START, STOP
 from .navigate import print_map
 from .product import drive_reason, next_step, product_summary
@@ -40,7 +40,27 @@ def _product_on(root: Path) -> bool:
 
 HANDOVER_LIMIT = 4000
 MAP_LIMIT = 15
-STATE = ".agent/hook-state.json"
+STATE = ".agent/hook-state.json"  # outside git, or when git cannot say where its directory is
+
+
+def state_path(root: Path) -> Path:
+    """Where the hooks keep per-session state: inside the git directory when there is one.
+
+    Scaffolders that empty the project (`npm create vite . --overwrite`) and `git clean -fdx`
+    keep `.git` and delete ignored files. In the 2026-10-08 Haiku tidepool trial that wiped
+    `.agent/hook-state.json` early on, and the stop gate judged nothing for the rest of the run.
+    """
+    found = run_git(root, "rev-parse", "--git-path", "repoctl-hook-state.json")
+    if found is not None and found.returncode == 0 and found.stdout.strip():
+        path = Path(found.stdout.strip())
+        return path if path.is_absolute() else root / path
+    return root / STATE
+
+
+def _save_state(root: Path, state: dict) -> None:
+    path = state_path(root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(state), encoding="utf-8")
 CANONICAL_INPUTS = (".agents/", "tools/kit/commands.py", "project.toml")
 CRITIC_VERDICTS = ("blocker", "ship-with-residuals")
 
@@ -91,8 +111,7 @@ def _record_snapshot(root: Path, session: str, changed: list[str]) -> None:
     state["snapshot"] = _snapshot(root, changed)
     state["snapshot_head"] = (git(root, "rev-parse", "HEAD") or "").strip()
     state["check_baseline"] = repository_findings(root)  # the stop gate blocks only on new ones
-    (root / STATE).parent.mkdir(parents=True, exist_ok=True)
-    (root / STATE).write_text(json.dumps(state), encoding="utf-8")
+    _save_state(root, state)
 
 
 def session_changes(root: Path, session: str) -> list[str] | None:
@@ -224,7 +243,7 @@ def write_handover(root: Path) -> str:
 
 def _load_state(root: Path, session: str) -> dict:
     try:
-        state = json.loads((root / STATE).read_text(encoding="utf-8"))
+        state = json.loads(state_path(root).read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         state = {}
     return state if isinstance(state, dict) and state.get("session") == session else {"session": session, "noted": []}
@@ -254,8 +273,7 @@ def after_edit(root: Path, event: dict[str, object]) -> None:
         notes.append(f"Rule for {relative}: {rule.description} ({rule.path}).")
     if owned or rules:
         state["noted"] = sorted(set(state["noted"]) | set(owned) | {rule.path for rule in rules})
-        (root / STATE).parent.mkdir(parents=True, exist_ok=True)
-        (root / STATE).write_text(json.dumps(state), encoding="utf-8")
+        _save_state(root, state)
     if notes:
         print(json.dumps({"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": " ".join(notes)}}))
 
@@ -454,8 +472,7 @@ def stop(root: Path, event: dict[str, object]) -> None:
         count = 1
     state["stop_chain"] = {"count": count, "last": digest}
     try:
-        (root / STATE).parent.mkdir(parents=True, exist_ok=True)
-        (root / STATE).write_text(json.dumps(state), encoding="utf-8")
+        _save_state(root, state)
     except OSError:
         pass  # without the record the next stop in this chain is judged as a first push
     print(json.dumps({"decision": "block", "reason": reason}))

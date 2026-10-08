@@ -62,18 +62,33 @@ class StopGateScopeTests(test_kit.KitRepository):
 
     def test_unresolvable_start_commit_falls_back_to_whole_tree(self) -> None:
         self.start()
-        path = self.root / ".agent/hook-state.json"
+        from kit import session
+        path = session.state_path(self.root)
         state = json.loads(path.read_text())
         state["snapshot_head"] = "0" * 40
         path.write_text(json.dumps(state))
         self.assertIn("docs/billing.md", json.loads(self.stop())["reason"])
 
     def test_hook_state_keeps_existing_keys(self) -> None:
-        self.write(".agent/hook-state.json", json.dumps({"session": "s1", "noted": ["docs/billing.md"]}))
+        from kit import session
+        session.state_path(self.root).write_text(json.dumps({"session": "s1", "noted": ["docs/billing.md"]}))
         self.start()
-        state = json.loads((self.root / ".agent/hook-state.json").read_text())
+        state = json.loads(session.state_path(self.root).read_text())
         self.assertEqual(state["noted"], ["docs/billing.md"])
         self.assertIn("src/billing/invoice.py", state["snapshot"])
+
+
+    def test_session_state_survives_a_scaffolder_that_empties_the_folder(self) -> None:
+        # `npm create vite . --overwrite` keeps .git and deletes everything else, ignored files included.
+        from kit import session
+        self.start()
+        self.assertIn(".git", session.state_path(self.root).parts)
+        import shutil
+        for child in self.root.iterdir():
+            if child.name != ".git":
+                shutil.rmtree(child) if child.is_dir() else child.unlink()
+        self.git("checkout", "--", ".")  # the agent restores the tracked files
+        self.assertIn("snapshot", json.loads(session.state_path(self.root).read_text()))
 
 
 if __name__ == "__main__":

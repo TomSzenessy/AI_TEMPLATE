@@ -165,7 +165,7 @@ findings, one root cause per change (see [`delegation.md`](./delegation.md)).
 - Staleness inspects the newest 2000 non-merge commits; a document last
   committed before that window is not judged.
 - The stop gate judges only what this session changed: `session-start` records the dirty paths with
-  content hashes and the current commit in `.agent/hook-state.json`, and `stop` judges the paths whose
+  content hashes and the current commit inside `.git` (scaffolders that empty the folder keep it), and `stop` judges the paths whose
   content differs plus the paths committed since that commit (no snapshot, or a start commit that is no
   longer an ancestor, means the whole tree). The session's commits are judged with their
   `Docs-Unaffected` trailers ([`bindings.md`](./bindings.md)), as `make done` judges them. An unresolved finding is raised once per turn until it is fixed or exempted by a
