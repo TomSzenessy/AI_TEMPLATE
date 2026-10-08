@@ -21,8 +21,8 @@ default, `BUDGET=` caps spend) the owner's request from
 `.agents/trials/<request>.toml`, and writes `.agent/trials/<run>/report.md`:
 spend, turns, kit commands, every gate block, failed kit command, bypass, and
 `Docs-Unaffected` trailer, and the product's final `make next` phase, the change-set gate (`finish`) and
-`make check` results, each reported under its own name. Gate phrases printed by
-the kit's own test suite inside `make done` are not counted as blocks. Judge each friction item with the blocking rule in
+`make check` results, each reported under its own name. Stop-hook blocks count as gate blocks; gate phrases printed by
+the kit's own test suite inside `make done` do not. Judge each friction item with the blocking rule in
 [`self-healing.md`](./self-healing.md#when-a-check-may-block): fix
 the kit, make the check advisory, or justify it. `--analyze <transcript>
 --project <dir>` reports on a run made by hand or with another host. Trial
