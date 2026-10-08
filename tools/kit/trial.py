@@ -253,6 +253,11 @@ def verdict(analysis: dict[str, object], state: dict[str, object]) -> str:
     A bypass fails the run even when every check passes: the benchmark measures the kit's
     gates, and an agent that went around one has not shown they hold.
     """
+    if not analysis.get("cost_usd") and int(analysis.get("turns") or 0) <= 1:
+        # A host failure (expired login, usage limit) leaves an untouched template that passes
+        # every check; that is no evidence about the kit (a 2026-10-08 Sonnet run read "pass").
+        final = " ".join(str(analysis.get("final_message", "")).split())[:120]
+        return f"no run (the agent did not work: {final or 'no output'})"
     reasons = []
     if analysis.get("bypasses"):
         reasons.append("gate bypassed with --no-verify")

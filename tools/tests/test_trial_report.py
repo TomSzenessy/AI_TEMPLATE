@@ -43,6 +43,12 @@ class ReportTests(unittest.TestCase):
         analysis = analyse(block, block, {**block, "message": {**block["message"], "id": "m2"}})
         self.assertEqual(analysis["phases"], [{"phase": "start", "turns": 2, "tokens": 2020}])
 
+    def test_a_run_that_never_started_is_not_a_pass(self) -> None:
+        limit = {"type": "result", "subtype": "success", "num_turns": 1, "total_cost_usd": 0,
+                 "duration_ms": 10, "result": "You've hit your session limit"}
+        report = trial.render(SPEC, "sonnet", analyse(limit), PASSING, Path("p"))
+        self.assertIn("- Verdict: no run (the agent did not work: You've hit your session limit)", report)
+
     def test_a_bypass_fails_the_run_even_when_every_check_passes(self) -> None:
         analysis = analyse(tool("a", "git commit --no-verify -m x"))
         self.assertIn("- Verdict: fail (gate bypassed with --no-verify)", trial.render(SPEC, "haiku", analysis, PASSING, Path("p")))
