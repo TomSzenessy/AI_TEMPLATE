@@ -196,5 +196,83 @@ class Feedback(unittest.TestCase):
             self.assertEqual(reviews.main([p, "--today", "2026-10-01"]), 0)
 
 
+class CustomThemes(unittest.TestCase):
+    """A user's own themes file: valid ones rank, malformed ones exit 2 with a message."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.path = os.path.join(self.tmp.name, "reviews.csv")
+        write_csv(self.path, ROWS)
+
+    def themes_file(self, data):
+        path = os.path.join(self.tmp.name, "themes.json")
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(data if isinstance(data, str) else json.dumps(data, ensure_ascii=False))
+        return path
+
+    def run_cli(self, themes, *flags):
+        out, err = io.StringIO(), io.StringIO()
+        with redirect_stdout(out), redirect_stderr(err):
+            code = reviews.main([self.path, "--themes", themes, "--today", "2026-10-01", *flags])
+        return code, out.getvalue(), err.getvalue()
+
+    def test_a_custom_theme_ranks_and_defaults_apply(self):
+        themes = self.themes_file({"themes": [{"id": "calendar", "patterns": ["calendar", "slot"]}],
+                                   "request_patterns": ["I wish"]})
+        code, out, _ = self.run_cli(themes)
+        self.assertEqual(code, 0)
+        self.assertIn("| 1 | calendar", out)  # label defaults to the id, kind to complaint
+        self.assertIn("I wish it had SMS reminders", out)
+
+    def test_unicode_ids_labels_and_patterns(self):
+        themes = self.themes_file({"themes": [{"id": "preis", "label": "Preis / \u4ef7\u683c",
+                                               "patterns": ["expensive", "\u00fcberteuert"]}]})
+        code, out, _ = self.run_cli(themes)
+        self.assertEqual(code, 0)
+        self.assertIn("Preis / \u4ef7\u683c", out)
+
+    def test_a_themes_file_with_no_themes_still_reports_unthemed_reviews(self):
+        code, out, _ = self.run_cli(self.themes_file({"themes": []}))
+        self.assertEqual(code, 0)
+        self.assertIn("Nothing matched", out)
+        self.assertIn("Read these by hand", out)
+
+    def test_malformed_themes_exit_2_with_a_message(self):
+        bad = {
+            "root is a list": [],
+            "themes is a string": {"themes": "pricing"},
+            "theme is a string": {"themes": ["pricing"]},
+            "theme has no id": {"themes": [{"patterns": ["x"]}]},
+            "empty id": {"themes": [{"id": "", "patterns": ["x"]}]},
+            "duplicate ids": {"themes": [{"id": "a", "patterns": ["x"]}, {"id": "a", "patterns": ["y"]}]},
+            "unknown kind": {"themes": [{"id": "a", "kind": "praise", "patterns": ["x"]}]},
+            "patterns is a string": {"themes": [{"id": "a", "patterns": "slow"}]},
+            "pattern is a number": {"themes": [{"id": "a", "patterns": [5]}]},
+            "empty pattern matches everything": {"themes": [{"id": "a", "patterns": [""]}]},
+            "bad regex": {"themes": [{"id": "a", "patterns": ["("]}]},
+            "request_patterns is a string": {"themes": [], "request_patterns": "wish"},
+        }
+        for name, data in bad.items():
+            code, out, err = self.run_cli(self.themes_file(data))
+            self.assertEqual(code, 2, name)
+            self.assertIn("reviews:", err, name)
+            self.assertEqual(out, "", name)
+
+    def test_unreadable_themes_files_exit_2(self):
+        for text in ("", "{nope", "null"):
+            code, _, err = self.run_cli(self.themes_file(text))
+            self.assertEqual(code, 2, text)
+            self.assertIn("reviews:", err)
+        code, _, err = self.run_cli(os.path.join(self.tmp.name, "missing.json"))
+        self.assertEqual(code, 2)
+        self.assertIn("reviews:", err)
+
+    def test_shipped_themes_have_unique_ids_and_known_kinds(self):
+        themes, _ = reviews.load_themes()
+        self.assertEqual(len({t["id"] for t in themes}), len(themes))
+        self.assertTrue({t["kind"] for t in themes} <= {"complaint", "request"})
+
+
 if __name__ == "__main__":
     unittest.main()

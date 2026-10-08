@@ -4,7 +4,7 @@
 import io
 import os
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 
 from _load import load, ROOT
 
@@ -88,6 +88,54 @@ class Contrast(unittest.TestCase):
         with redirect_stdout(io.StringIO()):
             self.assertEqual(contrast.main(["#aaaaaa", "#ffffff"]), 1)
             self.assertEqual(contrast.main(["#222222", "#ffffff"]), 0)
+
+    def _run_file(self, text, *flags):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "t.json")
+            with open(path, "wb") as fh:
+                fh.write(text if isinstance(text, bytes) else text.encode("utf-8"))
+            out, err = io.StringIO(), io.StringIO()
+            with redirect_stdout(out), redirect_stderr(err):
+                code = contrast.main([path, *flags])
+            return code, out.getvalue(), err.getvalue()
+
+    def test_unreadable_token_files_exit_2_with_a_message(self):
+        for text in (b"", b"{not json", b"\xff\xfe\x00\x01", b"[" * 5000 + b"]" * 5000):
+            code, _, err = self._run_file(text)
+            self.assertEqual(code, 2, text[:20])
+            self.assertIn("contrast:", err)
+
+    def test_token_file_that_is_not_an_object_exits_2(self):
+        for text in ("[]", "[\"#fff\", \"#000\"]", "3", "\"#fff\"", "null"):
+            code, _, err = self._run_file(text)
+            self.assertEqual(code, 2, text)
+            self.assertIn("contrast:", err)
+
+    def test_malformed_colours_are_unknown_tokens_not_crashes(self):
+        text = ('{"color": {"text": "rgb(0,0,0)", "bg": "#12345", "ok": "#fff", "n": 5, "nil": null, "lst": ["#000"]},'
+                ' "pairs": [["text", "bg"], ["ok", "bg"]]}')
+        code, out, _ = self._run_file(text)
+        self.assertEqual(code, 1)
+        self.assertEqual(out.count("unknown token"), 2)
+
+    def test_malformed_pairs_exit_2_with_a_message(self):
+        for pairs in ('"text bg"', '{"a": "b"}', '[5]', '[null]', '[["text"]]', '[[["x"], "bg"]]', '[["text", "bg", 7]]'):
+            text = '{"color": {"text": "#111", "bg": "#fff"}, "pairs": %s}' % pairs
+            code, _, err = self._run_file(text)
+            self.assertEqual(code, 2, pairs)
+            self.assertIn("contrast:", err)
+
+    def test_empty_and_missing_colour_sections_exit_2(self):
+        for text in ('{}', '{"color": {}}', '{"color": "#fff"}', '{"colors": []}'):
+            code, _, err = self._run_file(text)
+            self.assertEqual(code, 2, text)
+            self.assertIn("no pairs", err)
+
+    def test_unicode_token_names_work(self):
+        code, out, _ = self._run_file('{"color": {"text-primär": "#111", "bg-日本": "#fff"}}')
+        self.assertEqual(code, 0)
+        self.assertIn("text-primär", out)
 
 
 if __name__ == "__main__":

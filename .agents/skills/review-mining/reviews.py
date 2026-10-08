@@ -52,17 +52,42 @@ class FeedbackError(Exception):
     pass
 
 
+KINDS = ("complaint", "request")
+
+
+def _patterns(value, where):
+    """Compile a list of non-empty regex strings; anything else is a FeedbackError naming `where`."""
+    if not isinstance(value, list) or not all(isinstance(p, str) and p.strip() for p in value):
+        raise FeedbackError("%s must be a list of non-empty regex strings" % where)
+    try:
+        return [re.compile(p, re.I) for p in value]
+    except re.error as exc:
+        raise FeedbackError("%s has a bad pattern: %s" % (where, exc))
+
+
 def load_themes(path=DEFAULT_THEMES):
     with open(path, encoding="utf-8") as fh:
         data = json.load(fh)
-    themes = []
-    for t in data.get("themes", []):
+    if not isinstance(data, dict):
+        raise FeedbackError("%s must be a JSON object with a 'themes' list" % path)
+    entries = data.get("themes", [])
+    if not isinstance(entries, list):
+        raise FeedbackError("'themes' must be a list")
+    themes, seen = [], set()
+    for t in entries:
+        if not isinstance(t, dict) or not isinstance(t.get("id"), str) or not t["id"].strip():
+            raise FeedbackError("every theme needs a non-empty string 'id': %r" % (t,))
+        if t["id"] in seen:
+            raise FeedbackError("duplicate theme id %r: its reviews would be counted twice" % t["id"])
+        seen.add(t["id"])
+        kind = t.get("kind", "complaint")
+        if kind not in KINDS:
+            raise FeedbackError("theme %r has kind %r: use %s" % (t["id"], kind, " or ".join(KINDS)))
         themes.append({
-            "id": t["id"], "label": t.get("label", t["id"]),
-            "kind": t.get("kind", "complaint"),
-            "patterns": [re.compile(p, re.I) for p in t.get("patterns", [])],
+            "id": t["id"], "label": t.get("label", t["id"]), "kind": kind,
+            "patterns": _patterns(t.get("patterns", []), "theme %r patterns" % t["id"]),
         })
-    requests = [re.compile(p, re.I) for p in data.get("request_patterns", [])]
+    requests = _patterns(data.get("request_patterns", []), "request_patterns")
     return themes, requests
 
 

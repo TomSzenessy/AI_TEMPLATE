@@ -157,14 +157,23 @@ def visual_scores(paths):
     scores = []
     for p in paths:
         with open(p, encoding="utf-8") as fh:
-            data = json.load(fh)
-        if "score" not in data:
+            try:
+                data = json.load(fh)
+            except ValueError as exc:  # includes JSONDecodeError and UnicodeDecodeError
+                raise MatrixError("%s is not valid UTF-8 JSON: %s" % (p, exc))
+        if not isinstance(data, dict) or "score" not in data:
             raise MatrixError("%s is not imgdiff.py --json output" % p)
-        name = data.get("files", {}).get("clone", p)
+        score = data["score"]
+        if isinstance(score, bool) or not isinstance(score, (int, float)) or not 0 <= score <= 100:
+            raise MatrixError("%s: score must be a number from 0 to 100, got %r" % (p, score))
+        files = data.get("files", {})
+        name = files.get("clone", p) if isinstance(files, dict) else p
+        if not isinstance(name, str):
+            name = p
         mode = data.get("mode", "layout")
         if data.get("comparable") is False:
             mode = "blank"  # nothing to compare: neither a match nor a mismatch
-        scores.append({"file": name, "score": float(data["score"]), "mode": mode})
+        scores.append({"file": name, "score": float(score), "mode": mode})
     return scores
 
 
