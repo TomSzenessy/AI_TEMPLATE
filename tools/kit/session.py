@@ -386,7 +386,7 @@ def install_git_hooks(root: Path) -> str | None:
     return "installed git hooks (core.hooksPath=.githooks): commits now run the self-healing gate"
 
 
-STOP_REPEATS = 3  # pushes per user turn; the cap that keeps a gate from looping an agent forever
+STOP_REPEATS = 5  # pushes per user turn; the cap that keeps a gate from looping an agent forever
 
 
 def stop(root: Path, event: dict[str, object]) -> None:
