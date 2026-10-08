@@ -249,7 +249,7 @@ class ScaffoldTests(KitRepository):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('local_skills = ["release-notes"]', (self.root / "project.toml").read_text())
         self.assertTrue((self.root / ".claude/skills/release-notes/SKILL.md").is_file())
-        self.assertIn("unfinished scaffold", self.self_heal())
+        self.assertIn("unfinished scaffold", self.self_heal_advisory())  # advisory since #9
 
     def test_new_agent_appears_in_generated_role_table(self) -> None:
         result = self.cli("new", "--kind", "agent", "--name", "test-writer", "--access", "full",

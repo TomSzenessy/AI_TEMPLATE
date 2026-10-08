@@ -109,7 +109,8 @@ class CapabilityModelTests(KitRepository):
                 self.assertIn(name, report, f"make capabilities lists the {kind}")
         self.assertIn("pricing.md", (self.root / "docs/README.md").read_text())
         self.assertIn("seed-data:", (self.root / "Makefile").read_text(), "a project command gets a make target")
-        self.assertIn("unfinished scaffold", self.self_heal(), "stubs fail until their FILL-IN lines are replaced")
+        self.assertIn("unfinished scaffold", self.self_heal_advisory(), "stubs are reported until their FILL-IN lines are replaced")
+        self.assertNotIn("unfinished scaffold", self.self_heal(), "a stub is advisory since #9, never blocking")
         self.assertEqual(self.cli("seed-data").returncode, 0, "the project command runs through repoctl")
 
     def test_blocking_check_must_give_its_reason(self) -> None:

@@ -39,32 +39,32 @@ class CrashTests(Scratch):
 
     def test_empty_link_in_doc_does_not_crash_the_check(self) -> None:
         self.write("docs/a.md", "# A\n[x]( )\n[gone](missing.md)\n")
-        hard, _ = self.checks()
-        self.assertTrue(any("[markdown-links]" in item and "missing.md" in item for item in hard), hard)
-        self.assertFalse(any("crashed" in item for item in hard), hard)
+        hard, advisory = self.checks()
+        self.assertTrue(any("[markdown-links]" in item and "missing.md" in item for item in advisory), advisory)
+        self.assertFalse(any("crashed" in item for item in hard + advisory), hard + advisory)
 
     def test_invalid_utf8_doc_is_a_finding(self) -> None:
         self.write("docs/a.md", b"# A\n\xff\xfe\n")
-        hard, _ = self.checks()
-        self.assertTrue(any("not valid UTF-8" in item and "docs/a.md" in item for item in hard), hard)
-        self.assertFalse(any("crashed" in item for item in hard), hard)
+        hard, advisory = self.checks()
+        self.assertTrue(any("not valid UTF-8" in item and "docs/a.md" in item for item in hard + advisory), hard + advisory)
+        self.assertFalse(any("crashed" in item for item in hard + advisory), hard + advisory)
         result = self.cli("check")
         self.assertNotIn("Traceback", result.stderr)
-        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.returncode, 1)  # this scratch repo's baseline manifest findings still block
 
     def test_invalid_utf8_capability_file_is_a_one_line_error(self) -> None:
         self.write(".agents/skills/bad/SKILL.md", b"---\nname: bad\ndescription: \xff\n---\n")
         result = self.cli("check")
         self.assertNotIn("Traceback", result.stderr)
-        self.assertIn("not valid UTF-8", result.stderr)
-        self.assertEqual(result.returncode, 1)
+        hard, advisory = self.checks()  # advisory since #9: reported, never a traceback
+        self.assertTrue(any("not valid UTF-8" in item for item in hard + advisory), hard + advisory)
 
     def test_bad_owners_type_is_named_and_other_checks_still_report(self) -> None:
         self.write("project.toml", MANIFEST.replace("owners = []", "owners = 5"))
         self.write("docs/a.md", "# A\n[gone](missing.md)\n")
-        hard, _ = self.checks()
+        hard, advisory = self.checks()
         self.assertTrue(any("[manifest-structure]" in item and "owners" in item for item in hard), hard)
-        self.assertTrue(any("[markdown-links]" in item and "missing.md" in item for item in hard), hard)
+        self.assertTrue(any("[markdown-links]" in item and "missing.md" in item for item in advisory), advisory)
 
     def test_non_table_skills_and_repository_do_not_traceback(self) -> None:
         self.write("project.toml", MANIFEST.replace('owners = []', 'owners = []\nskills = [1]\nrepository = 3'))
@@ -82,12 +82,13 @@ class CrashTests(Scratch):
         self.assertTrue(any("[boom]" in item for item in hard), hard)
 
     def test_findings_are_prefixed_and_reasons_printed_once(self) -> None:
-        self.write("docs/a.md", "# A\n[gone](missing.md)\n[gone2](missing2.md)\n")
+        self.write("docs/a.md", "# A\n<!-- covers: missing/** -->\n")
+        self.write("docs/b.md", "# B\n<!-- covers: missing2/** -->\n")
         hard, _ = self.checks()
         self.assertTrue(all(item.startswith("[") or item.startswith("known failure") for item in hard), hard)
         result = self.cli("check")
-        self.assertEqual(result.stderr.count("[markdown-links] why it blocks"), 1, result.stderr)
-        self.assertIn("[markdown-links] ", result.stderr)
+        self.assertEqual(result.stderr.count("[dead-bindings] why it blocks"), 1, result.stderr)
+        self.assertIn("[dead-bindings] ", result.stderr)
 
     def test_bad_eval_regex_and_bad_eval_toml_are_one_line_errors(self) -> None:
         from kit import evals

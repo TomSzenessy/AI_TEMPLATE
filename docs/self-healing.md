@@ -33,7 +33,8 @@ assumed. A new or changed check **blocks** only when all three hold:
    a binding, a digest), not a ticked box or a keyword in prose.
 
 Otherwise it is **advisory** (`make garden`, the session brief) or an
-**automatic fix** (`make sync`). Further rules:
+**automatic fix** (`make sync`). Since #9 `markdown-links`, `command-references`,
+`markers`, `budgets` are advisory. Further rules:
 
 - **One blocking point per concern.** Each later gate fires only on what the
   earlier one let through (`--no-verify`, uncommitted work), never on a
@@ -69,8 +70,8 @@ Otherwise it is **advisory** (`make garden`, the session brief) or an
 | Session start or resume | `repoctl hook session-start` | `make start` | Brief: branch, recent commits, `HANDOVER.md`, map, the `make next` step, open self-healing findings. Derived files are regenerated and the git commit gate is installed. |
 | Before context compaction | `repoctl hook pre-compact` | — | Writes `.agent/checkpoint.md` (uncommitted paths, docs still owed). |
 | After a file edit | `repoctl hook after-edit` | — | Names the docs covering the edited path (once per session); regenerates derived files when a source changed; warns on edits to generated files. |
-| Before declaring done | `repoctl hook stop` | `make done` | Gate over this branch's change set: owed docs, derived-file drift, dead bindings, expired, undated, or unfinished markers, plus critic evidence when committed `high`-risk paths changed (see [Ceremony by risk](#ceremony-by-risk)); `make done` also prints product completeness and, as advice, a stale UI review ([`building.md`](./building.md)). The hook blocks again in the same turn only on changed findings (at most five pushes); it also holds a session on `make check` findings that were not there when the session started, and a session that changed product-surface code is also held while must features are open or `features.csv` is invalid ([`building.md`](./building.md)); `make done` also runs every test and predicts the commit gate for uncommitted work, so the two never disagree. |
-| Every commit | `.githooks/commit-msg` (any agent or human) | same | Refuses a commit whose staged covered code skips its doc (unless the message carries a `Docs-Unaffected:` trailer), plus marker checks, and derived-file drift when the commit touches a source. In a merge commit, paths the merged branch brought in skip the owed-doc check (already judged); the rest is checked. Exit 3 means blocked; a broken plugin or kit also blocks (see [A broken check](#a-broken-check-is-a-finding-not-a-traceback)). Bypass deliberately with `--no-verify`. |
+| Before declaring done | `repoctl hook stop` | `make done` | Gate over this branch's change set: owed docs, derived-file drift, dead bindings, plus critic evidence when committed `high`-risk paths changed (see [Ceremony by risk](#ceremony-by-risk)); `make done` also prints product completeness and, as advice, a stale UI review ([`building.md`](./building.md)). The hook blocks again in the same turn only on changed findings (at most five pushes); it holds a session on `make check` findings that were not there when the session started, and a session that changed product-surface code is held while must features are open or `features.csv` is invalid ([`building.md`](./building.md)); `make done` also runs every test and predicts the commit gate for uncommitted work, so the two never disagree. |
+| Every commit | `.githooks/commit-msg` (any agent or human) | same | Refuses a commit whose staged covered code skips its doc (unless the message carries a `Docs-Unaffected:` trailer), and derived-file drift when the commit touches a source. In a merge commit, paths the merged branch brought in skip the owed-doc check (already judged); the rest is checked. Exit 3 means blocked; a broken plugin or kit also blocks (see [A broken check](#a-broken-check-is-a-finding-not-a-traceback)). Bypass with `--no-verify`. |
 
 Owed docs (`doc-coupling`), critic evidence and `surface-docs` are registry
 checks, so `[checks]` downgrades apply; `surface-docs` counts a surface's

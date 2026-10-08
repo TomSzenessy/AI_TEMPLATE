@@ -114,7 +114,9 @@ class HygieneTests(KitRepository):
     def test_budget_is_a_finding(self) -> None:
         self.write("AGENTS.md", "# Agents\n" + "x" * 400)
         self.commit("grow router")
-        self.assertIn("over its 200-byte budget", self.self_heal())
+        hard, advisory = checkrun.run_checks(self.root, blocking_only=False, skip=self.CONTRACT)
+        self.assertIn("over its 200-byte budget", "\n".join(advisory))  # advisory since #9: reported, never blocking
+        self.assertNotIn("byte budget", "\n".join(hard))
 
 
 class ChangeCouplingTests(Scratch):

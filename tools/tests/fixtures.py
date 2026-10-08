@@ -254,6 +254,11 @@ class KitRepository(Scratch):
         hard, _ = checkrun.run_checks(self.root, blocking_only=True, skip=self.CONTRACT)
         return "\n".join(hard + docsync.index_errors(self.root, self.files()))
 
+    def self_heal_advisory(self) -> str:
+        """The advisory findings (markers, budgets, links, command references since #9) the same checks report."""
+        _, advisory = checkrun.run_checks(self.root, blocking_only=False, skip=self.CONTRACT)
+        return "\n".join(advisory)
+
     def files(self) -> list[str]:
         return [line for line in self.git("ls-files").splitlines() if line]
 

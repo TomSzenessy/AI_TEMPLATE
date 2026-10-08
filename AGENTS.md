@@ -85,7 +85,7 @@ route is [`SECURITY.md`](./SECURITY.md).
 
 - Durable knowledge lives in its owner doc, live work in issues; after a rename, search for stale references.
 - Docs declare `<!-- covers: globs -->`; stale or dead bindings fail, unless a commit's `Docs-Unaffected:` trailer says why.
-- Replace instead of duplicating: mark the old path `DEPRECATED(remove-by=YYYY-MM-DD)`; expired markers fail. Task markers in code reference an issue.
+- Replace instead of duplicating: mark the old path `DEPRECATED(remove-by=YYYY-MM-DD)`; expired markers are reported. Task markers in code reference an issue.
 - `.claude/`, `.mcp.json`, and marked `repoctl` blocks are generated: edit `.agents/`, then `make sync`.
 - Always-loaded files stay within `project.toml [budgets]`; move detail to an owner doc.
 - A surface needs an owner, quality oracle, and verification; a nested `AGENTS.md` only for rules that differ.

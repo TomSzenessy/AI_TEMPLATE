@@ -38,7 +38,8 @@ def _raised(function, *arguments) -> list[str]:
 # --- Repository contract ---------------------------------------------------------
 
 @check("manifest-structure", "project.toml surfaces, governance, vision, and verification are coherent; run by make check",
-       blocks=True, reason="Every command reads project.toml; an incoherent manifest breaks all of them at once.")
+       blocks=True, reason="Every command reads project.toml; in the 2026-10-08 Haiku trials every hit was a real defect "
+              "(unregistered surfaces, unaccepted vision or stack decision).")
 def manifest_structure(context) -> list[str]:
     typed = structure.manifest_type_errors(context.project)
     if typed:
@@ -60,7 +61,7 @@ def file_hygiene(context) -> list[str]:
 
 
 @check("markdown-links", "Relative Markdown links resolve to real files; on every change",
-       blocks=True, reason="Agents navigate by links; a dead link sends them searching blind.")
+       blocks=False)  # advisory since #9: in 13 Haiku trials no run was held up by a dead link
 def markdown_links(context) -> list[str]:
     return _raised(docs.check_markdown_links, context.root)
 
@@ -81,13 +82,15 @@ def host_read_config(context) -> list[str]:
 # --- Derived files and the docs index ----------------------------------------------
 
 @check("derived-drift", "Generated files (host adapters, docs index, Makefile commands, rules) match their sources; run make sync",
-       blocks=True, reason="Hosts read the generated copies; drift means agents follow stale instructions.")
+       blocks=True, reason="Hosts read the generated copies; drift means agents follow stale instructions (a Haiku tidepool "
+              "trial committed stale adapters); make sync fixes it.")
 def derived_drift(context) -> list[str]:
     return derive.drift(context.root)
 
 
 @check("docs-index", "Every document is reachable from docs/README.md; when a doc is added",
-       blocks=True, reason="An unindexed doc is never read; make sync fixes it from the doc's index line.")
+       blocks=True, reason="An unindexed doc is never read; Haiku trials wrote design and research docs no index linked. "
+              "make sync fixes it from the doc's index line.")
 def docs_index(context) -> list[str]:
     return _raised(docs.check_docs_index, context.root) + docsync.index_errors(context.root, context.files)
 
@@ -95,7 +98,8 @@ def docs_index(context) -> list[str]:
 # --- Docs that track the code ------------------------------------------------------
 
 @check("dead-bindings", "Every covers glob matches a file; when code moves or dies",
-       blocks=True, reason="A binding to nothing means the doc describes code that is gone.")
+       blocks=True, reason="A binding to nothing means the doc describes code that is gone; a Haiku ledger-cli trial bound "
+              "docs to cmd/ paths it never created.")
 def dead_bindings(context) -> list[str]:
     return docsync.dead_bindings(context.bindings, context.files)
 
@@ -107,7 +111,7 @@ def stale_docs(context) -> list[str]:
 
 
 @check("command-references", "Every `make x` and `repoctl x` named in Markdown exists; when commands or docs change",
-       blocks=True, reason="A documented command that does not exist costs every reader a failed run.")
+       blocks=False)  # advisory since #9: never hit in a trial
 def command_references(context) -> list[str]:
     return docsync.command_reference_errors(context.root, context.files)
 
@@ -115,13 +119,13 @@ def command_references(context) -> list[str]:
 # --- Code hygiene ---------------------------------------------------------------------
 
 @check("markers", "Deprecations carry a remove-by date, task markers an issue, and FILL-IN placeholders are replaced",
-       blocks=True, reason="Undated deprecations and orphan task markers are how duplicate paths rot silently.")
+       blocks=False)  # advisory since #9: trials only met it as noise from test fixtures
 def markers(context) -> list[str]:
     return hygiene.scan_markers(context.root, context.scoped_files).errors
 
 
 @check("budgets", "Files agents load often stay within project.toml [budgets]; when the router or a skill grows",
-       blocks=True, reason="Always-loaded bytes are paid by every session; the fix is to move detail to an owner doc.")
+       blocks=False)  # advisory since #9: never hit in a trial; make garden reports it
 def budgets(context) -> list[str]:
     return hygiene.budget_errors(context.root, context.project, context.files)
 
@@ -340,6 +344,7 @@ def doc_coupling(context) -> list[str]:
 
 
 @check("critic-evidence", "High-risk work carries a critic verdict bound to HEAD in .agent/critic.md; asked by the stop and done gates",
-       blocks=True, reason="High-risk changes need an independent read; the gate reads the saved verdict so the claim is checkable.")
+       blocks=True, reason="High-risk changes need an independent read; on 2026-10-08 a critic found an unbounded stop-hook "
+              "loop the builder had missed. The gate reads the saved verdict so the claim is checkable.")
 def critic_evidence(context) -> list[str]:
     return gatechecks.critic_evidence(context)

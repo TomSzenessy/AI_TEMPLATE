@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from fixtures import KitRepository  # noqa: E402
 
 SESSION = json.dumps({"session_id": "s-check"})
-BROKEN = "# Billing\n\n<!-- covers: src/billing/** -->\n\nSee [the guide](./missing-guide.md).\n"
+BROKEN = "# Billing\n\n<!-- covers: src/billing/** -->\n<!-- covers: gone/missing-guide/** -->\n\nReturns 2.\n"
 
 
 class StopRunsRepositoryChecksTests(KitRepository):
@@ -24,10 +24,10 @@ class StopRunsRepositoryChecksTests(KitRepository):
     def test_a_session_edit_that_breaks_make_check_blocks(self) -> None:
         self.cli("hook", "session-start", stdin=SESSION)
         self.write("docs/billing.md", BROKEN)
-        self.assertIn("[markdown-links]", self.cli("check").stderr, "the fixture must break make check")
+        self.assertIn("[dead-bindings]", self.cli("check").stderr, "the fixture must break make check")
         decision = json.loads(self.stop())
         self.assertEqual(decision["decision"], "block")
-        self.assertIn("[markdown-links]", decision["reason"])
+        self.assertIn("[dead-bindings]", decision["reason"])
 
     def test_a_session_that_changed_nothing_is_not_blocked_by_old_findings(self) -> None:
         self.write("docs/billing.md", BROKEN)
@@ -36,11 +36,11 @@ class StopRunsRepositoryChecksTests(KitRepository):
         self.assertEqual(self.stop(), "")
 
     def test_findings_from_before_the_session_do_not_block_an_unrelated_edit(self) -> None:
-        self.write("docs/billing.md", BROKEN)
-        self.commit("broken before the session")
+        self.write("docs/stray.md", "# Stray\n")  # unindexed: a docs-index finding that predates the session
+        self.commit("unindexed before the session")
+        self.assertIn("[docs-index]", self.cli("check").stderr, "the fixture must break make check")
         self.cli("hook", "session-start", stdin=SESSION)
-        self.write("src/billing/invoice.py", "def render_invoice():\n    return 3\n")
-        self.write("docs/billing.md", BROKEN + "\nReturns 3.\n")
+        self.write("src/util.py", "def helper():\n    return 3\n")  # nothing binds this; billing.md stays as it was
         self.assertEqual(self.stop(), "")
 
     def test_a_clean_session_edit_passes(self) -> None:
@@ -64,9 +64,9 @@ class StopChainTests(KitRepository):
     def test_new_findings_during_the_chain_block_again(self) -> None:
         self.cli("hook", "session-start", stdin=SESSION)
         self.break_link("first")
-        self.assertIn("first.md", json.loads(self.stop(SESSION))["reason"])
+        self.assertIn("gone/first/", json.loads(self.stop(SESSION))["reason"])
         self.break_link("second")  # "fixed" the first, introduced another
-        self.assertIn("second.md", json.loads(self.stop(ACTIVE))["reason"])
+        self.assertIn("gone/second/", json.loads(self.stop(ACTIVE))["reason"])
 
     def test_no_progress_in_the_chain_lets_the_agent_stop(self) -> None:
         self.cli("hook", "session-start", stdin=SESSION)

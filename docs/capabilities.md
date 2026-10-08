@@ -57,8 +57,8 @@ product, which `make adopt` records), `[adapters.claude]`
 `severity = "advisory"` with a required `reason`; rules in
 [downgrading a check](#downgrading-a-check)), and `[budgets]` (byte limits for any
 glob, including product code). `[budgets]` keeps the files agents load often
-within a byte limit (about 4 bytes per token); an over-budget file fails
-`make check`, so detail belongs in a linked owner document, not in the router.
+within a byte limit (about 4 bytes per token); an over-budget file is reported
+by `make check` and `make garden` (advisory), so detail belongs in a linked owner document, not in the router.
 
 ### Downgrading a check
 
@@ -66,9 +66,9 @@ A check that misfires in one repository is made advisory in `project.toml`, not
 edited out of the kit (so `make kit-update` still applies):
 
 ```toml
-[checks.markdown-links]
+[checks.dead-bindings]
 severity = "advisory"
-reason = "generated docs link to build output that exists only in CI"
+reason = "docs cover build output that exists only in CI"
 ```
 
 The check still runs and its findings print as advisory (`make check`,

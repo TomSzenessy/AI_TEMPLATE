@@ -10,6 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # `fixtures`, however this file is invoked (#33)
 from fixtures import RECENT, Scratch, fake_gh  # noqa: E402  shared builders, in-process CLI (#43)
+from kit.checkrun import run_checks  # noqa: E402
 
 
 def kit_workflow(root: Path, name: str) -> Path:
@@ -478,9 +479,9 @@ rollback = "none"
 
     def test_bundled_skill_links_are_checked_in_fallback(self) -> None:
         self.write(".agents/skills/agent-handover/SKILL.md", "# Broken\n\n[bad](../../missing.md)\n")
-        result = self.cli("check")
-        self.assertEqual(result.returncode, 1)
-        self.assertIn(".agents/skills/agent-handover/SKILL.md", result.stderr)
+        hard, advisory = run_checks(self.root, blocking_only=False)  # markdown-links is advisory since #9
+        self.assertTrue(any(".agents/skills/agent-handover/SKILL.md" in item for item in advisory), advisory)
+        self.assertFalse(any(".agents/skills/agent-handover/SKILL.md" in item for item in hard), hard)
 
     def test_unregistered_skill_directory_is_rejected(self) -> None:
         self.write(".agents/skills/attacker/SKILL.md", "# Unregistered\n")
@@ -622,10 +623,11 @@ Test evidence: the regression is reproducible.
         self.write("docs/guide.md", "# Guide\n\n[x](../../outside.md)\n")
         self.write("docs/unc.md", "# UNC\n\n[x](%5C%5Cattacker.example%5Cshare%5Cfile)\n")
         self.write("docs/README.md", "# Docs\n\n- [Guide](guide.md)\n- [UNC](unc.md)\n")
-        result = self.cli("check")
-        self.assertEqual(result.returncode, 1)
-        self.assertIn("escapes repository root", result.stderr)
-        self.assertIn("unsafe local Markdown target", result.stderr)
+        hard, advisory = run_checks(self.root, blocking_only=False)  # markdown-links is advisory since #9
+        findings = "\n".join(advisory)
+        self.assertIn("escapes repository root", findings)
+        self.assertIn("unsafe local Markdown target", findings)
+        self.assertNotIn("unsafe local Markdown target", "\n".join(hard))
 
     def test_structure_rejects_missing_oracle_duplicate_paths_and_bad_file_surface(self) -> None:
         self.write("project.toml", """schema = 1

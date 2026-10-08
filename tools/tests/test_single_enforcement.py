@@ -70,30 +70,42 @@ class GatesTakeBlockingFromTheRegistry(Scratch):
         self.git("config", "user.name", "T")
         self.write("project.toml", MANIFEST)
         self.write("docs/README.md", "# Docs\n")
+        self.write("docs/billing.md", "# Billing\n\n<!-- covers: src/billing/** -->\n\nReturns 2.\n")
+        self.write("src/billing/a.py", "x = 1\n")
         self.commit("base")
-        self.write("src/a.py", "# " + "TO" + "DO tidy this\n")
+        self.write("src/billing/a.py", "x = 2\n")
         self.git("add", "-A")
 
     def downgrade(self, name: str) -> None:
         self.write("project.toml", MANIFEST + f'\n[checks.{name}]\nseverity = "advisory"\nreason = "this repository tolerates it"\n')
         self.git("add", "-A")
 
-    def test_commit_gate_blocks_on_an_unreferenced_task_marker(self) -> None:
-        self.assertTrue(any(item.startswith("[markers]") for item in session.commit_findings(self.root, None)))
+    def blocked(self, findings: list[str]) -> bool:
+        return any(item.startswith("[doc-coupling]") for item in findings)
+
+    def test_commit_gate_blocks_on_a_blocking_check(self) -> None:
+        self.assertTrue(self.blocked(session.commit_findings(self.root, None)))
 
     def test_commit_gate_honours_a_downgrade(self) -> None:
-        self.downgrade("markers")
-        self.assertFalse(any(item.startswith("[markers]") for item in session.commit_findings(self.root, None)))
+        self.downgrade("doc-coupling")
+        self.assertFalse(self.blocked(session.commit_findings(self.root, None)))
 
     def test_finish_gate_agrees_with_the_commit_gate(self) -> None:
-        self.assertTrue(any(item.startswith("[markers]") for item in session.finish_findings(self.root)))
-        self.downgrade("markers")
-        self.assertFalse(any(item.startswith("[markers]") for item in session.finish_findings(self.root)))
+        self.assertTrue(self.blocked(session.finish_findings(self.root)))
+        self.downgrade("doc-coupling")
+        self.assertFalse(self.blocked(session.finish_findings(self.root)))
 
     def test_commit_gate_exit_status_comes_from_its_findings(self) -> None:
         self.assertEqual(session.commit_gate(self.root, None), session.GATE_BLOCKED)
-        self.downgrade("markers")
+        self.downgrade("doc-coupling")
         self.assertEqual(session.commit_gate(self.root, None), 0)
+
+    def test_an_advisory_task_marker_never_blocks_either_gate(self) -> None:
+        self.downgrade("doc-coupling")
+        self.write("src/a.py", "# " + "TO" + "DO tidy this\n")  # a task marker with no issue: advisory since #9
+        self.git("add", "-A")
+        self.assertFalse(any(item.startswith("[markers]") for item in session.commit_findings(self.root, None)))
+        self.assertFalse(any(item.startswith("[markers]") for item in session.finish_findings(self.root)))
 
 
 class DocCouplingComesFromTheRegistry(Scratch):

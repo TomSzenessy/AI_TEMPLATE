@@ -295,7 +295,7 @@ def finish_findings(root: Path, session_paths: list[str] | None = None, since: s
     if not changed:
         return []
     file_set = set(repository_files(root))
-    rules = {"dead-bindings", "markers", "doc-coupling", "critic-evidence"}
+    rules = {"dead-bindings", "doc-coupling", "critic-evidence"}
     if not scoped or any(path.startswith(CANONICAL_INPUTS) or path.endswith(".md") for path in changed):
         rules.add("derived-drift")
     change = Change("finish", changed, base=base, scoped=scoped, since=since)
@@ -340,7 +340,7 @@ def commit_findings(root: Path, message_file: str | None) -> list[str]:
     merged_in: set[str] = set()
     if git(root, "rev-parse", "-q", "--verify", "MERGE_HEAD") is not None:
         merged_in = set(diff_paths(root, "HEAD...MERGE_HEAD"))
-    rules = {"plugin-load", "markers", "doc-coupling"}
+    rules = {"plugin-load", "doc-coupling"}
     # Derived drift only matters when this commit touches a source of derived files.
     if any(path.startswith(CANONICAL_INPUTS) or path.endswith(".md") for path in staged):
         rules.add("derived-drift")
@@ -359,7 +359,7 @@ def commit_gate(root: Path, message_file: str | None) -> int:
         "Owed doc: update and stage it, or add the trailer 'Docs-Unaffected: <doc.md> <reason>'\n"
         "  (name the doc itself; a code path or glob such as 'tools/** untouched' exempts nothing)\n"
         "  in the message's LAST paragraph (with any Co-Authored-By lines), as git requires.\n"
-        "Derived file: run make sync and stage the result. Marker: fix the named line.",
+        "Derived file: run make sync and stage the result.",
         file=sys.stderr,
     )
     return GATE_BLOCKED

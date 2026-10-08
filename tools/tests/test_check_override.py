@@ -17,7 +17,7 @@ from kit.registry import Registry  # noqa: E402
 
 MANIFEST = 'schema = 1\nname = "Demo"\nkind = "template"\nphase = "bootstrap"\nlicense = "UNSELECTED"\nowners = []\n' \
            '[governance]\nprofile = "regulated"\n'
-OVERRIDE = '\n[checks.markdown-links]\nseverity = "advisory"\nreason = "generated docs link to build output"\n'
+OVERRIDE = '\n[checks.dead-bindings]\nseverity = "advisory"\nreason = "docs describe generated build output"\n'
 
 
 class CheckOverrideTests(Scratch):
@@ -25,42 +25,42 @@ class CheckOverrideTests(Scratch):
         super().setUp()
         self.write("project.toml", MANIFEST)
         self.write("docs/README.md", "# Docs\n")
-        self.write("docs/a.md", "# A\n[gone](missing.md)\n")
+        self.write("docs/a.md", "# A\n<!-- covers: missing/** -->\n")
 
     def downgrade(self) -> None:
         self.write("project.toml", MANIFEST + OVERRIDE)
 
     def test_without_the_declaration_the_check_blocks(self) -> None:
-        self.assertIn("[markdown-links]", self.cli("check").stderr)
+        self.assertIn("[dead-bindings]", self.cli("check").stderr)
         hard, _ = run_checks(self.root, blocking_only=True)
-        self.assertTrue(any(item.startswith("[markdown-links]") for item in hard), hard)
+        self.assertTrue(any(item.startswith("[dead-bindings]") for item in hard), hard)
 
     def test_downgraded_check_stops_blocking_but_still_reports(self) -> None:
         self.downgrade()
         hard, advisory = run_checks(self.root, blocking_only=True)
-        self.assertFalse(any(item.startswith("[markdown-links]") for item in hard), hard)
-        self.assertTrue(any(item.startswith("[markdown-links]") and "missing.md" in item for item in advisory), advisory)
+        self.assertFalse(any(item.startswith("[dead-bindings]") for item in hard), hard)
+        self.assertTrue(any(item.startswith("[dead-bindings]") and "missing/**" in item for item in advisory), advisory)
         result = self.cli("check")
-        self.assertNotIn("[markdown-links]", result.stderr)  # other baseline findings of this bare scratch repo remain
-        self.assertIn("advisory (downgraded in project.toml [checks]): [markdown-links]", result.stdout)
+        self.assertNotIn("[dead-bindings]", result.stderr)  # other baseline findings of this bare scratch repo remain
+        self.assertIn("advisory (downgraded in project.toml [checks]): [dead-bindings]", result.stdout)
 
     def test_the_downgrade_is_listed_with_its_reason(self) -> None:
         self.downgrade()
         for command in ("capabilities", "garden"):
             result = self.cli(command)
-            self.assertIn("markdown-links: generated docs link to build output", result.stdout, command)
+            self.assertIn("dead-bindings: docs describe generated build output", result.stdout, command)
 
     def test_removing_the_declaration_restores_blocking(self) -> None:
         self.downgrade()
-        self.assertNotIn("[markdown-links]", self.cli("check").stderr)
+        self.assertNotIn("[dead-bindings]", self.cli("check").stderr)
         self.write("project.toml", MANIFEST)
-        self.assertIn("[markdown-links]", self.cli("check").stderr)
+        self.assertIn("[dead-bindings]", self.cli("check").stderr)
 
     def test_other_checks_keep_blocking(self) -> None:
         self.downgrade()
-        self.write("docs/b.md", "# B\n<!-- covers: nothing/here/** -->\n")
+        self.write("docs/b.md", "# B\n")  # not in the docs index
         hard, _ = run_checks(self.root, blocking_only=True)
-        self.assertTrue(any(item.startswith("[dead-bindings]") for item in hard), hard)
+        self.assertTrue(any(item.startswith("[docs-index]") for item in hard), hard)
 
     def rejected(self, block: str) -> str:
         self.write("project.toml", MANIFEST + block)
@@ -70,19 +70,19 @@ class CheckOverrideTests(Scratch):
 
     def test_nothing_removes_or_skips_a_check(self) -> None:
         for value in ("off", "skip", "disabled", "ignore", "blocking"):
-            message = self.rejected(f'\n[checks.markdown-links]\nseverity = "{value}"\nreason = "because I said so, loudly"\n')
+            message = self.rejected(f'\n[checks.dead-bindings]\nseverity = "{value}"\nreason = "because I said so, loudly"\n')
             self.assertIn('severity must be "advisory"', message)
-        self.assertIn("only severity", self.rejected('\n[checks.markdown-links]\nenabled = false\nseverity = "advisory"\n'
+        self.assertIn("only severity", self.rejected('\n[checks.dead-bindings]\nenabled = false\nseverity = "advisory"\n'
                                                       'reason = "because I said so, loudly"\n'))
 
     def test_unknown_check_and_missing_reason_are_clear_errors(self) -> None:
         self.assertIn("names no check", self.rejected('\n[checks.no-such-check]\nseverity = "advisory"\nreason = "a long enough reason"\n'))
-        self.assertIn("reason is required", self.rejected('\n[checks.markdown-links]\nseverity = "advisory"\n'))
-        self.assertIn("reason is required", self.rejected('\n[checks.markdown-links]\nseverity = "advisory"\nreason = "n/a"\n'))
+        self.assertIn("reason is required", self.rejected('\n[checks.dead-bindings]\nseverity = "advisory"\n'))
+        self.assertIn("reason is required", self.rejected('\n[checks.dead-bindings]\nseverity = "advisory"\nreason = "n/a"\n'))
         self.assertIn("already advisory", self.rejected('\n[checks.orphan-files]\nseverity = "advisory"\nreason = "a long enough reason"\n'))
 
     def test_a_malformed_table_stops_the_gate_instead_of_passing(self) -> None:
-        self.write("project.toml", MANIFEST + '\n[checks.markdown-links]\nseverity = "off"\nreason = "a long enough reason"\n')
+        self.write("project.toml", MANIFEST + '\n[checks.dead-bindings]\nseverity = "off"\nreason = "a long enough reason"\n')
         self.assertNotEqual(self.cli("check").returncode, 0)
 
 

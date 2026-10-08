@@ -8,13 +8,13 @@
 Markers are plain comments and work in any language:
 
 - `DEPRECATED(remove-by=YYYY-MM-DD, use=<replacement>)` next to replaced code.
-  `make check` fails after the date, so a duplicate path either dies or gets a
-  deliberate new deadline. `make garden` lists dates due within 30 days.
+  `make check` reports it after the date (advisory since #9), so a duplicate path
+  either dies or gets a deliberate new deadline. `make garden` lists dates due within 30 days.
 - A language deprecation annotation (`@deprecated`, `@Deprecated`) needs a
   `remove-by=` date on its line or within the next three lines.
-- Task markers in code must reference an issue (`#123`, a URL, or `Local-WAL`),
+- Task markers in code should reference an issue (`#123`, a URL, or `Local-WAL`),
   because open work lives in the issue register, not in comments.
-- `FILL-IN:` placeholders left by `make new` fail until replaced, so a
+- `FILL-IN:` placeholders left by `make new` are reported until replaced, so a
   half-written skill, role, or doc cannot rot unnoticed.
 - A workflow `run:` block longer than 10 lines fails: CI logic belongs in
   `tools/` where it is unit-tested and runs locally (`repoctl ci <check>`).

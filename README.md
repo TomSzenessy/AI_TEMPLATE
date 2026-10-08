@@ -74,7 +74,7 @@ merged in beside them ([`docs/ADAPTATION.md`](./docs/ADAPTATION.md#adopting-an-e
 | What goes wrong in agent-built codebases | What this template does about it |
 |---|---|
 | Docs drift from the code | Docs declare `<!-- covers: -->` paths; stale or dead bindings fail `make check`, and the git commit gate and agent stop hook refuse changes that skip the owning doc. |
-| Replaced code lingers as duplicates | `DEPRECATED(remove-by=YYYY-MM-DD)` markers fail after their date; a `TODO` comment must name an issue; `make garden` reports duplicated prose and every sign of decay weekly. |
+| Replaced code lingers as duplicates | `DEPRECATED(remove-by=YYYY-MM-DD)` markers are reported after their date; a `TODO` comment must name an issue; `make garden` reports duplicated prose and every sign of decay weekly. |
 | Context is lost between sessions | Session hooks (or `make start`) print a brief; a checkpoint is written before the agent host shrinks an old conversation to save space; `make handover` pre-fills the next session's record. |
 | Too much to read, too many places | `AGENTS.md` is a short rulebook loaded into every session (a byte budget keeps it short); the docs index and host files are generated; `make where` finds code, owners, and past failures in one call. |
 | One agent tries to hold everything | Six roles (scout, implementer, critic, researcher, doc-gardener, skill-scout) with a fixed brief and short reports keep the agent in charge free to decide. |
