@@ -137,6 +137,7 @@ def _text(content: object) -> str:
     return content if isinstance(content, str) else json.dumps(content)
 
 
+STOP_FEEDBACK = "Stop hook feedback:"  # how the host hands a stop-hook block back to the agent
 TEST_SUMMARY = re.compile(r"(?m)^Ran \d+ tests? in [\d.]+s$")
 
 
@@ -170,6 +171,9 @@ def analyze_transcript(transcript: Path) -> dict[str, object]:
                 targets.update(MAKE.findall(command))
                 if "--no-verify" in command:
                     bypasses.append(" ".join(command.split())[:200])
+            elif part.get("type") == "text" and event.get("type") == "user" and STOP_FEEDBACK in str(part.get("text")):
+                text = str(part.get("text"))
+                blocks.append({"command": "(stop hook)", "message": " ".join(text.split(STOP_FEEDBACK, 1)[1].split())[:400]})
             elif part.get("type") == "tool_result":
                 command = commands.get(str(part.get("tool_use_id")), "")
                 text = _text(part.get("content"))

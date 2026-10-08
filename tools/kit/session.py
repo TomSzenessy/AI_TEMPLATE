@@ -365,25 +365,51 @@ def install_git_hooks(root: Path) -> str | None:
     return "installed git hooks (core.hooksPath=.githooks): commits now run the self-healing gate"
 
 
+STOP_REPEATS = 3  # pushes per user turn; the cap that keeps a gate from looping an agent forever
+
+
 def stop(root: Path, event: dict[str, object]) -> None:
-    if event.get("stop_hook_active"):
-        return  # the agent already continued once because of this gate
+    """Block a stop on findings; while the agent continues because of this gate, block again
+    only when the findings changed (it is making progress), at most STOP_REPEATS times.
+
+    One push was not enough: in the 2026-10-08 Haiku poster-press trial the agent fixed the
+    findings it was shown, introduced two new ones while doing so, and stopped unchecked.
+    """
     session = str(event.get("session_id", "local"))
+    reason = _stop_reason(root, session)
+    state = _load_state(root, session)
+    chain = state.get("stop_chain") if isinstance(state.get("stop_chain"), dict) else {}
+    if reason is None:
+        return
+    digest = hashlib.sha256(reason.encode("utf-8")).hexdigest()
+    if event.get("stop_hook_active"):
+        if chain.get("last") == digest or int(chain.get("count", 0)) >= STOP_REPEATS:
+            return  # no progress since the last push, or the cap: the agent may stop and explain
+        count = int(chain.get("count", 0)) + 1
+    else:
+        count = 1
+    state["stop_chain"] = {"count": count, "last": digest}
+    try:
+        (root / STATE).parent.mkdir(parents=True, exist_ok=True)
+        (root / STATE).write_text(json.dumps(state), encoding="utf-8")
+    except OSError:
+        pass  # without the record the next stop in this chain is judged as a first push
+    print(json.dumps({"decision": "block", "reason": reason}))
+
+
+def _stop_reason(root: Path, session: str) -> str | None:
     paths = session_changes(root, session)
-    since = str(_load_state(root, session).get("snapshot_head", "")) or None if paths is not None else None
+    state = _load_state(root, session)
+    since = str(state.get("snapshot_head", "")) or None if paths is not None else None
     findings = finish_findings(root, paths, since)
     if not findings and paths:
-        baseline = _load_state(root, session).get("check_baseline")
+        baseline = state.get("check_baseline")
         if isinstance(baseline, list):
             findings = [item for item in repository_findings(root) if item not in baseline]
     if findings:
         reason = f"{GATE_STOP_BLOCKED}:\n" + "\n".join(f"- {item}" for item in findings[:12])
-        reason += "\nFix these (delegate doc work to the doc-gardener role if large), or explain to the user why they stay."
-        print(json.dumps({"decision": "block", "reason": reason}))
-        return
-    drive = _product_drive(root, paths)
-    if drive:
-        print(json.dumps({"decision": "block", "reason": drive}))
+        return reason + "\nFix these (delegate doc work to the doc-gardener role if large), or explain to the user why they stay."
+    return _product_drive(root, paths)
 
 
 def repository_findings(root: Path) -> list[str]:

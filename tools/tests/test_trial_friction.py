@@ -50,6 +50,16 @@ class FrictionCounterTests(unittest.TestCase):
     def test_without_a_suite_the_whole_output_is_judged(self) -> None:
         self.assertEqual(len(analyse("Commit blocked by the self-healing gate:\n- docs/a.md")["gate_blocks"]), 1)
 
+    def test_stop_hook_blocks_are_counted(self) -> None:
+        events = [{"type": "user", "message": {"role": "user", "content": [
+            {"type": "text", "text": "Stop hook feedback:\nSelf-healing gate before stopping:\n- [docs-index] x"}]}}]
+        with tempfile.TemporaryDirectory() as folder:
+            transcript = Path(folder) / "t.jsonl"
+            transcript.write_text("\n".join(json.dumps(event) for event in events) + "\n")
+            blocks = trial.analyze_transcript(transcript)["gate_blocks"]
+        self.assertEqual([block["command"] for block in blocks], ["(stop hook)"])
+        self.assertIn("[docs-index] x", blocks[0]["message"])
+
 
 if __name__ == "__main__":
     unittest.main()

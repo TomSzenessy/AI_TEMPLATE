@@ -49,5 +49,42 @@ class StopRunsRepositoryChecksTests(KitRepository):
         self.assertEqual(self.stop(), "")
 
 
+ACTIVE = json.dumps({"session_id": "s-check", "stop_hook_active": True})
+
+
+class StopChainTests(KitRepository):
+    """While the agent continues because of the gate, it is judged again if it made progress."""
+
+    def stop(self, event: str) -> str:
+        return self.cli("hook", "stop", stdin=event).stdout
+
+    def break_link(self, name: str) -> None:
+        self.write("docs/billing.md", BROKEN.replace("missing-guide", name))
+
+    def test_new_findings_during_the_chain_block_again(self) -> None:
+        self.cli("hook", "session-start", stdin=SESSION)
+        self.break_link("first")
+        self.assertIn("first.md", json.loads(self.stop(SESSION))["reason"])
+        self.break_link("second")  # "fixed" the first, introduced another
+        self.assertIn("second.md", json.loads(self.stop(ACTIVE))["reason"])
+
+    def test_no_progress_in_the_chain_lets_the_agent_stop(self) -> None:
+        self.cli("hook", "session-start", stdin=SESSION)
+        self.break_link("same")
+        self.assertTrue(self.stop(SESSION))
+        self.assertEqual(self.stop(ACTIVE), "", "same findings again: the agent may stop and explain")
+
+    def test_the_chain_is_capped(self) -> None:
+        from kit import session
+        self.cli("hook", "session-start", stdin=SESSION)
+        self.break_link("n0")
+        self.assertTrue(self.stop(SESSION))
+        for number in range(1, session.STOP_REPEATS):
+            self.break_link(f"n{number}")
+            self.assertTrue(self.stop(ACTIVE), number)
+        self.break_link("over")
+        self.assertEqual(self.stop(ACTIVE), "", "the cap holds even when findings keep changing")
+
+
 if __name__ == "__main__":
     unittest.main()
