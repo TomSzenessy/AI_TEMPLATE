@@ -25,7 +25,7 @@ from .garden import self_heal_errors
 from .gitinfo import branch, branch_paths, changed_paths, committed_paths, diff_paths, git, head, path_matches
 from .names import AFTER_EDIT, CHECKPOINT, COMMIT_MSG, CRITIC_RECORD, HANDOVER, PRE_COMPACT, SESSION_START, STOP
 from .navigate import print_map
-from .product import next_step, product_summary
+from .product import drive_reason, next_step, product_summary
 from .checkrun import run_checks
 from .registry import KINDS, Registry, project_plugin_files
 from .risk import assess, classify, tier_rules
@@ -439,6 +439,20 @@ def stop(root: Path, event: dict[str, object]) -> None:
         reason = f"{GATE_STOP_BLOCKED}:\n" + "\n".join(f"- {item}" for item in findings[:12])
         reason += "\nFix these (delegate doc work to the doc-gardener role if large), or explain to the user why they stay."
         print(json.dumps({"decision": "block", "reason": reason}))
+        return
+    drive = _product_drive(root, paths)
+    if drive:
+        print(json.dumps({"decision": "block", "reason": drive}))
+
+
+def _product_drive(root: Path, paths: list[str] | None) -> str | None:
+    """The product pack's push to keep building; only for a session that changed product code."""
+    if not paths or not _product_on(root):
+        return None
+    try:
+        return drive_reason(root, paths)
+    except RepoctlError:
+        return None  # a broken manifest is the other checks' finding, not a reason to hold the session
 
 
 def finish(root: Path) -> int:

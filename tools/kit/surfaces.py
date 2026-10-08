@@ -25,3 +25,17 @@ def product_surfaces(project: dict[str, object]) -> list[dict[str, object]]:
         surface for surface in declared_surfaces(project)
         if surface.get("status", "active") == "active" and surface.get("kind") != "template"
     ]
+
+
+NOT_PRODUCT_CODE = (".agents/", ".claude/", "docs/", ".github/")
+
+
+def touches_product(project: dict[str, object], paths: list[str]) -> bool:
+    """True when any path is code or content inside an active product surface (docs and tooling never count)."""
+    roots = [str(surface.get("path", "")).strip("/") for surface in product_surfaces(project) if isinstance(surface.get("path"), str)]
+    for path in paths:
+        if path.startswith(NOT_PRODUCT_CODE) or path.endswith(".md"):
+            continue
+        if any(root in {"", "."} or path == root or path.startswith(root + "/") for root in roots):
+            return True
+    return False
