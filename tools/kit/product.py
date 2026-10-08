@@ -22,7 +22,7 @@ from pathlib import Path
 from .config import setting
 from .core import RepoctlError, load_project, read_text_file
 from .names import DESIGN, STACK_DECISION
-from .surfaces import is_product, is_ui, product_surfaces  # noqa: F401  (still this module's surface)
+from .surfaces import is_product, is_ui, product_surfaces, touches_product  # noqa: F401  (still this module's surface)
 
 FEATURES = "docs/product/features.csv"
 RESEARCH = "docs/product/research.md"
@@ -230,3 +230,28 @@ def product_summary(root: Path) -> str | None:
         names = ", ".join(row["feature"] for row in open_must[:3]) + (" …" if len(open_must) > 3 else "")
         return f"Product {percent:.0f}% complete; NOT done: {len(open_must)} must feature(s) open ({names}). Run make next."
     return f"Product {percent:.0f}% complete; all must features evidenced. Run make next for the remaining steps."
+
+
+def drive_reason(root: Path, changed: list[str]) -> str | None:
+    """Why a session that changed product code must not stop yet; None when it may (the stop hook's push, #8).
+
+    Only a session that changed a product surface is asked: answering a question or editing docs never is.
+    """
+    project = load_project(root)
+    if not is_product(project) or not touches_product(project, changed):
+        return None
+    try:
+        _, open_must = score(load_features(root))
+        problem = ""
+    except RepoctlError as error:
+        open_must, problem = [], str(error)
+    if not open_must and not problem:
+        return None
+    step = next_step(root)
+    if problem:
+        lead = f"{FEATURES} is invalid ({problem}); the product cannot be judged until it is fixed."
+    else:
+        names = ", ".join(row["feature"] for row in open_must[:5]) + (" …" if len(open_must) > 5 else "")
+        lead = f"{len(open_must)} must feature(s) are still open ({names})."
+    return (f"This slice is done, but not the product. {lead} Keep building, or tell the user plainly what stays open.\n"
+            f"Next ({step['phase']}): {step['action']}\nHow: {step['guide']}\nDone when: {step['verify']}")

@@ -32,7 +32,9 @@ order:
 | launch | release sequence in [`production.md`](./production.md) |
 
 Keep looping (`make next`, build, `make done`) until the launch phase. A green
-`make done` with open must features means the slice is done, not the product.
+`make done` with open must features means the slice is done, not the product:
+the stop hook enforces it once per turn when the session changed product-surface
+code ([`self-healing.md`](./self-healing.md#lifecycle-any-host)).
 What changed in `tools/kit/product.py` last: `docs/design.md` and
 `docs/STACK-DECISION.md` are read through the shared name constants in
 `tools/kit/names.py`; the phases above are unchanged.
@@ -51,7 +53,8 @@ appends the applicable rows of
 [`production-features.csv`](../.agents/skills/product-kickoff/production-features.csv)
 (onboarding, every screen state, accessibility, identity, undo, backup, error
 handling, deployment, performance, and more), which is what turns a demo into a
-product. `make check` fails when the list has no must row, a must row has no
+product. `make check` fails when a row has an invalid `priority` or `status`
+(the message names the row and the valid values), the list has no must row, a must row has no
 acceptance criterion, or a `yes`/`partial` row cites anything that is not an
 existing file; a must row marked `yes` also needs a test file or
 `docs/product/ui-reviews.md` among its evidence, so citing `README.md` cannot
