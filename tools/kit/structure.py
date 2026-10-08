@@ -356,7 +356,9 @@ def _check_record(root: Path, project: dict[str, object], relative: str, label: 
     if unaccepted and accepted_first:
         raise RepoctlError(status_message)
     if not re.search(rf"(?im)^Project:\s*{re.escape(str(project.get('name', '')))}\s*$", content):
-        raise RepoctlError(unbound_message)
+        # Say what "bound" means: a round-4 Haiku trial spent its whole budget guessing at key names.
+        raise RepoctlError(f"{unbound_message}: {relative} needs the line 'Project: {project.get('name', '')}' "
+                           "(the name in project.toml)")
     if unaccepted:
         raise RepoctlError(status_message)
     if placeholders and re.search(r"\[(?:REQUIRED|TBD|pending)|\bTBD\b", content, re.I):

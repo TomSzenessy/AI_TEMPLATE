@@ -298,5 +298,23 @@ class SecondPassTests(Scratch):
         self.assertIn("no LICENSE of yours", out.getvalue())
 
 
+class RecordBindingTests(Scratch):
+    """'Not bound to project.toml' says which line binds it (round-4 Haiku tidepool trial)."""
+
+    def check(self, body: str) -> None:
+        from kit import structure
+        self.write("docs/STACK-DECISION.md", body)
+        structure._check_record(self.root, {"name": "tidepool"}, "docs/STACK-DECISION.md", "stack decision record",
+                                "project stack decision", False, status_message="must be accepted",
+                                unbound_message="stack decision record is not bound to project.toml",
+                                accepted_first=False)
+
+    def test_the_message_names_the_line_and_adding_it_fixes_it(self) -> None:
+        today = core.today().isoformat()
+        with self.assertRaisesRegex(RepoctlError, r"needs the line 'Project: tidepool'"):
+            self.check(f"# Stack\n\n**Project:** tidepool\nStatus: accepted\nOwner: o\nDate: {today}\n")
+        self.check(f"# Stack\n\nProject: tidepool\nStatus: accepted\nOwner: o\nDate: {today}\n")
+
+
 if __name__ == "__main__":
     unittest.main()
