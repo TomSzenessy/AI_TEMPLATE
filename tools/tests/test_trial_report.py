@@ -45,7 +45,7 @@ class ReportTests(unittest.TestCase):
         analysis = analyse(tool("a", "make done"))
         self.assertIn("- Verdict: pass", trial.render(SPEC, "haiku", analysis, PASSING, Path("p")))
         failing = {**PASSING, "check_passed": False}
-        self.assertIn("- Verdict: fail (make check failed)", trial.render(SPEC, "haiku", analysis, failing, Path("p")))
+        self.assertIn("- Verdict: fail (make check did not pass)", trial.render(SPEC, "haiku", analysis, failing, Path("p")))
 
     def test_turns_and_tokens_are_counted_per_phase(self) -> None:
         analysis = analyse(turn(1, 1), tool("a", "make next"), result("a", "Next (intake): ask"),

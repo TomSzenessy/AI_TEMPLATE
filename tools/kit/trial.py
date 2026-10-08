@@ -250,9 +250,9 @@ def verdict(analysis: dict[str, object], state: dict[str, object]) -> str:
     if analysis.get("bypasses"):
         reasons.append("gate bypassed with --no-verify")
     if state.get("check_passed") is not True:
-        reasons.append("make check failed")
+        reasons.append("make check did not pass")
     if state.get("finish_passed") is not True:
-        reasons.append("change-set gate failed")
+        reasons.append("change-set gate did not pass")
     return "pass" if not reasons else f"fail ({', '.join(reasons)})"
 
 
