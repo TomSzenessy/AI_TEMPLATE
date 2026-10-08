@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))  # `fixtures`, however 
 from fixtures import (RECENT, TOOLS, KitRepository, fake_gh)  # noqa: E402
 
 from kit import (session)  # noqa: E402
+from kit.checkrun import Change  # noqa: E402
 from kit.core import load_project  # noqa: E402
 
 
@@ -244,7 +245,8 @@ class CriticRecordGateTests(KitRepository):
         return load_project(self.root)
 
     def findings(self) -> str:
-        return "\n".join(session.critic_findings(self.root, self.project(), "main"))
+        change = Change("finish", [], base="main")
+        return "\n".join(session.registry_findings(self.root, {"critic-evidence"}, None, change))
 
     def head(self) -> str:
         return self.git("rev-parse", "HEAD").strip()

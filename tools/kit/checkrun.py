@@ -7,6 +7,7 @@ modules. Everything that needs `Context` or `run_checks` imports it here.
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
 
@@ -15,12 +16,30 @@ from .docmeta import bindings
 from .registry import Registry
 
 
+@dataclass(frozen=True)
+class Change:
+    """The change set a gate is judging, for the checks that are about a change rather than a tree.
+
+    `kind` is "commit" (the staged set; `exempt` and `merged_in` come from its message and merge
+    state) or "finish" (the branch or one session: `scoped`, `since`, `base`).
+    """
+
+    kind: str
+    paths: list[str]
+    base: str = ""
+    scoped: bool = False
+    since: str | None = None
+    exempt: frozenset[str] = field(default_factory=frozenset)
+    merged_in: frozenset[str] = field(default_factory=frozenset)
+
+
 class Context:
     """What a check sees: the repository root plus shared, lazily computed facts."""
 
-    def __init__(self, root: Path, registry: Registry | None = None, scope: list[str] | None = None) -> None:
+    def __init__(self, root: Path, registry: Registry | None = None, scope: list[str] | None = None, change: Change | None = None) -> None:
         self.root = root
         self.registry = registry or Registry(root)
+        self.change = change  # set only by the commit and finish gates
         self.scope = scope  # the paths a gate is judging; None means the whole repository
 
     @cached_property
@@ -64,7 +83,7 @@ class Context:
 
 def run_checks(root: Path, *, blocking_only: bool, context: Context | None = None,
                skip: frozenset[str] = frozenset(), only: frozenset[str] | None = None,
-               scope: list[str] | None = None) -> tuple[list[str], list[str]]:
+               scope: list[str] | None = None, change: Change | None = None) -> tuple[list[str], list[str]]:
     """(blocking findings, advisory findings) from every check of an enabled pack, minus `skip`.
 
     This is the one place a finding becomes blocking: gates (`make check`, the commit gate, the
@@ -77,7 +96,7 @@ def run_checks(root: Path, *, blocking_only: bool, context: Context | None = Non
     signature's key and permanent fix, so a known failure is recognised rather than
     diagnosed again.
     """
-    context = context or Context(root, scope=scope)
+    context = context or Context(root, scope=scope, change=change)
     registry = context.registry
     hard: list[str] = []
     advisory: list[str] = []

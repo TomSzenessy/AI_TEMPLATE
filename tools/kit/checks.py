@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import re
 
-from . import derive, docs, docsync, github, hygiene, product, skills, structure
+from . import derive, docs, docsync, gatechecks, github, hygiene, product, skills, structure
 from .config import setting
 from .core import FILE_SURFACE_KINDS, RepoctlError, declared_surfaces, parse_iso_date, today
 from .gitinfo import changed_paths, has_history, path_matches
@@ -316,3 +316,18 @@ def host_twins(context) -> list[str]:
                            "capability's absence is visible.")
 def plugin_load(context) -> list[str]:
     return [f"{path}: {error}" for path, error in context.registry.plugin_errors]
+
+
+# --- Change-set rules the commit and stop gates name (no change set, no findings) ----
+
+@check("doc-coupling", "A covered document is updated with the code it covers; asked per commit and per session by the gates",
+       blocks=True, reason="Trials showed agents skip doc updates; the gates ask this per change set, where the "
+                           "branch-wide stale-docs check cannot say which commit owes the update.")
+def doc_coupling(context) -> list[str]:
+    return gatechecks.owed_docs(context)
+
+
+@check("critic-evidence", "High-risk work carries a critic verdict bound to HEAD in .agent/critic.md; asked by the stop and done gates",
+       blocks=True, reason="High-risk changes need an independent read; the gate reads the saved verdict so the claim is checkable.")
+def critic_evidence(context) -> list[str]:
+    return gatechecks.critic_evidence(context)

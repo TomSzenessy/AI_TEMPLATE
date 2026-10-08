@@ -22,13 +22,13 @@ from .core import (
     RepoctlError, default_branch, governance_profile, load_project, read_text_file, repository_files,
 )
 from .garden import self_heal_errors
-from .gitinfo import branch, branch_paths, changed_paths, committed_paths, diff_paths, git, head, path_matches, run_git
+from .gitinfo import branch, branch_paths, changed_paths, diff_paths, git, head, path_matches, run_git
 from .names import AFTER_EDIT, CHECKPOINT, COMMIT_MSG, CRITIC_RECORD, HANDOVER, PRE_COMPACT, SESSION_START, STOP
 from .navigate import print_map
 from .product import drive_reason, next_step, product_summary
-from .checkrun import run_checks
+from .checkrun import Change, run_checks
 from .registry import KINDS, Registry, project_plugin_files
-from .risk import assess, classify, tier_rules
+from .risk import assess
 from .uireview import review_status
 
 
@@ -61,8 +61,9 @@ def _save_state(root: Path, state: dict) -> None:
     path = state_path(root)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(state), encoding="utf-8")
+
+
 CANONICAL_INPUTS = (".agents/", "tools/kit/commands.py", "project.toml")
-CRITIC_VERDICTS = ("blocker", "ship-with-residuals")
 
 
 def read_event() -> dict[str, object]:
@@ -279,44 +280,6 @@ def after_edit(root: Path, event: dict[str, object]) -> None:
         print(json.dumps({"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": " ".join(notes)}}))
 
 
-def critic_findings(root: Path, project: dict[str, object], base: str, only: list[str] | None = None) -> list[str]:
-    """High-risk work needs an independent critic whose verdict this gate can read.
-
-    The record is the critic's return saved verbatim to `.agent/critic.md`; a
-    verdict outside the fixed vocabulary is a failure, not a softer pass.
-    """
-    if governance_profile(project) == "minimal":
-        return []  # the host owns issues, review, and ceremony
-    rules = tier_rules(project)
-    if only is not None and not any(classify(path, rules) == "high" for path in only):
-        return []  # a session scope demands evidence only for high-risk work it changed
-    risky = [path for path in committed_paths(root, base) if classify(path, rules) == "high"]
-    if not risky:
-        return []
-    vocabulary = " | ".join(CRITIC_VERDICTS)
-    content = read_text_file(root, CRITIC_RECORD) or ""
-    if not content.strip():
-        return [
-            f"high-risk change ({', '.join(risky[:4])}) has no critic evidence: run the critic role on this change"
-            f" set and save its return verbatim to {CRITIC_RECORD}"
-        ]
-    verdict = re.search(r"(?im)^Verdict:\s*(\S+)", content)
-    if verdict is None:
-        return [f"{CRITIC_RECORD} states no verdict; the critic returns exactly one of: {vocabulary}"]
-    word = verdict.group(1).strip().lower()
-    if word not in CRITIC_VERDICTS:
-        return [f"{CRITIC_RECORD} verdict {word!r} is outside the fixed vocabulary ({vocabulary}); prose is not a verdict"]
-    if word == CRITIC_VERDICTS[0]:
-        return [f"{CRITIC_RECORD} verdict is {word}: fix what it lists, then ask the critic again"]
-    reviewed = re.search(r"(?im)^Commit:\s*([0-9a-f]{40})\b", content)
-    if not reviewed:
-        return [f"{CRITIC_RECORD} has no 'Commit: <40-hex>' line, so it is not bound to a reviewed change set"]
-    current = (git(root, "rev-parse", "HEAD") or "").strip()
-    if current and reviewed.group(1) != current:
-        return [f"{CRITIC_RECORD} reviews {reviewed.group(1)[:12]}, not HEAD {current[:12]}: the critic read older work"]
-    return []
-
-
 def finish_findings(root: Path, session_paths: list[str] | None = None, since: str | None = None) -> list[str]:
     """Fast completion gate over this branch's change set (commits since the base plus uncommitted).
 
@@ -331,38 +294,19 @@ def finish_findings(root: Path, session_paths: list[str] | None = None, since: s
     changed = session_paths if session_paths is not None else branch_paths(root, base)
     if not changed:
         return []
-    files = repository_files(root)
-    file_set = set(files)
-    doc_bindings = docmeta.bindings(root, files)
-    if scoped:
-        dirty = set(changed_paths(root))
-        uncommitted = [path for path in changed if path in dirty]
-        owed = docsync.owed_since(root, doc_bindings, f"{since}..HEAD", uncommitted) if since else {}
-    else:
-        uncommitted = changed_paths(root)
-        owed = docsync.owed_documents(root, doc_bindings, base, uncommitted)
-    # Predict the commit gate too: it asks per commit, so a doc touched earlier on the
-    # branch does not cover uncommitted code. Two gates that disagree cost a round trip.
-    for doc, paths in docsync.pending_documents(doc_bindings, uncommitted).items():
-        owed.setdefault(doc, paths)
-    findings = [
-        f"{doc} covers changed {', '.join(paths[:4])}{' …' if len(paths) > 4 else ''} but was not updated"
-        " (update it, or record why in the commit with a 'Docs-Unaffected: <doc> <reason>' trailer)"
-        for doc, paths in owed.items()
-    ]
-    rules = {"dead-bindings", "markers"}
+    file_set = set(repository_files(root))
+    rules = {"dead-bindings", "markers", "doc-coupling", "critic-evidence"}
     if not scoped or any(path.startswith(CANONICAL_INPUTS) or path.endswith(".md") for path in changed):
         rules.add("derived-drift")
-    findings += registry_findings(root, rules, [path for path in changed if path in file_set])
-    findings += critic_findings(root, project, base, session_paths)
-    return findings
+    change = Change("finish", changed, base=base, scoped=scoped, since=since)
+    return registry_findings(root, rules, [path for path in changed if path in file_set], change)
 
 
 SCISSORS = re.compile(r"(?m)^# -+ >8 -+$")
 GATE_BLOCKED = 3  # the hook blocks on any non-zero status except 126/127 (no interpreter or launcher)
 
 
-def registry_findings(root: Path, names: set[str], scope: list[str] | None) -> list[str]:
+def registry_findings(root: Path, names: set[str], scope: list[str] | None, change: Change | None = None) -> list[str]:
     """Blocking findings of the named registry checks over `scope`: the gates' one route to a block.
 
     A gate decides which rules apply to its change set; the registry decides whether each blocks
@@ -370,7 +314,7 @@ def registry_findings(root: Path, names: set[str], scope: list[str] | None) -> l
     a blocking finding: a gate must never be skipped because the kit it runs on is broken (issue #28).
     """
     try:
-        return run_checks(root, blocking_only=True, only=frozenset(names), scope=scope)[0]
+        return run_checks(root, blocking_only=True, only=frozenset(names), scope=scope, change=change)[0]
     except Exception as error:  # noqa: BLE001 - an unloadable registry is itself a blocking finding
         return [f"[registry] the capability registry cannot load: {type(error).__name__}: {error} "
                 "(fix it, then recommit; `git commit --no-verify` bypasses the gate, say why in the PR)"]
@@ -389,25 +333,19 @@ def commit_findings(root: Path, message_file: str | None) -> list[str]:
     message = SCISSORS.split(message, maxsplit=1)[0]
     message = "\n".join(line for line in message.splitlines() if not line.startswith("#"))
     exempt = docsync.exemption_scope(docsync.message_trailers(root, message)) or set()
-    files = repository_files(root)
-    file_set = set(files)
-    doc_bindings = docmeta.bindings(root, files)
+    file_set = set(repository_files(root))
     # A merge commit brings in commits that already passed this gate or recorded a
     # Docs-Unaffected decision; re-asking would re-litigate it. make done and CI's
     # stale-document check still read those commits' trailers.
     merged_in: set[str] = set()
     if git(root, "rev-parse", "-q", "--verify", "MERGE_HEAD") is not None:
         merged_in = set(diff_paths(root, "HEAD...MERGE_HEAD"))
-    rules = {"plugin-load", "markers"}
+    rules = {"plugin-load", "markers", "doc-coupling"}
     # Derived drift only matters when this commit touches a source of derived files.
     if any(path.startswith(CANONICAL_INPUTS) or path.endswith(".md") for path in staged):
         rules.add("derived-drift")
-    findings = registry_findings(root, rules, [path for path in staged if path in file_set]) + [
-        f"{doc} covers staged {', '.join(paths[:4])} but is not staged"
-        for doc, paths in docsync.pending_documents(doc_bindings, [p for p in staged if p not in merged_in]).items()
-        if "*" not in exempt and doc not in exempt
-    ]
-    return findings
+    change = Change("commit", staged, exempt=frozenset(exempt), merged_in=frozenset(merged_in))
+    return registry_findings(root, rules, [path for path in staged if path in file_set], change)
 
 
 def commit_gate(root: Path, message_file: str | None) -> int:
