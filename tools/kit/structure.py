@@ -17,6 +17,7 @@ from .core import (
     check_failed,
     date_out_of_policy,
     read_utf8,
+    repository_files,
     declared_surfaces,
     ensure_inside_root,
     governance_profile,
@@ -73,7 +74,18 @@ def discover_candidate_surfaces(
                         candidates.add(child_relative)
         else:
             candidates.add(path.relative_to(root).as_posix())
-    return sorted(candidates - _git_ignored(root, candidates))
+    held = _held_paths(repository_files(root))
+    return sorted((candidates & held) - _git_ignored(root, candidates))
+
+
+def _held_paths(files: list[str]) -> set[str]:
+    """Every listed file plus each ancestor directory of one. A directory holding only ignored output is absent."""
+    held: set[str] = set()
+    for relative in files:
+        parts = relative.split("/")
+        for depth in range(1, len(parts) + 1):
+            held.add("/".join(parts[:depth]))
+    return held
 
 
 def _git_ignored(root: Path, paths: set[str]) -> set[str]:

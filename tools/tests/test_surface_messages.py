@@ -24,6 +24,32 @@ class IgnoredOutputIsNotASurfaceTests(Scratch):
         self.assertIn("ledger", candidates)
         self.assertNotIn("ledger_cli.egg-info", candidates)
 
+    def test_a_directory_holding_only_ignored_files_is_not_a_candidate(self) -> None:
+        self.git("init", "-q")
+        self.write(".gitignore", ".gocache*\n")
+        self.write("controlplane/.gocache/build/cache.bin", "cache\n")
+        self.write("ledger/__init__.py", "")
+        candidates = structure.discover_candidate_surfaces(self.root, PROJECT)
+        self.assertNotIn("controlplane", candidates)
+        self.assertIn("ledger", candidates)
+
+    def test_a_directory_with_a_tracked_file_is_a_candidate(self) -> None:
+        self.git("init", "-q")
+        self.write(".gitignore", ".gocache*\n")
+        self.write("controlplane/.gocache/build/cache.bin", "cache\n")
+        self.write("controlplane/main.go", "package main\n")
+        self.git("add", "controlplane/main.go")
+        candidates = structure.discover_candidate_surfaces(self.root, PROJECT)
+        self.assertIn("controlplane", candidates)
+
+    def test_a_directory_with_an_untracked_unignored_file_is_a_candidate(self) -> None:
+        self.git("init", "-q")
+        self.write(".gitignore", ".gocache*\n")
+        self.write("controlplane/.gocache/build/cache.bin", "cache\n")
+        self.write("controlplane/main.go", "package main\n")
+        candidates = structure.discover_candidate_surfaces(self.root, PROJECT)
+        self.assertIn("controlplane", candidates)
+
     def test_outside_git_nothing_is_dropped(self) -> None:
         self.write("ledger_cli.egg-info/PKG-INFO", "Name: ledger\n")
         self.assertIn("ledger_cli.egg-info", structure.discover_candidate_surfaces(self.root, PROJECT))

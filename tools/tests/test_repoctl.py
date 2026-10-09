@@ -173,7 +173,7 @@ rollback = "remove the project-local skill and restore the previous lockfile"
     def test_infrastructure_defaults_and_root_surface_rogue_detection(self) -> None:
         (self.root / "tests").mkdir()
         (self.root / "config").mkdir()
-        (self.root / "apps" / "rogue").mkdir(parents=True)
+        self.write("apps/rogue/app.py", "APP = 1\n")
         self.write("project.toml", """schema = 1
 name = "Demo"
 kind = "web"
