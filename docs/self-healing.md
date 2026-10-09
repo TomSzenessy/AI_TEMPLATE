@@ -34,7 +34,10 @@ assumed. A new or changed check **blocks** only when all three hold:
 
 Otherwise it is **advisory** (`make garden`, the session brief) or an
 **automatic fix** (`make sync`). Since #9 `markdown-links`, `command-references`,
-`markers`, `budgets` are advisory. Further rules:
+`markers`, `budgets` are advisory. `file-hygiene` stays blocking, but a repository exempts one
+path through `[checks.file-hygiene] allow_paths` (glob plus a mandatory reason, see
+[`capabilities.md`](./capabilities.md#exempting-one-path-from-file-hygiene)); the advisory
+`file-hygiene-allowed` check keeps each exemption and its reason visible. Further rules:
 
 - **One blocking point per concern.** Each later gate fires only on what the
   earlier one let through (`--no-verify`, uncommitted work), never on a
