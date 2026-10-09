@@ -11,6 +11,7 @@ the project owns, then runs the same initialization:
   lines appended), `README.md` (the identity block appended), `docs/README.md`
   (the generated index appended), and workflows (written as `kit-<name>`);
 - the project's existing docs get an index line so `make check` can route them;
+- the kit's LICENSE is never copied into a repository without one (its manifest label is `UNSELECTED`);
 - everything else that collides is kept as the project's and listed.
 
 Run it from the existing repository: `make -f <kit>/Makefile adopt KIT=<kit>`
@@ -90,9 +91,9 @@ def keep_project_license(target: Path, project_had_one: bool) -> str | None:
     manifest = target / "project.toml"
     text = manifest.read_text(encoding="utf-8")
     if not project_had_one:
-        if (target / "LICENSE").exists():
-            return "no LICENSE of yours: the kit's LICENSE was copied; replace it with your own and set license in project.toml"
-        return None
+        manifest.write_text(re.sub(r'(?m)^license\s*=\s*"[^"]*"', 'license = "UNSELECTED"', text, count=1), encoding="utf-8")
+        return ('no LICENSE of yours: none was added (a license is your choice, not the kit\'s); '
+                'license = "UNSELECTED" in project.toml until you add a LICENSE and set it')
     head = (target / "LICENSE").read_text(encoding="utf-8", errors="replace")[:400]
     label = next((spdx for marker, spdx in LICENSES if marker.lower() in head.lower()), "UNSELECTED")
     manifest.write_text(re.sub(r'(?m)^license\s*=\s*"[^"]*"', f'license = "{label}"', text, count=1), encoding="utf-8")
@@ -116,6 +117,8 @@ def adopt(target: Path, kit: Path, name: str, kind: str, owner: str | None) -> N
         source, destination = kit / relative, target / relative
         if relative.startswith(".github/workflows/") and destination.exists():
             destination = destination.with_name("kit-" + destination.name)
+        if relative == "LICENSE" and not destination.exists():
+            continue  # the kit's own license is not the adopter's to inherit
         if not destination.exists():
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, destination)
@@ -143,7 +146,7 @@ def adopt(target: Path, kit: Path, name: str, kind: str, owner: str | None) -> N
             kept.append(relative)
     indexed = index_existing_docs(target, before)
     initialize_project(target, name, kind, owner, mode="adopt")
-    license_note = keep_project_license(target, "LICENSE" in kept)
+    license_note = keep_project_license(target, (target / "LICENSE").is_file())
     derive.sync(target)
     shipped = kit_paths(kit)  # your kept files are never kit files; only the kit's version of them is remembered
     write_lock(target, kit, [path for path in shipped if path not in kept], [path for path in kept if path in shipped])

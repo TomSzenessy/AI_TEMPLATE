@@ -338,6 +338,17 @@ class AdoptTests(Scratch):
         update = self.cli("kit-update", "--kit", str(TOOLS.parent))
         self.assertIn("0 updated, 0 added, 0 removed, 0 to merge", update.stdout, update.stdout + update.stderr)
 
+    def test_adopt_never_licenses_a_project_that_has_no_license(self) -> None:
+        """#60: a license is the adopter's legal choice; the kit's MIT text must not appear by default."""
+        self.git("rm", "-q", "LICENSE")
+        self.git("commit", "-qm", "drop license")
+        result = self.adopt()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse((self.root / "LICENSE").exists(), "the kit's LICENSE must not be copied")
+        self.assertIn('license = "UNSELECTED"', (self.root / "project.toml").read_text())
+        self.assertIn("UNSELECTED", result.stdout)
+        self.assertNotIn("LICENSE", json.loads((self.root / "tools/kit-lock.json").read_text())["files"])
+
     def test_adopt_refuses_uncommitted_work(self) -> None:
         (self.root / "notes/new.py").write_text("X = 1\n")
         self.assertIn("commit or stash", self.adopt().stderr)
