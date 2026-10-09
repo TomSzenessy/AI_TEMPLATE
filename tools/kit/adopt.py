@@ -28,7 +28,7 @@ from . import derive
 from .bootstrap import initialize_project
 from .core import RepoctlError, repository_files
 from .gitinfo import git
-from .kitlock import colliding_targets, kit_paths, render_kit_makefile, write_lock
+from .kitlock import colliding_targets, kit_paths, RENAMED_TEXT, project_path, rename_mentions, renamed_targets, render_kit_makefile, write_lock
 
 H1 = re.compile(r"(?m)^# (.+)$")
 INDEX_LINE = re.compile(r"<!--\s*index:")
@@ -41,7 +41,7 @@ def merge_makefile(target: Path, kit_makefile: str) -> list[str]:
     (target / "kit.mk").write_text(render_kit_makefile(project_makefile, kit_makefile), encoding="utf-8")
     if not re.search(r"(?m)^-?include\s+kit\.mk\s*$", project_makefile):
         separator = "" if project_makefile.endswith("\n") else "\n"
-        include = "\n# Agent kit: make start, make next, make done (see AGENTS.md)\ninclude kit.mk\n"
+        include = ("\n# Agent kit: " + rename_mentions("make start, make next, make done", renamed) + " (see AGENTS.md)\ninclude kit.mk\n")
         (target / "Makefile").write_text(project_makefile + separator + include, encoding="utf-8")
     return renamed
 
@@ -112,7 +112,9 @@ def adopt(target: Path, kit: Path, name: str, kind: str, owner: str | None) -> N
         raise RepoctlError("commit or stash the existing changes first, so the adoption is one reviewable change")
     before = set((git(target, "ls-files", "-z") or "").split("\0")) - {""}
     copied, kept, merged = [], [], []
-    renamed: list[str] = []
+    renamed: list[str] = []  # known before any file is written, so every mention agrees with kit.mk
+    if (target / "Makefile").is_file() and (kit / "Makefile").is_file():
+        renamed = colliding_targets((target / "Makefile").read_text(encoding="utf-8"), (kit / "Makefile").read_text(encoding="utf-8"))
     for relative in repository_files(kit, walk=False):  # template-only material too; init prunes it as make init does
         source, destination = kit / relative, target / relative
         if relative.startswith(".github/workflows/") and destination.exists():
@@ -133,7 +135,7 @@ def adopt(target: Path, kit: Path, name: str, kind: str, owner: str | None) -> N
             text = destination.read_text(encoding="utf-8")
             if "<!-- repoctl:project-readme -->" not in text:
                 block = (f"\n<!-- repoctl:project-readme -->\n> Project initialized: **{name}** (`{kind}`). Agents start "
-                         "with [`AGENTS.md`](./AGENTS.md): `make start`, `make next`, `make done`.\n")
+                         + rename_mentions("with [`AGENTS.md`](./AGENTS.md): `make start`, `make next`, `make done`.\n", renamed))
                 destination.write_text(text + ("" if text.endswith("\n") else "\n") + block, encoding="utf-8")
             merged.append("README.md (identity block appended)")
         elif relative == "docs/README.md":
@@ -146,9 +148,16 @@ def adopt(target: Path, kit: Path, name: str, kind: str, owner: str | None) -> N
             kept.append(relative)
     indexed = index_existing_docs(target, before)
     initialize_project(target, name, kind, owner, mode="adopt")
+    shipped = kit_paths(kit)  # your kept files are never kit files; only the kit's version of them is remembered
+    targets = renamed_targets(target)
+    for relative in [*shipped, "project.toml"]:  # prose follows the renamed targets (make kit-update renders the same way)
+        path = target / project_path(target, relative)  # a renamed workflow, never the project's own
+        if relative.endswith(RENAMED_TEXT) and relative not in kept and path.is_file():
+            text = path.read_text(encoding="utf-8")
+            if rename_mentions(text, targets) != text:
+                path.write_text(rename_mentions(text, targets), encoding="utf-8")
     license_note = keep_project_license(target, (target / "LICENSE").is_file())
     derive.sync(target)
-    shipped = kit_paths(kit)  # your kept files are never kit files; only the kit's version of them is remembered
     write_lock(target, kit, [path for path in shipped if path not in kept], [path for path in kept if path in shipped])
     print(f"Adopted the agent kit: {len(copied)} file(s) added, {len(merged)} merged, {len(kept)} of yours kept.")
     for item in merged:

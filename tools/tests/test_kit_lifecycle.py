@@ -349,6 +349,39 @@ class AdoptTests(Scratch):
         self.assertIn("UNSELECTED", result.stdout)
         self.assertNotIn("LICENSE", json.loads((self.root / "tools/kit-lock.json").read_text())["files"])
 
+    def test_a_renamed_target_is_renamed_in_every_kit_authored_mention(self) -> None:
+        """#62: the project's `start` target boots a game server; nothing the kit wrote may tell an
+        agent to run it or pre-approve it."""
+        makefile = self.root / "Makefile"
+        makefile.write_text(makefile.read_text() + "\nstart:\n\t@echo boot the game server\n")
+        self.git("commit", "-qam", "start target")
+        result = self.adopt()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("kit-start", result.stdout)
+        stale = re.compile(r"make start(?![\w-])")
+        skipped = {"Makefile", "tools/kit-lock.json"}
+        for relative in self.git("ls-files", "-co", "--exclude-standard").splitlines():
+            if relative in skipped or not relative.endswith((".md", ".json", ".toml", ".mk", ".yml")):
+                continue
+            if relative.startswith("tools/tests/") or relative.startswith("notes/"):
+                continue
+            text = (self.root / relative).read_text(errors="replace")
+            self.assertIsNone(stale.search(text), f"{relative} still says `make start`")
+        settings = json.loads((self.root / ".claude/settings.json").read_text())
+        allowed = settings["permissions"]["allow"]
+        self.assertIn("Bash(make kit-start)", allowed)
+        self.assertNotIn("Bash(make start)", allowed)
+        self.assertIn("make kit-start", (self.root / "AGENTS.md").read_text())
+        brief = self.cli("hook", "session-start")
+        self.assertIsNone(stale.search(brief.stdout), brief.stdout)
+        self.assertEqual(self.cli("sync").returncode, 0)
+        self.assertIn("Bash(make kit-start)", (self.root / ".claude/settings.json").read_text(), "sync keeps the rename")
+        self.assertNotIn("Bash(make start)", (self.root / ".claude/settings.json").read_text())
+        self.git("add", "-A")
+        self.git("commit", "-qm", "adopt")
+        update = self.cli("kit-update", "--kit", str(TOOLS.parent))
+        self.assertIn("0 updated, 0 added, 0 removed, 0 to merge", update.stdout, update.stdout + update.stderr)
+
     def test_adopt_refuses_uncommitted_work(self) -> None:
         (self.root / "notes/new.py").write_text("X = 1\n")
         self.assertIn("commit or stash", self.adopt().stderr)

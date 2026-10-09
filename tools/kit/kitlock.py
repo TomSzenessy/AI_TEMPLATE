@@ -28,6 +28,28 @@ def colliding_targets(project_makefile: str, kit_makefile: str) -> list[str]:
     return sorted(name for name in set(MAKE_TARGET.findall(kit_makefile)) & ours if not name.startswith("."))
 
 
+def renamed_targets(root: Path) -> list[str]:
+    """The kit targets this project runs as `kit-<name>`: the one table behind every kit-authored
+    mention. Read from the files (the project's Makefile defines <name>, `kit.mk` defines `kit-<name>`),
+    so adopt, `make sync`, and the session brief cannot disagree about it."""
+    try:
+        ours = set(MAKE_TARGET.findall((root / "Makefile").read_text(encoding="utf-8")))
+        kit = set(MAKE_TARGET.findall((root / "kit.mk").read_text(encoding="utf-8")))
+    except OSError:
+        return []
+    return sorted(name for name in ours - kit if not name.startswith(".") and f"kit-{name}" in kit)
+
+
+RENAMED_TEXT = (".md", ".toml", ".yml", ".yaml", ".json")  # kit prose and config that names `make <target>`
+
+
+def rename_mentions(text: str, names: list[str]) -> str:
+    """`make <name>` becomes `make kit-<name>` in prose, allowlists, and generated text."""
+    for name in names:
+        text = re.sub(rf"\bmake {re.escape(name)}(?![\w-])", f"make kit-{name}", text)
+    return text
+
+
 def rename_kit_targets(project_makefile: str, kit_text: str) -> str:
     """Kit targets the project's Makefile already defines become kit-<name>, wherever they are named."""
     renamed = colliding_targets(project_makefile, kit_text)
@@ -171,10 +193,17 @@ def _new_content(kit: Path, root: Path, path: str) -> bytes:
     if path == "Makefile" and project_path(root, path) == "kit.mk":
         ours = (root / "Makefile").read_text(encoding="utf-8") if (root / "Makefile").is_file() else ""
         return render_kit_makefile(ours, (kit / path).read_text(encoding="utf-8")).encode()
-    if path.endswith(".md"):  # the same localization make init applied when the project was made
+    if path.endswith(".md"):  # the same localization make init applied when the project was made, plus adopt's target renames
         template = load_project(kit).get("template", {})
         prune = list(template.get("prune", [])) if isinstance(template, dict) else []
         pruned = {file for file in repository_files(kit) if any(path_matches(file, pattern) for pattern in prune)}
         source = str(template.get("source", "")).rstrip("/") if isinstance(template, dict) else ""
-        return localize_text(path, (kit / path).read_text(encoding="utf-8"), pruned, prune, source).encode()
-    return (kit / path).read_bytes()
+        text = localize_text(path, (kit / path).read_text(encoding="utf-8"), pruned, prune, source)
+        return rename_mentions(text, renamed_targets(root)).encode()
+    content = (kit / path).read_bytes()
+    if path.endswith(RENAMED_TEXT):
+        try:
+            return rename_mentions(content.decode("utf-8"), renamed_targets(root)).encode()
+        except UnicodeDecodeError:
+            pass
+    return content

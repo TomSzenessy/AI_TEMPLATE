@@ -15,6 +15,7 @@ from pathlib import Path
 
 from .core import RepoctlError, load_project
 from .gitinfo import git, is_repository
+from .kitlock import rename_mentions, renamed_targets
 from .names import AFTER_EDIT, PRE_COMPACT, SESSION_START, STOP
 from .registry import Registry, yaml_string
 
@@ -47,7 +48,8 @@ def claude_settings(root: Path) -> tuple[dict[str, str], dict[str, str], list[st
     claude = claude if isinstance(claude, dict) else {}
     models = {**CLAUDE_MODELS, **claude.get("models", {})}
     tools = {**CLAUDE_TOOLS, **claude.get("tools", {})}
-    allow = list(claude.get("allow", CLAUDE_ALLOWED_COMMANDS))
+    renamed = renamed_targets(root)  # an adopted project runs a colliding kit target as kit-<name>
+    allow = list(claude["allow"]) if "allow" in claude else [rename_mentions(command, renamed) for command in CLAUDE_ALLOWED_COMMANDS]
     return models, tools, allow
 
 

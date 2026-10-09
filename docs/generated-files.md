@@ -9,7 +9,7 @@ Nothing that can be generated is maintained by hand. `make sync` (also run by
 | Derived | Single source |
 |---|---|
 | `.claude/skills/*`, `.claude/agents/*` (redirect stubs) | `.agents/skills/*/SKILL.md`, `.agents/agents/*.md` frontmatter |
-| `.claude/settings.json` (hooks, pre-approved kit commands) | the kit, plus optional `project.toml [adapters.claude]` |
+| `.claude/settings.json` (hooks, pre-approved kit commands) | the kit, plus optional `project.toml [adapters.claude]`; in an adopted project a command whose target was renamed `kit-<name>` is pre-approved under that name ([`ADAPTATION.md`](./ADAPTATION.md)) |
 | `.mcp.json` | `.agents/mcp/*.toml` routes of enabled packs (servers are still approved per person) |
 | The command block in the `Makefile` (`kit.mk` after `make adopt`) and `make help` | each `@command` declaration in `tools/kit/commands.py` and `.agents/commands/` |
 | The project rules block in `AGENTS.md` | `.agents/rules/*.md` without a `scope` |
