@@ -58,13 +58,14 @@ def update(root: Path, kit: Path) -> int:
     kept: dict[str, str] = dict(lock.get("kept", {}))  # type: ignore[arg-type]
     bases: dict[str, str] = dict(lock.get("bases", {}))  # type: ignore[arg-type]
     merged: dict[str, str] = dict(lock.get("merged", {}))  # type: ignore[arg-type]
+    moved: dict[str, str] = dict(lock.get("moved", {}))  # type: ignore[arg-type]
     new_paths = kit_paths(kit)
     updated, added, removed, conflicts = [], [], [], []
     files: dict[str, str] = {}
     # A conflict is reported once per kit change: the lock then remembers the version offered, so an
     # unchanged kit stays quiet about a file the project chose to keep its way.
     for path in new_paths:
-        local = project_path(root, path)
+        local = project_path(root, path, moved)
         target = root / local
         content = _new_content(kit, root, path, merged)
         offered = digest_bytes(content)
@@ -96,7 +97,7 @@ def update(root: Path, kit: Path) -> int:
                 bases.setdefault(path, locked[path])
         files[path] = offered
     for path in sorted(set(locked) - set(new_paths)):
-        local = project_path(root, path)
+        local = project_path(root, path, moved)
         target = root / local
         if target.is_file() and digest(target) == locked[path]:
             target.unlink()
@@ -105,7 +106,8 @@ def update(root: Path, kit: Path) -> int:
             conflicts.append(f"{local} (removed from the kit; yours was changed, so it stays)")
     kept = {path: value for path, value in kept.items() if path in new_paths}
     _save_lock(root, _kit_version(kit), files, kept, {path: value for path, value in bases.items() if path in files},
-               {path: value for path, value in merged.items() if path in files})
+               {path: value for path, value in merged.items() if path in files},
+               {path: value for path, value in moved.items() if path in new_paths})
     derive.sync(root)
     before = str(lock["kit_version"])
     origin = "no version recorded before" if before in ("unknown", "none") else f"was {before[:12]}"

@@ -161,9 +161,11 @@ def _kit_version(kit: Path) -> str:
     return (git(kit, "rev-parse", "HEAD") or "").strip() or "unknown"
 
 
-def project_path(root: Path, path: str) -> str:
-    """Where a kit file lives in this project: adopted projects keep the kit Makefile as kit.mk and
-    colliding workflows as kit-<name>."""
+def project_path(root: Path, path: str, moved: dict[str, str] | None = None) -> str:
+    """Where a kit file lives in this project: adopted projects keep the kit Makefile as kit.mk,
+    colliding workflows as kit-<name>, and a file that collided by case under the name adopt gave it (`moved`)."""
+    if moved and path in moved:
+        return moved[path]
     if path == "Makefile" and (root / "kit.mk").is_file():
         return "kit.mk"
     if path.startswith(".github/workflows/"):
@@ -174,17 +176,20 @@ def project_path(root: Path, path: str) -> str:
 
 
 def write_lock(root: Path, kit: Path, paths: list[str] | None = None, kept: list[str] = (),
-               merged: dict[str, str] | None = None) -> None:
+               merged: dict[str, str] | None = None, moved: dict[str, str] | None = None) -> None:
     """Record what the project now has from the kit (init and adopt). `kept` are the project's own files
     at kit paths (make adopt never overwrites them); only the kit's version of those is remembered."""
     shipped = paths if paths is not None else kit_paths(kit)
-    files = {path: digest(root / project_path(root, path)) for path in shipped if (root / project_path(root, path)).is_file()}
+    moved = moved or {}
+    files = {path: digest(root / project_path(root, path, moved)) for path in shipped
+             if (root / project_path(root, path, moved)).is_file()}
     _save_lock(root, _kit_version(kit), files, {path: digest_bytes(_new_content(kit, root, path)) for path in kept},
-               merged=merged)
+               merged=merged, moved=moved)
 
 
 def _save_lock(root: Path, version: str, files: dict[str, str], kept: dict[str, str],
-               bases: dict[str, str] | None = None, merged: dict[str, str] | None = None) -> None:
+               bases: dict[str, str] | None = None, merged: dict[str, str] | None = None,
+               moved: dict[str, str] | None = None) -> None:
     previous = read_lock(root) if (root / LOCK).is_file() else {}
     if version == "unknown" and previous.get("kit_version") not in (None, "none", "unknown"):
         version = str(previous["kit_version"])  # a non-git kit checkout does not erase a known version
@@ -193,6 +198,8 @@ def _save_lock(root: Path, version: str, files: dict[str, str], kept: dict[str, 
         data["kept"] = dict(sorted(kept.items()))
     if merged:  # kit files that hold the project's own content too (AGENTS.md): only the kit part is refreshed
         data["merged"] = dict(sorted(merged.items()))
+    if moved:  # kit files adopt had to save under another name (a case-only clash with the project's own file)
+        data["moved"] = dict(sorted(moved.items()))
     if bases:  # conflicted files: the version they had from the kit before the project's edit
         data["bases"] = dict(sorted(bases.items()))
     (root / LOCK).parent.mkdir(parents=True, exist_ok=True)
