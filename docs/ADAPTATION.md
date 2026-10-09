@@ -98,7 +98,10 @@ internal consolidation and one recorded fact, same gate behaviour.
 2. If `make init` created `template-bootstrap`, replace it with the first real
    surface before treating verification as product evidence.
 3. Run `make inventory` and classify each candidate as product, infrastructure,
-   generated output, or unresolved.
+   generated output, or unresolved. A top-level directory is a candidate only
+   when git lists at least one tracked or untracked-but-not-ignored file under
+   it, so a directory holding only ignored caches (such as a leftover `.gocache`)
+   is not reported.
    Test and example folders (`tests/`, `test/`, `e2e/`, `__tests__/`, `spec/`,
    `fixtures/`, `examples/`, `test-results/`, `playwright-report/`) count as
    infrastructure by default; ambiguous ones such as `scripts/` or `config/`

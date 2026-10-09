@@ -37,7 +37,7 @@ so every freshness rule agrees across machines (a "not in the future" rule
 compares with `core.latest_today`, UTC+14, so a local date always passes; `core.date_out_of_policy` is the one staleness policy), `checkrun.run_checks` is the one place a finding becomes blocking (gates name checks; a project may downgrade one in `[checks]`, validated by `registry.check_overrides`; `core.hygiene_allowlist` is the one parser of `[checks.file-hygiene] allow_paths`, which exempts single paths without downgrading the check, and `core.CODE_CONTENT_PATTERNS` is the literal-only credential scan used on tracked files), `registry.KINDS` and
 `session.HOOK_EVENTS` are the single lists their users derive from, and
 `structure` validates the vision and stack-decision records through one
-`_check_record`. Behavior lives in standard-library modules under `tools/kit/`
+`_check_record`. `structure.discover_candidate_surfaces` lists a top-level directory as a product-surface candidate only when `core.repository_files` lists a tracked or untracked-but-not-ignored file beneath it, so a directory holding only git-ignored output (a leftover `.gocache`) is not a candidate; outside git nothing is known to be ignored. Behavior lives in standard-library modules under `tools/kit/`
 whose imports point toward the leaves (`gitinfo`, `names`, `helptext`) and never form a cycle:
 `tools/tests/test_import_graph.py` fails on any, function-local imports included. Only the lazy
 dispatch imports in `commands` are exempt, kept so `repoctl help` starts fast:
