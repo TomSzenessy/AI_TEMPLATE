@@ -9,9 +9,12 @@ from pathlib import Path, PureWindowsPath
 from urllib.parse import unquote, urlsplit
 
 from .docsync import INDEX_SKIP
+from .gitinfo import path_matches
 from .core import (
     RepoctlError,
     check_failed,
+    code_secret_matches,
+    hygiene_allowlist,
     INLINE_CODE,
     ensure_inside_root,
     has_link_component,
@@ -19,7 +22,6 @@ from .core import (
     markdown_link_target,
     markdown_without_fenced_code,
     read_utf8,
-    secret_matches,
     worktree_files,
 )
 
@@ -117,13 +119,38 @@ def check_docs_index(root: Path) -> None:
         raise check_failed("documentation index", errors)
 
 
-def check_file_hygiene(root: Path) -> None:
+def exempted_paths(root: Path, allowed: list[tuple[str, str]]) -> tuple[dict[str, str], list[str]]:
+    """({path: reason} for each file a `[checks.file-hygiene] allow_paths` glob exempts, the globs that match no file)."""
+    exempt: dict[str, str] = {}
+    used: set[str] = set()
+    for path in worktree_files(root):
+        relative = path.relative_to(root).as_posix()
+        for glob, reason in allowed:
+            if path_matches(relative, glob):
+                exempt.setdefault(relative, reason)
+                used.add(glob)
+    return exempt, [glob for glob, _ in allowed if glob not in used]
+
+
+def allowed_path_notes(root: Path, allowed: list[tuple[str, str]]) -> list[str]:
+    """The advisory lines that keep every exemption visible: each exempt file with its reason, and each dead glob."""
+    exempt, unused = exempted_paths(root, allowed)
+    notes = [f"exempt from credential and .env findings by project.toml allow_paths: {path} ({reason})"
+             for path, reason in sorted(exempt.items())]
+    notes += [f"allow_paths glob matches no file: {glob} (delete the entry)" for glob in unused]
+    return notes
+
+
+def check_file_hygiene(root: Path, allowed: list[tuple[str, str]] | None = None) -> None:
     errors: list[str] = []
     notes: list[str] = []
+    exempt = exempted_paths(root, allowed or [])[0]
     for path in worktree_files(root):
         relative = path.relative_to(root).as_posix()
         if is_link_like(path) or has_link_component(root, path):
             errors.append(f"symlink or reparse point must stay inside the repository: {relative}")
+            continue
+        if relative in exempt:
             continue
         name = path.name.lower()
         allowed_environment_suffixes = (".example", ".sample", ".template")
@@ -188,7 +215,7 @@ def scan_file_for_secrets(path: Path) -> tuple[list[str], bool]:
                     return list(found), True
                 scanned += len(data)
                 buffer = carry + data
-                for label in secret_matches(buffer.decode(codec, errors="ignore")):
+                for label in code_secret_matches(buffer.decode(codec, errors="ignore")):
                     found.setdefault(label)
                 carry = buffer[-SCAN_OVERLAP_BYTES:]
             return list(found), not handle.read(1)

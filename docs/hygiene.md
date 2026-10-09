@@ -42,6 +42,11 @@ checked rather than hoped for.
 - `host-read-config` **advises** on files only a host convention reads (editor,
   git, hosting, scanner config), for the same reason.
 
+- `file-hygiene` blocks tracked secrets (`.env*`, key files, literal credentials);
+  `file-hygiene-allowed` **advises** with every path a project exempted through
+  `[checks.file-hygiene] allow_paths`, and its reason
+  ([`capabilities.md`](./capabilities.md#exempting-one-path-from-file-hygiene)).
+
 ## Structure you can see
 
 - `change-coupling` **advises**, from recent git history, when two areas keep

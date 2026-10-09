@@ -35,6 +35,10 @@ copy it into every prompt.
   untrusted.
 - Keep secrets out of source, images, fixtures, logs, issues, analytics, and
   client bundles. Use a secret manager or CI secrets, rotate, scope, and audit.
+  The blocking `file-hygiene` check enforces this on tracked files; a deliberate
+  exception (a public key file, a test key fixture) is declared per path with a
+  reason in `[checks.file-hygiene] allow_paths` and stays listed as an advisory
+  ([`capabilities.md`](./capabilities.md#exempting-one-path-from-file-hygiene)).
 - Hash passwords with a password-specific KDF; use constant-time comparison
   for secret/token checks. Choose modern, reviewed crypto rather than bespoke
   algorithms.

@@ -243,6 +243,59 @@ SENSITIVE_CONTENT_PATTERNS = {
     ),
 }
 
+# Source code names credentials constantly (`token = os.environ[...]`, `Authorization: Bearer ${token}`), so the
+# tracked-file scan flags a credential only when a secret-looking LITERAL is assigned. Prose (issue bodies,
+# evidence) keeps the stricter patterns above, where there is no variable to read instead.
+_CREDENTIAL_NAME = r"(?:api[_-]?key|password|passwd|access[_-]?token|client[_-]?secret|token|secret)"
+_LITERAL_VALUE = r"(?=[\w\-+/=.]*\d)[\w\-+/=.]{16,}"  # one unbroken run with a digit: not an identifier, call, or template
+CODE_CONTENT_PATTERNS = {
+    **SENSITIVE_CONTENT_PATTERNS,
+    "authorization credential": re.compile(
+        r"(?i)\b(?:proxy-)?authorization[\"']?\s*:\s*[\"']?(?:bearer|basic)\s+(?=[\w.~+/=-]*\d)[\w.~+/=-]{16,}"
+    ),
+    "credential assignment": re.compile(
+        rf"{_CREDENTIAL_NAME}[\w-]*[\"']?\s*[:=]\s*[rbf]?([\"'])(?![A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\1){_LITERAL_VALUE}\1"  # quoted literal, not an ENV_VAR name
+        rf"|^[ \t]*(?:export[ \t]+)?[\w.-]*{_CREDENTIAL_NAME}[\w-]*[ \t]*[:=][ \t]*{_LITERAL_VALUE}[ \t]*(?:#.*)?$",  # env/ini line
+        re.I | re.M,
+    ),
+}
+
+
+def code_secret_matches(content: str) -> list[str]:
+    return [label for label, pattern in CODE_CONTENT_PATTERNS.items() if pattern.search(content)]
+
+
+def hygiene_allowlist(project: dict[str, object]) -> list[tuple[str, str]]:
+    """(glob, reason) for each `[checks.file-hygiene] allow_paths` entry; the reason is mandatory.
+
+    The one parser: the manifest validation and the check both read it, so a malformed entry stops
+    `make check` instead of silently exempting (or failing to exempt) a file.
+    """
+    table = project.get("checks")
+    entry = table.get("file-hygiene") if isinstance(table, dict) else None
+    if not isinstance(entry, dict) or "allow_paths" not in entry:
+        return []
+    where = "project.toml [checks.file-hygiene] allow_paths"
+    items = entry["allow_paths"]
+    if not isinstance(items, list):
+        raise RepoctlError(f'{where} must be a list of {{ glob = "...", reason = "..." }} tables')
+    allowed: list[tuple[str, str]] = []
+    for position, item in enumerate(items, 1):
+        label = f"{where} entry {position}"
+        if not isinstance(item, dict):
+            raise RepoctlError(f'{label} must be a table with glob and reason, e.g. {{ glob = "site/.env.production", reason = "..." }}')
+        if set(item) - {"glob", "reason"}:
+            raise RepoctlError(f"{label} accepts only glob and reason")
+        glob, reason = item.get("glob"), item.get("reason")
+        if not isinstance(glob, str) or not glob.strip():
+            raise RepoctlError(f"{label} needs a glob (the path or pattern to exempt)")
+        if glob.strip().strip("/") in {"*", "**", "."}:
+            raise RepoctlError(f"{label}: a glob that exempts everything would turn the check off; name the file")
+        if not isinstance(reason, str) or len(reason.strip()) < 10:
+            raise RepoctlError(f"{label}: a reason is required (10+ characters): why this path may hold or name credentials")
+        allowed.append((glob.strip(), " ".join(reason.split())))
+    return allowed
+
 
 def worktree_files(root: Path, *, walk: bool = True) -> list[Path]:
     """Tracked plus untracked-not-ignored paths when `root` is a repository's top level.
