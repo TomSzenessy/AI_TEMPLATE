@@ -103,6 +103,8 @@ def run_headless(command: list[str], cwd: Path, timeout: int, stdout=None,
             process.communicate()
             raise
         kill_group(process)  # nothing the agent backgrounded outlives the run
+        if process.returncode is None:
+            process.wait()  # reap the leader after a grace-period kill, so no zombie and a real return code
         return subprocess.CompletedProcess(command, process.returncode, out, err)
     finally:
         if previous is not None:

@@ -214,6 +214,7 @@ def analyze_transcript(transcript: Path) -> dict[str, object]:
         "bypasses": bypasses,
         "final_message": str(results[-1].get("result", "")) if results else "",
         "host_error": bool(results) and bool(results[-1].get("is_error")),
+        "results": len(results),
     }
 
 
@@ -249,17 +250,21 @@ def project_state(project: Path) -> dict[str, object]:
 
 
 def verdict(analysis: dict[str, object], state: dict[str, object]) -> str:
-    """Pass only on a green change-set gate and make check with no gate bypassed (#21).
+    """Pass only when the agent finished on its own, the gates are green, and nothing was bypassed (#21).
 
-    A bypass fails the run even when every check passes: the benchmark measures the kit's
-    gates, and an agent that went around one has not shown they hold.
+    An untouched or half-built project passes `make check` and `finish`, so the gates alone prove
+    nothing about a run that never ran, timed out, or was stopped by the host.
     """
+    final = " ".join(str(analysis.get("final_message", "")).split())[:120]
+    if not analysis.get("results"):
+        return "no run (the agent produced no final result: timed out, killed, or no output)"
     if analysis.get("host_error") and not analysis.get("cost_usd"):
-        # A host failure (expired login, usage limit) leaves an untouched template that passes
-        # every check; that is no evidence about the kit (a 2026-10-08 Sonnet run read "pass").
-        final = " ".join(str(analysis.get("final_message", "")).split())[:120]
         return f"no run (the agent did not work: {final or 'no output'})"
     reasons = []
+    if analysis.get("host_error"):
+        reasons.append(f"stopped by the host: {final or 'error'}")
+    elif not analysis.get("completed"):
+        reasons.append("the agent did not finish")
     if analysis.get("bypasses"):
         reasons.append("gate bypassed with --no-verify")
     if state.get("check_passed") is not True:
