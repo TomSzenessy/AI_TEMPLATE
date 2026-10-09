@@ -10,7 +10,11 @@ the project owns, then runs the same initialization:
   the project already defines renamed `kit-<name>`), `.gitignore` (missing
   lines appended), `README.md` (the identity block appended), `docs/README.md`
   (the generated index appended), and workflows (written as `kit-<name>`);
+- `AGENTS.md` is merged: the kit router first, the project's file verbatim beneath it, the budget raised to fit;
 - the project's existing docs get an index line so `make check` can route them;
+- a kit file that differs from a project file only by case is never skipped or recorded as the project's: it is
+  installed under its own name where the filesystem allows, else saved as `kit-<name>` and reported;
+- the kit's LICENSE is never copied into a repository without one (its manifest label is `UNSELECTED`);
 - everything else that collides is kept as the project's and listed.
 
 Run it from the existing repository: `make -f <kit>/Makefile adopt KIT=<kit>`
@@ -19,6 +23,7 @@ or `python3 <kit>/tools/repoctl.py --root . adopt --from <kit> --name ... --kind
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 from pathlib import Path
@@ -27,7 +32,7 @@ from . import derive
 from .bootstrap import initialize_project
 from .core import RepoctlError, repository_files
 from .gitinfo import git
-from .kitlock import colliding_targets, kit_paths, render_kit_makefile, write_lock
+from .kitlock import AGENTS_MERGE, _new_content, colliding_targets, kit_paths, RENAMED_TEXT, merge_agents, project_path, rename_mentions, renamed_targets, render_kit_makefile, write_lock
 
 H1 = re.compile(r"(?m)^# (.+)$")
 INDEX_LINE = re.compile(r"<!--\s*index:")
@@ -40,7 +45,7 @@ def merge_makefile(target: Path, kit_makefile: str) -> list[str]:
     (target / "kit.mk").write_text(render_kit_makefile(project_makefile, kit_makefile), encoding="utf-8")
     if not re.search(r"(?m)^-?include\s+kit\.mk\s*$", project_makefile):
         separator = "" if project_makefile.endswith("\n") else "\n"
-        include = "\n# Agent kit: make start, make next, make done (see AGENTS.md)\ninclude kit.mk\n"
+        include = ("\n# Agent kit: " + rename_mentions("make start, make next, make done", renamed) + " (see AGENTS.md)\ninclude kit.mk\n")
         (target / "Makefile").write_text(project_makefile + separator + include, encoding="utf-8")
     return renamed
 
@@ -90,13 +95,46 @@ def keep_project_license(target: Path, project_had_one: bool) -> str | None:
     manifest = target / "project.toml"
     text = manifest.read_text(encoding="utf-8")
     if not project_had_one:
-        if (target / "LICENSE").exists():
-            return "no LICENSE of yours: the kit's LICENSE was copied; replace it with your own and set license in project.toml"
-        return None
+        manifest.write_text(re.sub(r'(?m)^license\s*=\s*"[^"]*"', 'license = "UNSELECTED"', text, count=1), encoding="utf-8")
+        return ('no LICENSE of yours: none was added (a license is your choice, not the kit\'s); '
+                'license = "UNSELECTED" in project.toml until you add a LICENSE and set it')
     head = (target / "LICENSE").read_text(encoding="utf-8", errors="replace")[:400]
     label = next((spdx for marker, spdx in LICENSES if marker.lower() in head.lower()), "UNSELECTED")
     manifest.write_text(re.sub(r'(?m)^license\s*=\s*"[^"]*"', f'license = "{label}"', text, count=1), encoding="utf-8")
     return f"license label set to {label} from your LICENSE" + (" (set it by hand)" if label == "UNSELECTED" else "")
+
+
+MERGED_AT_COLLISION = ("Makefile", ".gitignore", "README.md", "docs/README.md", "AGENTS.md")
+
+
+def free_name(parent: Path, wanted: str) -> str:
+    names = set(os.listdir(parent))
+    candidate, counter = wanted, 1
+    while candidate in names:
+        counter += 1
+        candidate = f"{Path(wanted).stem}-{counter}{Path(wanted).suffix}"
+    return candidate
+
+
+BUDGET_LINE = re.compile(r'(?m)^"AGENTS\.md"\s*=\s*(\d+)[^\n]*$')
+BUDGET_STEP = 500
+
+
+def merge_project_agents(target: Path, kit: Path, project: bytes) -> str:
+    """Router first (as `make kit-update` renders it), the project's own AGENTS.md verbatim beneath it;
+    the AGENTS.md byte budget is raised to fit, so the first `make check` does not reject the merge."""
+    merged = merge_agents(_new_content(kit, target, "AGENTS.md"), project)
+    (target / "AGENTS.md").write_bytes(merged)
+    note = "AGENTS.md: the kit router is first and your file is kept verbatim under 'Project contract'"
+    manifest = target / "project.toml"
+    text = manifest.read_text(encoding="utf-8")
+    found = BUDGET_LINE.search(text)
+    if found and int(found.group(1)) < len(merged):
+        needed = -(-(len(merged) + BUDGET_STEP) // BUDGET_STEP) * BUDGET_STEP
+        line = f'"AGENTS.md" = {needed}  # raised by make adopt to fit the merged router + your contract; trim yours to lower it'
+        manifest.write_text(text[:found.start()] + line + text[found.end():], encoding="utf-8")
+        note += f"; project.toml [budgets] AGENTS.md raised {found.group(1)} -> {needed} bytes to fit it"
+    return note
 
 
 def adopt(target: Path, kit: Path, name: str, kind: str, owner: str | None) -> None:
@@ -111,11 +149,39 @@ def adopt(target: Path, kit: Path, name: str, kind: str, owner: str | None) -> N
         raise RepoctlError("commit or stash the existing changes first, so the adoption is one reviewable change")
     before = set((git(target, "ls-files", "-z") or "").split("\0")) - {""}
     copied, kept, merged = [], [], []
-    renamed: list[str] = []
+    collisions: list[str] = []
+    moved: dict[str, str] = {}
+    by_lower: dict[str, list[str]] = {}
+    for tracked in before:
+        by_lower.setdefault(tracked.lower(), []).append(tracked)
+    project_agents: bytes | None = None
+    renamed: list[str] = []  # known before any file is written, so every mention agrees with kit.mk
+    if (target / "Makefile").is_file() and (kit / "Makefile").is_file():
+        renamed = colliding_targets((target / "Makefile").read_text(encoding="utf-8"), (kit / "Makefile").read_text(encoding="utf-8"))
     for relative in repository_files(kit, walk=False):  # template-only material too; init prunes it as make init does
         source, destination = kit / relative, target / relative
         if relative.startswith(".github/workflows/") and destination.exists():
             destination = destination.with_name("kit-" + destination.name)
+        if relative == "LICENSE" and not destination.exists():
+            continue  # the kit's own license is not the adopter's to inherit
+        clash = next((other for other in by_lower.get(relative.lower(), ()) if other != relative), None)
+        if clash and relative not in before:  # the project has this path in another case
+            if relative in MERGED_AT_COLLISION or relative.startswith(".github/workflows/"):
+                collisions.append(f"{relative} vs your {clash} (merged into yours)")
+            else:
+                parent = destination.parent
+                exact = parent.is_dir() and destination.name in os.listdir(parent)
+                same_file = destination.exists() and not exact  # a case-insensitive filesystem: one file, two names
+                if same_file:
+                    destination = parent / free_name(parent, "kit-" + destination.name)
+                    moved[relative] = destination.relative_to(target).as_posix()
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, destination)
+                copied.append(destination.relative_to(target).as_posix())
+                collisions.append(f"{relative} vs your {clash}: " + (
+                    f"this filesystem ignores case, so the kit's file is saved as {moved[relative]}" if same_file
+                    else "installed beside yours under its own name (a case-insensitive checkout cannot hold both)"))
+                continue
         if not destination.exists():
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, destination)
@@ -124,13 +190,16 @@ def adopt(target: Path, kit: Path, name: str, kind: str, owner: str | None) -> N
             renamed = merge_makefile(target, source.read_text(encoding="utf-8"))
             note = f"; renamed: {', '.join('kit-' + n for n in renamed)}" if renamed else ""
             merged.append(f"Makefile (kit targets in kit.mk{note})")
+        elif relative == "AGENTS.md":
+            project_agents = destination.read_bytes()  # merged after init, which must not rewrite it
+            merged.append("AGENTS.md (kit router first, your file verbatim beneath it)")
         elif relative == ".gitignore":
             merged.append(f".gitignore ({merge_gitignore(target, source.read_text(encoding='utf-8'))} line(s) added)")
         elif relative == "README.md":
             text = destination.read_text(encoding="utf-8")
             if "<!-- repoctl:project-readme -->" not in text:
                 block = (f"\n<!-- repoctl:project-readme -->\n> Project initialized: **{name}** (`{kind}`). Agents start "
-                         "with [`AGENTS.md`](./AGENTS.md): `make start`, `make next`, `make done`.\n")
+                         + rename_mentions("with [`AGENTS.md`](./AGENTS.md): `make start`, `make next`, `make done`.\n", renamed))
                 destination.write_text(text + ("" if text.endswith("\n") else "\n") + block, encoding="utf-8")
             merged.append("README.md (identity block appended)")
         elif relative == "docs/README.md":
@@ -143,15 +212,30 @@ def adopt(target: Path, kit: Path, name: str, kind: str, owner: str | None) -> N
             kept.append(relative)
     indexed = index_existing_docs(target, before)
     initialize_project(target, name, kind, owner, mode="adopt")
-    license_note = keep_project_license(target, "LICENSE" in kept)
-    derive.sync(target)
     shipped = kit_paths(kit)  # your kept files are never kit files; only the kit's version of them is remembered
-    write_lock(target, kit, [path for path in shipped if path not in kept], [path for path in kept if path in shipped])
+    targets = renamed_targets(target)
+    for relative in [*shipped, "project.toml"]:  # prose follows the renamed targets (make kit-update renders the same way)
+        path = target / project_path(target, relative, moved)  # a renamed workflow or case-moved file, never the project's own
+        if relative.endswith(RENAMED_TEXT) and relative not in kept and path.is_file():
+            text = path.read_text(encoding="utf-8")
+            if rename_mentions(text, targets) != text:
+                path.write_text(rename_mentions(text, targets), encoding="utf-8")
+    agents_note = None
+    if project_agents is not None:
+        agents_note = merge_project_agents(target, kit, project_agents)
+    license_note = keep_project_license(target, (target / "LICENSE").is_file())
+    derive.sync(target)
+    write_lock(target, kit, [path for path in shipped if path not in kept], [path for path in kept if path in shipped],
+               {"AGENTS.md": AGENTS_MERGE} if project_agents is not None else None, moved)
     print(f"Adopted the agent kit: {len(copied)} file(s) added, {len(merged)} merged, {len(kept)} of yours kept.")
     for item in merged:
         print(f"  merged: {item}")
     if kept:
         print(f"  kept yours: {', '.join(kept[:12])}{' …' if len(kept) > 12 else ''}")
+    for item in collisions:
+        print(f"  case collision: {item}")
+    if agents_note:
+        print(f"  {agents_note}")
     if license_note:
         print(f"  {license_note}")
     if indexed:

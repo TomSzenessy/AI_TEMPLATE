@@ -284,7 +284,7 @@ class SecondPassTests(Scratch):
         self.assertTrue(any("collides" in item for item in errors), errors)
 
     @template_only  # adopts from the template checkout
-    def test_adopt_reports_renamed_workflow_and_copied_license(self) -> None:
+    def test_adopt_reports_renamed_workflow_and_leaves_license_unselected(self) -> None:
         import contextlib
         import io
         git_in(self.root, "init", "-q")
@@ -295,7 +295,8 @@ class SecondPassTests(Scratch):
         with contextlib.redirect_stdout(out):
             adopt.adopt(self.root, TOOLS.parent, "demo", "web", None)
         self.assertTrue((self.root / ".github/workflows/kit-ci.yml").is_file())
-        self.assertIn("no LICENSE of yours", out.getvalue())
+        self.assertFalse((self.root / "LICENSE").exists())
+        self.assertIn("UNSELECTED", out.getvalue())
 
 
 class RecordBindingTests(Scratch):

@@ -28,6 +28,28 @@ def colliding_targets(project_makefile: str, kit_makefile: str) -> list[str]:
     return sorted(name for name in set(MAKE_TARGET.findall(kit_makefile)) & ours if not name.startswith("."))
 
 
+def renamed_targets(root: Path) -> list[str]:
+    """The kit targets this project runs as `kit-<name>`: the one table behind every kit-authored
+    mention. Read from the files (the project's Makefile defines <name>, `kit.mk` defines `kit-<name>`),
+    so adopt, `make sync`, and the session brief cannot disagree about it."""
+    try:
+        ours = set(MAKE_TARGET.findall((root / "Makefile").read_text(encoding="utf-8")))
+        kit = set(MAKE_TARGET.findall((root / "kit.mk").read_text(encoding="utf-8")))
+    except OSError:
+        return []
+    return sorted(name for name in ours - kit if not name.startswith(".") and f"kit-{name}" in kit)
+
+
+RENAMED_TEXT = (".md", ".toml", ".yml", ".yaml", ".json")  # kit prose and config that names `make <target>`
+
+
+def rename_mentions(text: str, names: list[str]) -> str:
+    """`make <name>` becomes `make kit-<name>` in prose, allowlists, and generated text."""
+    for name in names:
+        text = re.sub(rf"\bmake {re.escape(name)}(?![\w-])", f"make kit-{name}", text)
+    return text
+
+
 def rename_kit_targets(project_makefile: str, kit_text: str) -> str:
     """Kit targets the project's Makefile already defines become kit-<name>, wherever they are named."""
     renamed = colliding_targets(project_makefile, kit_text)
@@ -116,13 +138,34 @@ def kit_paths(kit: Path) -> list[str]:
             and not any(path_matches(path, pattern) for pattern in (*PROJECT_OWNED, *prune))]
 
 
+AGENTS_MERGE = "adopted-agents"  # marker name of the project part inside a merged AGENTS.md
+_AGENTS_PART = re.compile(rb"(?s)<!-- repoctl:" + AGENTS_MERGE.encode() + rb" -->\n(.*)<!-- /repoctl:" + AGENTS_MERGE.encode() + rb" -->")
+AGENTS_HEADING = (b"\n## Project contract (your AGENTS.md from before the kit, kept verbatim)\n\n"
+                  b"Owned by the project: `make kit-update` refreshes only the router above this heading.\n\n")
+
+
+def merge_agents(router: bytes, project: bytes) -> bytes:
+    """The kit router first, the project's own file verbatim beneath it between markers (the markers
+    exclude it from the kit hash, so only the router part is ever refreshed)."""
+    tail = b"" if project.endswith(b"\n") else b"\n"
+    return (router.rstrip(b"\n") + b"\n" + AGENTS_HEADING + b"<!-- repoctl:" + AGENTS_MERGE.encode() + b" -->\n"
+            + project + tail + b"<!-- /repoctl:" + AGENTS_MERGE.encode() + b" -->\n")
+
+
+def project_agents_part(content: bytes) -> bytes | None:
+    found = _AGENTS_PART.search(content)
+    return found.group(1) if found else None
+
+
 def _kit_version(kit: Path) -> str:
     return (git(kit, "rev-parse", "HEAD") or "").strip() or "unknown"
 
 
-def project_path(root: Path, path: str) -> str:
-    """Where a kit file lives in this project: adopted projects keep the kit Makefile as kit.mk and
-    colliding workflows as kit-<name>."""
+def project_path(root: Path, path: str, moved: dict[str, str] | None = None) -> str:
+    """Where a kit file lives in this project: adopted projects keep the kit Makefile as kit.mk,
+    colliding workflows as kit-<name>, and a file that collided by case under the name adopt gave it (`moved`)."""
+    if moved and path in moved:
+        return moved[path]
     if path == "Makefile" and (root / "kit.mk").is_file():
         return "kit.mk"
     if path.startswith(".github/workflows/"):
@@ -132,22 +175,31 @@ def project_path(root: Path, path: str) -> str:
     return path
 
 
-def write_lock(root: Path, kit: Path, paths: list[str] | None = None, kept: list[str] = ()) -> None:
+def write_lock(root: Path, kit: Path, paths: list[str] | None = None, kept: list[str] = (),
+               merged: dict[str, str] | None = None, moved: dict[str, str] | None = None) -> None:
     """Record what the project now has from the kit (init and adopt). `kept` are the project's own files
     at kit paths (make adopt never overwrites them); only the kit's version of those is remembered."""
     shipped = paths if paths is not None else kit_paths(kit)
-    files = {path: digest(root / project_path(root, path)) for path in shipped if (root / project_path(root, path)).is_file()}
-    _save_lock(root, _kit_version(kit), files, {path: digest_bytes(_new_content(kit, root, path)) for path in kept})
+    moved = moved or {}
+    files = {path: digest(root / project_path(root, path, moved)) for path in shipped
+             if (root / project_path(root, path, moved)).is_file()}
+    _save_lock(root, _kit_version(kit), files, {path: digest_bytes(_new_content(kit, root, path)) for path in kept},
+               merged=merged, moved=moved)
 
 
 def _save_lock(root: Path, version: str, files: dict[str, str], kept: dict[str, str],
-               bases: dict[str, str] | None = None) -> None:
+               bases: dict[str, str] | None = None, merged: dict[str, str] | None = None,
+               moved: dict[str, str] | None = None) -> None:
     previous = read_lock(root) if (root / LOCK).is_file() else {}
     if version == "unknown" and previous.get("kit_version") not in (None, "none", "unknown"):
         version = str(previous["kit_version"])  # a non-git kit checkout does not erase a known version
     data: dict[str, object] = {"kit_version": version, "files": dict(sorted(files.items()))}
     if kept:
         data["kept"] = dict(sorted(kept.items()))
+    if merged:  # kit files that hold the project's own content too (AGENTS.md): only the kit part is refreshed
+        data["merged"] = dict(sorted(merged.items()))
+    if moved:  # kit files adopt had to save under another name (a case-only clash with the project's own file)
+        data["moved"] = dict(sorted(moved.items()))
     if bases:  # conflicted files: the version they had from the kit before the project's edit
         data["bases"] = dict(sorted(bases.items()))
     (root / LOCK).parent.mkdir(parents=True, exist_ok=True)
@@ -166,15 +218,29 @@ def read_lock(root: Path) -> dict[str, object]:
     return data
 
 
-def _new_content(kit: Path, root: Path, path: str) -> bytes:
-    """The kit file as this project should have it (kit.mk is regenerated with the project's renames)."""
+def _new_content(kit: Path, root: Path, path: str, merged: dict[str, str] | None = None) -> bytes:
+    """The kit file as this project should have it (kit.mk is regenerated with the project's renames;
+    a merged file keeps the project's part as it is now)."""
     if path == "Makefile" and project_path(root, path) == "kit.mk":
         ours = (root / "Makefile").read_text(encoding="utf-8") if (root / "Makefile").is_file() else ""
         return render_kit_makefile(ours, (kit / path).read_text(encoding="utf-8")).encode()
-    if path.endswith(".md"):  # the same localization make init applied when the project was made
+    if path.endswith(".md"):  # the same localization make init applied when the project was made, plus adopt's target renames
         template = load_project(kit).get("template", {})
         prune = list(template.get("prune", [])) if isinstance(template, dict) else []
         pruned = {file for file in repository_files(kit) if any(path_matches(file, pattern) for pattern in prune)}
         source = str(template.get("source", "")).rstrip("/") if isinstance(template, dict) else ""
-        return localize_text(path, (kit / path).read_text(encoding="utf-8"), pruned, prune, source).encode()
-    return (kit / path).read_bytes()
+        text = localize_text(path, (kit / path).read_text(encoding="utf-8"), pruned, prune, source)
+        router = rename_mentions(text, renamed_targets(root)).encode()
+        if merged and path in merged:
+            current = (root / path).read_bytes() if (root / path).is_file() else b""
+            part = project_agents_part(current)
+            if part is not None:
+                return merge_agents(router, part)
+        return router
+    content = (kit / path).read_bytes()
+    if path.endswith(RENAMED_TEXT):
+        try:
+            return rename_mentions(content.decode("utf-8"), renamed_targets(root)).encode()
+        except UnicodeDecodeError:
+            pass
+    return content

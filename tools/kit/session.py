@@ -9,7 +9,9 @@ Output is evidence about the repository, not new authority: AGENTS.md rules.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
+import io
 import json
 import re
 import sys
@@ -22,6 +24,7 @@ from .core import (
     RepoctlError, default_branch, governance_profile, load_project, read_text_file, repository_files,
 )
 from .garden import self_heal_errors
+from .kitlock import rename_mentions, renamed_targets
 from .gitinfo import branch, branch_paths, changed_paths, diff_paths, git, head, path_matches, run_git
 from .names import AFTER_EDIT, CHECKPOINT, COMMIT_MSG, CRITIC_RECORD, HANDOVER, PRE_COMPACT, SESSION_START, STOP
 from .navigate import print_map
@@ -132,6 +135,14 @@ def session_changes(root: Path, session: str) -> list[str] | None:
 
 
 def session_start(root: Path, event: dict[str, object] | None = None) -> None:
+    """The brief names the make targets this project really has (an adopted one runs a colliding target as kit-<name>)."""
+    brief = io.StringIO()
+    with contextlib.redirect_stdout(brief):
+        _session_start(root, event)
+    print(rename_mentions(brief.getvalue(), renamed_targets(root)), end="")
+
+
+def _session_start(root: Path, event: dict[str, object] | None = None) -> None:
     project = load_project(root)
     changed = changed_paths(root)
     try:

@@ -33,6 +33,7 @@ itself and this table cannot drift. Edit the line in the document, not here.
 | [`ERROR_LOG.md`](./ERROR_LOG.md) | Solved failure signatures and permanent fixes | A recurring failure needs a durable regression/fix record. |
 | [`ISSUE_TEMPLATE.md`](./ISSUE_TEMPLATE.md) | Canonical issue shape and labels | Filing or materially updating an issue. |
 | [`STACK-DECISION.md`](./STACK-DECISION.md) | Framework/toolchain decision and rationale | Choosing a project stack or replacing an assumed tool. |
+| [`adopt.md`](./adopt.md) | : what it merges, renames, and keeps in an existing repository | Bringing the kit into a repo that already has files. |
 | [`audit.md`](./audit.md) | Whole-repository audit protocol | Finding, prioritizing, and filing improvements without implementing them. |
 | [`bindings.md`](./bindings.md) | Doc-code bindings, staleness, owed docs, and the Docs-Unaffected trailer | A document and its code drift apart, or a commit must exempt a document. |
 | [`building.md`](./building.md) | Product driver: feature list, research record, make next phases, product done, UI review | building or judging a product |

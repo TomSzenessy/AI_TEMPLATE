@@ -338,6 +338,133 @@ class AdoptTests(Scratch):
         update = self.cli("kit-update", "--kit", str(TOOLS.parent))
         self.assertIn("0 updated, 0 added, 0 removed, 0 to merge", update.stdout, update.stdout + update.stderr)
 
+    def test_adopt_never_licenses_a_project_that_has_no_license(self) -> None:
+        """#60: a license is the adopter's legal choice; the kit's MIT text must not appear by default."""
+        self.git("rm", "-q", "LICENSE")
+        self.git("commit", "-qm", "drop license")
+        result = self.adopt()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse((self.root / "LICENSE").exists(), "the kit's LICENSE must not be copied")
+        self.assertIn('license = "UNSELECTED"', (self.root / "project.toml").read_text())
+        self.assertIn("UNSELECTED", result.stdout)
+        self.assertNotIn("LICENSE", json.loads((self.root / "tools/kit-lock.json").read_text())["files"])
+
+    def test_a_renamed_target_is_renamed_in_every_kit_authored_mention(self) -> None:
+        """#62: the project's `start` target boots a game server; nothing the kit wrote may tell an
+        agent to run it or pre-approve it."""
+        makefile = self.root / "Makefile"
+        makefile.write_text(makefile.read_text() + "\nstart:\n\t@echo boot the game server\n")
+        self.git("commit", "-qam", "start target")
+        result = self.adopt()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("kit-start", result.stdout)
+        stale = re.compile(r"make start(?![\w-])")
+        skipped = {"Makefile", "tools/kit-lock.json"}
+        for relative in self.git("ls-files", "-co", "--exclude-standard").splitlines():
+            if relative in skipped or not relative.endswith((".md", ".json", ".toml", ".mk", ".yml")):
+                continue
+            if relative.startswith("tools/tests/") or relative.startswith("notes/"):
+                continue
+            text = (self.root / relative).read_text(errors="replace")
+            self.assertIsNone(stale.search(text), f"{relative} still says `make start`")
+        settings = json.loads((self.root / ".claude/settings.json").read_text())
+        allowed = settings["permissions"]["allow"]
+        self.assertIn("Bash(make kit-start)", allowed)
+        self.assertNotIn("Bash(make start)", allowed)
+        self.assertIn("make kit-start", (self.root / "AGENTS.md").read_text())
+        brief = self.cli("hook", "session-start")
+        self.assertIsNone(stale.search(brief.stdout), brief.stdout)
+        self.assertEqual(self.cli("sync").returncode, 0)
+        self.assertIn("Bash(make kit-start)", (self.root / ".claude/settings.json").read_text(), "sync keeps the rename")
+        self.assertNotIn("Bash(make start)", (self.root / ".claude/settings.json").read_text())
+        self.git("add", "-A")
+        self.git("commit", "-qm", "adopt")
+        update = self.cli("kit-update", "--kit", str(TOOLS.parent))
+        self.assertIn("0 updated, 0 added, 0 removed, 0 to merge", update.stdout, update.stdout + update.stderr)
+
+    def test_adopt_merges_the_kit_router_with_the_projects_own_agents_file(self) -> None:
+        """#63: the router (session protocol, rules block) comes first, the project's contract stays
+        byte-for-byte beneath it, the budget fits, and kit-update refreshes only the router part."""
+        import tomllib
+        ours = ("# Notes contract\n\n" + "".join(f"- Rule {n}: keep the invariant {n} true.\n" for n in range(600))
+                + "Last line without a newline").encode()
+        self.assertGreater(len(ours), 20000)
+        (self.root / "AGENTS.md").write_bytes(ours)
+        self.git("add", "-A")
+        self.git("commit", "-qm", "agents contract")
+        result = self.adopt()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("merged: AGENTS.md", result.stdout)
+        self.assertNotRegex(result.stdout, r"kept yours:[^\n]*AGENTS\.md")
+        merged = (self.root / "AGENTS.md").read_bytes()
+        self.assertIn(ours, merged, "the project's file is preserved verbatim")
+        text = merged.decode()
+        self.assertLess(text.index("Session protocol"), text.index("# Notes contract"), "kit router first")
+        self.assertIn("<!-- repoctl:rules -->", text)
+        self.assertIn("## Project contract", text)
+        budget = tomllib.loads((self.root / "project.toml").read_text())["budgets"]["AGENTS.md"]
+        self.assertGreaterEqual(budget, len(merged))
+        self.assertIn("budget", result.stdout)
+        check = self.cli("check")
+        self.assertNotIn("byte budget", check.stderr, check.stderr)
+        lock = json.loads((self.root / "tools/kit-lock.json").read_text())
+        self.assertIn("AGENTS.md", lock["merged"])
+        self.assertIn("AGENTS.md", lock["files"])
+        self.git("add", "-A")
+        self.git("commit", "-qm", "adopt")
+        update = self.cli("kit-update", "--kit", str(TOOLS.parent))
+        self.assertIn("0 updated, 0 added, 0 removed, 0 to merge", update.stdout, update.stdout + update.stderr)
+        # The project edits its part; the kit changes its router; the update touches only the router.
+        edited = merged.replace(b"Rule 7:", b"Rule seven:")
+        (self.root / "AGENTS.md").write_bytes(edited)
+        self.git("commit", "-qam", "edit our rules")
+        kit = Path(tempfile.mkdtemp()) / "kit"
+        self.addCleanup(shutil.rmtree, kit.parent, True)
+        shutil.copytree(TOOLS.parent, kit, ignore=shutil.ignore_patterns(".git"))
+        (kit / "AGENTS.md").write_text((kit / "AGENTS.md").read_text() + "\n- NEWROUTERRULE applies to everything.\n")
+        git_in(kit, "init", "-q", "-b", "main")
+        git_in(kit, "add", "-A")
+        git_in(kit, "commit", "-q", "-m", "kit")
+        update = self.cli("kit-update", "--kit", str(kit))
+        self.assertIn("0 to merge", update.stdout, update.stdout + update.stderr)
+        after = (self.root / "AGENTS.md").read_text()
+        self.assertIn("NEWROUTERRULE", after)
+        self.assertIn("Rule seven:", after)
+        self.assertNotIn("Rule 7:", after)
+        self.assertEqual(after.count("# Notes contract"), 1)
+
+    def test_a_kit_file_that_differs_from_a_project_file_only_by_case_is_not_skipped(self) -> None:
+        """#65: on a case-insensitive filesystem `docs/capabilities.md` "exists" because the project has
+        `docs/CAPABILITIES.md`; the kit file must be installed (or staged and reported), never recorded as the project's."""
+        (self.root / "docs").mkdir(exist_ok=True)
+        (self.root / "docs/CAPABILITIES.md").write_text("# Generated capabilities\n\nOurs, generated by our tool.\n")
+        self.git("add", "-A")
+        self.git("commit", "-qm", "generated capabilities doc")
+        result = self.adopt()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("case collision", result.stdout)
+        self.assertIn("docs/capabilities.md", result.stdout)
+        self.assertNotRegex(result.stdout, r"kept yours:[^\n]*capabilities\.md")
+        names = os.listdir(self.root / "docs")
+        self.assertIn("CAPABILITIES.md", names, "the project's file keeps its name")
+        ours = (self.root / "docs/CAPABILITIES.md").read_text()  # adopt only adds its index line to a project doc
+        self.assertTrue(ours.startswith("# Generated capabilities\n") and ours.endswith("\nOurs, generated by our tool.\n"), ours)
+        installed = "capabilities.md" if "capabilities.md" in names else "kit-capabilities.md"
+        self.assertIn(installed, names, "the kit's doc is installed under its own name or staged under a non-colliding one")
+        self.assertIn(installed, result.stdout, "and the adopter is told where it is")
+        kit_title = (TOOLS.parent / "docs/capabilities.md").read_text().splitlines()[0]
+        self.assertEqual((self.root / "docs" / installed).read_text().splitlines()[0], kit_title)
+        lock = json.loads((self.root / "tools/kit-lock.json").read_text())
+        self.assertNotIn("docs/capabilities.md", lock.get("kept", {}))
+        from kit import kitlock
+        self.assertEqual(lock["files"]["docs/capabilities.md"], kitlock.digest(self.root / "docs" / installed),
+                         "the lock records the kit's file, never the project's")
+        self.git("add", "-A")
+        self.git("commit", "-qm", "adopt")
+        update = self.cli("kit-update", "--kit", str(TOOLS.parent))
+        self.assertIn("0 updated, 0 added, 0 removed, 0 to merge", update.stdout, update.stdout + update.stderr)
+        self.assertEqual((self.root / "docs/CAPABILITIES.md").read_text(), ours, "kit-update leaves it alone")
+
     def test_adopt_refuses_uncommitted_work(self) -> None:
         (self.root / "notes/new.py").write_text("X = 1\n")
         self.assertIn("commit or stash", self.adopt().stderr)
