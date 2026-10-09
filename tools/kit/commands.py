@@ -339,9 +339,9 @@ def github_sync(root: Path, args) -> None:
 
 
 @command("ci", "Run a CI check (the same tested code GitHub Actions runs)", make=None,
-         args=(arg("check", choices=["pr-reference", "issue-contract"]),))
+         args=(arg("check", choices=["pr-reference", "issue-contract", "gate"]),))
 def run_ci(root: Path, args) -> None:
-    runner = ci.run_pr_reference if args.check == "pr-reference" else ci.run_issue_contract
+    runner = {"pr-reference": ci.run_pr_reference, "issue-contract": ci.run_issue_contract, "gate": ci.run_gate}[args.check]
     print(runner(root))
 
 

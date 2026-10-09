@@ -156,4 +156,6 @@ def adopt(target: Path, kit: Path, name: str, kind: str, owner: str | None) -> N
         print(f"  {license_note}")
     if indexed:
         print(f"  index lines added to your docs (edit the wording): {', '.join(indexed[:8])}{' …' if len(indexed) > 8 else ''}")
+    print("  CI: .github/workflows/kit-ci.yml runs only the toolchain-free gate (repoctl check); it installs no Node/Go/etc., "
+          "so run your surfaces' own tests in your project's CI (docs/ADAPTATION.md#kit-ci-and-your-toolchains).")
     print("Next: declare your existing code as surfaces (make inventory shows candidates), then make next.")

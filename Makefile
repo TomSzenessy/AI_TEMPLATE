@@ -1,6 +1,7 @@
-# Newest Python >= 3.11 on PATH (an older system python3 may come first);
-# tools/repoctl applies the same rule for hooks. Override with PYTHON=...
-PYTHON ?= $(shell for p in python3.14 python3.13 python3.12 python3.11 python3 python; do command -v $$p >/dev/null 2>&1 && $$p -c 'import sys; sys.exit(sys.version_info < (3, 11))' 2>/dev/null && { echo $$p; break; }; done)
+# The environment's python3 when it is >= 3.11 (so a CI matrix job tests the interpreter
+# setup-python put first), else the newest python3.N >= 3.11 on PATH (an older system python3
+# may come first); tools/repoctl applies the same rule for hooks. Override with PYTHON=...
+PYTHON ?= $(shell ok='import sys; sys.exit(sys.version_info < (3, 11))'; for p in python3 python3.14 python3.13 python3.12 python3.11 python; do command -v $$p >/dev/null 2>&1 && $$p -c "$$ok" 2>/dev/null && { echo $$p; break; }; done)
 REPOCTL := $(PYTHON) tools/repoctl.py
 # This kit's directory, also when run from another repository with make -f (make adopt).
 # Read from the single MAKEFILE_LIST entry through the shell so a path with spaces survives;

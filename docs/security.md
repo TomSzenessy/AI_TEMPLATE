@@ -3,6 +3,8 @@
 <!-- index: design | Secure implementation baseline | Auth, secrets, CI, dependencies, deployment, or untrusted input changes. -->
 <!-- covers: .github/workflows/ci.yml .github/workflows/specialist-scans.yml .github/dependabot.yml .security/config.json tools/kit/docs.py -->
 
+The verify job runs `repoctl ci gate` on the interpreter `setup-python` configured; in an adopted project it runs only the toolchain-free `repoctl check` (see [`ADAPTATION.md`](./ADAPTATION.md)), so CI installs no project toolchains.
+
 CI logic lives in tested repository code, not in workflow YAML: workflows
 check out the repository and call `make verify`, `make test-future`, or `repoctl ci <check>`
 (`tools/kit/ci.py`), and `make check` rejects long inline `run:` blocks. Pushes

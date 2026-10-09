@@ -1,7 +1,7 @@
 # Project adaptation
 
 <!-- index: operate | Lean core, artifact lifecycle, packs, and capability patterns | Turning the template into a project without generating unnecessary structure. -->
-<!-- covers: tools/kit/bootstrap.py tools/kit/adopt.py -->
+<!-- covers: tools/kit/bootstrap.py tools/kit/adopt.py tools/kit/ci.py .github/workflows/ci.yml Makefile tools/repoctl -->
 
 The template is a small kernel plus switchable packs (`.agents/packs/`;
 [`[packs]` switching rules](./capabilities.md)), not a universal application scaffold. `make init`
@@ -52,6 +52,23 @@ owns:
 | `docs/README.md` | Your page stays; the generated documentation index is appended. |
 | `.github/workflows/<name>` | The kit's workflow is written beside yours as `kit-<name>`. |
 | `LICENSE` and anything else | Yours is kept; the manifest's `license` label follows your LICENSE. Kept files are recorded in `tools/kit-lock.json` as yours, so `make kit-update` never touches them and mentions one only when the kit's version of it changes. |
+
+### Kit CI and your toolchains
+
+The adopted `kit-ci.yml` installs only Python, so it cannot run a surface that
+needs Node, Go, or any other toolchain (that was exit 127, `vitest: not found`).
+It therefore calls `repoctl ci gate`, which in a project with
+`[kit].project_mode = "adopt"` runs only the toolchain-free `repoctl check`
+(structure, docs, issue contracts); the template and `make init` projects keep
+the full `make verify`. Your surfaces' own tests belong to your project's CI,
+with the toolchains it installs; `make adopt` prints this reminder. `make
+verify` and `make done` still run the surfaces locally.
+
+The Python the gate and the Makefile use is the one the environment configured:
+an explicit `PYTHON=`, else `python3` when it is 3.11 or newer (what
+`setup-python` puts first), else the newest `python3.N` that is. So the 3.11
+matrix job really runs 3.11, and code needing a newer Python fails it
+(`tools/tests/test_ci_gate.py`).
 
 Template-only material is pruned exactly as `make init` prunes it: links to
 it point at the template source and doc bindings to it are dropped. Your

@@ -281,6 +281,7 @@ class AdoptTests(Scratch):
         result = self.adopt()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("renamed: kit-help, kit-test", result.stdout)
+        self.assertIn("runs only the toolchain-free gate", result.stdout, "adopt says what kit-ci does not run (#67)")
         self.assertTrue((self.root / "README.md").read_text().startswith(readme_before), "the project's README is kept")
         self.assertIn("Copyright (c) 2025 Notes Team", (self.root / "LICENSE").read_text())
         self.assertIn('license = "MIT"', (self.root / "project.toml").read_text())
