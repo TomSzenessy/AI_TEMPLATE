@@ -29,6 +29,17 @@ class FailureSignatureTests(Scratch):
     def ledger(self, text: str = LEDGER) -> None:
         self.write("docs/ERROR_LOG.md", text)
 
+    def test_a_row_no_finding_can_match_is_reported_with_its_fix(self) -> None:
+        # #59: EL-007 quoted only `make done` (9 chars) and vanished from the matcher silently.
+        from kit import signatures
+        self.ledger(self.LEDGER + "| EL-002 | 2026-01-02 | `make done` passed on a broken tree | x | y |\n")
+        self.assertEqual([s.key for s in signatures.signatures(self.root)], ["EL-001"])
+        problems = signatures.unmatchable(self.root)
+        self.assertEqual(len(problems), 1)
+        self.assertIn("EL-002 cannot be matched", problems[0])
+        self.assertIn("12+ characters", problems[0])
+        self.assertIn("[ledger-signatures]", self.cli("garden").stdout + self.cli("check").stdout + self.cli("check").stderr)
+
     def test_a_repeated_failure_is_named_with_its_recorded_fix(self) -> None:
         self.ledger()
         records = signatures.signatures(self.root)

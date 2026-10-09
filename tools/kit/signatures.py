@@ -56,13 +56,13 @@ def _cells(line: str) -> list[str]:
     return [cell.strip() for cell in line.strip().strip("|").split("|")]
 
 
-def signatures(root: Path) -> tuple[Signature, ...]:
-    """Every keyed row of the ledger. Empty when a project carries no ledger.
+def _rows(root: Path) -> list[tuple[str, str, str, tuple[str, ...]]]:
+    """(key, symptom, permanent fix, matchable literals) for every keyed ledger row.
 
     Columns are read from the header, so reordering the table keeps matching honest.
     """
     text = read_text_file(root, LEDGER, limit=LEDGER_LIMIT) or ""
-    found: list[Signature] = []
+    rows: list[tuple[str, str, str, tuple[str, ...]]] = []
     columns: dict[str, int] = {}
     for line in text.splitlines():
         cells = _cells(line)
@@ -79,9 +79,24 @@ def signatures(root: Path) -> tuple[Signature, ...]:
             literal.strip() for literal in CODE_SPAN.findall(symptom)
             if len(literal.strip()) >= MINIMUM_LITERAL and SHAPED_LITERAL.search(literal)
         ))
-        if literals:
-            found.append(Signature(key, literals, " ".join(symptom.split()), cells[columns.get("permanent fix", 4)]))
-    return tuple(found)
+        rows.append((key, " ".join(symptom.split()), cells[columns.get("permanent fix", 4)], literals))
+    return rows
+
+
+def signatures(root: Path) -> tuple[Signature, ...]:
+    """Every keyed row of the ledger that can be matched. Empty when a project carries no ledger."""
+    return tuple(Signature(key, literals, symptom, fix) for key, symptom, fix, literals in _rows(root) if literals)
+
+
+def unmatchable(root: Path) -> list[str]:
+    """Ledger rows no finding can ever match, each with the fix (#59).
+
+    A row is matched by a backticked literal of at least MINIMUM_LITERAL characters shaped like a
+    message or path; a row quoting `make done` or nothing at all used to vanish silently.
+    """
+    return [f"{LEDGER} {key} cannot be matched: quote at least one backticked literal of "
+            f"{MINIMUM_LITERAL}+ characters from the real message or path in its symptom"
+            for key, _symptom, _fix, literals in _rows(root) if not literals]
 
 
 def match(finding: str, records: tuple[Signature, ...]) -> Signature | None:

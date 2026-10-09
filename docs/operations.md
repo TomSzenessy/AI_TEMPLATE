@@ -43,8 +43,8 @@ the failure prints in its symptom cell, and cites the regression test as
 evidence. Only a distinctive literal matches: a backticked span counts when it
 is at least 12 characters and shaped like a message, path, or command; shared
 vocabulary (`make check`), a bare filename, or a fresh failure matches nothing,
-so a new failure stays a new failure and a row without such a literal is simply
-never matched. When a blocking finding repeats a recorded literal, `make check`
+so a new failure stays a new failure and a row without such a literal is never
+matched; `make garden` names each such row (`[ledger-signatures]`) so the gap is visible. When a blocking finding repeats a recorded literal, `make check`
 adds a `known failure EL-###` line with the permanent fix, so a known failure is
 recognised instead of re-diagnosed.
 

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import re
 
-from . import derive, docs, docsync, gatechecks, github, hygiene, product, skills, structure
+from . import derive, docs, docsync, gatechecks, github, hygiene, product, signatures, skills, structure
 from .config import setting
 from .core import (
     FILE_SURFACE_KINDS,
@@ -96,6 +96,12 @@ def docs_index(context) -> list[str]:
 
 
 # --- Docs that track the code ------------------------------------------------------
+
+@check("ledger-signatures", "Every docs/ERROR_LOG.md row quotes a literal a future finding can match; when the ledger grows",
+       blocks=False)  # advisory: a curation aid (#59), the ledger's key test catches it in CI
+def ledger_signatures(context) -> list[str]:
+    return signatures.unmatchable(context.root)
+
 
 @check("dead-bindings", "Every covers glob matches a file; when code moves or dies",
        blocks=True, reason="A binding to nothing means the doc describes code that is gone; a Haiku ledger-cli trial bound "
