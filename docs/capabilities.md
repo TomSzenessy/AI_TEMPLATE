@@ -77,3 +77,33 @@ its reason. `advisory` is the only accepted value, the reason is required, an
 unknown or already-advisory check name is an error, and nothing removes or skips
 a check. Deleting the entry restores blocking. Blocking rules:
 [`self-healing.md`](./self-healing.md#when-a-check-may-block).
+
+### Exempting one path from file-hygiene
+
+`file-hygiene` blocks a tracked `.env*`, key file, or a literal credential. An
+app repository that handles tokens, ships a test key fixture, or commits a
+public `.env.production` (a publishable key) exempts those paths without
+downgrading the whole check:
+
+```toml
+[checks.file-hygiene]
+allow_paths = [
+  { glob = "site/.env.production", reason = "publishable Clerk key, public by design" },
+  { glob = "tests/fixtures/*.pem", reason = "throwaway key for signature tests" },
+]
+```
+
+A `reason` (10+ characters) is mandatory and an entry without one is a
+configuration error that stops `make check`; so is a glob such as `**` that
+exempts everything, or any key other than `glob` and `reason`. A matching file is
+skipped for the `.env`, key-file, and content findings only (a symlink that
+escapes the repository is never exemptable) and is listed by the advisory
+`file-hygiene-allowed` check with its reason, so the exemption stays visible; a
+glob that matches no file is listed too, to be deleted. `allow_paths` does not
+downgrade the check, and it can be combined with `severity = "advisory"` only
+when the whole check really misfires. The content scan itself flags a credential
+only when a secret-looking literal is assigned (`api_key = "k3y9..."`, an
+`API_TOKEN=...` line, an `Authorization: Bearer <literal>` header), private key
+blocks, and known token formats; code that reads `token` from a variable or the
+environment, or builds `Authorization: Bearer ${token}`, is not a finding. See
+[`security.md`](./security.md#secure-defaults).

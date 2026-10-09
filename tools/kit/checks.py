@@ -17,6 +17,7 @@ from .core import (
     FILE_SURFACE_KINDS,
     RepoctlError,
     declared_surfaces,
+    hygiene_allowlist,
     parse_iso_date,
     surface_extra_paths,
     today,
@@ -57,7 +58,14 @@ def skill_provenance(context) -> list[str]:
 @check("file-hygiene", "No secrets, key files, or escaping symlinks in tracked files; on every change",
        blocks=True, reason="A committed secret is a public incident; the fix (remove the file) is cheap and deterministic.")
 def file_hygiene(context) -> list[str]:
-    return _raised(docs.check_file_hygiene, context.root)
+    return _raised(docs.check_file_hygiene, context.root, hygiene_allowlist(context.project))
+
+
+@check("file-hygiene-allowed", "Paths project.toml [checks.file-hygiene] allow_paths exempts from file-hygiene, with their reasons; "
+                               "delete an entry when its file is gone",
+       blocks=False)
+def file_hygiene_allowed(context) -> list[str]:
+    return docs.allowed_path_notes(context.root, hygiene_allowlist(context.project))
 
 
 @check("markdown-links", "Relative Markdown links resolve to real files; on every change",

@@ -24,7 +24,7 @@ from typing import Callable
 import tomllib  # repoctl.py fails fast on Python < 3.11
 
 from .docmeta import doc_meta
-from .core import KEBAB, RepoctlError, check_failed, load_project, package_skill, read_utf8, repository_files
+from .core import KEBAB, RepoctlError, check_failed, hygiene_allowlist, load_project, package_skill, read_utf8, repository_files
 
 KINDS = ("skill", "agent", "doc", "rule", "check", "command", "mcp", "pack")  # the one list of capability kinds
 CORE = "core"
@@ -429,8 +429,14 @@ class Registry:
             where = f"project.toml [checks.{name}]"
             if name not in known:
                 raise RepoctlError(f"{where} names no check (known: {', '.join(sorted(known))})")
-            if not isinstance(entry, dict) or set(entry) - {"severity", "reason"}:
-                raise RepoctlError(f'{where} must be a table with only severity = "advisory" and reason = "..."')
+            if name == "file-hygiene":
+                hygiene_allowlist(self.project)  # validates allow_paths; it exempts paths and never downgrades the check
+            extra = {"allow_paths"} if name == "file-hygiene" else set()
+            if not isinstance(entry, dict) or set(entry) - {"severity", "reason"} - extra:
+                raise RepoctlError(f'{where} must be a table with only severity = "advisory" and reason = "..."'
+                                   + (" (and allow_paths)" if extra else ""))
+            if "severity" not in entry and extra and "allow_paths" in entry and "reason" not in entry:
+                continue
             if entry.get("severity") != "advisory":
                 raise RepoctlError(f'{where}: severity must be "advisory"; a check can be downgraded, never removed or skipped')
             reason = entry.get("reason")
@@ -463,7 +469,7 @@ def downgrade_lines(project: dict[str, object]) -> list[str]:
     if not isinstance(table, dict):
         return []
     return [f"{name}: {' '.join(str(entry.get('reason', '')).split())}"
-            for name, entry in sorted(table.items()) if isinstance(entry, dict)]
+            for name, entry in sorted(table.items()) if isinstance(entry, dict) and "severity" in entry]
 
 
 FINDING_PREFIX = re.compile(r"^\[([a-z0-9-]+)\] ")

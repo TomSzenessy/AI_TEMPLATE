@@ -34,7 +34,7 @@ assumed. A new or changed check **blocks** only when all three hold:
 
 Otherwise it is **advisory** (`make garden`, the session brief) or an
 **automatic fix** (`make sync`). Since #9 `markdown-links`, `command-references`,
-`markers`, `budgets` are advisory. Further rules:
+`markers`, `budgets` are advisory. `file-hygiene` stays blocking; `[checks.file-hygiene] allow_paths` exempts one path with a reason ([`capabilities.md`](./capabilities.md#exempting-one-path-from-file-hygiene)) and advisory `file-hygiene-allowed` lists it. Further rules:
 
 - **One blocking point per concern.** Each later gate fires only on what the
   earlier one let through (`--no-verify`, uncommitted work), never on a
@@ -55,13 +55,11 @@ Otherwise it is **advisory** (`make garden`, the session brief) or an
 - **One place decides blocking.** `Registry.blocks`, applied by `checkrun.run_checks`,
   is the only mechanism that turns a finding into a block: the check's `blocks=`
   declaration, then the project's downgrade ([`capabilities.md`](./capabilities.md#downgrading-a-check)).
-  Each gate (`make check`, the commit and stop gates) names the checks that fit
-  its change set; the commit hook maps a non-empty result to exit 3, and
+  Each gate names the checks that fit its change set; the commit hook maps a non-empty result to exit 3, and
   `make verify` runs `doctor --checks-done` so no check runs twice. Date
   freshness is one helper, `core.date_out_of_policy`.
-- **Retire what never fires usefully.** A check that only produces bypasses,
-  trailers, or ritual compliance is demoted to advisory or deleted in the next
-  trial review.
+- **Retire what never fires usefully.** A check that only yields bypasses or
+  ritual compliance is demoted or deleted in the next trial review.
 
 ## Lifecycle (any host)
 
@@ -70,7 +68,7 @@ Otherwise it is **advisory** (`make garden`, the session brief) or an
 | Session start or resume | `repoctl hook session-start` | `make start` | Brief: branch, recent commits, `HANDOVER.md`, map, the `make next` step, open self-healing findings. Derived files are regenerated and the git commit gate is installed. |
 | Before context compaction | `repoctl hook pre-compact` | — | Writes `.agent/checkpoint.md` (uncommitted paths, docs still owed). |
 | After a file edit | `repoctl hook after-edit` | — | Names the docs covering the edited path (once per session); regenerates derived files when a source changed; warns on edits to generated files. |
-| Before declaring done | `repoctl hook stop` | `make done` | Gate over this branch's change set: owed docs, derived-file drift, dead bindings, plus critic evidence when committed `high`-risk paths changed (see [Ceremony by risk](#ceremony-by-risk)); `make done` also prints product completeness and, as advice, a stale UI review ([`building.md`](./building.md)). The hook blocks again in the same turn only on changed findings (at most five pushes); it holds a session on `make check` findings that were not there when the session started, and a session that changed product-surface code is held while must features are open or `features.csv` is invalid ([`building.md`](./building.md)); `make done` also runs every test and predicts the commit gate for uncommitted work, so the two never disagree. |
+| Before declaring done | `repoctl hook stop` | `make done` | Gate over this branch's change set: owed docs, derived-file drift, dead bindings, plus critic evidence when committed `high`-risk paths changed (see [Ceremony by risk](#ceremony-by-risk)); `make done` also prints product completeness and, as advice, a stale UI review ([`building.md`](./building.md)). The hook blocks again in the same turn only on changed findings (at most five pushes); it holds a session on new `make check` findings, and a session that changed product-surface code is held while must features are open or `features.csv` is invalid ([`building.md`](./building.md)); `make done` also runs every test and predicts the commit gate for uncommitted work. |
 | Every commit | `.githooks/commit-msg` (any agent or human) | same | Refuses a commit whose staged covered code skips its doc (unless the message carries a `Docs-Unaffected:` trailer), and derived-file drift when the commit touches a source. In a merge commit, paths the merged branch brought in skip the owed-doc check (already judged); the rest is checked. Exit 3 means blocked; a broken plugin or kit also blocks (see [A broken check](#a-broken-check-is-a-finding-not-a-traceback)). Bypass with `--no-verify`. |
 
 Owed docs (`doc-coupling`), critic evidence and `surface-docs` are registry
@@ -128,12 +126,10 @@ this branch has **committed** `high` paths, `make done` and the stop hook
   vouch for today's change set. That fixes the order: commit the change, then run
   the critic on that commit, then save its return — a record written before the
   commit goes stale the moment the commit lands.
-- Missing record, missing `Verdict:`, or a record bound to another commit each
-  fail with a message naming the fix, so the gate teaches the protocol instead of
-  only reporting it.
+- A missing record, `Verdict:`, or a record bound to another commit each fails
+  with a message naming the fix.
 
-Two deliberate exemptions keep the gate from being friction: it reads committed
-paths only (a critic reviews a diff; a dirty tree is not one yet), and
+Two exemptions keep the gate light: it reads committed paths only (a dirty tree is not a diff yet), and
 `[governance].profile = "minimal"` skips it, because that profile hands issues and
 review to the host.
 
@@ -158,8 +154,7 @@ id = "web"
 garden = [["npx", "knip"]]
 ```
 
-The weekly report-only workflow (`.github/workflows/garden.yml`) publishes the
-report as a job summary. A `doc-gardener` or `implementer` subagent fixes
+The weekly report-only workflow (`.github/workflows/garden.yml`) publishes a job summary. A `doc-gardener` or `implementer` subagent fixes
 findings, one root cause per change (see [`delegation.md`](./delegation.md)).
 
 ## Scale and limits
@@ -171,7 +166,7 @@ findings, one root cause per change (see [`delegation.md`](./delegation.md)).
   committed before that window is not judged.
 - The stop gate judges only what this session changed: `session-start` records the dirty paths with
   content hashes and the current commit inside `.git`, and `stop` judges the paths whose
-  content differs plus the paths committed since that commit (no snapshot, or a start commit that is no
+  content differs plus the paths committed since that commit (no snapshot, or a start commit no
   longer an ancestor, means the whole tree). The session's commits are judged with their
   `Docs-Unaffected` trailers ([`bindings.md`](./bindings.md)), as `make done` judges them. An unresolved finding is raised once per turn until it is fixed or exempted by a
   trailer; `make done` still judges the whole branch.
