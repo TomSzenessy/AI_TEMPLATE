@@ -382,6 +382,57 @@ class AdoptTests(Scratch):
         update = self.cli("kit-update", "--kit", str(TOOLS.parent))
         self.assertIn("0 updated, 0 added, 0 removed, 0 to merge", update.stdout, update.stdout + update.stderr)
 
+    def test_adopt_merges_the_kit_router_with_the_projects_own_agents_file(self) -> None:
+        """#63: the router (session protocol, rules block) comes first, the project's contract stays
+        byte-for-byte beneath it, the budget fits, and kit-update refreshes only the router part."""
+        import tomllib
+        ours = ("# Notes contract\n\n" + "".join(f"- Rule {n}: keep the invariant {n} true.\n" for n in range(600))
+                + "Last line without a newline").encode()
+        self.assertGreater(len(ours), 20000)
+        (self.root / "AGENTS.md").write_bytes(ours)
+        self.git("add", "-A")
+        self.git("commit", "-qm", "agents contract")
+        result = self.adopt()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("merged: AGENTS.md", result.stdout)
+        self.assertNotRegex(result.stdout, r"kept yours:[^\n]*AGENTS\.md")
+        merged = (self.root / "AGENTS.md").read_bytes()
+        self.assertIn(ours, merged, "the project's file is preserved verbatim")
+        text = merged.decode()
+        self.assertLess(text.index("Session protocol"), text.index("# Notes contract"), "kit router first")
+        self.assertIn("<!-- repoctl:rules -->", text)
+        self.assertIn("## Project contract", text)
+        budget = tomllib.loads((self.root / "project.toml").read_text())["budgets"]["AGENTS.md"]
+        self.assertGreaterEqual(budget, len(merged))
+        self.assertIn("budget", result.stdout)
+        check = self.cli("check")
+        self.assertNotIn("byte budget", check.stderr, check.stderr)
+        lock = json.loads((self.root / "tools/kit-lock.json").read_text())
+        self.assertIn("AGENTS.md", lock["merged"])
+        self.assertIn("AGENTS.md", lock["files"])
+        self.git("add", "-A")
+        self.git("commit", "-qm", "adopt")
+        update = self.cli("kit-update", "--kit", str(TOOLS.parent))
+        self.assertIn("0 updated, 0 added, 0 removed, 0 to merge", update.stdout, update.stdout + update.stderr)
+        # The project edits its part; the kit changes its router; the update touches only the router.
+        edited = merged.replace(b"Rule 7:", b"Rule seven:")
+        (self.root / "AGENTS.md").write_bytes(edited)
+        self.git("commit", "-qam", "edit our rules")
+        kit = Path(tempfile.mkdtemp()) / "kit"
+        self.addCleanup(shutil.rmtree, kit.parent, True)
+        shutil.copytree(TOOLS.parent, kit, ignore=shutil.ignore_patterns(".git"))
+        (kit / "AGENTS.md").write_text((kit / "AGENTS.md").read_text() + "\n- NEWROUTERRULE applies to everything.\n")
+        git_in(kit, "init", "-q", "-b", "main")
+        git_in(kit, "add", "-A")
+        git_in(kit, "commit", "-q", "-m", "kit")
+        update = self.cli("kit-update", "--kit", str(kit))
+        self.assertIn("0 to merge", update.stdout, update.stdout + update.stderr)
+        after = (self.root / "AGENTS.md").read_text()
+        self.assertIn("NEWROUTERRULE", after)
+        self.assertIn("Rule seven:", after)
+        self.assertNotIn("Rule 7:", after)
+        self.assertEqual(after.count("# Notes contract"), 1)
+
     def test_adopt_refuses_uncommitted_work(self) -> None:
         (self.root / "notes/new.py").write_text("X = 1\n")
         self.assertIn("commit or stash", self.adopt().stderr)

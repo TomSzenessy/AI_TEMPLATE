@@ -57,6 +57,7 @@ def update(root: Path, kit: Path) -> int:
     locked: dict[str, str] = lock["files"]  # type: ignore[assignment]
     kept: dict[str, str] = dict(lock.get("kept", {}))  # type: ignore[arg-type]
     bases: dict[str, str] = dict(lock.get("bases", {}))  # type: ignore[arg-type]
+    merged: dict[str, str] = dict(lock.get("merged", {}))  # type: ignore[arg-type]
     new_paths = kit_paths(kit)
     updated, added, removed, conflicts = [], [], [], []
     files: dict[str, str] = {}
@@ -65,7 +66,7 @@ def update(root: Path, kit: Path) -> int:
     for path in new_paths:
         local = project_path(root, path)
         target = root / local
-        content = _new_content(kit, root, path)
+        content = _new_content(kit, root, path, merged)
         offered = digest_bytes(content)
         if path in kept:  # the project's own file at a kit path (make adopt kept it)
             if offered != kept[path]:
@@ -103,7 +104,8 @@ def update(root: Path, kit: Path) -> int:
         elif target.is_file():
             conflicts.append(f"{local} (removed from the kit; yours was changed, so it stays)")
     kept = {path: value for path, value in kept.items() if path in new_paths}
-    _save_lock(root, _kit_version(kit), files, kept, {path: value for path, value in bases.items() if path in files})
+    _save_lock(root, _kit_version(kit), files, kept, {path: value for path, value in bases.items() if path in files},
+               {path: value for path, value in merged.items() if path in files})
     derive.sync(root)
     before = str(lock["kit_version"])
     origin = "no version recorded before" if before in ("unknown", "none") else f"was {before[:12]}"

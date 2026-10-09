@@ -47,6 +47,7 @@ owns:
 | Collision | What adopt does |
 |---|---|
 | `Makefile` | Kit targets go to `kit.mk`, included at the end of your Makefile so your default goal stays; a kit target you already define is renamed `kit-<name>` (for example `kit-test`) everywhere in `kit.mk`, and `make sync` keeps the same renames when it regenerates the command block. Every kit-authored mention follows the rename (`make start` becomes `make kit-start` in kit Markdown/TOML prose, the session brief, and the generated Claude allowlist), all read from one table: your Makefile defines `<name>` and `kit.mk` defines `kit-<name>` (`kitlock.renamed_targets`). `make kit-update` renders prose the same way. An explicit `[adapters.claude] allow` is yours and used verbatim. |
+| `AGENTS.md` | Merged, not kept: the kit router first (including the `repoctl:rules` block), your file verbatim beneath it under a `Project contract` heading between `repoctl:adopted-agents` markers (nothing is dropped). `project.toml` `[budgets]` for `AGENTS.md` is raised to fit, and adopt says so. The lock records the merge (`merged`), so `make kit-update` refreshes only the router part ([`kit-update.md`](./kit-update.md)). |
 | `.gitignore` | Missing kit lines are appended under `# Agent kit`. |
 | `README.md` | Your README stays; the project identity block is appended. |
 | `docs/README.md` | Your page stays; the generated documentation index is appended. |

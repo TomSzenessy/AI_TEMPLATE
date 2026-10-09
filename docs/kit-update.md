@@ -17,6 +17,7 @@ printing the commit range it applies) then, per kit file:
 | changed by the project and by the kit | kept; the kit's version is saved under `.agent/kit-update/` and listed once to merge by hand |
 | new in the template | added; if you already have your own file there, it is kept and listed once |
 | removed from the template | deleted when unchanged, listed otherwise |
+| a merged file (`AGENTS.md` after `make adopt`: kit router + your contract) | only the router part is compared and refreshed; the project part, between the `repoctl:adopted-agents` markers, is never touched or hashed, and the update keeps it exactly as it is now |
 | your own file that `make adopt` kept at a kit path | never touched; listed only when the kit's version changes |
 
 A conflict is reported once per kit change: the lock then remembers the version
