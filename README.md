@@ -60,7 +60,7 @@ make -f ../agent-kit/Makefile adopt NAME=my-app KIND=web OWNER=your-handle
 `make adopt` never overwrites your files: the targets go to `kit.mk` (included
 from your Makefile, with any target you already define renamed `kit-<name>`),
 your README, licence, docs, and workflows stay yours, and the kit's pieces are
-merged in beside them ([`docs/ADAPTATION.md`](./docs/ADAPTATION.md#adopting-an-existing-repository)).
+merged in beside them ([`docs/adopt.md`](./docs/adopt.md)).
 
 <!-- repoctl:project-readme -->
 > **Template mode:** you are reading the template itself, not a project built
