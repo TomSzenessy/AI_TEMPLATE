@@ -37,8 +37,9 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ matrix.python }}
-      - name: Run the declared verification path
-        run: make verify
+      - name: Run the verification gate on the matrix interpreter
+        # The adopted copy (kit-ci.yml) runs only `repoctl check`; docs/ADAPTATION.md says why.
+        run: python3 tools/repoctl.py --root . ci gate
   test-future:
     name: tests 800 days ahead (no calendar rot)
     runs-on: ubuntu-latest

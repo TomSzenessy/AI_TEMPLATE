@@ -12,6 +12,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 import urllib.error
 import urllib.request
 from datetime import date
@@ -19,6 +20,7 @@ from pathlib import Path
 from typing import Callable
 
 from .github import _gh, load_label_registry
+from .config import project_setting
 from .core import RepoctlError, load_project, markdown_without_fenced_code, reject_secret_text
 from .core import today as core_today
 from .issues import contract, issue_problems, parse_sections
@@ -222,3 +224,28 @@ def run_issue_contract(root: Path) -> str:
             check=True,
         )
     return "Canonical issue contract passed"
+
+
+# --- the verification gate ---------------------------------------------------------
+
+
+def gate_command(root: Path, python: str) -> list[str]:
+    """The command the `kit-ci` verify job runs, pinned to the interpreter that runs it.
+
+    An adopted project's surfaces need toolchains this workflow never installs (Node, Go, ...), so
+    kit CI there runs only the toolchain-free gate, `repoctl check`; the surfaces' own tests belong
+    to the project's CI. The template itself (and `make init` projects) keep the full `make verify`.
+    """
+    if project_setting(load_project(root), "project_mode") == "adopt":
+        return [python, str(Path(__file__).resolve().parents[1] / "repoctl.py"), "--root", str(root), "check"]
+    return ["make", "--no-print-directory", f"PYTHON={python}", "verify"]
+
+
+def run_gate(root: Path) -> str:
+    python = sys.executable
+    command = gate_command(root, python)
+    print(f"kit-ci gate on Python {sys.version.split()[0]}: {' '.join(command)}", flush=True)
+    done = subprocess.run(command, cwd=root)
+    if done.returncode:
+        raise RepoctlError(f"the verification gate failed (exit {done.returncode})")
+    return "Verification gate passed"
