@@ -50,14 +50,17 @@ older than the lock) is not all hand merges: a file byte-identical to any
 version in the template's git history was never edited there, so it is updated
 like an unchanged file; only real edits are staged.
 
-The other direction: a project that changes a kit file reports it to the
-template with `make kit-report` (an issue on `[template].source`, same contract
-and duplicate check as `make issue`, with the project and commit appended), or
-records why the change is project-specific with `make kit-report REASON="..."`.
-The `kit-upstream` check holds `make done` and the stop gate until each kit file
-changed in the session is one or the other (record: ignored
-`.agent/kit-reports.json`), so every project improves the template, and the
-template's fix then reaches every project through `make kit-update`. Tests prove that init or adopt
+The other direction: a project that changes a kit file drafts a report for the
+template with `make kit-report` (ignored `.agent/kit-reports/`, nothing is
+sent), or records why the change is project-specific (a hand-merged kit update
+included) with `make kit-report REASON="..."`. The owner files a reviewed draft
+with `PUBLIC_REVIEWED=1`: an issue on `[template].source` with the same contract
+and duplicate check as `make issue`, naming the kit version and files but never
+the project's repository or commit, because the template may be public while the
+project is private. The `kit-upstream` check holds `make done` and the stop gate
+until each changed kit file version is drafted, reported, or explained (ignored
+`.agent/kit-reports.json`; another worktree asks again), so every project feeds
+the template, and its fix reaches every project through `make kit-update`. Tests prove that init or adopt
 followed by an update from the same kit changes nothing, and that an update
 applies fixes, additions, and removals while keeping the project's edits.
 

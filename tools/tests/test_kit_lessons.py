@@ -135,6 +135,8 @@ class CiStatusTests(unittest.TestCase):
         self.assertEqual(self.status(runs({"workflowName": "ci", "status": "in_progress", "conclusion": ""}))[0],
                          "pending")
         self.assertEqual(self.status(runs())[0], "none")
+        cancelled = runs({"workflowName": "ci", "status": "completed", "conclusion": "cancelled"})
+        self.assertEqual(self.status(cancelled)[0], "inconclusive", "cancelled is not a pass")
 
     def test_without_gh_or_inside_ci_it_says_why_instead_of_failing(self) -> None:
         def missing(args: list[str]) -> str:
@@ -249,9 +251,6 @@ class SessionBriefOwnershipTests(Scratch):
         brief = self.cli("hook", "session-start", stdin="{}").stdout
         self.assertIn("not yours unless you made them", brief)
 
-
-if __name__ == "__main__":
-    unittest.main()
 
 
 @unittest.skipUnless(__import__("fixtures").IN_TEMPLATE, "the template's own records")
@@ -378,24 +377,54 @@ class KitUpstreamTests(Scratch):
         self.write("tools/kit/x.py", "changed\n")
         self.assertEqual(kitreport.upstream_findings(self.root, ["tools/kit/x.py"]), [])
 
-    def test_a_report_files_on_the_template_with_its_origin(self) -> None:
+    def report_args(self, public: bool) -> mock.Mock:
+        return mock.Mock(reason=None, title="Better x", body_file=Path(".agent/bodies/r.md"), type="enhancement",
+                         priority="P3", topic="x", public_reviewed=public)
+
+    def test_a_report_is_only_a_local_draft_without_the_owner_opt_in(self) -> None:
+        """Critic finding: nothing leaves a (possibly private) project for a public template repository by default."""
         from kit import kitreport
         self.project()
         self.write("tools/kit/x.py", "ORIGINAL = 2\n")
         self.write(".agent/bodies/r.md", "### Summary\nbetter x\n")
         self.git("init", "-q")
+        self.git("remote", "add", "origin", "https://github.com/acme/secret-app.git")
+        with mock.patch("kit.issues.file_issue") as filed:
+            message = kitreport.report(self.root, self.report_args(public=False))
+        filed.assert_not_called()
+        self.assertIn("nothing was sent", message)
+        draft = (self.root / kitreport.DRAFTS / "x.md").read_text(encoding="utf-8")
+        self.assertNotIn("acme/secret-app", draft)
+        self.assertIn("kit file(s): tools/kit/x.py", draft)
+        self.assertEqual(kitreport.upstream_findings(self.root, ["tools/kit/x.py"]), [], "a draft clears the gate")
+
+    def test_the_owner_opt_in_files_on_the_template_without_the_project_name(self) -> None:
+        from kit import kitreport
+        self.project()
+        self.write("tools/kit/x.py", "ORIGINAL = 2\n")
+        self.write(".agent/bodies/r.md", "### Summary\nbetter x\n")
+        self.git("init", "-q")
+        self.git("remote", "add", "origin", "https://github.com/acme/secret-app.git")
         seen = {}
         def fake_file_issue(root, title, body, *rest, repository=None):
-            seen.update(title=title, body=(root / body).read_text(), repository=repository)
+            seen.update(body=(root / body).read_text(), repository=repository, public=rest[-2])
             return "https://github.com/owner/AI_TEMPLATE/issues/1"
-        args = mock.Mock(reason=None, title="Better x", body_file=Path(".agent/bodies/r.md"), type="enhancement",
-                         priority="P3", topic="x")
         with mock.patch("kit.issues.file_issue", fake_file_issue):
-            url = kitreport.report(self.root, args)
+            url = kitreport.report(self.root, self.report_args(public=True))
         self.assertEqual(seen["repository"], "owner/AI_TEMPLATE")
-        self.assertIn("kit file(s): tools/kit/x.py", seen["body"])
+        self.assertNotIn("acme", seen["body"])
+        self.assertTrue(seen["public"])
         self.assertTrue(url.endswith("/issues/1"))
+
+    def test_a_later_different_edit_is_asked_again(self) -> None:
+        from kit import kitreport
+        self.project()
+        self.write("tools/kit/x.py", "ORIGINAL = 2\n")
+        self.git("init", "-q")
+        kitreport.report(self.root, mock.Mock(reason="local", public_reviewed=False))
         self.assertEqual(kitreport.upstream_findings(self.root, ["tools/kit/x.py"]), [])
+        self.write("tools/kit/x.py", "ORIGINAL = 3\n")
+        self.assertEqual(len(kitreport.upstream_findings(self.root, ["tools/kit/x.py"])), 1)
 
 
 class LocklessKitUpdateTests(Scratch):
@@ -423,3 +452,7 @@ class LocklessKitUpdateTests(Scratch):
         (target / "b.py").write_text("B = 1  # ours\n")  # edited by the project
         self.assertTrue(kitupdate._past_kit_version(kit, "tools/a.py", target / "a.py"))
         self.assertFalse(kitupdate._past_kit_version(kit, "tools/b.py", target / "b.py"))
+
+
+if __name__ == "__main__":
+    unittest.main()

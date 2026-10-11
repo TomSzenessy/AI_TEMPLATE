@@ -2,10 +2,12 @@
 
 A project that changes a kit file (a file `tools/kit-lock.json` lists) found a kit bug or a better way. Fixing it
 only in the project leaves every other project with the old version, so the change is reported upstream:
-`make kit-report` files an issue on `[template].source` (same contract, labels and duplicate check as
-`make issue`), and the `kit-upstream` gate check holds `make done` and the stop gate until each changed kit file
-is reported or recorded as project-specific (`REASON="..."`). In the template itself there is no lock, so
-nothing is asked.
+`make kit-report` writes the report as a local draft (ignored `.agent/kit-reports/`), and files it as an issue on
+`[template].source` (same contract, labels and duplicate check as `make issue`) only when the owner passes
+`PUBLIC_REVIEWED=1`: the template repository may be public while the project is private, so nothing leaves the
+project without that opt-in, and a filed report never names the project's repository or commit. The `kit-upstream`
+gate check holds `make done` and the stop gate until each changed kit file is drafted, reported, or recorded as
+project-specific (`REASON="..."`). In the template itself there is no lock, so nothing is asked.
 """
 
 from __future__ import annotations
@@ -14,10 +16,10 @@ import json
 from pathlib import Path
 
 from .core import RepoctlError, ensure_inside_root, load_project
-from .gitinfo import git
 from .kitlock import digest, project_path, read_lock
 
-RECORD = ".agent/kit-reports.json"  # ignored: which kit paths this checkout already reported or explained
+RECORD = ".agent/kit-reports.json"  # ignored: which kit file versions this checkout drafted, reported or explained
+DRAFTS = ".agent/kit-reports"
 
 
 def _recorded(root: Path) -> dict[str, str]:
@@ -28,9 +30,14 @@ def _recorded(root: Path) -> dict[str, str]:
     return data if isinstance(data, dict) else {}
 
 
+def _key(root: Path, path: str) -> str:
+    """One kit file version: a later, different edit of a recorded path is asked about again."""
+    return f"{path}@{digest(root / path)[:16]}" if (root / path).is_file() else path
+
+
 def _record(root: Path, paths: list[str], note: str) -> None:
     data = _recorded(root)
-    data.update({path: note for path in paths})
+    data.update({_key(root, path): note for path in paths})
     target = ensure_inside_root(root, root / RECORD, "kit report record")
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(data, indent=1, sort_keys=True), encoding="utf-8")
@@ -55,13 +62,19 @@ def changed_kit_paths(root: Path, paths: list[str] | None = None) -> list[str]:
     return sorted(v for k, v in wanted.items() if (root / v).is_file() and digest(root / v) != files[k])
 
 
+def _owed(root: Path, paths: list[str] | None = None) -> list[str]:
+    recorded = _recorded(root)
+    return [path for path in changed_kit_paths(root, paths) if _key(root, path) not in recorded]
+
+
 def upstream_findings(root: Path, paths: list[str]) -> list[str]:
-    owed = [path for path in changed_kit_paths(root, paths) if path not in _recorded(root)]
+    owed = _owed(root, paths)
     if not owed:
         return []
-    return [f"changed kit file(s) {', '.join(owed[:5])}{' …' if len(owed) > 5 else ''}: report the improvement to "
-            "the template with `make kit-report TITLE=... BODY=... TYPE=bug|enhancement PRIORITY=... TOPIC=...`, or "
-            "record why it is project-specific with `make kit-report REASON=\"...\"`"]
+    return [f"changed kit file(s) {', '.join(owed[:5])}{' …' if len(owed) > 5 else ''}: draft a report for the "
+            "template with `make kit-report TITLE=... BODY=... TYPE=bug|enhancement PRIORITY=... TOPIC=...` (local; the "
+            "owner files it with PUBLIC_REVIEWED=1), or record why it is project-specific (a hand-merged kit update "
+            "included) with `make kit-report REASON=\"...\"`"]
 
 
 def template_repository(root: Path) -> str:
@@ -75,8 +88,8 @@ def template_repository(root: Path) -> str:
 
 
 def report(root: Path, args) -> str:
-    """File the kit report upstream (or record a project-specific reason) for the kit files changed here."""
-    paths = [path for path in changed_kit_paths(root) if path not in _recorded(root)]
+    """Draft the kit report (file it only with --public-reviewed), or record a project-specific reason."""
+    paths = _owed(root)
     if args.reason:
         _record(root, paths, f"project-specific: {args.reason}")
         return f"Recorded {len(paths)} kit path(s) as project-specific."
@@ -84,17 +97,24 @@ def report(root: Path, args) -> str:
     if missing:
         raise RepoctlError("kit-report needs " + ", ".join("--" + flag.replace("_", "-") for flag in missing)
                            + ' (or --reason "why it is project-specific")')
-    from .github import origin_target
-    from .issues import file_issue
     body_path = ensure_inside_root(root, root / args.body_file, "kit report body")
-    origin = origin_target(root) or "a project without a GitHub remote"
-    head = (git(root, "rev-parse", "--short", "HEAD") or "").strip()
-    footer = (f"\n\nReported from {origin} @ {head} by `make kit-report`; kit file(s): "
+    version = str(read_lock(root).get("kit_version", "unknown"))[:12]
+    # Never the project's repository or commit: the template may be public while the project is not.
+    footer = (f"\n\nReported by `make kit-report` from a project on kit {version}; kit file(s): "
               f"{', '.join(paths) or 'none named'}.\n")
-    staged = ensure_inside_root(root, root / ".agent" / "bodies" / "kit-report.md", "kit report body")
-    staged.parent.mkdir(parents=True, exist_ok=True)
-    staged.write_text(body_path.read_text(encoding="utf-8") + footer, encoding="utf-8")
-    url = file_issue(root, args.title, staged.relative_to(root), args.type, args.priority, "repo", args.topic,
-                     "triage", None, None, False, None, repository=template_repository(root))
+    slug = "".join(ch if ch.isalnum() else "-" for ch in args.topic.lower()).strip("-") or "report"
+    draft = ensure_inside_root(root, root / DRAFTS / f"{slug}.md", "kit report draft")
+    draft.parent.mkdir(parents=True, exist_ok=True)
+    text = body_path.read_text(encoding="utf-8")
+    draft.write_text(text if "Reported by `make kit-report`" in text else text + footer, encoding="utf-8")
+    relative = draft.relative_to(root)
+    if not getattr(args, "public_reviewed", False):
+        _record(root, paths, f"drafted: {relative}")
+        return (f"Drafted {relative} for {template_repository(root)} (nothing was sent). Review it, then file it with: "
+                f"make kit-report TITLE=\"{args.title}\" BODY={relative} TYPE={args.type} PRIORITY={args.priority} "
+                f"TOPIC={args.topic} PUBLIC_REVIEWED=1")
+    from .issues import file_issue
+    url = file_issue(root, args.title, relative, args.type, args.priority, "repo", args.topic,
+                     "triage", None, None, True, None, repository=template_repository(root))
     _record(root, paths, f"reported: {url}")
     return url

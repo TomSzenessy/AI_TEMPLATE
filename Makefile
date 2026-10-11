@@ -125,7 +125,7 @@ risk: python-check
 	@$(REPOCTL) risk
 
 kit-report: python-check
-	@$(REPOCTL) kit-report $(if $(KIT_IN_TITLE),--title "$${KIT_IN_TITLE}",) $(if $(KIT_IN_BODY),--body-file "$${KIT_IN_BODY}",) $(if $(KIT_IN_TYPE),--type "$${KIT_IN_TYPE}",) $(if $(KIT_IN_PRIORITY),--priority "$${KIT_IN_PRIORITY}",) $(if $(KIT_IN_TOPIC),--topic "$${KIT_IN_TOPIC}",) $(if $(KIT_IN_REASON),--reason "$${KIT_IN_REASON}",)
+	@$(REPOCTL) kit-report $(if $(KIT_IN_TITLE),--title "$${KIT_IN_TITLE}",) $(if $(KIT_IN_BODY),--body-file "$${KIT_IN_BODY}",) $(if $(KIT_IN_TYPE),--type "$${KIT_IN_TYPE}",) $(if $(KIT_IN_PRIORITY),--priority "$${KIT_IN_PRIORITY}",) $(if $(KIT_IN_TOPIC),--topic "$${KIT_IN_TOPIC}",) $(if $(KIT_IN_REASON),--reason "$${KIT_IN_REASON}",) $(if $(filter 1 yes true,$(KIT_IN_PUBLIC_REVIEWED)),--public-reviewed,)
 
 ci-status: python-check
 	@$(REPOCTL) ci-status

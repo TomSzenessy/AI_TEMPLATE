@@ -90,7 +90,8 @@ tier, cases, result, verdict, follow-up. A result without its commit cannot be
 reproduced or restored; tag the best version so it can be found.
 
 **Plateau rule:** three experiments in a row without a measured gain on the
-true objective means stop tuning and run the strategist role.
+true objective means stop tuning and run the strategist role; record its answer
+in the goal's issue.
 
 With several people or agents, each builds a competing variant on its own branch
 and claims it in the goal's issue (assignee, `status:in-progress`); the team

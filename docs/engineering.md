@@ -49,8 +49,8 @@ claim a verified license from the manifest alone.
 
 ## Time budgets
 
-Every external call has a timeout, and its timeout times its retries, plus the
-work around it, fits inside the deadline that encloses it (a response window,
+Every external call has a timeout, and all its attempts' timeouts, the backoff
+between them, and the work around them fit inside the deadline that encloses it (a response window,
 a round, a request budget, an event cap). A call that can outlive its deadline
 loses the whole unit of work even when its retry succeeds. Degrade before the
 deadline (a safe default move, a cached answer) instead of after it, and test

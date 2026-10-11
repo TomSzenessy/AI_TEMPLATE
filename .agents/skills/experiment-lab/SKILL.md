@@ -20,7 +20,8 @@ skill is the order of work.
    in the task text as a requirement.
 2. **Options before code.** Run the [`strategist`](../../agents/strategist.md)
    role with the goal and constraints; ask `skill-scout` for the capabilities
-   its top options need. Pick by expected gain per scarce evaluation.
+   its top options need. Pick by expected gain per scarce evaluation, and
+   record both answers in the goal's issue.
 3. **Deterministic core.** Put numbers, constraints and decisions in tested
    code; give the model only reading, writing and choosing among valid options.
    Every behaviour change becomes a named switch, off by default.

@@ -359,12 +359,12 @@ def initialize_project(root: Path, name: str, kind: str, owner: str | None = Non
         raise RepoctlError("project.toml must contain a name field")
     template_name = current_name.group(1)
     current = load_project(root)
+    if template_name != "REPLACE_WITH_PROJECT_NAME" and current.get("kind") != "template":
+        raise RepoctlError("project is already initialized; edit project.toml deliberately")
     guard_prune(current, prune_matches(root, current))  # before any write: a refused init changes nothing
     from .product import template_in_use
     in_use = template_in_use(root, current) is not None
     keep = frozenset(r for r in (VISION, STACK_DECISION) if in_use and not shipped(root, current, r))
-    if template_name != "REPLACE_WITH_PROJECT_NAME" and current.get("kind") != "template":
-        raise RepoctlError("project is already initialized; edit project.toml deliberately")
     old_owners = [str(o) for o in current.get("owners", []) if isinstance(o, str)]
 
     manifest = replace_manifest_field(manifest, "name", name)

@@ -140,6 +140,8 @@ def risk(root: Path, args) -> None:
     arg("--priority", var="PRIORITY"),
     arg("--topic", var="TOPIC"),
     arg("--reason", var="REASON", help="the change is project-specific: record why instead of reporting it"),
+    arg("--public-reviewed", action="store_true", var="PUBLIC_REVIEWED",
+        help="the owner reviewed the draft: file it on the (possibly public) template repository"),
 ))
 def kit_report(root: Path, args) -> None:
     from .kitreport import report

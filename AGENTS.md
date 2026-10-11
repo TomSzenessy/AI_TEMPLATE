@@ -49,7 +49,8 @@ file added the same way ([ADR 0002](./docs/adr/0002-one-capability-model.md)):
 - Outside skills, MCP servers, tools: the `skill-scout` role vets them first
   ([`docs/skills.md`](./docs/skills.md)). Nothing third-party runs unreviewed.
 - **Kit bug or improvement** (`tools/`, `.agents/`, `.githooks/`, a kit doc): fix
-  it here and `make kit-report` it to the template; `make kit-update` carries it.
+  it here and `make kit-report` a draft for the template (the owner files it);
+  `make kit-update` carries the fix.
 
 Project rules (scoped rules arrive when you edit a matching path):
 

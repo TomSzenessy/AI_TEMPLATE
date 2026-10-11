@@ -76,7 +76,7 @@ def _store(root: Path, sha: str, result: tuple[str, str]) -> None:
 
 def ci_status(root: Path, sha: str | None = None, runner: Runner | None = None,
               fresh: bool = False) -> tuple[str, str]:
-    """(state, detail) for one commit's CI runs: green, red, pending, none, unpushed, or unknown.
+    """(state, detail) for one commit's CI runs: green, red, pending, inconclusive, none, unpushed, or unknown.
     With the real `gh` (no `runner`) the answer is cached per commit in CACHE."""
     if os.environ.get("GITHUB_ACTIONS") == "true" or os.environ.get("CI") == "true":
         return "unknown", "running inside CI"
@@ -109,6 +109,8 @@ def _ask(root: Path, sha: str, runner: Runner | None) -> tuple[str, str]:
         return "red", f"CI failed on {sha[:7]}: {names}"
     if any(isinstance(r, dict) and r.get("status") != "completed" for r in runs):
         return "pending", f"CI still running on {sha[:7]}"
+    if not any(isinstance(r, dict) and r.get("conclusion") == "success" for r in runs):
+        return "inconclusive", f"no CI run succeeded on {sha[:7]} (cancelled, skipped, or awaiting approval)"
     return "green", f"CI passed on {sha[:7]}"
 
 

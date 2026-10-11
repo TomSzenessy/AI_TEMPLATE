@@ -43,7 +43,7 @@ fresh context cannot rationalize its own work.
 ## The brief (orchestrator → subagent)
 
 ```text
-Role: <scout | implementer | critic | researcher | doc-gardener | skill-scout>
+Role: <scout | implementer | critic | researcher | doc-gardener | skill-scout | strategist>
 Goal: <one sentence; the user-visible outcome this serves>
 <the role's `## Brief` fields, e.g. the critic's Issue, Diff, Artifact, Scope, Done when>
 Context: <issue link, decisions already made, relevant file:line pointers>
@@ -104,7 +104,8 @@ once on the combined change.
 
 The same holds for separate top-level sessions (two terminals, two hosts, a
 human and an agent): give each its own worktree (`git worktree add`). In a
-shared checkout, `git add` only the paths you changed, never `-A` or `.`, and
+shared checkout, `git add` only the paths you changed, never `-A` or `.`, check
+`git diff --cached --name-only` and unstage any path you do not own, and
 treat changes you did not make as someone else's work in progress: one
 session's merge commit must not carry another session's half-finished edits.
 
