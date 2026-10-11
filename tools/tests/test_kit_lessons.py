@@ -357,6 +357,37 @@ class GraduationInitTests(Scratch):
         self.assertIn("Owner: someone", vision.read_text(encoding="utf-8"))
         self.assertIn("REVIEW", done.stdout)
 
+    def test_graduation_locks_only_kit_files_so_a_later_update_keeps_the_project(self) -> None:
+        """Critic finding: init in a clone once locked the project's own files as kit, and the next kit-update
+        deleted them. The lock now lists only what tools/kit-files.json names."""
+        import json as _json
+        self.clone_in_use()
+        self.git("add", "-A")
+        self.git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "clone in use")
+        done = self.cli("init", "--name", "my-project", "--kind", "web")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        lock = _json.loads((self.root / "tools/kit-lock.json").read_text(encoding="utf-8"))
+        self.assertNotIn("app/main.py", lock["files"])
+        self.assertIn("tools/kit/core.py", lock["files"])
+        from kit import kitreport
+        self.write("app/main.py", "print('changed')\n")
+        self.assertEqual(kitreport.upstream_findings(self.root, ["app/main.py"]), [], "project code is not kit")
+        self.git("add", "-A")
+        self.git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "init and edit")
+        update = self.cli("kit-update", "--kit", str(Path(__file__).resolve().parents[2]))
+        self.assertEqual(update.returncode, 0, update.stdout + update.stderr)
+        self.assertTrue((self.root / "app/main.py").is_file(), update.stdout)
+
+    def test_a_clone_without_the_kit_list_is_told_to_update_first(self) -> None:
+        """Negative case: without tools/kit-files.json init refuses before any write and names kit-update."""
+        vision = self.clone_in_use()
+        (self.root / "tools/kit-files.json").unlink()
+        before = vision.read_text(encoding="utf-8")
+        done = self.cli("init", "--name", "my-project", "--kind", "web")
+        self.assertNotEqual(done.returncode, 0)
+        self.assertIn("make kit-update", done.stdout + done.stderr)
+        self.assertEqual(before, vision.read_text(encoding="utf-8"))
+
     def test_a_prune_pattern_over_its_own_surface_is_dropped_not_obeyed(self) -> None:
         """A clone used as a project once listed its own folders in prune (793 files on a real project): init keeps
         them, says so, and still prunes the template-only material."""

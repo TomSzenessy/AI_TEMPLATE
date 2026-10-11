@@ -21,7 +21,7 @@ import re
 from pathlib import Path
 
 from . import adapters, docsync
-from .core import ensure_inside_root, load_project, read_text_file, repository_files
+from .core import RepoctlError, ensure_inside_root, load_project, read_text_file, repository_files
 from .helptext import help_text
 from .kitlock import rename_kit_targets
 from .registry import Registry
@@ -155,8 +155,25 @@ def render_blocks(root: Path) -> dict[str, str]:
     return files
 
 
+def render_kit_files(root: Path) -> dict[str, str]:
+    """The template's exact list of the files it ships as kit (#75): a clone that graduates with `make init` locks
+    only these, never its own project files. Rendered only in the template itself, not in a clone of it."""
+    import json
+
+    from .kitlock import KIT_FILES, kit_paths
+    from .structure import is_template, template_in_use
+    try:
+        project = load_project(root)
+        if not is_template(project) or template_in_use(root, project) is not None:
+            return {}
+        paths = sorted({*kit_paths(root), KIT_FILES})
+    except RepoctlError:
+        return {}
+    return {KIT_FILES: json.dumps(paths, indent=0) + "\n"}
+
+
 def render_all(root: Path) -> dict[str, str]:
-    return {**adapters.render(root), **render_blocks(root)}
+    return {**adapters.render(root), **render_blocks(root), **render_kit_files(root)}
 
 
 def drift(root: Path) -> list[str]:

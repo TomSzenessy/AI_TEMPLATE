@@ -19,7 +19,7 @@ order:
 
 | Phase | Done when |
 |---|---|
-| initialize | only for a template clone used as a project (its origin is not `[template].source` and it declares a surface of its own): `make init` has given it its own identity |
+| initialize | only for a template clone used as a project (its origin is not `[template].source` and it declares a surface of its own): `make init` (after `make kit-update` when `tools/kit-files.json` is missing) has given it its own identity |
 | intake | `VISION.md` is accepted after the `product-kickoff` questions; `docs/design.md`, `docs/product/research.md`, and `docs/product/features.csv` are created by `product-kickoff` |
 | research | `docs/product/research.md` cites at least three sources (skipped for an adopted project) |
 | features | `docs/product/features.csv` exists with must rows |

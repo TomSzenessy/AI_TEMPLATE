@@ -20,6 +20,7 @@ from .gitinfo import git, path_matches
 from .names import DESIGN, ERROR_LOG, HANDOVER, STACK_DECISION, VISION
 
 LOCK = "tools/kit-lock.json"
+KIT_FILES = "tools/kit-files.json"  # the template's own list of the files it ships as kit (generated in the template)
 MAKE_TARGET = re.compile(r"(?m)^([A-Za-z0-9][A-Za-z0-9_.-]*)\s*:(?!=)")
 
 

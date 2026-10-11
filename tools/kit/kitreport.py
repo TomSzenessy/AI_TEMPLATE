@@ -73,7 +73,7 @@ def upstream_findings(root: Path, paths: list[str]) -> list[str]:
         return []
     return [f"changed kit file(s) {', '.join(owed[:5])}{' …' if len(owed) > 5 else ''}: draft a report for the "
             "template with `make kit-report TITLE=... BODY=... TYPE=bug|enhancement PRIORITY=... TOPIC=...` (local; the "
-            "owner files it with PUBLIC_REVIEWED=1), or record why it is project-specific (a hand-merged kit update "
+            "owner files it with `make kit-publish`), or record why it is project-specific (a hand-merged kit update "
             "included) with `make kit-report REASON=\"...\"`"]
 
 

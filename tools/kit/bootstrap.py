@@ -280,6 +280,22 @@ def guard_prune(project: dict[str, object], removed: list[str]) -> None:
                            "[template].prune first; prune is for template-only material")
 
 
+def listed_kit_files(root: Path) -> list[str]:
+    """The template's own list of kit files (tools/kit-files.json); a clone older than the list gets it from kit-update."""
+    import json
+
+    from .kitlock import KIT_FILES
+    try:
+        listed = json.loads((root / KIT_FILES).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        raise RepoctlError(f"{KIT_FILES} is missing: this clone predates it. Run `make kit-update` first (it adds the "
+                           "list and updates the kit), commit, then `make init`, so init can tell the kit's files from "
+                           "the project's") from error
+    if not isinstance(listed, list) or not all(isinstance(p, str) for p in listed):
+        raise RepoctlError(f"{KIT_FILES} must be a JSON list of paths")
+    return [p for p in listed if (root / p).is_file()]
+
+
 def drop_surface_prune(root: Path, project: dict[str, object]) -> dict[str, object]:
     """The project with every prune pattern that matches a file of one of its declared surfaces removed (#75)."""
     template = project.get("template", {})
@@ -382,10 +398,12 @@ def initialize_project(root: Path, name: str, kind: str, owner: str | None = Non
     current = load_project(root)
     if template_name != "REPLACE_WITH_PROJECT_NAME" and current.get("kind") != "template":
         raise RepoctlError("project is already initialized; edit project.toml deliberately")
-    from .product import template_in_use
+    from .structure import template_in_use
     in_use = template_in_use(root, current) is not None
+    shipped_kit: list[str] = []
     if in_use:  # a clone already used as a project: patterns over its own surfaces were never template material
         current = drop_surface_prune(root, current)
+        shipped_kit = listed_kit_files(root)
     guard_prune(current, prune_matches(root, current))  # before any write: a refused init changes nothing
     keep = frozenset(r for r in (VISION, STACK_DECISION) if in_use and not shipped(root, current, r))
     old_owners = [str(o) for o in current.get("owners", []) if isinstance(o, str)]
@@ -419,7 +437,9 @@ def initialize_project(root: Path, name: str, kind: str, owner: str | None = Non
     manifest_path.write_text(manifest, encoding="utf-8")
     update_readme_identity(root, name, kind, template_name)
     derive.sync(root)
-    write_lock(root, root)  # what this project got from the kit, so make kit-update can tell your edits apart
+    # What this project got from the kit, so make kit-update can tell your edits apart. A clone already used as a
+    # project locks only the files the template lists as its kit, never its own (a later kit-update would delete them).
+    write_lock(root, root, paths=shipped_kit if in_use else None)
     if removed:
         print(f"Moved {len(removed)} template-only file(s) to .agent/init-backup/; links now point to the template source.")
     print(f"Initialized {name} ({kind}). Declare real surfaces before implementation.")

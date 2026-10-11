@@ -559,3 +559,31 @@ def print_inventory(root: Path) -> None:
             )
     else:
         print("Declared surfaces: none")
+
+
+TEMPLATE_SURFACES = {"template", "template-bootstrap"}
+
+
+def template_in_use(root: Path, project: dict[str, object] | None = None) -> str | None:
+    """Why this checkout is the template used as a project (#75), or None.
+
+    `is_template = true` alone cannot tell the template from a clone of it: a project cloned from the template
+    and never `make init`-ed kept the template's name, GitHub target, README and next step for its whole life.
+    A checkout counts as a project when its origin is not the template source and it declares a surface of its
+    own; a fork made to improve the template declares none.
+    """
+    from .github import github_target_from_remote, origin_target
+
+    project = project if project is not None else load_project(root)
+    if not is_template(project):
+        return None
+    template = project.get("template", {})
+    source = github_target_from_remote(str(template.get("source", ""))) if isinstance(template, dict) else None
+    origin = origin_target(root)
+    own = [str(s.get("id")) for s in declared_surfaces(project) if s.get("id") not in TEMPLATE_SURFACES]
+    if not origin or not source or origin.lower() == source.lower() or not own:
+        return None
+    return (f"this checkout ({origin}) is the template ({source}) used as a project with surface(s) {', '.join(own)}: "
+            "run `make kit-update` if tools/kit-files.json is missing, then `make init NAME=<project> KIND=<kind> "
+            "OWNER=<handle>` so its name, GitHub target, README and next step become the project's (declared surfaces "
+            "are kept, never pruned)")

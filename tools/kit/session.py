@@ -210,7 +210,7 @@ def _session_start(root: Path, event: dict[str, object] | None = None) -> None:
 def _attention(root: Path) -> list[str]:
     """Repository facts no check owns: a template used as a project (#75), red CI on what was pushed (#76)."""
     from .cistatus import ci_status
-    from .product import template_in_use
+    from .structure import template_in_use
     found = []
     try:
         if (in_use := template_in_use(root)) is not None:

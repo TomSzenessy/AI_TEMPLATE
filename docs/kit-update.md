@@ -45,8 +45,11 @@ update refuses a dirty tree, so it lands as one reviewable change; run
 `make done` after it. `make garden` reports when the template has moved past
 the recorded `kit_version`.
 
-A project without a lock (a clone of the template never initialized, or one
-older than the lock) is not all hand merges: a file byte-identical to any
+A template clone used as a project locks, at `make init`, only the files the
+template lists in `tools/kit-files.json`, never its own; a clone older than the
+list runs `make kit-update` first, which adds it. A project without a lock (a
+clone of the template never initialized, or one older than the lock) is not all
+hand merges: a file byte-identical to any
 version in the template's git history was never edited there, so it is updated
 like an unchanged file (one `git log` of the kit per update); only real edits
 are staged.
