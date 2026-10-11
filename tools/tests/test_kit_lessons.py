@@ -198,6 +198,34 @@ class CiCacheTests(Scratch):
         self.assertEqual(len(calls), 2)
 
 
+class CiCacheRedTests(Scratch):
+    def test_a_cached_red_is_asked_again_by_the_gate(self) -> None:
+        """Critic finding: a re-run that turned the same commit green must clear the gate."""
+        import time
+        sha = "e" * 40
+        (self.root / ".agent").mkdir()
+        (self.root / cistatus.CACHE).write_text(json.dumps({sha: ["red", "CI failed", time.time() - 86400]}))
+        green = lambda root: (lambda args: json.dumps([{"workflowName": "ci", "status": "completed",
+                                                        "conclusion": "success"}]))
+        with mock.patch.dict(os.environ, {"GITHUB_ACTIONS": "", "CI": ""}), \
+             mock.patch.object(cistatus, "_gh_runner", green), \
+             mock.patch.object(cistatus, "pushed_head", return_value=sha), \
+             mock.patch.object(cistatus, "git", return_value=sha + "\n"):
+            self.assertEqual(cistatus.red_findings(self.root), [])
+            self.assertEqual(cistatus.ci_status(self.root, sha=sha)[0], "green")
+
+
+class ShippedCrlfTests(Scratch):
+    def test_a_crlf_checkout_still_matches_the_shipped_digest(self) -> None:
+        import hashlib
+        self.write("VISION.md", "Project: x\nline\n")
+        digest = "sha256:" + hashlib.sha256(b"Project: x\nline\n").hexdigest()
+        (self.root / "VISION.md").write_bytes(b"Project: x\r\nline\r\n")
+        self.assertTrue(bootstrap.shipped(self.root, {"template": {"records": {"VISION.md": digest}}}, "VISION.md"))
+        (self.root / "VISION.md").write_bytes(b"Project: x\r\nour own line\r\n")
+        self.assertFalse(bootstrap.shipped(self.root, {"template": {"records": {"VISION.md": digest}}}, "VISION.md"))
+
+
 class PruneBackupTests(Scratch):
     def test_pruned_files_move_into_the_backup(self) -> None:
         """#82: an undeclared project folder listed in prune is kept in the ignored backup, not lost."""

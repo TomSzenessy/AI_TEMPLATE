@@ -229,7 +229,8 @@ def shipped(root: Path, project: dict[str, object], relative: str) -> bool:
     path = root / relative
     if not expected or not path.is_file():
         return True  # no digest to compare with: treat it as the template's, back it up, and reset it
-    return f"sha256:{hashlib.sha256(path.read_bytes()).hexdigest()}" == expected
+    text = path.read_bytes().replace(b"\r\n", b"\n")  # a CRLF checkout (core.autocrlf) is still the shipped text
+    return f"sha256:{hashlib.sha256(text).hexdigest()}" == expected
 
 
 def reset_vision_for_project(root: Path, manifest: str, project_name: str, template_name: str,
@@ -397,7 +398,7 @@ def initialize_project(root: Path, name: str, kind: str, owner: str | None = Non
     derive.sync(root)
     write_lock(root, root)  # what this project got from the kit, so make kit-update can tell your edits apart
     if removed:
-        print(f"Removed {len(removed)} template-only file(s); links now point to the template source.")
+        print(f"Moved {len(removed)} template-only file(s) to .agent/init-backup/; links now point to the template source.")
     print(f"Initialized {name} ({kind}). Declare real surfaces before implementation.")
     if not owner:
         print('Owner is the placeholder "project-owner": set owners = ["<handle>"] in project.toml (or init with OWNER=<handle>).')

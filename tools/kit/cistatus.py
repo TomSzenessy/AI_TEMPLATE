@@ -45,7 +45,7 @@ def pushed_head(root: Path) -> str | None:
 
 
 CACHE = ".agent/ci-status.json"  # ignored; one gh call per commit, not per start, done and stop (#83)
-FINAL = {"green", "red"}
+FINAL = {"green"}  # red is asked again: a re-run on the same commit can turn it green
 RETRY_S = 300  # pending, none, or unknown (offline) is asked again after this long, not on every gate
 
 
@@ -74,7 +74,8 @@ def _store(root: Path, sha: str, result: tuple[str, str]) -> None:
         pass  # a cache that cannot be written only costs another call
 
 
-def ci_status(root: Path, sha: str | None = None, runner: Runner | None = None) -> tuple[str, str]:
+def ci_status(root: Path, sha: str | None = None, runner: Runner | None = None,
+              fresh: bool = False) -> tuple[str, str]:
     """(state, detail) for one commit's CI runs: green, red, pending, none, unpushed, or unknown.
     With the real `gh` (no `runner`) the answer is cached per commit in CACHE."""
     if os.environ.get("GITHUB_ACTIONS") == "true" or os.environ.get("CI") == "true":
@@ -82,7 +83,7 @@ def ci_status(root: Path, sha: str | None = None, runner: Runner | None = None) 
     sha = sha or pushed_head(root)
     if sha is None:
         return "unpushed", "HEAD is not on its upstream yet"
-    if runner is None and (hit := _cached(root, sha)) is not None:
+    if runner is None and (hit := _cached(root, sha)) is not None and not (fresh and hit[0] != "green"):
         return hit
     result = _ask(root, sha, runner)
     if runner is None:
@@ -117,7 +118,7 @@ def default_branch_red(root: Path, default: str, runner: Runner | None = None) -
     if not sha or sha == (git(root, "rev-parse", "HEAD") or "").strip():
         return None
     state, detail = ci_status(root, sha=sha, runner=runner)
-    return f"default branch {default}: {detail}" if state == "red" else None
+    return f"default branch {default} (as of the last fetch): {detail}" if state == "red" else None
 
 
 def red_findings(root: Path, since: str | None = None, runner: Runner | None = None) -> list[str]:
@@ -125,7 +126,7 @@ def red_findings(root: Path, since: str | None = None, runner: Runner | None = N
     head = (git(root, "rev-parse", "HEAD") or "").strip()
     if since and head.startswith(since):
         return []  # the session committed nothing: a red run that was already there is not its to fix
-    state, detail = ci_status(root, runner=runner)
+    state, detail = ci_status(root, runner=runner, fresh=True)  # a gate never blocks on a cached red
     if state != "red":
         return []
-    return [f"{detail}; fix it (`gh run view --log-failed`) and push again: a red default branch is never done"]
+    return [f"{detail}; fix it (`gh run view --log-failed`) and push, or re-run a flaky workflow: red is never done"]
