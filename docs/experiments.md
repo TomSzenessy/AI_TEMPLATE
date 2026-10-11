@@ -16,7 +16,9 @@ evaluator, while the approach that would win is never built.
 Write down, before any code: the formula the real evaluator applies, the unit
 it averages over, and the conditions of the run that counts (one attempt or
 best of many, known or hidden cases, time and rate limits, what ends a run).
-Compute that score locally from the evaluator's own definition. A proxy (a
+Compute that score locally from the evaluator's own definition, and read the
+evaluator's exact checks (which inputs it verifies, which it ignores) before
+building anything that depends on them. A proxy (a
 practice board that keeps your best result per case, a demo, a vibe) is
 labelled as a proxy everywhere it appears; compare yourself with others only
 under the same condition (single attempt against single attempt).
@@ -46,7 +48,12 @@ Spend the cheapest evaluation that can decide the question:
 | scarce real | the counted evaluations | confirming a lab winner; the rehearsal |
 
 Budget the scarce tier up front, keep a reserve for a full rehearsal under the
-real conditions, and log what each spend bought.
+real conditions, and log what each spend bought. Before every run whose result
+matters, pull what the team pushed and run from a pushed, clean commit: a result
+measured on code nobody else has cannot be reproduced or credited.
+
+Encode the task's rules (forbidden calls, freezes, rate and size limits) as
+guards and tests in the code, so no variant can break them by accident.
 
 ## 4. The local lab
 
@@ -66,6 +73,11 @@ change would otherwise be tested on the real evaluator.
   the deadline that encloses it ([`engineering.md`](./engineering.md#time-budgets)).
 - **Search**: let the lab sweep switches and parameters; a lab winner is a
   hypothesis until a higher tier confirms it.
+- **A model-played tier**: when the real counterpart reads language, add a lab
+  mode where a model plays it inside the fitted limits; use it to check
+  finalists and wording, not for searches (it is slow and costs money).
+- **Model choice**: run the same scenarios with each candidate model and keep
+  the cheapest one that matches the best score and latency.
 
 ## 5. Experiments and the ledger
 
@@ -79,6 +91,10 @@ reproduced or restored; tag the best version so it can be found.
 
 **Plateau rule:** three experiments in a row without a measured gain on the
 true objective means stop tuning and run the strategist role.
+
+With several people or agents, each builds a competing variant on its own branch
+and claims it in the goal's issue (assignee, `status:in-progress`); the team
+picks by measured results named by commit, not by argument.
 
 ## 6. Learnings
 

@@ -364,6 +364,17 @@ def critic_evidence(context) -> list[str]:
     return gatechecks.critic_evidence(context)
 
 
+@check("kit-upstream", "A kit file changed in a project is reported to the template or recorded as local; asked by the stop and done gates",
+       blocks=True, reason="Kit fixes made in a project stayed there; every other project kept the bug (#88). Reporting "
+                           "is one command, and REASON records a project-specific change.")
+def kit_upstream(context) -> list[str]:
+    change = context.change
+    if change is None or change.kind != "finish":
+        return []
+    from .kitreport import upstream_findings
+    return upstream_findings(context.root, change.paths)
+
+
 @check("ci-red", "The CI run of a pushed HEAD this session committed is not red; asked by the stop and done gates",
        blocks=True, reason="A red default branch went unnoticed for five pushes while every local gate passed (#76); "
                            "only the pushed commit's CI shows what a clean environment sees.")

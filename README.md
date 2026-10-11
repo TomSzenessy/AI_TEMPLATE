@@ -138,6 +138,8 @@ EXTEND THE SYSTEM (one path for every kind of capability)
 
 WHEN NEEDED
   make risk                          How much ceremony this change needs (low, normal, high)
+  make kit-report TITLE="..." BODY=path TYPE=... PRIORITY=... TOPIC=... | REASON="..."
+                                     Report a kit improvement made here as an issue on the template, or record why it is local
   make ci-status                     The CI result of what you pushed: green, red, pending, or why it cannot tell
   make handover                      Write HANDOVER.md before pausing (git facts pre-filled)
   make map                           One-screen repository map

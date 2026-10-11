@@ -131,6 +131,21 @@ def risk(root: Path, args) -> None:
     print_risk(root, args.base)
 
 
+@command("kit-report", "Report a kit improvement made here as an issue on the template, or record why it is local",
+         group="when-needed", usage='make kit-report TITLE="..." BODY=path TYPE=... PRIORITY=... TOPIC=... | REASON="..."',
+         args=(
+    arg("--title", var="TITLE"),
+    arg("--body-file", type=Path, var="BODY"),
+    arg("--type", var="TYPE"),
+    arg("--priority", var="PRIORITY"),
+    arg("--topic", var="TOPIC"),
+    arg("--reason", var="REASON", help="the change is project-specific: record why instead of reporting it"),
+))
+def kit_report(root: Path, args) -> None:
+    from .kitreport import report
+    print(report(root, args))
+
+
 @command("ci-status", "The CI result of what you pushed: green, red, pending, or why it cannot tell", group="when-needed",
          usage="make ci-status")
 def ci_status(root: Path, args) -> int:

@@ -331,7 +331,7 @@ def finish_findings(root: Path, session_paths: list[str] | None = None, since: s
     if not changed:
         return []
     file_set = set(repository_files(root))
-    rules = {"dead-bindings", "doc-coupling", "critic-evidence", "ci-red"}
+    rules = {"dead-bindings", "doc-coupling", "critic-evidence", "ci-red", "kit-upstream"}
     if not scoped or any(path.startswith(CANONICAL_INPUTS) or path.endswith(".md") for path in changed):
         rules.add("derived-drift")
     change = Change("finish", changed, base=base, scoped=scoped, since=since)

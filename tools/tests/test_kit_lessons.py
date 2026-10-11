@@ -146,7 +146,8 @@ class CiStatusTests(unittest.TestCase):
     def test_a_session_that_committed_nothing_is_not_blamed(self) -> None:
         """Negative case: a red run that was already there is not this session's finding."""
         red = runs({"workflowName": "ci", "status": "completed", "conclusion": "failure"})
-        with mock.patch.object(cistatus, "git", return_value=self.SHA + "\n"), \
+        with mock.patch.dict(os.environ, {"GITHUB_ACTIONS": "", "CI": ""}), \
+             mock.patch.object(cistatus, "git", return_value=self.SHA + "\n"), \
              mock.patch.object(cistatus, "pushed_head", return_value=self.SHA):
             self.assertEqual(cistatus.red_findings(Path("."), since=self.SHA[:12], runner=red), [])
             self.assertEqual(len(cistatus.red_findings(Path("."), since="b" * 12, runner=red)), 1)
@@ -341,3 +342,84 @@ class GraduationInitTests(Scratch):
         self.assertNotEqual(done.returncode, 0)
         self.assertIn("app/main.py", done.stdout + done.stderr)
         self.assertEqual(before, (vision.read_text(encoding="utf-8"), (self.root / "project.toml").read_text(encoding="utf-8")))
+
+
+class KitUpstreamTests(Scratch):
+    """#88: a kit file changed in a project is reported to the template or recorded as project-specific."""
+
+    def project(self) -> None:
+        import hashlib
+        self.write("project.toml", 'schema = 1\nname = "p"\nkind = "web"\n[template]\n'
+                                   'source = "https://github.com/owner/AI_TEMPLATE"\n')
+        self.write("tools/kit/x.py", "ORIGINAL = 1\n")
+        shipped = hashlib.sha256(b"ORIGINAL = 1\n").hexdigest()
+        from kit.kitlock import digest
+        self.write("tools/kit-lock.json", json.dumps({"kit_version": "none",
+                                                      "files": {"tools/kit/x.py": digest(self.root / "tools/kit/x.py")}}))
+        self.assertTrue(shipped)
+
+    def test_a_changed_kit_file_holds_the_gate_until_reported_or_explained(self) -> None:
+        from kit import kitreport
+        self.project()
+        self.assertEqual(kitreport.upstream_findings(self.root, ["tools/kit/x.py"]), [])  # unchanged: nothing owed
+        self.write("tools/kit/x.py", "ORIGINAL = 2  # better\n")
+        owed = kitreport.upstream_findings(self.root, ["tools/kit/x.py"])
+        self.assertEqual(len(owed), 1)
+        self.assertIn("make kit-report", owed[0])
+        self.git("init", "-q")
+        args = mock.Mock(reason="only this project needs it", title=None, body_file=None, type=None,
+                         priority=None, topic=None)
+        self.assertIn("project-specific", kitreport.report(self.root, args))
+        self.assertEqual(kitreport.upstream_findings(self.root, ["tools/kit/x.py"]), [])
+
+    def test_the_template_itself_is_never_asked(self) -> None:
+        """Negative case: no lock, no kit files to report."""
+        from kit import kitreport
+        self.write("tools/kit/x.py", "changed\n")
+        self.assertEqual(kitreport.upstream_findings(self.root, ["tools/kit/x.py"]), [])
+
+    def test_a_report_files_on_the_template_with_its_origin(self) -> None:
+        from kit import kitreport
+        self.project()
+        self.write("tools/kit/x.py", "ORIGINAL = 2\n")
+        self.write(".agent/bodies/r.md", "### Summary\nbetter x\n")
+        self.git("init", "-q")
+        seen = {}
+        def fake_file_issue(root, title, body, *rest, repository=None):
+            seen.update(title=title, body=(root / body).read_text(), repository=repository)
+            return "https://github.com/owner/AI_TEMPLATE/issues/1"
+        args = mock.Mock(reason=None, title="Better x", body_file=Path(".agent/bodies/r.md"), type="enhancement",
+                         priority="P3", topic="x")
+        with mock.patch("kit.issues.file_issue", fake_file_issue):
+            url = kitreport.report(self.root, args)
+        self.assertEqual(seen["repository"], "owner/AI_TEMPLATE")
+        self.assertIn("kit file(s): tools/kit/x.py", seen["body"])
+        self.assertTrue(url.endswith("/issues/1"))
+        self.assertEqual(kitreport.upstream_findings(self.root, ["tools/kit/x.py"]), [])
+
+
+class LocklessKitUpdateTests(Scratch):
+    """#89: without a lock, a file identical to any past kit version is updated, a real edit is staged."""
+
+    def test_old_kit_versions_update_and_real_edits_stay(self) -> None:
+        import shutil
+        import tempfile
+        from fixtures import git_in
+        from kit import kitupdate
+        kit = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, kit, True)
+        git_in(kit, "init", "-q")
+        (kit / "tools").mkdir()
+        for name, old in (("a.py", "A = 1\n"), ("b.py", "B = 1\n")):
+            (kit / "tools" / name).write_text(old)
+        git_in(kit, "add", "-A")
+        git_in(kit, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "v1")
+        for name, new in (("a.py", "A = 2\n"), ("b.py", "B = 2\n")):
+            (kit / "tools" / name).write_text(new)
+        git_in(kit, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qam", "v2")
+        target = self.root / "tools"
+        target.mkdir()
+        (target / "a.py").write_text("A = 1\n")  # the old kit version, never edited
+        (target / "b.py").write_text("B = 1  # ours\n")  # edited by the project
+        self.assertTrue(kitupdate._past_kit_version(kit, "tools/a.py", target / "a.py"))
+        self.assertFalse(kitupdate._past_kit_version(kit, "tools/b.py", target / "b.py"))

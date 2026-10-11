@@ -45,9 +45,19 @@ update refuses a dirty tree, so it lands as one reviewable change; run
 `make done` after it. `make garden` reports when the template has moved past
 the recorded `kit_version`.
 
-The other direction: an agent that finds a kit bug in a project fixes it there
-and reports it at `[template].source` (AGENTS.md), and the template's fix then
-reaches every project through `make kit-update`. Tests prove that init or adopt
+A project without a lock (a clone of the template never initialized, or one
+older than the lock) is not all hand merges: a file byte-identical to any
+version in the template's git history was never edited there, so it is updated
+like an unchanged file; only real edits are staged.
+
+The other direction: a project that changes a kit file reports it to the
+template with `make kit-report` (an issue on `[template].source`, same contract
+and duplicate check as `make issue`, with the project and commit appended), or
+records why the change is project-specific with `make kit-report REASON="..."`.
+The `kit-upstream` check holds `make done` and the stop gate until each kit file
+changed in the session is one or the other (record: ignored
+`.agent/kit-reports.json`), so every project improves the template, and the
+template's fix then reaches every project through `make kit-update`. Tests prove that init or adopt
 followed by an update from the same kit changes nothing, and that an update
 applies fixes, additions, and removals while keeping the project's edits.
 

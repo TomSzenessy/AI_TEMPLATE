@@ -56,6 +56,14 @@ loses the whole unit of work even when its retry succeeds. Degrade before the
 deadline (a safe default move, a cached answer) instead of after it, and test
 the hung-call path, not only the slow one.
 
+## No silent fallbacks
+
+A fallback that hides a failure turns a broken run into a wrong result: a model
+call that failed and was replaced by a default move, a configuration file that
+was refused and replaced by a built-in one. Every fallback is counted and shown
+where the result is read (the report, the run record, the settings page), and
+"which configuration is in effect" is visible, never inferred.
+
 ## Dependencies and change safety
 
 A new dependency needs a recorded reason, license/provenance check, pinned
