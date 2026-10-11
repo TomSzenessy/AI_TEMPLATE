@@ -180,6 +180,18 @@ if __name__ == "__main__":
     unittest.main()
 
 
+@unittest.skipUnless(__import__("fixtures").IN_TEMPLATE, "the template's own records")
+class ShippedRecordDigestTests(unittest.TestCase):
+    def test_template_records_match_their_shipped_digests(self) -> None:
+        """Editing VISION.md or the stack record in the template needs the new digest in [template].records."""
+        root = Path(__file__).resolve().parents[2]
+        from kit.core import load_project
+        project = load_project(root)
+        for relative in ("VISION.md", "docs/STACK-DECISION.md"):
+            self.assertTrue(bootstrap.shipped(root, project, relative),
+                            f"update [template].records for {relative}: shasum -a 256 {relative}")
+
+
 class CiRedWiringTests(Scratch):
     """Critic finding B1: the check must run inside the real done/stop gate, not only when called directly."""
 
@@ -202,7 +214,7 @@ class CiRedWiringTests(Scratch):
 class GraduationInitTests(Scratch):
     """Critic finding B2: following the brief's "run make init" advice must lose no project text."""
 
-    def clone_in_use(self, extra_prune: str = "") -> Path:
+    def clone_in_use(self, extra_prune: str = "", edit_vision: bool = True) -> Path:
         import shutil
         from fixtures import git_in
         root = Path(__file__).resolve().parents[2]
@@ -217,7 +229,8 @@ class GraduationInitTests(Scratch):
         (self.root / "project.toml").write_text(manifest, encoding="utf-8")
         self.write("app/main.py", "print('ours')\n")
         vision = self.root / "VISION.md"
-        vision.write_text(vision.read_text(encoding="utf-8") + "\nOur own goal: ship the app.\n", encoding="utf-8")
+        if edit_vision:
+            vision.write_text(vision.read_text(encoding="utf-8") + "\nOur own goal: ship the app.\n", encoding="utf-8")
         self.git("init", "-q")
         self.git("remote", "add", "origin", "https://github.com/someone/my-project.git")
         return vision
@@ -229,6 +242,23 @@ class GraduationInitTests(Scratch):
         self.assertIn("Our own goal: ship the app.", vision.read_text(encoding="utf-8"))
         self.assertTrue((self.root / bootstrap.BACKUP / "README.md").is_file())
         self.assertTrue((self.root / "app/main.py").is_file())
+
+    def test_an_untouched_template_vision_is_reset_not_kept(self) -> None:
+        """Critic finding: a clone that never ran kickoff still has the template's vision; it must not become the project's."""
+        vision = self.clone_in_use(edit_vision=False)
+        done = self.cli("init", "--name", "my-project", "--kind", "web", "--owner", "someone")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        text = vision.read_text(encoding="utf-8")
+        self.assertRegex(text, r"(?m)^Status: pending$")
+        self.assertIn("Owner: someone", text)
+        self.assertTrue((self.root / bootstrap.BACKUP / "VISION.md").is_file())
+
+    def test_a_kept_record_names_the_new_owner(self) -> None:
+        vision = self.clone_in_use()
+        done = self.cli("init", "--name", "my-project", "--kind", "web", "--owner", "someone")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("Owner: someone", vision.read_text(encoding="utf-8"))
+        self.assertIn("REVIEW", done.stdout)
 
     def test_a_refused_prune_changes_nothing(self) -> None:
         """Negative case: a prune pattern over a surface stops init before its first write."""

@@ -220,21 +220,32 @@ def back_up(root: Path, relative: str, text: str) -> str:
     return f"{BACKUP}/{relative}"
 
 
+def shipped(root: Path, project: dict[str, object], relative: str) -> bool:
+    """Is this record still the template's own text, by the digest `[template].records` ships? (#75)"""
+    import hashlib
+    template = project.get("template", {})
+    records = template.get("records", {}) if isinstance(template, dict) else {}
+    expected = records.get(relative) if isinstance(records, dict) else None
+    path = root / relative
+    if not expected or not path.is_file():
+        return True  # no digest to compare with: treat it as the template's, back it up, and reset it
+    return f"sha256:{hashlib.sha256(path.read_bytes()).hexdigest()}" == expected
+
+
 def reset_vision_for_project(root: Path, manifest: str, project_name: str, template_name: str,
-                             keep: bool = False) -> str:
+                             keep: frozenset[str] = frozenset()) -> str:
     """Pending intake records for the new project, never the template's own vision and stack text.
 
-    `keep`: a template clone already used as a project (#75) keeps its records, only renamed, and reviews them.
+    `keep`: records a template clone already used as a project wrote itself (#75); they stay, renamed.
     """
-    if keep:
-        for relative in (VISION, STACK_DECISION):
-            path = root / relative
-            if path.is_file():
-                text = path.read_text(encoding="utf-8")
-                path.write_text(re.sub(rf"(?m)^Project:\s*{re.escape(template_name)}\s*$", f"Project: {project_name}",
-                                       text), encoding="utf-8")
-        print(f"Kept {VISION} and {STACK_DECISION} (this checkout was already a project): review that they describe it.")
-        return manifest
+    for relative in sorted(keep):
+        path = root / relative
+        text = path.read_text(encoding="utf-8")
+        path.write_text(re.sub(rf"(?m)^Project:\s*{re.escape(template_name)}\s*$", f"Project: {project_name}", text),
+                        encoding="utf-8")
+        print(f"Kept {relative}: this checkout wrote it as a project. REVIEW that it describes the project.")
+    if keep >= {VISION}:
+        return manifest  # its own vision keeps its own status
     manifest = re.sub(
         r'(?ms)(\[vision\]\s*\n\s*status\s*=\s*)"[^"]+"',
         r'\1"pending"',
@@ -242,6 +253,8 @@ def reset_vision_for_project(root: Path, manifest: str, project_name: str, templ
         count=1,
     )
     for relative, skeleton in ((VISION, VISION_SKELETON), (STACK_DECISION, STACK_SKELETON)):
+        if relative in keep:
+            continue
         path = ensure_inside_root(root, root / relative, "intake record")
         if _template_record(path, template_name):
             if path.is_file():
@@ -346,6 +359,7 @@ def initialize_project(root: Path, name: str, kind: str, owner: str | None = Non
     guard_prune(current, prune_matches(root, current))  # before any write: a refused init changes nothing
     from .product import template_in_use
     in_use = template_in_use(root, current) is not None
+    keep = frozenset(r for r in (VISION, STACK_DECISION) if in_use and not shipped(root, current, r))
     if template_name != "REPLACE_WITH_PROJECT_NAME" and current.get("kind") != "template":
         raise RepoctlError("project is already initialized; edit project.toml deliberately")
     old_owners = [str(o) for o in current.get("owners", []) if isinstance(o, str)]
@@ -362,7 +376,7 @@ def initialize_project(root: Path, name: str, kind: str, owner: str | None = Non
     for old_owner in old_owners:
         manifest = manifest.replace(f'owner = "{old_owner}"', 'owner = "project-owner"')
     manifest = reset_template_surface(manifest)
-    manifest = reset_vision_for_project(root, manifest, name, template_name, keep=in_use)
+    manifest = reset_vision_for_project(root, manifest, name, template_name, keep=keep)
     removed = prune_template_material(root, load_project(root))
     manifest = reset_repository_metadata(manifest)
     manifest = reset_packs(manifest)
@@ -372,7 +386,10 @@ def initialize_project(root: Path, name: str, kind: str, owner: str | None = Non
         for record in (VISION, STACK_DECISION):
             path = root / record
             if path.is_file():
-                path.write_text(path.read_text(encoding="utf-8").replace("Owner: project-owner", f"Owner: {owner}"), encoding="utf-8")
+                text = path.read_text(encoding="utf-8").replace("Owner: project-owner", f"Owner: {owner}")
+                for old_owner in old_owners if record in keep else ():  # a kept record still names the template's
+                    text = re.sub(rf"(?m)^Owner:\s*{re.escape(old_owner)}\s*$", f"Owner: {owner}", text)
+                path.write_text(text, encoding="utf-8")
     manifest_path.write_text(manifest, encoding="utf-8")
     update_readme_identity(root, name, kind, template_name)
     derive.sync(root)

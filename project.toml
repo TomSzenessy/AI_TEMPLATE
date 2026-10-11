@@ -28,6 +28,9 @@ is_template = true
 # links to removed files are rewritten to `source` so nothing breaks.
 source = "https://github.com/TomSzenessy/AI_TEMPLATE"
 prune = ["docs/research/**", ".agents/trials/**"]
+# Digests of the template's own intake records: `make init` in a clone already used as a project keeps a record
+# that differs from these (the project wrote it) and resets one that matches (#75). A template test keeps them current.
+records = { "VISION.md" = "sha256:54cd11f15fea92efb8536336450fa30a5073563d72b73c8ead995b61e03a755b", "docs/STACK-DECISION.md" = "sha256:477676bd70f6eb7c05c5449ec13e2889142e127eafc8020daba519f19dfc0722" }
 
 [vision]
 status = "accepted"
