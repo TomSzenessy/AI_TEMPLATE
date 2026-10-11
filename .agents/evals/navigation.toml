@@ -68,3 +68,23 @@ expect = '''^[\s`'"*]*(\./)?\.agents/mcp/?(?=[\s`'"*.,;:—-]|$)(?!.*\b(?:not|ne
 id = "switch-off-a-pack"
 prompt = "A repository is not a product. Which file and table switch off the product pack? Reply as file [table]."
 expect = "project\\.toml.*\\[packs\\]"
+
+[[tasks]]
+id = "score-goal-skill"
+prompt = "Your goal is to maximise a benchmark score, and real evaluations against the official evaluator are scarce. Which skill do you load first? Reply with the skill name only."
+expect = '''experiment-lab'''
+
+[[tasks]]
+id = "plateau-role"
+prompt = "Three experiments in a row brought no measured gain on the goal's metric. Which agent role do you run next? Reply with the role name only."
+expect = '''strategist'''
+
+[[tasks]]
+id = "kit-feedback"
+prompt = "In a project made from this template you improved a file under tools/kit/. Which make command records that improvement for the template? Reply with the command only."
+expect = '''make kit-report'''
+
+[[tasks]]
+id = "ci-after-push"
+prompt = "You just pushed a commit. Which make command tells you whether CI passed for what you pushed? Reply with the command only."
+expect = '''make ci-status'''
