@@ -160,11 +160,56 @@ class SurfaceSetupTests(unittest.TestCase):
         with self.assertRaises(RepoctlError):
             structure.validation_commands({"id": "web", "setup": [[""]]}, "setup")
 
-    def test_setup_runs_only_inside_ci(self) -> None:
-        with mock.patch.dict(os.environ, {"GITHUB_ACTIONS": "", "CI": ""}):
+    def test_setup_runs_only_on_the_workflow_opt_in(self) -> None:
+        """#84: CI=true alone (a local tool may export it) never runs installs."""
+        with mock.patch.dict(os.environ, {"REPOCTL_SETUP": "", "CI": "true", "GITHUB_ACTIONS": "true"}):
             self.assertFalse(structure.in_ci())
-        with mock.patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}):
+        with mock.patch.dict(os.environ, {"REPOCTL_SETUP": "1"}):
             self.assertTrue(structure.in_ci())
+
+
+class CiCacheTests(Scratch):
+    """#83: one gh call per commit; an offline answer is not asked again on every gate."""
+
+    def counting(self, *items: dict):
+        calls = []
+        def runner(args: list[str]) -> str:
+            calls.append(args)
+            return json.dumps(list(items))
+        return calls, (lambda root: runner)
+
+    def test_a_final_answer_is_asked_once_per_commit(self) -> None:
+        calls, factory = self.counting({"workflowName": "ci", "status": "completed", "conclusion": "success"})
+        with mock.patch.dict(os.environ, {"GITHUB_ACTIONS": "", "CI": ""}), \
+             mock.patch.object(cistatus, "_gh_runner", factory):
+            self.assertEqual(cistatus.ci_status(self.root, sha="c" * 40)[0], "green")
+            self.assertEqual(cistatus.ci_status(self.root, sha="c" * 40)[0], "green")
+        self.assertEqual(len(calls), 1)
+
+    def test_a_pending_answer_is_asked_again_after_the_retry_window(self) -> None:
+        calls, factory = self.counting({"workflowName": "ci", "status": "in_progress", "conclusion": ""})
+        with mock.patch.dict(os.environ, {"GITHUB_ACTIONS": "", "CI": ""}), \
+             mock.patch.object(cistatus, "_gh_runner", factory):
+            cistatus.ci_status(self.root, sha="d" * 40)
+            cistatus.ci_status(self.root, sha="d" * 40)
+            self.assertEqual(len(calls), 1, "within the window: cached")
+            with mock.patch("time.time", return_value=__import__("time").time() + cistatus.RETRY_S + 1):
+                cistatus.ci_status(self.root, sha="d" * 40)
+        self.assertEqual(len(calls), 2)
+
+
+class PruneBackupTests(Scratch):
+    def test_pruned_files_move_into_the_backup(self) -> None:
+        """#82: an undeclared project folder listed in prune is kept in the ignored backup, not lost."""
+        self.write("project.toml", 'schema = 1\nname = "x"\nkind = "template"\n[template]\nprune = ["notes/**"]\n')
+        self.write("notes/idea.md", "# our idea\n")
+        self.git("init", "-q")
+        self.git("add", "-A")
+        from kit.core import load_project
+        removed = bootstrap.prune_template_material(self.root, load_project(self.root))
+        self.assertEqual(removed, ["notes/idea.md"])
+        self.assertFalse((self.root / "notes/idea.md").exists())
+        self.assertEqual((self.root / bootstrap.BACKUP / "notes/idea.md").read_text(encoding="utf-8"), "# our idea\n")
 
 
 class SessionBriefOwnershipTests(Scratch):

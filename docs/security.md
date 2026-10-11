@@ -3,7 +3,7 @@
 <!-- index: design | Secure implementation baseline | Auth, secrets, CI, dependencies, deployment, or untrusted input changes. -->
 <!-- covers: .github/workflows/ci.yml .github/workflows/specialist-scans.yml .github/dependabot.yml .security/config.json tools/kit/docs.py -->
 
-The verify job runs `repoctl ci gate` on the interpreter `setup-python` configured; in an adopted project it runs only the toolchain-free `repoctl check` (see [`adopt.md`](./adopt.md#kit-ci-and-your-toolchains)), so CI installs no project toolchains beyond a surface's own `setup` commands, which verification runs only inside CI; pin them to a lockfile and disable install scripts (`npm ci --ignore-scripts`).
+The verify job runs `repoctl ci gate` on the interpreter `setup-python` configured; in an adopted project it runs only the toolchain-free `repoctl check` (see [`adopt.md`](./adopt.md#kit-ci-and-your-toolchains)), so CI installs no project toolchains beyond a surface's own `setup` commands, which verification runs only under the workflow's `REPOCTL_SETUP=1`; pin them to a lockfile and disable install scripts (`npm ci --ignore-scripts`).
 
 CI logic lives in tested repository code, not in workflow YAML: workflows
 check out the repository and call `make verify`, `make test-future`, or `repoctl ci <check>`

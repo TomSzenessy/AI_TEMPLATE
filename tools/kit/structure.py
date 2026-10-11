@@ -103,7 +103,8 @@ def _git_ignored(root: Path, paths: set[str]) -> set[str]:
 
 
 def in_ci() -> bool:
-    return os.environ.get("GITHUB_ACTIONS") == "true" or os.environ.get("CI") == "true"
+    """Run surface `setup` installs: only on the explicit opt-in the kit CI workflow sets (#84), never on CI=true."""
+    return os.environ.get("REPOCTL_SETUP") == "1"
 
 
 def validation_commands(surface: dict[str, object], field: str = "verification") -> list[list[str]]:

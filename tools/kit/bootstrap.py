@@ -301,8 +301,10 @@ def prune_template_material(root: Path, project: dict[str, object]) -> list[str]
         updated = localize_text(relative, text, removed_set, patterns, source)
         if updated != text:
             (root / relative).write_text(updated, encoding="utf-8")
-    for relative in removed:
-        (root / relative).unlink()
+    for relative in removed:  # #82: a project folder listed in prune by mistake is kept, not lost
+        target = ensure_inside_root(root, root / BACKUP / relative, "init backup")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        (root / relative).replace(target)  # moved, byte for byte, into the ignored backup
     for directory in sorted({str(Path(path).parent) for path in removed}, key=len, reverse=True):
         candidate = root / directory
         while candidate != root and candidate.is_dir() and not any(candidate.iterdir()):

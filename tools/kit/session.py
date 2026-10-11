@@ -220,6 +220,12 @@ def _attention(root: Path) -> list[str]:
     state, detail = ci_status(root)
     if state == "red":
         found.append(f"{detail}: fix it before new work (`gh run view --log-failed`)")
+    from .cistatus import default_branch_red
+    try:
+        if (line := default_branch_red(root, default_branch(load_project(root)))) is not None:
+            found.append(line)
+    except Exception:  # noqa: BLE001 - the brief must survive a broken manifest
+        pass
     return found
 
 
