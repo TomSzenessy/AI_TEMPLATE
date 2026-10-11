@@ -22,7 +22,7 @@ labelled as a proxy everywhere it appears; compare yourself with others only
 under the same condition (single attempt against single attempt).
 
 Read the task text for tips ("build your own simulator", "read the notes",
-"don't take the first offer"): each one is a requirement until a measurement
+"test on the sample set first"): each one is a requirement until a measurement
 says otherwise.
 
 ## 2. Deterministic core, model at the edges
@@ -58,7 +58,7 @@ change would otherwise be tested on the real evaluator.
   the lab covers cases you have not seen.
 - **Held-out split**: tune on one set of scenarios, rank on another; a large gap
   between them means the variant fits the lab, not the task.
-- **Must-be-zero counts** in every report: crashes, refused or invalid moves,
+- **Must-be-zero counts** in every report: crashes, refused or invalid actions,
   broken constraints, results worse than doing nothing, runs out of time.
 - **Stress tests**: hung and slow calls, rate limits, hard time caps, a
   counterpart that quits or never answers, malformed input, many runs in

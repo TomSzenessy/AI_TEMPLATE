@@ -196,7 +196,7 @@ def next_step(root: Path) -> dict[str, str]:
     project = load_project(root)
     if (in_use := template_in_use(root, project)) is not None:
         return {"phase": "initialize", "action": in_use[0].upper() + in_use[1:] + ".",
-                "guide": "docs/kit-update.md", "verify": "make doctor"}
+                "guide": "docs/ADAPTATION.md", "verify": "make doctor"}
     if not is_product(project):
         return {"phase": "template", "action": "Maintain the template: fix `make garden` findings, keep evals green.",
                 "guide": "docs/self-healing.md", "verify": "make done"}

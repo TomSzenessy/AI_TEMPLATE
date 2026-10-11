@@ -37,10 +37,13 @@ are indexed in [`docs/README.md`](./docs/README.md). The tooling comes from the 
 """
 
 
-def project_readme_body(content: str, source: str) -> str:
-    """The template's own prose leaves with `make init` (#75): marked sections go, an About section to fill in arrives."""
+def project_readme_body(content: str, source: str, removed: list[str] | None = None) -> str:
+    """The template's own prose leaves with `make init` (#75): marked sections go, an About section to fill in arrives.
+    `removed` collects the sections taken out, so the caller can keep them."""
     if "<!-- repoctl:template-only -->" not in content:
         return content
+    if removed is not None:
+        removed.extend(match.group(0) for match in TEMPLATE_ONLY.finditer(content))
     content = TEMPLATE_ONLY.sub("", content)
     content = re.sub(r"(?m)^## Start a project\s*$", "## Quick start", content, count=1)
     end = "<!-- /repoctl:project-readme -->"
@@ -56,7 +59,10 @@ def update_readme_identity(root: Path, name: str, kind: str, old_name: str) -> N
     except FileNotFoundError:
         return
     template = load_project(root).get("template", {})
-    content = project_readme_body(content, str(template.get("source", "")) if isinstance(template, dict) else "")
+    taken: list[str] = []
+    content = project_readme_body(content, str(template.get("source", "")) if isinstance(template, dict) else "", taken)
+    if taken:
+        print(f"Removed {len(taken)} template-only README section(s); kept in {back_up(root, 'README.md', ''.join(taken))}.")
     heading = rf"^\s*# (?:Agent Template|{re.escape(old_name)})\s*$"
     content = re.sub(heading, lambda _: f"# {name}", content, count=1, flags=re.MULTILINE)
     marker = "<!-- repoctl:project-readme -->"
@@ -204,8 +210,31 @@ def _template_record(path: Path, template_name: str) -> bool:
     return bool(re.search(rf"(?m)^Project:\s*({re.escape(template_name)}|REPLACE_WITH_PROJECT_NAME)\s*$", text))
 
 
-def reset_vision_for_project(root: Path, manifest: str, project_name: str, template_name: str) -> str:
-    """Pending intake records for the new project, never the template's own vision and stack text."""
+BACKUP = ".agent/init-backup"  # ignored: what init replaced or removed, so following its advice loses nothing
+
+
+def back_up(root: Path, relative: str, text: str) -> str:
+    target = ensure_inside_root(root, root / BACKUP / relative, "init backup")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(text, encoding="utf-8")
+    return f"{BACKUP}/{relative}"
+
+
+def reset_vision_for_project(root: Path, manifest: str, project_name: str, template_name: str,
+                             keep: bool = False) -> str:
+    """Pending intake records for the new project, never the template's own vision and stack text.
+
+    `keep`: a template clone already used as a project (#75) keeps its records, only renamed, and reviews them.
+    """
+    if keep:
+        for relative in (VISION, STACK_DECISION):
+            path = root / relative
+            if path.is_file():
+                text = path.read_text(encoding="utf-8")
+                path.write_text(re.sub(rf"(?m)^Project:\s*{re.escape(template_name)}\s*$", f"Project: {project_name}",
+                                       text), encoding="utf-8")
+        print(f"Kept {VISION} and {STACK_DECISION} (this checkout was already a project): review that they describe it.")
+        return manifest
     manifest = re.sub(
         r'(?ms)(\[vision\]\s*\n\s*status\s*=\s*)"[^"]+"',
         r'\1"pending"',
@@ -215,9 +244,28 @@ def reset_vision_for_project(root: Path, manifest: str, project_name: str, templ
     for relative, skeleton in ((VISION, VISION_SKELETON), (STACK_DECISION, STACK_SKELETON)):
         path = ensure_inside_root(root, root / relative, "intake record")
         if _template_record(path, template_name):
+            if path.is_file():
+                back_up(root, relative, path.read_text(encoding="utf-8"))
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(skeleton.format(name=project_name), encoding="utf-8")
     return manifest
+
+
+def guard_prune(project: dict[str, object], removed: list[str]) -> None:
+    """#75: a project's own folders were once added to the template's prune list; never delete a surface's files."""
+    owned = [str(s.get("path", "")).strip("/") for s in declared_surfaces(project)
+             if s.get("id") not in {"template", "template-bootstrap"} and str(s.get("path", "")).strip("/") not in {"", "."}]
+    guarded = sorted({p for p in removed for o in owned if p == o or p.startswith(o + "/")})
+    if guarded:
+        raise RepoctlError(f"[template].prune would delete {len(guarded)} file(s) of declared surfaces "
+                           f"({', '.join(guarded[:5])}{' ...' if len(guarded) > 5 else ''}): remove those patterns from "
+                           "[template].prune first; prune is for template-only material")
+
+
+def prune_matches(root: Path, project: dict[str, object]) -> list[str]:
+    template = project.get("template", {})
+    patterns = list(template.get("prune", [])) if isinstance(template, dict) else []
+    return [path for path in repository_files(root) if any(path_matches(path, pattern) for pattern in patterns)]
 
 
 def prune_template_material(root: Path, project: dict[str, object]) -> list[str]:
@@ -229,13 +277,7 @@ def prune_template_material(root: Path, project: dict[str, object]) -> list[str]
     source = str(template.get("source", "")).rstrip("/")
     files = repository_files(root)
     removed = [path for path in files if any(path_matches(path, pattern) for pattern in patterns)]
-    owned = [str(s.get("path", "")).strip("/") for s in declared_surfaces(project)
-             if s.get("id") not in {"template", "template-bootstrap"} and str(s.get("path", "")).strip("/") not in {"", "."}]
-    guarded = sorted({p for p in removed for o in owned if p == o or p.startswith(o + "/")})
-    if guarded:  # #75: a project's own folders were once added to the template's prune list
-        raise RepoctlError(f"[template].prune would delete {len(guarded)} file(s) of declared surfaces "
-                           f"({', '.join(sorted({p.split('/')[0] for p in guarded}))}): remove those patterns from "
-                           "[template].prune first; prune is for template-only material")
+    guard_prune(project, removed)
     removed_set = set(removed)
     for relative in files:
         if not relative.endswith(".md") or relative in removed_set:
@@ -301,6 +343,9 @@ def initialize_project(root: Path, name: str, kind: str, owner: str | None = Non
         raise RepoctlError("project.toml must contain a name field")
     template_name = current_name.group(1)
     current = load_project(root)
+    guard_prune(current, prune_matches(root, current))  # before any write: a refused init changes nothing
+    from .product import template_in_use
+    in_use = template_in_use(root, current) is not None
     if template_name != "REPLACE_WITH_PROJECT_NAME" and current.get("kind") != "template":
         raise RepoctlError("project is already initialized; edit project.toml deliberately")
     old_owners = [str(o) for o in current.get("owners", []) if isinstance(o, str)]
@@ -317,7 +362,7 @@ def initialize_project(root: Path, name: str, kind: str, owner: str | None = Non
     for old_owner in old_owners:
         manifest = manifest.replace(f'owner = "{old_owner}"', 'owner = "project-owner"')
     manifest = reset_template_surface(manifest)
-    manifest = reset_vision_for_project(root, manifest, name, template_name)
+    manifest = reset_vision_for_project(root, manifest, name, template_name, keep=in_use)
     removed = prune_template_material(root, load_project(root))
     manifest = reset_repository_metadata(manifest)
     manifest = reset_packs(manifest)

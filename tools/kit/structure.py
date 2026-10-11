@@ -479,8 +479,9 @@ def run_verification(root: Path) -> None:
         )
         surface_root = surface_path if surface_path.is_dir() else surface_path.parent
         commands = validation_commands(surface)
+        setup = validation_commands(surface, "setup")  # validated everywhere, run only in CI
         if commands and in_ci():  # CI starts clean: install what the surface needs, as declared, before verifying
-            commands = validation_commands(surface, "setup") + commands
+            commands = setup + commands
         if not commands:
             if profile != "minimal":
                 validate_critic_evidence(root, surface)

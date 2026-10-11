@@ -45,7 +45,7 @@ skill is the order of work.
 ## Done when
 
 - The local score function matches a real result, and the lab reports zero
-  crashes, invalid moves, broken constraints and timeouts on held-out and
+  crashes, invalid actions, broken constraints and timeouts on held-out and
   stress scenarios.
 - The ledger shows each promoted switch with its commit and its confirming
   measurement, and the rehearsal result is recorded.

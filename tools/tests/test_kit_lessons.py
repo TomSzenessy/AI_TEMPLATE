@@ -178,3 +178,63 @@ class SessionBriefOwnershipTests(Scratch):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CiRedWiringTests(Scratch):
+    """Critic finding B1: the check must run inside the real done/stop gate, not only when called directly."""
+
+    def test_the_done_gate_reports_a_red_pushed_head(self) -> None:
+        from fixtures import build_demo
+        from kit import session
+        build_demo(self.root)
+        self.git("switch", "-q", "-c", "work")
+        self.write("src/billing/invoice.py", "def render_invoice():\n    return 2\n")
+        self.commit("change")
+        red = ("red", "CI failed on abc1234: ci (failure)")
+        with mock.patch.object(cistatus, "ci_status", return_value=red):
+            findings = session.finish_findings(self.root)
+        self.assertTrue(any("[ci-red]" in item for item in findings), findings)
+        with mock.patch.object(cistatus, "ci_status", return_value=("green", "ok")):
+            self.assertFalse(any("[ci-red]" in item for item in session.finish_findings(self.root)))
+
+
+@unittest.skipUnless(__import__("fixtures").IN_TEMPLATE, "initializes a copy of the template")
+class GraduationInitTests(Scratch):
+    """Critic finding B2: following the brief's "run make init" advice must lose no project text."""
+
+    def clone_in_use(self, extra_prune: str = "") -> Path:
+        import shutil
+        from fixtures import git_in
+        root = Path(__file__).resolve().parents[2]
+        for relative in filter(None, git_in(root, "ls-files", "-z").stdout.split("\0")):
+            source = root / relative
+            if source.is_file():
+                (self.root / relative).parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, self.root / relative)
+        manifest = (self.root / "project.toml").read_text(encoding="utf-8")
+        manifest = manifest.replace("prune = [", f"prune = [{extra_prune}", 1)
+        manifest += '\n[[surfaces]]\nid = "app"\npath = "app"\nkind = "backend"\nstatus = "active"\nverification = [["true"]]\n'
+        (self.root / "project.toml").write_text(manifest, encoding="utf-8")
+        self.write("app/main.py", "print('ours')\n")
+        vision = self.root / "VISION.md"
+        vision.write_text(vision.read_text(encoding="utf-8") + "\nOur own goal: ship the app.\n", encoding="utf-8")
+        self.git("init", "-q")
+        self.git("remote", "add", "origin", "https://github.com/someone/my-project.git")
+        return vision
+
+    def test_init_keeps_the_records_of_a_clone_in_use_and_backs_up_the_readme(self) -> None:
+        vision = self.clone_in_use()
+        done = self.cli("init", "--name", "my-project", "--kind", "web")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("Our own goal: ship the app.", vision.read_text(encoding="utf-8"))
+        self.assertTrue((self.root / bootstrap.BACKUP / "README.md").is_file())
+        self.assertTrue((self.root / "app/main.py").is_file())
+
+    def test_a_refused_prune_changes_nothing(self) -> None:
+        """Negative case: a prune pattern over a surface stops init before its first write."""
+        vision = self.clone_in_use(extra_prune='"app/**", ')
+        before = vision.read_text(encoding="utf-8"), (self.root / "project.toml").read_text(encoding="utf-8")
+        done = self.cli("init", "--name", "my-project", "--kind", "web")
+        self.assertNotEqual(done.returncode, 0)
+        self.assertIn("app/main.py", done.stdout + done.stderr)
+        self.assertEqual(before, (vision.read_text(encoding="utf-8"), (self.root / "project.toml").read_text(encoding="utf-8")))

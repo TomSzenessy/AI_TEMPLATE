@@ -17,7 +17,8 @@ from pathlib import Path
 from .gitinfo import git
 
 Runner = Callable[[list[str]], str]
-TIMEOUT_S = 15
+TIMEOUT_S = 8  # the session brief waits for it once; offline it must not stall the start
+RED = {"failure", "timed_out", "startup_failure"}  # cancelled or awaiting approval is not a defect of the commit
 
 
 def _gh_runner(root: Path) -> Runner:
@@ -33,6 +34,10 @@ def pushed_head(root: Path) -> str | None:
     """HEAD's full sha when its upstream contains it (it was pushed), else None."""
     sha = (git(root, "rev-parse", "HEAD") or "").strip()
     upstream = (git(root, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}") or "").strip()
+    if not upstream:  # pushed without -u: the remote branch of the same name still says whether it is there
+        name = (git(root, "rev-parse", "--abbrev-ref", "HEAD") or "").strip()
+        upstream = f"origin/{name}" if name and name != "HEAD" and git(root, "rev-parse", "--verify", "-q",
+                                                                            f"origin/{name}") else ""
     if not sha or not upstream:
         return None
     contained = git(root, "merge-base", "--is-ancestor", sha, upstream)
@@ -57,7 +62,7 @@ def ci_status(root: Path, sha: str | None = None, runner: Runner | None = None) 
     if not isinstance(runs, list) or not runs:
         return "none", f"no CI run for {sha[:7]}"
     failed = [r for r in runs if isinstance(r, dict) and r.get("status") == "completed"
-              and r.get("conclusion") not in ("success", "skipped", "neutral")]
+              and r.get("conclusion") in RED]
     if failed:
         names = ", ".join(f"{r.get('workflowName')} ({r.get('conclusion')}) {r.get('url', '')}".strip() for r in failed[:3])
         return "red", f"CI failed on {sha[:7]}: {names}"
