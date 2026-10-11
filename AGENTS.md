@@ -13,9 +13,12 @@ step), `make where Q="..."`, `make capabilities`, and `make done` before you cal
 2. **Orient.** `project.toml` owns shape, surfaces, checks, and provenance;
    obey the nearest scoped `AGENTS.md`.
 3. **Before editing:** `git status`, the current issue/PR, and `make risk`
-   (ceremony for this change: low, normal, or high).
+   (ceremony for this change: low, normal, or high). Parallel sessions work in
+   separate git worktrees; stage only the paths you changed.
 4. **Finish:** update every doc covering what you changed, run `make done`,
-   and observe the real artifact. When pausing, run `make handover`.
+   and observe the real artifact. After a push, `make ci-status` until the CI of
+   what you pushed is green; a red run is yours to fix. When pausing, run
+   `make handover`.
 
 Code, tests, and runtime observations are evidence; a plausible explanation
 is not a diagnosis.
@@ -28,6 +31,11 @@ directly** otherwise — a subagent costs more than the change. Each role file i
 [`.agents/agents/`](./.agents/agents/) fixes the brief it takes and the block it
 returns ([`docs/delegation.md`](./docs/delegation.md)). Reports cite `path:line`;
 keep raw dumps out of your context.
+
+**At the start of a goal**, and again when its measured result stops improving,
+run the `strategist` role for genuinely different approaches and the
+`skill-scout` role for capabilities that would reach the goal faster; record
+both answers in the goal's issue. A bounded fix needs neither.
 
 ## Extend the system
 
@@ -62,6 +70,7 @@ route is [`SECURITY.md`](./SECURITY.md).
 [`docs/README.md`](./docs/README.md) lists every document and when to read it:
 
 - **New product:** `product-kickoff` (headless with no owner answers: write the questions with your picks, then stop), then `stack-foundation`, then `make next` until launch ([`docs/building.md`](./docs/building.md)). **Anything users see:** `ux-quality` and `make ui-review`.
+- **A score, metric, benchmark, or scarce real evaluations:** `experiment-lab` ([`docs/experiments.md`](./docs/experiments.md)): objective first, deterministic core, a local lab before tuning, a ledger.
 - **Vocabulary, architecture, seams:** [`CONTEXT.md`](./CONTEXT.md), [`docs/architecture/README.md`](./docs/architecture/README.md).
 - **Bug or incident:** [`docs/operations.md`](./docs/operations.md); reproduce first. **Release or quality claim:** [`docs/verification.md`](./docs/verification.md), [`docs/production.md`](./docs/production.md).
 - **Auth, secrets, dependencies, CI, untrusted input:** [`docs/security.md`](./docs/security.md).

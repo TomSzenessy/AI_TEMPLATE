@@ -10,6 +10,7 @@ from .core import (
     KEBAB,
     PROJECT_NAME_PATTERN,
     RepoctlError,
+    declared_surfaces,
     ensure_inside_root,
     is_placeholder,
     load_project,
@@ -22,12 +23,40 @@ from .kitlock import localize_text, write_lock
 from .names import STACK_DECISION, VISION
 
 
+TEMPLATE_ONLY = re.compile(r"(?ms)^<!-- repoctl:template-only -->\n.*?^<!-- /repoctl:template-only -->\n?")
+PROJECT_ABOUT = """
+## About
+
+FILL-IN: what this project does, for whom, how its success is judged, and how to run it.
+
+## Working on this repository
+
+People and agents start with [`AGENTS.md`](./AGENTS.md): `make start`, `make next`, `make done`; the documents
+are indexed in [`docs/README.md`](./docs/README.md). The tooling comes from the kit at {source};
+`make kit-update` brings its fixes.
+"""
+
+
+def project_readme_body(content: str, source: str) -> str:
+    """The template's own prose leaves with `make init` (#75): marked sections go, an About section to fill in arrives."""
+    if "<!-- repoctl:template-only -->" not in content:
+        return content
+    content = TEMPLATE_ONLY.sub("", content)
+    content = re.sub(r"(?m)^## Start a project\s*$", "## Quick start", content, count=1)
+    end = "<!-- /repoctl:project-readme -->"
+    if "\n## About\n" not in content and end in content:
+        content = content.replace(end, end + "\n" + PROJECT_ABOUT.format(source=source or "the template source"), 1)
+    return re.sub(r"\n{3,}", "\n\n", content)
+
+
 def update_readme_identity(root: Path, name: str, kind: str, old_name: str) -> None:
     readme = ensure_inside_root(root, root / "README.md", "project README")
     try:
         content = readme.read_text(encoding="utf-8")
     except FileNotFoundError:
         return
+    template = load_project(root).get("template", {})
+    content = project_readme_body(content, str(template.get("source", "")) if isinstance(template, dict) else "")
     heading = rf"^\s*# (?:Agent Template|{re.escape(old_name)})\s*$"
     content = re.sub(heading, lambda _: f"# {name}", content, count=1, flags=re.MULTILINE)
     marker = "<!-- repoctl:project-readme -->"
@@ -200,6 +229,13 @@ def prune_template_material(root: Path, project: dict[str, object]) -> list[str]
     source = str(template.get("source", "")).rstrip("/")
     files = repository_files(root)
     removed = [path for path in files if any(path_matches(path, pattern) for pattern in patterns)]
+    owned = [str(s.get("path", "")).strip("/") for s in declared_surfaces(project)
+             if s.get("id") not in {"template", "template-bootstrap"} and str(s.get("path", "")).strip("/") not in {"", "."}]
+    guarded = sorted({p for p in removed for o in owned if p == o or p.startswith(o + "/")})
+    if guarded:  # #75: a project's own folders were once added to the template's prune list
+        raise RepoctlError(f"[template].prune would delete {len(guarded)} file(s) of declared surfaces "
+                           f"({', '.join(sorted({p.split('/')[0] for p in guarded}))}): remove those patterns from "
+                           "[template].prune first; prune is for template-only material")
     removed_set = set(removed)
     for relative in files:
         if not relative.endswith(".md") or relative in removed_set:

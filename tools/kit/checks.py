@@ -362,3 +362,14 @@ def doc_coupling(context) -> list[str]:
               "loop the builder had missed. The gate reads the saved verdict so the claim is checkable.")
 def critic_evidence(context) -> list[str]:
     return gatechecks.critic_evidence(context)
+
+
+@check("ci-red", "The CI run of a pushed HEAD this session committed is not red; asked by the stop and done gates",
+       blocks=True, reason="A red default branch went unnoticed for five pushes while every local gate passed (#76); "
+                           "only the pushed commit's CI shows what a clean environment sees.")
+def ci_red(context) -> list[str]:
+    change = context.change
+    if change is None or change.kind != "finish":
+        return []
+    from .cistatus import red_findings
+    return red_findings(context.root, change.since if change.scoped else None)

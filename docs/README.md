@@ -38,6 +38,7 @@ itself and this table cannot drift. Edit the line in the document, not here.
 | [`bindings.md`](./bindings.md) | Doc-code bindings, staleness, owed docs, and the Docs-Unaffected trailer | A document and its code drift apart, or a commit must exempt a document. |
 | [`building.md`](./building.md) | Product driver: feature list, research record, make next phases, product done, UI review | building or judging a product |
 | [`delegation.md`](./delegation.md) | Orchestrator/subagent roles, brief, return, and critic verdict contract | Work is bounded enough to hand to a scout, implementer, critic, researcher, doc-gardener, or skill-scout. |
+| [`experiments.md`](./experiments.md) | Score-driven goals: true objective, evaluation ladder, local lab, experiment ledger | A goal is a measured score or metric, or real evaluations are scarce |
 | [`generated-files.md`](./generated-files.md) | Derived files, host adapters, and generated blocks | A generated file looks wrong, or a new agent host is added. |
 | [`hygiene.md`](./hygiene.md) | Deprecation markers, orphan files, change coupling, and product guardrails | Code or files look stale, duplicated, or ownerless. |
 | [`kit-update.md`](./kit-update.md) | The kit lock, make kit-update, and the golden-path test | A kit fix must reach projects, or a project updates from the template. |

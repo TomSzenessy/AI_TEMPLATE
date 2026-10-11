@@ -58,7 +58,7 @@ done: python-check
 # (tools/kit/commands.py and .agents/commands/). Make variables reach repoctl as
 # quoted data, never as shell source. Edit the declaration, not this block.
 # <repoctl:commands>
-.PHONY: start next where ui-review new similar capabilities risk handover map garden sync issue review-packet incident init adopt kit-update check doctor readiness inventory resources skill-digest validate labels github-sync eval trial help
+.PHONY: start next where ui-review new similar capabilities risk ci-status handover map garden sync issue review-packet incident init adopt kit-update check doctor readiness inventory resources skill-digest validate labels github-sync eval trial help
 
 export KIT_IN_ACCESS = $(if $(filter command line,$(origin ACCESS)),$(value ACCESS))
 export KIT_IN_AGENT = $(if $(filter command line,$(origin AGENT)),$(value AGENT))
@@ -122,6 +122,9 @@ capabilities: python-check
 
 risk: python-check
 	@$(REPOCTL) risk
+
+ci-status: python-check
+	@$(REPOCTL) ci-status
 
 handover: python-check
 	@$(REPOCTL) handover

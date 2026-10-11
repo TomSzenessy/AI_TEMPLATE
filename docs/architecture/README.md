@@ -47,7 +47,7 @@ dispatch imports in `commands` are exempt, kept so `repoctl help` starts fast:
 | Manifest, paths, worktree, text primitives, the shared Reviewer/date rule, conventional file names, hook events | `core`, `gitinfo`, `names` | this page |
 | Capability model: loader, packs, command and check declarations, the check context, `make help` | `registry`, `checkrun`, `commands`, `checks`, `gatechecks`, `helptext` | this page and [ADR 0002](../adr/0002-one-capability-model.md) |
 | Surfaces, vision, inventory, declared verification, adoption | `structure`, `surfaces`, `bootstrap`, `adopt` | [`../ADAPTATION.md`](../ADAPTATION.md) |
-| Issues, review packets, incidents, GitHub CLI, CI checks | `issues`, `github`, `ci` | [`../ISSUE_TEMPLATE.md`](../ISSUE_TEMPLATE.md) |
+| Issues, review packets, incidents, GitHub CLI, CI checks, the CI result of a pushed commit | `issues`, `github`, `ci`, `cistatus` | [`../ISSUE_TEMPLATE.md`](../ISSUE_TEMPLATE.md), [`../self-healing.md`](../self-healing.md) |
 | Skills provenance, resource registry | `skills` | [`../skills.md`](../skills.md) |
 | Links, index, file hygiene | `docs` | [`../security.md`](../security.md) |
 | Launch evidence | `launch` | [`../production.md`](../production.md) |

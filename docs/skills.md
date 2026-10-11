@@ -10,6 +10,11 @@ routing, start with [`resources.md`](./resources.md).
 
 ## Discovery loop
 
+The loop runs on demand, and once at the start of every goal: the `skill-scout`
+role asks which skills, MCP servers, tools, datasets or prior art would reach
+this goal faster than the bundled ones, and its answer (including "nothing
+needed") goes into the goal's issue. A one-file fix skips it.
+
 1. Name the missing capability and its required interface in the issue.
 2. Search local project/global skills first. Prefer an already-reviewed skill
    whose source and revision are recorded.

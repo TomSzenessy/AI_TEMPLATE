@@ -102,10 +102,15 @@ def _git_ignored(root: Path, paths: set[str]) -> set[str]:
     return {line.strip().rstrip("/") for line in found.stdout.splitlines() if line.strip()}
 
 
-def validation_commands(surface: dict[str, object]) -> list[list[str]]:
-    commands = surface.get("verification", [])
+def in_ci() -> bool:
+    return os.environ.get("GITHUB_ACTIONS") == "true" or os.environ.get("CI") == "true"
+
+
+def validation_commands(surface: dict[str, object], field: str = "verification") -> list[list[str]]:
+    """A surface's `verification` commands, or its `setup` commands (the toolchain install CI runs first, #76)."""
+    commands = surface.get(field, [])
     if not isinstance(commands, list):
-        raise RepoctlError(f"surface {surface.get('id', '<missing id>')} verification must be an array")
+        raise RepoctlError(f"surface {surface.get('id', '<missing id>')} {field} must be an array")
     normalized: list[list[str]] = []
     for position, command in enumerate(commands, start=1):
         if (
@@ -114,7 +119,7 @@ def validation_commands(surface: dict[str, object]) -> list[list[str]]:
             or not all(isinstance(argument, str) and argument for argument in command)
         ):
             raise RepoctlError(
-                f"surface {surface.get('id', '<missing id>')} verification command #{position} must contain non-empty strings"
+                f"surface {surface.get('id', '<missing id>')} {field} command #{position} must contain non-empty strings"
             )
         if command and command[0].rsplit("/", 1)[-1] in {"make", "gmake"} and "verify" in command[1:]:
             raise RepoctlError("surface verification must not call the aggregate make verify command")
@@ -474,6 +479,8 @@ def run_verification(root: Path) -> None:
         )
         surface_root = surface_path if surface_path.is_dir() else surface_path.parent
         commands = validation_commands(surface)
+        if commands and in_ci():  # CI starts clean: install what the surface needs, as declared, before verifying
+            commands = validation_commands(surface, "setup") + commands
         if not commands:
             if profile != "minimal":
                 validate_critic_evidence(root, surface)

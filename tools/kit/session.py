@@ -155,6 +155,8 @@ def _session_start(root: Path, event: dict[str, object] | None = None) -> None:
         f"{project.get('name')} · phase={project.get('phase')} · profile={governance_profile(project)} · "
         f"branch {branch(root)} @ {head(root)} · {len(changed)} uncommitted path(s)"
     )
+    if changed:  # #77: a parallel session's merge once committed another session's half-finished edits
+        print("  (present before this session: not yours unless you made them; `git add` only the paths you change)")
     recent = (git(root, "log", "-5", "--format=- %h %s") or "").strip()
     if recent:
         print("\nRecent commits:\n" + recent)
@@ -174,6 +176,7 @@ def _session_start(root: Path, event: dict[str, object] | None = None) -> None:
         findings = [str(error)]
     if healed:
         findings.insert(0, "regenerated derived files: " + ", ".join(healed))
+    findings[:0] = _attention(root)
     if hooks_note:
         findings.insert(0, hooks_note)
     try:
@@ -202,6 +205,22 @@ def _session_start(root: Path, event: dict[str, object] | None = None) -> None:
         f"\n- Missing a capability? `make similar Q=\"...\"`, then `make new KIND=...` ({', '.join(KINDS[:5])},"
         f"\n  {', '.join(KINDS[5:-1])}, or {KINDS[-1]}) wires it in; outside tools go through the skill-scout role first."
     )
+
+
+def _attention(root: Path) -> list[str]:
+    """Repository facts no check owns: a template used as a project (#75), red CI on what was pushed (#76)."""
+    from .cistatus import ci_status
+    from .product import template_in_use
+    found = []
+    try:
+        if (in_use := template_in_use(root)) is not None:
+            found.append(in_use)
+    except Exception:  # noqa: BLE001 - the brief must survive a broken manifest; the checks report it
+        pass
+    state, detail = ci_status(root)
+    if state == "red":
+        found.append(f"{detail}: fix it before new work (`gh run view --log-failed`)")
+    return found
 
 
 def pre_compact(root: Path) -> None:

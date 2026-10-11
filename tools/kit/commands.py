@@ -131,6 +131,15 @@ def risk(root: Path, args) -> None:
     print_risk(root, args.base)
 
 
+@command("ci-status", "The CI result of what you pushed: green, red, pending, or why it cannot tell", group="when-needed",
+         usage="make ci-status")
+def ci_status(root: Path, args) -> int:
+    from .cistatus import ci_status as status
+    state, detail = status(root)
+    print(f"{state}: {detail}")
+    return 1 if state == "red" else 0
+
+
 @command("handover", "Write HANDOVER.md before pausing (git facts pre-filled)", group="when-needed", usage="make handover")
 def handover(root: Path, args) -> None:
     print(session.write_handover(root))

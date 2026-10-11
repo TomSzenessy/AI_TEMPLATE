@@ -47,6 +47,15 @@ claim a verified license from the manifest alone.
   paths, and documentation. File residual cleanup as an issue when it is
   independent.
 
+## Time budgets
+
+Every external call has a timeout, and its timeout times its retries, plus the
+work around it, fits inside the deadline that encloses it (a response window,
+a round, a request budget, an event cap). A call that can outlive its deadline
+loses the whole unit of work even when its retry succeeds. Degrade before the
+deadline (a safe default move, a cached answer) instead of after it, and test
+the hung-call path, not only the slow one.
+
 ## Dependencies and change safety
 
 A new dependency needs a recorded reason, license/provenance check, pinned
