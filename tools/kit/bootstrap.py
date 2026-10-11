@@ -63,6 +63,10 @@ def update_readme_identity(root: Path, name: str, kind: str, old_name: str) -> N
     content = project_readme_body(content, str(template.get("source", "")) if isinstance(template, dict) else "", taken)
     if taken:
         print(f"Removed {len(taken)} template-only README section(s); kept in {back_up(root, 'README.md', ''.join(taken))}.")
+    from .structure import TEMPLATE_README_HEADINGS
+    left = [h for h in TEMPLATE_README_HEADINGS if h in {line.strip() for line in content.splitlines()}]
+    if left:  # a README older than the template-only markers: name what to replace (make garden keeps listing it)
+        print(f"README.md still has the template's own section(s) {', '.join(left)}: replace them with the project's.")
     heading = rf"^\s*# (?:Agent Template|{re.escape(old_name)})\s*$"
     content = re.sub(heading, lambda _: f"# {name}", content, count=1, flags=re.MULTILINE)
     marker = "<!-- repoctl:project-readme -->"
@@ -276,6 +280,23 @@ def guard_prune(project: dict[str, object], removed: list[str]) -> None:
                            "[template].prune first; prune is for template-only material")
 
 
+def drop_surface_prune(root: Path, project: dict[str, object]) -> dict[str, object]:
+    """The project with every prune pattern that matches a file of one of its declared surfaces removed (#75)."""
+    template = project.get("template", {})
+    if not isinstance(template, dict):
+        return project
+    owned = [str(s.get("path", "")).strip("/") for s in declared_surfaces(project)
+             if s.get("id") not in {"template", "template-bootstrap"} and str(s.get("path", "")).strip("/") not in {"", "."}]
+    files = repository_files(root)
+    keep, dropped = [], []
+    for pattern in template.get("prune", []):
+        hits = [p for p in files if path_matches(p, pattern)]
+        (dropped if any(p == o or p.startswith(o + "/") for p in hits for o in owned) else keep).append(pattern)
+    if dropped:
+        print(f"Kept {', '.join(dropped)} out of the prune: they cover this project's own surfaces.")
+    return {**project, "template": {**template, "prune": keep}}
+
+
 def prune_matches(root: Path, project: dict[str, object]) -> list[str]:
     template = project.get("template", {})
     patterns = list(template.get("prune", [])) if isinstance(template, dict) else []
@@ -361,9 +382,11 @@ def initialize_project(root: Path, name: str, kind: str, owner: str | None = Non
     current = load_project(root)
     if template_name != "REPLACE_WITH_PROJECT_NAME" and current.get("kind") != "template":
         raise RepoctlError("project is already initialized; edit project.toml deliberately")
-    guard_prune(current, prune_matches(root, current))  # before any write: a refused init changes nothing
     from .product import template_in_use
     in_use = template_in_use(root, current) is not None
+    if in_use:  # a clone already used as a project: patterns over its own surfaces were never template material
+        current = drop_surface_prune(root, current)
+    guard_prune(current, prune_matches(root, current))  # before any write: a refused init changes nothing
     keep = frozenset(r for r in (VISION, STACK_DECISION) if in_use and not shipped(root, current, r))
     old_owners = [str(o) for o in current.get("owners", []) if isinstance(o, str)]
 
@@ -380,7 +403,7 @@ def initialize_project(root: Path, name: str, kind: str, owner: str | None = Non
         manifest = manifest.replace(f'owner = "{old_owner}"', 'owner = "project-owner"')
     manifest = reset_template_surface(manifest)
     manifest = reset_vision_for_project(root, manifest, name, template_name, keep=keep)
-    removed = prune_template_material(root, load_project(root))
+    removed = prune_template_material(root, current)  # with the prune list this init decided on
     manifest = reset_repository_metadata(manifest)
     manifest = reset_packs(manifest)
     if owner:

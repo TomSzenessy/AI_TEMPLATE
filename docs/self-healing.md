@@ -28,13 +28,13 @@ assumed. A new or changed check **blocks** only when all three hold:
 1. **Evidence:** skipping the step produced a worse product or codebase in a
    build trial, eval, or incident (not "an agent might forget").
 2. **Cheap, named fix:** the message names the command or edit that clears
-   it, and that fix costs minutes, not a review cycle.
+   it in minutes, not a review cycle.
 3. **Deterministic and hard to game:** it checks the artifact itself (a file,
    a binding, a digest), not a ticked box or a keyword in prose.
 
-Otherwise it is **advisory** (`make garden`, the session brief) or an
+Otherwise it is **advisory** (`make garden`, the brief) or an
 **automatic fix** (`make sync`). Since #9 `markdown-links`, `command-references`,
-`markers`, `budgets` are advisory. `file-hygiene` stays blocking; `[checks.file-hygiene] allow_paths` exempts one path with a reason ([`capabilities.md`](./capabilities.md#exempting-one-path-from-file-hygiene)) and advisory `file-hygiene-allowed` lists it. Further rules:
+`markers`, `budgets` are advisory, as is `readme-template-sections`. `file-hygiene` stays blocking; `[checks.file-hygiene] allow_paths` exempts one path with a reason ([`capabilities.md`](./capabilities.md#exempting-one-path-from-file-hygiene)) and advisory `file-hygiene-allowed` lists it. Further rules:
 
 - **One blocking point per concern.** Each later gate fires only on what the
   earlier one let through (`--no-verify`, uncommitted work), never on a
@@ -68,7 +68,7 @@ Otherwise it is **advisory** (`make garden`, the session brief) or an
 | Session start or resume | `repoctl hook session-start` | `make start` | Brief: branch, recent commits, `HANDOVER.md`, map, the `make next` step, open findings, red CI, a template clone used as a project. Derived files are regenerated and the git commit gate is installed (adopted projects: [`adopt.md`](./adopt.md)). |
 | Before context compaction | `repoctl hook pre-compact` | — | Writes `.agent/checkpoint.md` (uncommitted paths, docs still owed). |
 | After a file edit | `repoctl hook after-edit` | — | Names the docs covering the edited path (once per session); regenerates derived files when a source changed; warns on edits to generated files. |
-| Before declaring done | `repoctl hook stop` | `make done` | Gate over this branch's change set: owed docs, derived-file drift, dead bindings, red pushed CI (`ci-red`), an unreported kit change (`kit-upstream`), plus critic evidence when committed `high`-risk paths changed ([ceremony](#ceremony-by-risk)); `make done` also prints product completeness and advises on a stale UI review. The hook blocks again in the same turn only on changed findings (five at most); it holds a session on new `make check` findings, and one that changed product-surface code while must features are open or `features.csv` is invalid ([`building.md`](./building.md)); `make done` also runs every test and predicts the commit gate. |
+| Before declaring done | `repoctl hook stop` | `make done` | Gate over this branch's change set: owed docs, derived-file drift, dead bindings, red pushed CI (`ci-red`), an unreported kit change (`kit-upstream`), plus critic evidence for committed `high`-risk paths ([ceremony](#ceremony-by-risk)); `make done` also prints product completeness and advises on a stale UI review. The hook blocks again in the same turn only on changed findings (five at most); it holds a session on new `make check` findings, and one that changed product-surface code while must features are open or `features.csv` is invalid ([`building.md`](./building.md)); `make done` also runs every test and predicts the commit gate. |
 | Every commit | `.githooks/commit-msg` (any agent or human) | same | Refuses a commit whose staged covered code skips its doc (unless the message carries a `Docs-Unaffected:` trailer), and derived-file drift when the commit touches a source. In a merge commit, paths the merged branch brought in skip the owed-doc check (already judged); the rest is checked. Exit 3 means blocked; a broken plugin or kit also blocks (see [A broken check](#a-broken-check-is-a-finding-not-a-traceback)). Bypass with `--no-verify`. |
 
 Owed docs (`doc-coupling`), critic evidence and `surface-docs` are registry

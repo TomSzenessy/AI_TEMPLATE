@@ -89,6 +89,20 @@ class TemplateInUseTests(Scratch):
         self.assertTrue((self.root / "service/main.py").exists(), "nothing is deleted when prune is refused")
 
 
+class ReadmeTemplateSectionsTests(Scratch):
+    def test_an_initialized_readme_with_template_sections_is_listed(self) -> None:
+        self.write("README.md", "# app\n\n## Why\ntemplate prose\n\n## Start a project\nx\n")
+        project = {"name": "app", "repository": {"is_template": False}}
+        self.assertEqual(structure.readme_template_sections(self.root, project), ["## Why", "## Start a project"])
+
+    def test_the_template_and_a_clean_project_readme_are_not_listed(self) -> None:
+        """Negative case: the template keeps its sections; a project README without them is clean."""
+        self.write("README.md", "# app\n\n## Why\n")
+        self.assertEqual(structure.readme_template_sections(self.root, {"name": "x", "repository": {"is_template": True}}), [])
+        self.write("README.md", "# app\n\n## About\nours\n")
+        self.assertEqual(structure.readme_template_sections(self.root, {"name": "app"}), [])
+
+
 class ProjectReadmeTests(unittest.TestCase):
     TEMPLATE = (
         "# AI_TEMPLATE\n\n<!-- repoctl:template-only -->\nThe template sells itself.\n\n## Why\nBecause.\n"
@@ -343,14 +357,15 @@ class GraduationInitTests(Scratch):
         self.assertIn("Owner: someone", vision.read_text(encoding="utf-8"))
         self.assertIn("REVIEW", done.stdout)
 
-    def test_a_refused_prune_changes_nothing(self) -> None:
-        """Negative case: a prune pattern over a surface stops init before its first write."""
+    def test_a_prune_pattern_over_its_own_surface_is_dropped_not_obeyed(self) -> None:
+        """A clone used as a project once listed its own folders in prune (793 files on a real project): init keeps
+        them, says so, and still prunes the template-only material."""
         vision = self.clone_in_use(extra_prune='"app/**", ')
-        before = vision.read_text(encoding="utf-8"), (self.root / "project.toml").read_text(encoding="utf-8")
         done = self.cli("init", "--name", "my-project", "--kind", "web")
-        self.assertNotEqual(done.returncode, 0)
-        self.assertIn("app/main.py", done.stdout + done.stderr)
-        self.assertEqual(before, (vision.read_text(encoding="utf-8"), (self.root / "project.toml").read_text(encoding="utf-8")))
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("app/**", done.stdout)
+        self.assertTrue((self.root / "app/main.py").is_file())
+        self.assertIn("Our own goal: ship the app.", vision.read_text(encoding="utf-8"))
 
 
 class KitUpstreamTests(Scratch):
@@ -435,7 +450,18 @@ class KitUpstreamTests(Scratch):
         """Claude Code asks the person before `make kit-publish`; drafting needs no approval."""
         settings = json.loads((Path(__file__).resolve().parents[2] / ".claude/settings.json").read_text())
         self.assertIn("Bash(make kit-publish:*)", settings["permissions"]["ask"])
+        self.assertIn("Bash(tools/repoctl kit-publish:*)", settings["permissions"]["ask"])
         self.assertNotIn("Bash(make kit-publish:*)", settings["permissions"]["allow"])
+
+    def test_publish_refuses_a_body_that_is_not_a_draft(self) -> None:
+        """Negative case: kit-publish files only what kit-report drafted, never an arbitrary file."""
+        from kit import kitreport
+        self.project()
+        self.write(".agent/bodies/r.md", "### Summary\nraw\n")
+        args = mock.Mock(title="x", body_file=Path(".agent/bodies/r.md"), type="bug", priority="P3", topic="x")
+        with mock.patch("kit.issues.file_issue") as filed, self.assertRaises(RepoctlError):
+            kitreport.publish(self.root, args)
+        filed.assert_not_called()
 
     def test_a_later_different_edit_is_asked_again(self) -> None:
         from kit import kitreport

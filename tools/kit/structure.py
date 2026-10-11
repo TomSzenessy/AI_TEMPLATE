@@ -432,6 +432,22 @@ def manifest_type_errors(project: dict[str, object]) -> list[str]:
     return errors
 
 
+# The template's own README sections (#75): a project README that still has them reads as the template.
+TEMPLATE_README_HEADINGS = ("## Why", "## Start a project", "### Already have a codebase?", "## How it stays healthy")
+
+
+def readme_template_sections(root: Path, project: dict[str, object]) -> list[str]:
+    """The template's own README headings left in an initialized project's README."""
+    if project.get("name") == "REPLACE_WITH_PROJECT_NAME" or is_template(project):
+        return []
+    try:
+        text = read_utf8(root / "README.md")
+    except (FileNotFoundError, OSError):
+        return []
+    lines = {line.strip() for line in text.splitlines()}
+    return [heading for heading in TEMPLATE_README_HEADINGS if heading in lines]
+
+
 def check_readme_identity(root: Path, project: dict[str, object]) -> None:
     if project.get("name") == "REPLACE_WITH_PROJECT_NAME" or is_template(project):
         return  # the template states template mode; only `make init` writes a project identity

@@ -122,6 +122,9 @@ def publish(root: Path, args) -> str:
     missing = [flag for flag in ("title", "body_file", "type", "priority", "topic") if not getattr(args, flag)]
     if missing:
         raise RepoctlError("kit-publish needs " + ", ".join("--" + flag.replace("_", "-") for flag in missing))
+    draft = ensure_inside_root(root, root / args.body_file, "kit report draft")
+    if not draft.resolve().is_relative_to((root / DRAFTS).resolve()):
+        raise RepoctlError(f"kit-publish files only a draft from {DRAFTS}/ (written by make kit-report)")
     from .issues import file_issue
     return file_issue(root, args.title, args.body_file, args.type, args.priority, "repo", args.topic,
                       "triage", None, None, True, None, repository=template_repository(root))

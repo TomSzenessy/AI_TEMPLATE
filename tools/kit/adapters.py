@@ -104,7 +104,8 @@ def render_claude(root: Path) -> dict[str, str]:
         "permissions": {
             "allow": [f"Bash({command})" for command in allow],
             # Filing on the (possibly public) template repository is the owner's decision (#88): the host asks.
-            "ask": ["Bash(make kit-publish:*)", "Bash(python3 tools/repoctl.py kit-publish:*)"],
+            "ask": ["Bash(make kit-publish:*)", "Bash(python3 tools/repoctl.py kit-publish:*)",
+                    "Bash(tools/repoctl kit-publish:*)", "Bash(./tools/repoctl kit-publish:*)"],
         },
     }
     # MCP servers are deliberately not pre-approved here: Claude Code asks the

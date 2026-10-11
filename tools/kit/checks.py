@@ -49,6 +49,14 @@ def manifest_structure(context) -> list[str]:
         structure.check_readme_identity, context.root, context.project)
 
 
+@check("readme-template-sections", "An initialized project's README says what the project is, not what the template is; "
+       "after make init", blocks=False)
+def readme_template_sections(context) -> list[str]:
+    found = structure.readme_template_sections(context.root, context.project)
+    return [f"README.md still has the template's own section(s) {', '.join(found)}: replace them with what this "
+            "project does and how to run it (the template keeps them at [template].source)"] if found else []
+
+
 @check("skill-provenance", "Third-party skills carry source, revision, digest, and review; before trusting a skill",
        blocks=True, reason="Unreviewed third-party instructions are an injection path; the digest makes tampering visible.")
 def skill_provenance(context) -> list[str]:
