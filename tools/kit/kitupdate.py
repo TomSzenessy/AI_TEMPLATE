@@ -47,13 +47,30 @@ def _stage(root: Path, local: str, content: bytes) -> str:
     return staged.relative_to(root).as_posix()
 
 
+_HISTORY: dict[str, dict[str, set[str]]] = {}
+
+
+def _kit_history(kit: Path) -> dict[str, set[str]]:
+    """Every blob each path ever had in the kit checkout, from one `git log` per update (#89)."""
+    key = str(kit)
+    if key not in _HISTORY:
+        log = git(kit, "log", "--all", "--format=", "--raw", "--no-abbrev", "--no-renames") or ""
+        history: dict[str, set[str]] = {}
+        for line in log.splitlines():
+            meta, _, path = line.partition("\t")  # the path follows a tab and may contain spaces
+            fields = meta.split()
+            if line.startswith(":") and path and len(fields) >= 5:
+                history.setdefault(path, set()).add(fields[3])
+        _HISTORY[key] = history
+    return _HISTORY[key]
+
+
 def _past_kit_version(kit: Path, path: str, target: Path) -> bool:
     """Is `target` byte-identical to a version of `path` anywhere in the kit checkout's history? (#89)"""
     mine = git(target.parent, "hash-object", "--", target.name)
-    log = git(kit, "log", "--all", "--format=", "--raw", "--no-abbrev", "--", path)
-    if not mine or not log:
+    blobs = _kit_history(kit).get(path)
+    if not mine or not blobs:
         return False  # no git, or a kit checkout without history: list it for a hand merge as before
-    blobs = {fields[3] for line in log.splitlines() if (fields := line.split()) and len(fields) >= 5}
     return mine.strip() in blobs
 
 

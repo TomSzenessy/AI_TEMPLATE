@@ -46,6 +46,7 @@ def pushed_head(root: Path) -> str | None:
 
 CACHE = ".agent/ci-status.json"  # ignored; one gh call per commit, not per start, done and stop (#83)
 FINAL = {"green"}  # red is asked again: a re-run on the same commit can turn it green
+GREEN_S = 86400  # a green answer is asked again after a day: a later re-run or new workflow can turn it red (#85)
 RETRY_S = 300  # pending, none, or unknown (offline) is asked again after this long, not on every gate
 
 
@@ -58,7 +59,8 @@ def _cached(root: Path, sha: str) -> tuple[str, str] | None:
     if not isinstance(entry, list) or len(entry) != 3:
         return None
     state, detail, at = entry
-    return (state, detail) if state in FINAL or time.time() - float(at) < RETRY_S else None
+    age = time.time() - float(at)
+    return (state, detail) if age < (GREEN_S if state in FINAL else RETRY_S) else None
 
 
 def _store(root: Path, sha: str, result: tuple[str, str]) -> None:

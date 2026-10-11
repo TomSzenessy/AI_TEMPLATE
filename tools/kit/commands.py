@@ -132,7 +132,7 @@ def risk(root: Path, args) -> None:
 
 
 @command("kit-report", "Report a kit improvement made here as an issue on the template, or record why it is local",
-         group="when-needed", usage='make kit-report TITLE="..." BODY=path TYPE=... PRIORITY=... TOPIC=... | REASON="..."',
+         group="when-needed", usage='make kit-report TITLE="..." BODY=path TYPE=... PRIORITY=... TOPIC=... | REASON="..."',  # drafts only
          args=(
     arg("--title", var="TITLE"),
     arg("--body-file", type=Path, var="BODY"),
@@ -140,12 +140,24 @@ def risk(root: Path, args) -> None:
     arg("--priority", var="PRIORITY"),
     arg("--topic", var="TOPIC"),
     arg("--reason", var="REASON", help="the change is project-specific: record why instead of reporting it"),
-    arg("--public-reviewed", action="store_true", var="PUBLIC_REVIEWED",
-        help="the owner reviewed the draft: file it on the (possibly public) template repository"),
 ))
 def kit_report(root: Path, args) -> None:
     from .kitreport import report
     print(report(root, args))
+
+
+@command("kit-publish", "File a reviewed kit-report draft on the template repository (the owner's step)",
+         group="when-needed", usage='make kit-publish TITLE="..." BODY=.agent/kit-reports/<draft>.md TYPE=... PRIORITY=... TOPIC=...',
+         args=(
+    arg("--title", var="TITLE"),
+    arg("--body-file", type=Path, var="BODY"),
+    arg("--type", var="TYPE"),
+    arg("--priority", var="PRIORITY"),
+    arg("--topic", var="TOPIC"),
+))
+def kit_publish(root: Path, args) -> None:
+    from .kitreport import publish
+    print(publish(root, args))
 
 
 @command("ci-status", "The CI result of what you pushed: green, red, pending, or why it cannot tell", group="when-needed",

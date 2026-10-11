@@ -101,7 +101,11 @@ def render_claude(root: Path) -> dict[str, str]:
             ],
             "Stop": [{"hooks": [{"type": "command", "command": HOOK.format(event=STOP)}]}],
         },
-        "permissions": {"allow": [f"Bash({command})" for command in allow]},
+        "permissions": {
+            "allow": [f"Bash({command})" for command in allow],
+            # Filing on the (possibly public) template repository is the owner's decision (#88): the host asks.
+            "ask": ["Bash(make kit-publish:*)", "Bash(python3 tools/repoctl.py kit-publish:*)"],
+        },
     }
     # MCP servers are deliberately not pre-approved here: Claude Code asks the
     # user once per project server, which keeps consent with the person.

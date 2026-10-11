@@ -88,7 +88,7 @@ def template_repository(root: Path) -> str:
 
 
 def report(root: Path, args) -> str:
-    """Draft the kit report (file it only with --public-reviewed), or record a project-specific reason."""
+    """Draft the kit report for the template (nothing is sent), or record a project-specific reason."""
     paths = _owed(root)
     if args.reason:
         _record(root, paths, f"project-specific: {args.reason}")
@@ -104,17 +104,24 @@ def report(root: Path, args) -> str:
               f"{', '.join(paths) or 'none named'}.\n")
     slug = "".join(ch if ch.isalnum() else "-" for ch in args.topic.lower()).strip("-") or "report"
     draft = ensure_inside_root(root, root / DRAFTS / f"{slug}.md", "kit report draft")
+    number = 2
+    while draft.exists():  # a second report on the same topic never overwrites the first draft
+        draft = draft.with_name(f"{slug}-{number}.md")
+        number += 1
     draft.parent.mkdir(parents=True, exist_ok=True)
-    text = body_path.read_text(encoding="utf-8")
-    draft.write_text(text if "Reported by `make kit-report`" in text else text + footer, encoding="utf-8")
+    draft.write_text(body_path.read_text(encoding="utf-8") + footer, encoding="utf-8")
     relative = draft.relative_to(root)
-    if not getattr(args, "public_reviewed", False):
-        _record(root, paths, f"drafted: {relative}")
-        return (f"Drafted {relative} for {template_repository(root)} (nothing was sent). Review it, then file it with: "
-                f"make kit-report TITLE=\"{args.title}\" BODY={relative} TYPE={args.type} PRIORITY={args.priority} "
-                f"TOPIC={args.topic} PUBLIC_REVIEWED=1")
+    _record(root, paths, f"drafted: {relative}")
+    return (f"Drafted {relative} for {template_repository(root)} (nothing was sent). The owner reviews it and files it "
+            f"with: make kit-publish TITLE=\"{args.title}\" BODY={relative} TYPE={args.type} PRIORITY={args.priority} "
+            f"TOPIC={args.topic}")
+
+
+def publish(root: Path, args) -> str:
+    """File a reviewed draft on the template repository: the owner's step (Claude Code asks before running it)."""
+    missing = [flag for flag in ("title", "body_file", "type", "priority", "topic") if not getattr(args, flag)]
+    if missing:
+        raise RepoctlError("kit-publish needs " + ", ".join("--" + flag.replace("_", "-") for flag in missing))
     from .issues import file_issue
-    url = file_issue(root, args.title, relative, args.type, args.priority, "repo", args.topic,
-                     "triage", None, None, True, None, repository=template_repository(root))
-    _record(root, paths, f"reported: {url}")
-    return url
+    return file_issue(root, args.title, args.body_file, args.type, args.priority, "repo", args.topic,
+                      "triage", None, None, True, None, repository=template_repository(root))

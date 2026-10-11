@@ -189,6 +189,16 @@ class CiCacheTests(Scratch):
             self.assertEqual(cistatus.ci_status(self.root, sha="c" * 40)[0], "green")
         self.assertEqual(len(calls), 1)
 
+    def test_a_green_answer_is_asked_again_after_a_day(self) -> None:
+        """#85: a later failing re-run or a new workflow on the same commit becomes visible."""
+        calls, factory = self.counting({"workflowName": "ci", "status": "completed", "conclusion": "success"})
+        with mock.patch.dict(os.environ, {"GITHUB_ACTIONS": "", "CI": ""}), \
+             mock.patch.object(cistatus, "_gh_runner", factory):
+            cistatus.ci_status(self.root, sha="f" * 40)
+            with mock.patch("time.time", return_value=__import__("time").time() + cistatus.GREEN_S + 1):
+                cistatus.ci_status(self.root, sha="f" * 40)
+        self.assertEqual(len(calls), 2)
+
     def test_a_pending_answer_is_asked_again_after_the_retry_window(self) -> None:
         calls, factory = self.counting({"workflowName": "ci", "status": "in_progress", "conclusion": ""})
         with mock.patch.dict(os.environ, {"GITHUB_ACTIONS": "", "CI": ""}), \
@@ -377,9 +387,9 @@ class KitUpstreamTests(Scratch):
         self.write("tools/kit/x.py", "changed\n")
         self.assertEqual(kitreport.upstream_findings(self.root, ["tools/kit/x.py"]), [])
 
-    def report_args(self, public: bool) -> mock.Mock:
+    def report_args(self) -> mock.Mock:
         return mock.Mock(reason=None, title="Better x", body_file=Path(".agent/bodies/r.md"), type="enhancement",
-                         priority="P3", topic="x", public_reviewed=public)
+                         priority="P3", topic="x")
 
     def test_a_report_is_only_a_local_draft_without_the_owner_opt_in(self) -> None:
         """Critic finding: nothing leaves a (possibly private) project for a public template repository by default."""
@@ -390,7 +400,7 @@ class KitUpstreamTests(Scratch):
         self.git("init", "-q")
         self.git("remote", "add", "origin", "https://github.com/acme/secret-app.git")
         with mock.patch("kit.issues.file_issue") as filed:
-            message = kitreport.report(self.root, self.report_args(public=False))
+            message = kitreport.report(self.root, self.report_args())
         filed.assert_not_called()
         self.assertIn("nothing was sent", message)
         draft = (self.root / kitreport.DRAFTS / "x.md").read_text(encoding="utf-8")
@@ -398,23 +408,34 @@ class KitUpstreamTests(Scratch):
         self.assertIn("kit file(s): tools/kit/x.py", draft)
         self.assertEqual(kitreport.upstream_findings(self.root, ["tools/kit/x.py"]), [], "a draft clears the gate")
 
-    def test_the_owner_opt_in_files_on_the_template_without_the_project_name(self) -> None:
+    def test_publishing_a_draft_files_it_on_the_template_without_the_project_name(self) -> None:
         from kit import kitreport
         self.project()
         self.write("tools/kit/x.py", "ORIGINAL = 2\n")
         self.write(".agent/bodies/r.md", "### Summary\nbetter x\n")
         self.git("init", "-q")
         self.git("remote", "add", "origin", "https://github.com/acme/secret-app.git")
+        kitreport.report(self.root, self.report_args())
+        second = kitreport.report(self.root, self.report_args())
+        self.assertIn("x-2.md", second, "a second draft on the same topic does not overwrite the first")
         seen = {}
         def fake_file_issue(root, title, body, *rest, repository=None):
             seen.update(body=(root / body).read_text(), repository=repository, public=rest[-2])
             return "https://github.com/owner/AI_TEMPLATE/issues/1"
+        draft = mock.Mock(title="Better x", body_file=kitreport.Path(kitreport.DRAFTS) / "x.md", type="enhancement",
+                          priority="P3", topic="x")
         with mock.patch("kit.issues.file_issue", fake_file_issue):
-            url = kitreport.report(self.root, self.report_args(public=True))
+            url = kitreport.publish(self.root, draft)
         self.assertEqual(seen["repository"], "owner/AI_TEMPLATE")
         self.assertNotIn("acme", seen["body"])
         self.assertTrue(seen["public"])
         self.assertTrue(url.endswith("/issues/1"))
+
+    def test_the_host_asks_before_a_public_filing(self) -> None:
+        """Claude Code asks the person before `make kit-publish`; drafting needs no approval."""
+        settings = json.loads((Path(__file__).resolve().parents[2] / ".claude/settings.json").read_text())
+        self.assertIn("Bash(make kit-publish:*)", settings["permissions"]["ask"])
+        self.assertNotIn("Bash(make kit-publish:*)", settings["permissions"]["allow"])
 
     def test_a_later_different_edit_is_asked_again(self) -> None:
         from kit import kitreport

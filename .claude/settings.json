@@ -63,6 +63,10 @@
       "Bash(make resources)",
       "Bash(make similar:*)",
       "Bash(make new:*)"
+    ],
+    "ask": [
+      "Bash(make kit-publish:*)",
+      "Bash(python3 tools/repoctl.py kit-publish:*)"
     ]
   }
 }
