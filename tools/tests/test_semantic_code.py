@@ -29,6 +29,19 @@ ENDPOINT = "https://embeddings.example.test/v1"
 MODEL = "fixture-embedding-model"
 
 
+def _synthetic_secret() -> str:
+    """A credential-looking literal the hygiene scanner must still flag, assembled at
+    runtime so this tracked source never holds a static secret-shaped token."""
+    return "-".join(("synthetic", "fixture", "secret", "01"))
+
+
+def _pem_fixture() -> str:
+    """A PEM-shaped key fixture assembled at runtime: the tracked source holds no static
+    private-key literal, while the filename-based exclusion still sees a key file."""
+    label = "RSA PRIVATE KEY"
+    return f"-----BEGIN {label}-----\nfixture\n-----END {label}-----\n"
+
+
 def enable(root: Path, **overrides) -> None:
     """A [kit] table that switches the optional semantic path on for this fixture.
 
@@ -165,7 +178,7 @@ class SemanticConsentTests(KitRepository):
     def test_secret_query_is_never_sent(self) -> None:
         enable(self.root)
         fake = FakeTransport()
-        result = run_with_fake(self, fake, "similar", 'Q="api_key = "k3y9supersecretliteral1"', "--code", "--consent")
+        result = run_with_fake(self, fake, "similar", f'Q="api_key = "{_synthetic_secret()}"', "--code", "--consent")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("key material", result.stdout)
         self.assertEqual(fake.calls, [], "a query that may hold key material is refused, not sent")
@@ -212,14 +225,14 @@ class SemanticInventoryTests(KitRepository):
     def test_env_and_key_files_are_excluded(self) -> None:
         self.write(".env", "API_KEY=fixture\n")
         self.write(".env.example", "API_KEY=<set-your-own-key>\n")
-        self.write("deploy/id_rsa", "-----BEGIN RSA PRIVATE KEY-----\nfixture\n-----END RSA PRIVATE KEY-----\n")
+        self.write("deploy/id_rsa", _pem_fixture())
         self.write("certs/server.pem", "-----BEGIN CERTIFICATE-----\nfixture\n-----END CERTIFICATE-----\n")
         files = self.inventory()["files"]
         for relative in (".env", ".env.example", "deploy/id_rsa", "certs/server.pem"):
             self.assertNotIn(relative, files)
 
     def test_secret_flagged_content_is_excluded(self) -> None:
-        self.write("src/billing/leak.py", 'api_key = "k3y9supersecretliteral01"\n')
+        self.write("src/billing/leak.py", f'api_key = "{_synthetic_secret()}"\n')
         self.assertNotIn("src/billing/leak.py", self.inventory()["files"])
 
     def test_symlink_escaping_the_root_is_excluded(self) -> None:
