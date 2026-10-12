@@ -143,6 +143,52 @@ class CiStatusTests(unittest.TestCase):
         self.assertEqual(state, "red")
         self.assertIn("ci (failure)", detail)
 
+    def test_issue_events_do_not_turn_successful_push_verification_red(self) -> None:
+        """#97: issue validation shares a SHA, not the commit verification contract."""
+        for event in ("issues", "issue_comment"):
+            with self.subTest(event=event):
+                state, detail = self.status(runs(
+                    {"workflowName": "ci", "event": "push", "status": "completed", "conclusion": "success"},
+                    {"workflowName": "Issue contract", "event": event, "status": "completed",
+                     "conclusion": "failure", "url": "https://x/issue"},
+                ))
+                self.assertEqual(state, "green")
+                self.assertNotIn("Issue contract", detail)
+
+    def test_real_verification_failures_stay_red_with_unrelated_issue_success(self) -> None:
+        for event in ("push", "pull_request", "pull_request_target", "workflow_dispatch", "schedule", None):
+            with self.subTest(event=event):
+                state, detail = self.status(runs(
+                    {"workflowName": "verification", "event": event, "status": "completed",
+                     "conclusion": "failure", "url": "https://x/real-failure"},
+                    {"workflowName": "Issue contract", "event": "issues", "status": "completed",
+                     "conclusion": "success"},
+                ))
+                self.assertEqual(state, "red")
+                self.assertIn("verification (failure) https://x/real-failure", detail)
+
+    def test_issue_only_results_have_no_applicable_commit_verification(self) -> None:
+        for event in ("issues", "issue_comment"):
+            for status, conclusion in (("completed", "success"), ("completed", "failure"), ("queued", "")):
+                with self.subTest(event=event, status=status, conclusion=conclusion):
+                    state, detail = self.status(runs(
+                        {"workflowName": "Issue contract", "event": event, "status": status,
+                         "conclusion": conclusion},
+                    ))
+                    self.assertEqual(state, "none")
+                    self.assertIn("no applicable commit verification", detail)
+
+    def test_query_requests_event_and_ignores_pending_issue_validation(self) -> None:
+        calls = []
+        def runner(args: list[str]) -> str:
+            calls.append(args)
+            return json.dumps([
+                {"workflowName": "ci", "event": "push", "status": "completed", "conclusion": "success"},
+                {"workflowName": "Issue contract", "event": "issue_comment", "status": "in_progress"},
+            ])
+        self.assertEqual(self.status(runner)[0], "green")
+        self.assertIn("event", calls[0][calls[0].index("--json") + 1].split(","))
+
     def test_green_pending_and_none(self) -> None:
         self.assertEqual(self.status(runs({"workflowName": "ci", "status": "completed", "conclusion": "success"}))[0],
                          "green")
@@ -203,6 +249,26 @@ class CiCacheTests(Scratch):
             self.assertEqual(cistatus.ci_status(self.root, sha="c" * 40)[0], "green")
         self.assertEqual(len(calls), 1)
 
+    def test_pre_event_scope_cache_is_requeried_and_replaced(self) -> None:
+        """#97: old false green/red/pending results must not outlive event classification."""
+        import time
+        sha = "7" * 40
+        (self.root / ".agent").mkdir()
+        for old_state, items, expected in (
+            ("red", [{"event": "push", "status": "completed", "conclusion": "success"}], "green"),
+            ("green", [{"event": "issues", "status": "completed", "conclusion": "success"}], "none"),
+            ("pending", [{"event": "push", "status": "completed", "conclusion": "failure",
+                          "workflowName": "ci"}], "red"),
+        ):
+            with self.subTest(old_state=old_state):
+                (self.root / cistatus.CACHE).write_text(json.dumps({sha: [old_state, "old result", time.time()]}))
+                calls, factory = self.counting(*items)
+                with mock.patch.dict(os.environ, {"GITHUB_ACTIONS": "", "CI": ""}), \
+                     mock.patch.object(cistatus, "_gh_runner", factory):
+                    self.assertEqual(cistatus.ci_status(self.root, sha=sha)[0], expected)
+                    self.assertEqual(cistatus.ci_status(self.root, sha=sha)[0], expected)
+                self.assertEqual(len(calls), 1, "old scope is invalidated; new scope is cached")
+
     def test_a_green_answer_is_asked_again_after_a_day(self) -> None:
         """#85: a later failing re-run or a new workflow on the same commit becomes visible."""
         calls, factory = self.counting({"workflowName": "ci", "status": "completed", "conclusion": "success"})
@@ -231,7 +297,7 @@ class CiCacheRedTests(Scratch):
         import time
         sha = "e" * 40
         (self.root / ".agent").mkdir()
-        (self.root / cistatus.CACHE).write_text(json.dumps({sha: ["red", "CI failed", time.time() - 86400]}))
+        (self.root / cistatus.CACHE).write_text(json.dumps({sha: ["red", "CI failed", time.time() - 86400, cistatus.CACHE_SCOPE]}))
         green = lambda root: (lambda args: json.dumps([{"workflowName": "ci", "status": "completed",
                                                         "conclusion": "success"}]))
         with mock.patch.dict(os.environ, {"GITHUB_ACTIONS": "", "CI": ""}), \
@@ -258,7 +324,7 @@ class CiCacheDamageTests(Scratch):
         """A non-numeric timestamp in the cache must never break the session brief."""
         sha = "9" * 40
         (self.root / ".agent").mkdir()
-        (self.root / cistatus.CACHE).write_text(json.dumps({sha: ["green", "ok", "not-a-time"]}))
+        (self.root / cistatus.CACHE).write_text(json.dumps({sha: ["green", "ok", "not-a-time", cistatus.CACHE_SCOPE]}))
         self.assertIsNone(cistatus._cached(self.root, sha))
 
 

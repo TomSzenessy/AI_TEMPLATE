@@ -45,6 +45,7 @@ def pushed_head(root: Path) -> str | None:
 
 
 CACHE = ".agent/ci-status.json"  # ignored; one gh call per commit, not per start, done and stop (#83)
+CACHE_SCOPE = "commit-verification-v1"  # pre-#97 answers included unrelated issue events; never reuse them
 FINAL = {"green"}  # red is asked again: a re-run on the same commit can turn it green
 GREEN_S = 86400  # a green answer is asked again after a day: a later re-run or new workflow can turn it red (#85)
 RETRY_S = 300  # pending, none, or unknown (offline) is asked again after this long, not on every gate
@@ -56,9 +57,9 @@ def _cached(root: Path, sha: str) -> tuple[str, str] | None:
         entry = json.loads((root / CACHE).read_text(encoding="utf-8")).get(sha)
     except (OSError, ValueError, AttributeError):
         return None
-    if not isinstance(entry, list) or len(entry) != 3:
+    if not isinstance(entry, list) or len(entry) != 4 or entry[3] != CACHE_SCOPE:
         return None
-    state, detail, at = entry
+    state, detail, at, _ = entry
     try:
         age = time.time() - float(at)
     except (TypeError, ValueError):
@@ -72,7 +73,7 @@ def _store(root: Path, sha: str, result: tuple[str, str]) -> None:
     try:
         data = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
         data = data if isinstance(data, dict) else {}
-        data[sha] = [*result, time.time()]
+        data[sha] = [*result, time.time(), CACHE_SCOPE]
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(dict(list(data.items())[-50:])), encoding="utf-8")
     except (OSError, ValueError):
@@ -99,14 +100,18 @@ def ci_status(root: Path, sha: str | None = None, runner: Runner | None = None,
 def _ask(root: Path, sha: str, runner: Runner | None) -> tuple[str, str]:
     try:
         raw = (runner or _gh_runner(root))(
-            ["run", "list", "--commit", sha, "--limit", "100", "--json", "workflowName,status,conclusion,url"])
+            ["run", "list", "--commit", sha, "--limit", "100", "--json", "workflowName,status,conclusion,url,event"])
         runs = json.loads(raw or "[]")
     except FileNotFoundError:
         return "unknown", "GitHub CLI (gh) is not installed"
     except (RuntimeError, OSError, subprocess.TimeoutExpired, json.JSONDecodeError) as error:
         return "unknown", f"cannot read CI: {error}"
+    if isinstance(runs, list):
+        # Issue validation uses the default-branch SHA, but does not verify that commit (#97).
+        # Keep every other event (including missing metadata) so real CI failures stay visible.
+        runs = [r for r in runs if not isinstance(r, dict) or r.get("event") not in {"issues", "issue_comment"}]
     if not isinstance(runs, list) or not runs:
-        return "none", f"no CI run for {sha[:7]}"
+        return "none", f"no applicable commit verification run for {sha[:7]}"
     failed = [r for r in runs if isinstance(r, dict) and r.get("status") == "completed"
               and r.get("conclusion") in RED]
     if failed:
