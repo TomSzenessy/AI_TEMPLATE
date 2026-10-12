@@ -163,10 +163,34 @@ def _pull_at_start(root: Path, session: str) -> list[str]:
         return []
 
 
+def _refresh_pulled_healing(root: Path, session: str, previous_head: str, healed: list[str]) -> None:
+    """#94: only a proven clean resume pull can make its subsequent healing foreign work.
+
+    _pull_at_start moves the baseline only when this session has committed nothing and
+    git fast-forwards a clean tree. Without that provenance, keep the original ownership.
+    """
+    state = _load_state(root, session)
+    snapshot = state.get("snapshot")
+    if not isinstance(snapshot, dict) or not previous_head or state.get("snapshot_head") == previous_head:
+        return
+    for item in healed:
+        if item.startswith("adapter regeneration failed:"):
+            continue  # a diagnostic is not a generated path
+        path = item.removeprefix("removed ")
+        if _relative(root, path) == path:
+            snapshot[path] = _digest(root, path)
+    _save_state(root, state)
+
+
 def _session_start(root: Path, event: dict[str, object] | None = None) -> None:
     session = str((event or {}).get("session_id", "local"))
+    previous_head = str(_load_state(root, session).get("snapshot_head", ""))
     synced = _pull_at_start(root, session)
     healed = _heal_derived(root)  # before the snapshot too: regenerated files are not this session's edits
+    try:
+        _refresh_pulled_healing(root, session, previous_head, healed)
+    except OSError:
+        pass  # failed attribution must not hide work from the stop gate
     project = load_project(root)
     changed = changed_paths(root)
     try:

@@ -973,6 +973,102 @@ class GitSyncTests(Scratch):
         self.assertIn("1 commit(s) behind upstream", brief)
         self.assertEqual(session.session_changes(self.root, "s"), ["mine.txt"])
 
+    def healing_session(self):
+        from fixtures import build_demo, git_in
+        from kit import session
+        build_demo(self.root)
+        self.write(".gitignore", ".agent/\n")
+        self.commit("demo with ignored hook scratch")
+        self.git("push", "-q")
+        git_in(self.other, "pull", "-q")
+
+        def start() -> str:
+            result = self.cli("hook", "session-start", stdin='{"session_id": "s-heal"}')
+            self.assertEqual(result.returncode, 0, result.stderr)
+            return result.stdout
+
+        start()
+        return start, session
+
+    def peer_changes_role(self, *, remove_skill: bool = False, blocked: bool = False) -> str:
+        from fixtures import git_in
+        source = self.other / ".agents/agents/scout.md"
+        content = source.read_text().replace("Read-only locator", "Peer locator").replace("Own locator", "Peer locator")
+        source.write_text(content)
+        if remove_skill:
+            (self.other / ".agents/skills/demo-skill/SKILL.md").unlink()
+        if blocked:  # actual generator write failure, without breaking registry loading
+            target = self.other / ".claude/agents/scout.md"
+            target.unlink()
+            target.mkdir()
+            (target / "blocker.txt").write_text("not a writable adapter file\n")
+            git_in(self.other, "add", ".claude")
+        git_in(self.other, "add", ".agents")
+        git_in(self.other, *self.ci, "-m", "peer canonical change without regeneration")
+        git_in(self.other, "push", "-q")
+        return git_in(self.other, "rev-parse", "HEAD").stdout.strip()
+
+    def test_resume_heals_pulled_adapter_without_owning_it(self) -> None:
+        start, session = self.healing_session()
+        before = session._load_state(self.root, "s-heal")
+        peer = self.peer_changes_role(remove_skill=True)
+        brief = start()
+        self.assertIn("pulled 1 new commit", brief)
+        self.assertIn(".claude/agents/scout.md", brief)
+        after = session._load_state(self.root, "s-heal")
+        self.assertNotEqual(before["snapshot_head"], peer)
+        self.assertEqual(after["snapshot_head"], peer)
+        self.assertIn("Peer locator", (self.root / ".claude/agents/scout.md").read_text())
+        self.assertEqual(session.session_changes(self.root, "s-heal"), [])
+        orphan = ".claude/skills/demo-skill/SKILL.md"
+        self.assertFalse((self.root / orphan).exists())
+        self.assertIn("removed " + orphan, brief)
+        self.assertEqual(after["snapshot"][orphan], "deleted")
+
+    def test_resume_regeneration_error_is_not_a_snapshot_path(self) -> None:
+        start, session = self.healing_session()
+        baseline = session._load_state(self.root, "s-heal")
+        self.peer_changes_role(blocked=True)
+        brief = start()
+        self.assertIn("pulled 1 new commit", brief)
+        self.assertIn("adapter regeneration failed:", brief)
+        self.assertEqual(session._load_state(self.root, "s-heal")["snapshot"], baseline["snapshot"])
+
+    def test_resume_keeps_own_native_source_and_unrelated_edits_owned(self) -> None:
+        start, session = self.healing_session()
+        baseline = session._load_state(self.root, "s-heal")
+        source = ".agents/agents/scout.md"  # native hosts read the canonical role directly
+        self.write(source, (self.root / source).read_text().replace("Read-only locator", "Own locator"))
+        self.write("mine.txt", "own non-generated edit\n")
+        self.peer_changes_role()  # dirty canonical work must prevent the automatic pull/exemption
+        self.assertIn("1 commit(s) behind upstream", start())
+        self.assertEqual(session.session_changes(self.root, "s-heal"),
+                         [source, ".claude/agents/scout.md", "mine.txt"])
+        after = session._load_state(self.root, "s-heal")
+        self.assertEqual(after["snapshot"], baseline["snapshot"])
+        self.assertEqual(after["snapshot_head"], baseline["snapshot_head"])
+        self.assertEqual(after["check_baseline"], baseline["check_baseline"])
+        stopped = json.loads(self.cli("hook", "stop", stdin='{"session_id": "s-heal"}').stdout)
+        self.assertIn(source, stopped["reason"])
+        self.assertIn("uncommitted work of this session", stopped["reason"])
+
+    def test_resume_keeps_own_committed_native_source_history_before_peer_pull(self) -> None:
+        start, session = self.healing_session()
+        baseline = session._load_state(self.root, "s-heal")
+        source = ".agents/agents/scout.md"
+        self.write(source, (self.root / source).read_text().replace("Read-only locator", "Own locator"))
+        self.commit("own native canonical change without regeneration")
+        self.git("push", "-q")
+        from fixtures import git_in
+        git_in(self.other, "pull", "-q")
+        self.peer_changes_role()
+        self.assertIn("1 commit(s) behind upstream", start())
+        self.assertEqual(session.session_changes(self.root, "s-heal"), [source, ".claude/agents/scout.md"])
+        self.assertEqual(session._load_state(self.root, "s-heal")["snapshot_head"], baseline["snapshot_head"])
+        self.assertEqual(session._load_state(self.root, "s-heal")["check_baseline"], baseline["check_baseline"])
+        stopped = json.loads(self.cli("hook", "stop", stdin='{"session_id": "s-heal"}').stdout)
+        self.assertIn(".claude/agents/scout.md", stopped["reason"])
+
     def test_the_brief_never_pulls_into_a_dirty_tree(self) -> None:
         """Negative case: local edits are never merged into; the brief says to pull instead."""
         from kit import gitsync

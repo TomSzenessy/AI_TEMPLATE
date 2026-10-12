@@ -164,6 +164,9 @@ findings, one root cause per change (see [`delegation.md`](./delegation.md)).
   committed since (no snapshot, or a start commit no longer an ancestor: the whole tree), with the
   commits' `Docs-Unaffected` trailers ([`bindings.md`](./bindings.md)) as `make done` does. A
   finding is raised once per turn until fixed or exempted; `make done` judges the whole branch.
+  Resume refreshes only regenerated writes/removals after a proven clean automatic fast-forward
+  with no session commits. Errors are not paths; own/dirty work and other healing stay owned.
+  Input/output catalog: [`generated-files.md`](./generated-files.md).
 - Hooks, the git gate, and `make` run through `tools/repoctl`, which picks the
   newest Python 3.11+ on `PATH` even when `python3` is an older system
   interpreter (override with `REPOCTL_PYTHON` or `make PYTHON=...`). Windows
