@@ -137,18 +137,16 @@ BRIEF_TIMEOUT_S = 2
 def brief_ci_lines(root: Path, session_id: str | None = None, runner: Runner | None = None) -> list[str]:
     """HEAD/default conclusions from one bounded run list, cached by existing hook session and target pair."""
     import time
-    from .core import RepoctlError, load_project
+    from .core import RepoctlError, default_branch, load_project
     if os.environ.get("GITHUB_ACTIONS") == "true" or os.environ.get("CI") == "true":
         return ["CI brief: unknown (running inside CI)"]
     head = (git(root, "rev-parse", "HEAD") or "").strip()
     pushed = pushed_head(root)
     try:
-        repository = load_project(root).get("repository", {})
-        default = repository.get("default_branch") if isinstance(repository, dict) else None
+        default = default_branch(load_project(root), fallback=None)
     except (RepoctlError, OSError):
         default = None
     # No main/master guess: only an explicitly configured branch and its actual local remote ref.
-    default = default if isinstance(default, str) and default else None
     default_sha = (git(root, "rev-parse", "--verify", "-q", f"refs/remotes/origin/{default}^{{commit}}") or "").strip() if default else ""
     # Only the current invocation owns this identity; an unwritable baseline may belong to an older host.
     session = session_id if isinstance(session_id, str) and session_id and session_id != "local" else None
