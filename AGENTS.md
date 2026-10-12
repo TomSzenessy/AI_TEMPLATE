@@ -81,7 +81,7 @@ route is [`SECURITY.md`](./SECURITY.md).
 - **Bug or incident:** [`docs/operations.md`](./docs/operations.md); reproduce first. **Release or quality claim:** [`docs/verification.md`](./docs/verification.md), [`docs/production.md`](./docs/production.md).
 - **Auth, secrets, dependencies, CI, untrusted input:** [`docs/security.md`](./docs/security.md).
 - **Personal data, legal text, launch:** [`docs/privacy.md`](./docs/privacy.md), [`docs/legal/README.md`](./docs/legal/README.md).
-- **Skills, MCP, pasted resources:** [`docs/resources.md`](./docs/resources.md), [`docs/skills.md`](./docs/skills.md).
+- **Absorb notes/URLs, skills, MCP:** `skill-scout` ([resources owner](./docs/resources.md)).
 - **A failing check:** its message names the fix; mechanics in [`docs/self-healing.md`](./docs/self-healing.md).
 - **Audit or cleanup:** [`docs/audit.md`](./docs/audit.md) (report-only by default) and `make garden`.
 

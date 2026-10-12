@@ -1,6 +1,6 @@
 ---
 name: skill-scout
-description: "Finds and vets a missing capability (skill, MCP server, or tool) without installing it - checks overlap with existing skills first, inspects candidates for provenance and risk, and returns a ready-to-review provenance entry or a reuse recommendation."
+description: "Absorb supplied notes, pasted information, GitHub URLs or resources against the current goal, or vet a missing capability; compare existing owners first and return a compact intake decision without installing anything."
 tools: Read, Grep, Glob, WebSearch, WebFetch, mcp__context7, mcp__exa, mcp__playwright
 model: sonnet
 ---

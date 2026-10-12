@@ -80,7 +80,7 @@ itself and this table cannot drift. Edit the line in the document, not here.
 |---|---|---|
 | [`capabilities.md`](./capabilities.md) | How to add, find, or switch off a capability or pack, and the configuration policy | You add, find, or switch off a skill, role, doc, rule, check, command, MCP route, or pack. |
 | [`evals.md`](./evals.md) | Fresh-agent navigation evals and scored build trials | AGENTS.md, the docs, a skill, or a gate changed and needs fresh-agent evidence. |
-| [`resources.md`](./resources.md) | Sources and intake | Capability, example, current docs, external gate. |
+| [`resources.md`](./resources.md) | Sources and intake | Absorb notes/URLs; capability, example, docs, gate. |
 | [`skills.md`](./skills.md) | Skill discovery, provenance, and overlap rules | A task needs a capability the repository does not provide. |
 | [`adr/0001-issue-backed-write-ahead.md`](./adr/0001-issue-backed-write-ahead.md) | Accepted write-ahead and documentation-boundary decision | You need the rationale for issue-backed continuity. |
 | [`adr/0002-one-capability-model.md`](./adr/0002-one-capability-model.md) | The capability model: kinds, declaration fields, discovery, packs, and what is out of scope | You add, find, or switch off a skill, role, doc, rule, check, command, MCP route, or pack. |
