@@ -29,11 +29,11 @@ python3 .agents/skills/brand-sweep/sweep.py . --avoid "Original Name,Its Company
 python3 .agents/skills/brand-sweep/sweep.py . --config reference/brand.json        # same, from the brand file
 ```
 
-The sweep only reads. You (the agent) write `reference/brand.md` and
-`reference/brand.json` (`avoid`, `domains`, `colors`, optional `exclude`),
-which `sweep.py --config` then reads. Colours are hex (`#006bff`, `006bff`,
-`#06f`, `#006bffaa`; alpha is ignored); `rgb(...)` or a typo exits 2, never a
-silent "Clean".
+The sweep only reads. You (the agent) write `brand.md` and `brand.json`
+(`avoid`, `domains`, `colors`, optional `exclude`) under `reference/` in
+reference mode or `docs/design/` in original mode, which `sweep.py --config`
+then reads. Colours are hex (`#006bff`, `006bff`, `#06f`, `#006bffaa`; alpha is
+ignored); `rgb(...)` or a typo exits 2, never a silent "Clean".
 
 ## Step 1: the name
 

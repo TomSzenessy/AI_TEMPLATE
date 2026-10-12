@@ -85,8 +85,10 @@ python3 .agents/skills/design-tokens/contrast.py reference/design/tokens.json   
 ```
 
 AA is the floor (the checker owns the thresholds). Hex may be bare or `#`,
-3, 4, 6 or 8 digits (alpha ignored). It exits 1 on a failure. Fix it in the tokens, not
-per component.
+3, 4, 6 or 8 digits (alpha ignored: composite a transparent pair against the
+actual resolved background before the opaque check). It exits 1 on a failure;
+zero failures is a checked floor, not WCAG certification. Fix it in the tokens,
+not per component.
 
 ## Step 3: component specs
 
@@ -104,9 +106,9 @@ Button
   used on   S02, S07, S09
 ```
 
-Every state the recon saw, plus the ones it should have: focus, disabled,
-loading, error, empty. Keyboard and screen reader behaviour is part of the
-spec.
+Every state the reference recon saw or the confirmed original brief requires,
+plus the ones it should have: focus, disabled, loading, error, empty.
+Keyboard and screen reader behaviour is part of the spec.
 
 ## Step 4: build the primitives
 
