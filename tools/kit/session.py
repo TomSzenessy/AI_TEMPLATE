@@ -199,7 +199,7 @@ def _session_start(root: Path, event: dict[str, object] | None = None) -> None:
         findings = [str(error)]
     if healed:
         findings.insert(0, "regenerated derived files: " + ", ".join(healed))
-    findings[:0] = synced + _attention(root)
+    findings[:0] = synced + _attention(root, session)
     if hooks_note:
         findings.insert(0, hooks_note)
     try:
@@ -230,9 +230,9 @@ def _session_start(root: Path, event: dict[str, object] | None = None) -> None:
     )
 
 
-def _attention(root: Path) -> list[str]:
+def _attention(root: Path, session_id: str | None = None) -> list[str]:
     """Repository facts no check owns: a template used as a project (#75), red CI on what was pushed (#76)."""
-    from .cistatus import ci_status
+    from .cistatus import brief_ci_lines
     from .structure import template_in_use
     found = []
     try:
@@ -241,17 +241,9 @@ def _attention(root: Path) -> list[str]:
     except Exception:  # noqa: BLE001 - the brief must survive a broken manifest; the checks report it
         pass
     try:
-        state, detail = ci_status(root)
+        found.extend(brief_ci_lines(root, session_id))
     except Exception:  # noqa: BLE001 - the brief must survive anything the CI lookup meets
-        state, detail = "unknown", ""
-    if state == "red":
-        found.append(f"{detail}: fix it before new work (`gh run view --log-failed`)")
-    from .cistatus import default_branch_red
-    try:
-        if (line := default_branch_red(root, default_branch(load_project(root)))) is not None:
-            found.append(line)
-    except Exception:  # noqa: BLE001 - the brief must survive a broken manifest
-        pass
+        found.append("CI brief: unknown (cannot read CI snapshot)")
     return found
 
 

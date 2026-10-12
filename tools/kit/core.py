@@ -104,9 +104,13 @@ def governance_profile(project: dict[str, object]) -> str:
     return profile
 
 
-def default_branch(project: dict[str, object]) -> str:
+def default_branch(project: dict[str, object], *, fallback: str | None = "main") -> str | None:
+    """The shared branch reader; fallback=None requires explicit nonblank string metadata."""
     repository = project.get("repository", {})
-    return str(repository.get("default_branch", "main")) if isinstance(repository, dict) else "main"
+    value = repository.get("default_branch", fallback) if isinstance(repository, dict) else fallback
+    if fallback is None and (not isinstance(value, str) or not value.strip()):
+        return None
+    return str(value)
 
 
 def declared_surfaces(project: dict[str, object]) -> list[dict[str, object]]:

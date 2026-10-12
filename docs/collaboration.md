@@ -30,6 +30,21 @@ in scope conservatively. If only issue-event runs exist, status is `none`
 Cached answers carry this classification's scope version, so pre-isolation
 answers are discarded and queried again; the existing expiry windows remain.
 
+The session brief shows both HEAD and the configured default branch's CI
+conclusion (the actual `origin/<default>` commit as of the start's last fetch).
+One `gh run list` request reads at most 100 recent repository runs with a
+2-second subprocess bound; a target omitted from that window reports `none`,
+not green. Missing branch metadata/ref reports `unknown`, never a guessed
+main/master status. Missing/offline `gh` also reports `unknown`.
+The ignored diagnostic snapshot is reused for the same existing host hook
+session ID from the current start invocation and unchanged HEAD/default target
+pair; changed targets or a new session requery. A failed baseline write cannot
+substitute an older persisted host ID. Without a real host ID (`make start` uses `local`), reuse is
+limited to five minutes, not a claim of once-per-session behavior. This brief
+can remain stale within a known session; it is not completion evidence.
+Its separate cache never feeds targeted `make ci-status` or stop/done checks:
+those retain their commit query, expiry and nongreen refresh rules.
+
 Push each working step, at least every 30 minutes and always before stopping.
 On a rebase conflict keep both sides' intent and rerun the tests; never
 resolve by dropping the other side. Shared documents change on the default

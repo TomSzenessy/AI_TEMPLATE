@@ -42,7 +42,10 @@ compares with `core.latest_today`, UTC+14, so a local date always passes; `core.
 `_check_record`. `structure.discover_candidate_surfaces` lists a top-level directory as a product-surface candidate only when `core.repository_files` lists a tracked or untracked-but-not-ignored file beneath it, so a directory holding only git-ignored output (a leftover `.gocache`) is not a candidate; outside git nothing is known to be ignored. Behavior lives in standard-library modules under `tools/kit/`
 whose imports point toward the leaves (`gitinfo`, `names`, `helptext`) and never form a cycle:
 `tools/tests/test_import_graph.py` fails on any, function-local imports included. Only the lazy
-dispatch imports in `commands` are exempt, kept so `repoctl help` starts fast:
+dispatch imports in `commands` are exempt, kept so `repoctl help` starts fast.
+`core.default_branch` retains its legacy default; callers needing an actual
+configured branch use `fallback=None` (missing, blank or non-string metadata
+returns `None`), without another value reader or a guessed branch:
 
 | Concern | Modules | Owner doc |
 |---|---|---|
