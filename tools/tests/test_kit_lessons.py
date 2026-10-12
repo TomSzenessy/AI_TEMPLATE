@@ -664,6 +664,43 @@ class GitSyncTests(Scratch):
         self.assertTrue((self.root / "b.txt").is_file())
         self.assertEqual(session.session_changes(self.root, "s"), [])
 
+    def test_a_resumed_session_never_takes_pulled_commits_as_its_own(self) -> None:
+        """Critic blocker: on resume or compaction the snapshot is kept, so a pull then looked like the session's."""
+        import contextlib
+        import io
+        from test_plugin_isolation import MANIFEST
+        from fixtures import git_in
+        from kit import session
+        self.write("project.toml", MANIFEST)
+        self.write("docs/README.md", "# Docs\n")
+        self.write(".gitignore", ".agent/\n")  # as in every kit project: hook scratch is never committed
+        self.git("add", "-A")
+        self.git(*self.ci, "-m", "manifest")
+        self.git("push", "-q")
+        git_in(self.other, "pull", "-q")
+
+        def start() -> str:
+            with contextlib.redirect_stdout(io.StringIO()) as brief:
+                session.session_start(self.root, {"session_id": "s"})
+            return brief.getvalue()
+
+        start()
+        self.teammate_pushes()  # nothing committed here yet: the resumed brief pulls and moves the baseline
+        self.assertIn("pulled 1 new commit", start())
+        self.assertEqual(session.session_changes(self.root, "s"), [])
+        self.write("mine.txt", "x\n")
+        self.git("add", "-A")
+        self.git(*self.ci, "-m", "mine")
+        self.git("push", "-q")
+        (self.other / "c.txt").write_text("3\n")
+        git_in(self.other, "pull", "-q")
+        git_in(self.other, "add", "-A")
+        git_in(self.other, *self.ci, "-m", "three")
+        git_in(self.other, "push", "-q")
+        brief = start()  # the session has its own commits now: it is told, never fast-forwarded
+        self.assertIn("1 commit(s) behind upstream", brief)
+        self.assertEqual(session.session_changes(self.root, "s"), ["mine.txt"])
+
     def test_the_brief_never_pulls_into_a_dirty_tree(self) -> None:
         """Negative case: local edits are never merged into; the brief says to pull instead."""
         from kit import gitsync

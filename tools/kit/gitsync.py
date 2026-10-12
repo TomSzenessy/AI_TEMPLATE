@@ -57,15 +57,15 @@ def ahead_behind(root: Path) -> tuple[int, int] | None:
     return (int(counts[0]), int(counts[1])) if len(counts) == 2 and all(c.isdigit() for c in counts) else None
 
 
-def brief_lines(root: Path) -> list[str]:
-    """The session brief's sync facts: fetch, then fast-forward a clean tree that is strictly behind."""
+def brief_lines(root: Path, pull: bool = True) -> list[str]:
+    """The session brief's sync facts: fetch, then (with `pull`) fast-forward a clean tree that is strictly behind."""
     if not fetch(root):
         return []
     counts = ahead_behind(root)
     if counts is None:
         return []
     ahead, behind = counts
-    if behind and not ahead and not changed_paths(root):
+    if pull and behind and not ahead and not changed_paths(root):
         merged = run_git(root, "merge", "--ff-only", "-q", "@{u}")
         if merged is not None and merged.returncode == 0:
             return [f"pulled {behind} new commit(s) from upstream (fast-forward): read them before new work"]
