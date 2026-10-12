@@ -34,7 +34,7 @@ assumed. A new or changed check **blocks** only when all three hold:
 
 Otherwise it is **advisory** (`make garden`, the brief) or an
 **automatic fix** (`make sync`). Since #9 `markdown-links`, `command-references`,
-`markers`, `budgets` are advisory, as is `readme-template-sections`. `file-hygiene` stays blocking; `[checks.file-hygiene] allow_paths` exempts one path with a reason ([`capabilities.md`](./capabilities.md#exempting-one-path-from-file-hygiene)) and advisory `file-hygiene-allowed` lists it in ordinary check output too. Further rules:
+`markers`, `budgets` are advisory, as is `readme-template-sections`. `file-hygiene` stays blocking; `[checks.file-hygiene] allow_paths` exempts one path with a reason ([`capabilities.md`](./capabilities.md#exempting-one-path-from-file-hygiene)) and advisory `file-hygiene-allowed` lists it too. Further rules:
 
 - **One blocking point per concern.** Each later gate fires only on what the
   earlier one let through (`--no-verify`, uncommitted work), never on a
@@ -50,8 +50,8 @@ Otherwise it is **advisory** (`make garden`, the brief) or an
   `private-preview` on; an issue's reviewer date never ages, because it
   belongs to the text it reviewed; during development `make garden` reports
   them and `make check` fails only on a future date.
-  `make test-future` (also in CI, with `KIT_SLOW=1`) runs the suite 800 days ahead (`make test-slow` adds the full inner runs), so a
-  date-pinned fixture fails now, not in two years.
+  `make test-future` (also in CI, with `KIT_SLOW=1`) runs the suite 800 days ahead,
+  so a date-pinned fixture fails now, not in two years.
 - **One place decides blocking.** `Registry.blocks`, applied by `checkrun.run_checks`,
   is the only mechanism that turns a finding into a block: the check's `blocks=`
   declaration, then the project's downgrade ([`capabilities.md`](./capabilities.md#downgrading-a-check)).
@@ -155,8 +155,10 @@ findings, one root cause per change (see [`delegation.md`](./delegation.md)).
 ## Scale and limits
 
 - `make where` searches with `git grep` (falls back to a Python scan outside
-  git) and skips files over 400 KB. Doc bindings are cached by size and mtime
-  in ignored `.agent/cache/`, so the per-edit hook does not re-read every doc.
+  git) and skips files over 400 KB; it also scores indexed doc
+  descriptions/triggers and read-only `resources.toml` entries (id, summary,
+  source). Doc bindings are cached by size and mtime in ignored `.agent/cache/`,
+  so the per-edit hook does not re-read every doc.
 - Staleness inspects the newest 2000 non-merge commits; a document last
   committed before that window is not judged.
 - The stop gate judges only what this session changed: `session-start` records the dirty paths with
