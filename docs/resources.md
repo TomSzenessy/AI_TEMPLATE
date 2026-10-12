@@ -116,9 +116,10 @@ Decide in this order: does a real task's trigger match it? Is it the primary
 source or the closest one? Is it already covered? Can it be pinned, reviewed,
 and rolled back? Keep the registry lean: one route per topic, and popularity is
 not trust. When torn between link and vendor, link — a route costs one entry
-and no provenance surface. For each supplied resource, the issue records the named gap, intake decision,
-pinned source/license and rollback, then a **trial outcome or specific non-trial
-reason**. Trial the smallest useful capability in a disposable environment after
+and no provenance surface. For each supplied item, record the named goal or gap,
+intake decision, and **trial outcome or specific non-trial reason**. Record pinned
+source/license and rollback when introducing external code or a capability.
+Trial the smallest useful capability in a disposable environment after
 admission/approval, and observe the artifact against its stated oracle. If it
 adds no capability, exceeds the budget/permissions, or cannot yet be admitted,
 name that reason and the next action; link-only is not proof of utility. Reading
