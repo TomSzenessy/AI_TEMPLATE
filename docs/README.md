@@ -38,7 +38,7 @@ itself and this table cannot drift. Edit the line in the document, not here.
 | [`bindings.md`](./bindings.md) | Doc-code bindings, staleness, owed docs, and the Docs-Unaffected trailer | A document and its code drift apart, or a commit must exempt a document. |
 | [`building.md`](./building.md) | Product driver: feature list, research record, make next phases, product done, UI review | building or judging a product |
 | [`collaboration.md`](./collaboration.md) | Sharing work: fetch, push, pull-first, CI after push, claims, issue comment types | several people or agents work on one repository |
-| [`delegation.md`](./delegation.md) | Orchestrator/subagent roles, brief, return, and critic verdict contract | Work is bounded enough to hand to a scout, implementer, critic, researcher, doc-gardener, or skill-scout. |
+| [`delegation.md`](./delegation.md) | Briefs, returns, verdicts | Work needs separate context or independence. |
 | [`experiments.md`](./experiments.md) | Measured goals: true objective, evaluation ladder, local lab, experiment ledger | A goal is a measured score or metric, or real evaluations are slow, costly, or limited |
 | [`generated-files.md`](./generated-files.md) | Derived files, host adapters, and generated blocks | A generated file looks wrong, or a new agent host is added. |
 | [`hygiene.md`](./hygiene.md) | Deprecation markers, orphan files, change coupling, and product guardrails | Code or files look stale, duplicated, or ownerless. |
@@ -46,7 +46,7 @@ itself and this table cannot drift. Edit the line in the document, not here.
 | [`operations.md`](./operations.md) | Failure loop and error ledger rules | A bug, outage, flaky test, or operational failure occurs. |
 | [`production.md`](./production.md) | Production evidence and release boundary | A real project is being prepared for deployment or release. |
 | [`self-healing.md`](./self-healing.md) | When a check may block, lifecycle hooks, failure output, ceremony by risk, and the gardener | A check fails, a gate blocks, or the kit itself changes. |
-| [`verification.md`](./verification.md) | Definition of done, evidence ladder, and quality loop | A change is ready for review or a quality claim is made. |
+| [`verification.md`](./verification.md) | Evidence, quality loop | Substantial work before implementation; review or quality claim. |
 | [`incidents/README.md`](./incidents/README.md) | Reviewed public incident record boundary | A public incident is promoted or a regression artifact is reviewed. |
 
 ### Design and engineering
@@ -80,7 +80,7 @@ itself and this table cannot drift. Edit the line in the document, not here.
 |---|---|---|
 | [`capabilities.md`](./capabilities.md) | How to add, find, or switch off a capability or pack, and the configuration policy | You add, find, or switch off a skill, role, doc, rule, check, command, MCP route, or pack. |
 | [`evals.md`](./evals.md) | Fresh-agent navigation evals and scored build trials | AGENTS.md, the docs, a skill, or a gate changed and needs fresh-agent evidence. |
-| [`resources.md`](./resources.md) | Primary docs, MCP routes, licenses, and resource intake | A task needs a capability, example, current documentation, or external gate. |
+| [`resources.md`](./resources.md) | Sources and intake | Capability, example, current docs, external gate. |
 | [`skills.md`](./skills.md) | Skill discovery, provenance, and overlap rules | A task needs a capability the repository does not provide. |
 | [`adr/0001-issue-backed-write-ahead.md`](./adr/0001-issue-backed-write-ahead.md) | Accepted write-ahead and documentation-boundary decision | You need the rationale for issue-backed continuity. |
 | [`adr/0002-one-capability-model.md`](./adr/0002-one-capability-model.md) | The capability model: kinds, declaration fields, discovery, packs, and what is out of scope | You add, find, or switch off a skill, role, doc, rule, check, command, MCP route, or pack. |

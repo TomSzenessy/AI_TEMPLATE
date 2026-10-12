@@ -1,6 +1,6 @@
 # Resource routing for agents
 
-<!-- index: extend | Primary docs, MCP routes, licenses, and resource intake | A task needs a capability, example, current documentation, or external gate. -->
+<!-- index: extend | Sources and intake | Capability, example, current docs, external gate. -->
 <!-- covers: resources.toml .agents/mcp/** -->
 
 This is a **routing catalog**, not a bundled code library. Use it to find the
@@ -121,9 +121,11 @@ and applying a source can be useful without installing its tool stack. Never
 install a package merely to satisfy this record.
 
 The intake is done when `make resources` and `make check` pass and every supplied
-item has that observed result or reason. The `skill-scout` proposes the trial;
-the orchestrator owns approval, execution and recording. REA's optional path and
-source/release distinction are in the
+item has that observed result or reason. The `skill-scout` proposes the trial. When approved,
+the orchestrator ensures approval, execution and recorded evidence. A scoped
+builder may execute the approved trial under the
+[delegation contract](./delegation.md#when-to-delegate); accountability stays with
+the orchestrator. REA's optional path and source/release distinction are in the
 [technical-recon reference](../.agents/skills/technical-recon/references/rea.md).
 
 ## First-party resource map

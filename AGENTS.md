@@ -87,13 +87,13 @@ route is [`SECURITY.md`](./SECURITY.md).
 
 ## Build and repair loop
 
-1. **Frame** the user-visible outcome, acceptance evidence, surface, non-goals.
+1. **Frame** user-visible outcome, evidence, surface, non-goals;
+   [plan quality](./docs/verification.md#the-quality-loop) before implementation.
 2. **Reproduce** a bug as a failing test or deterministic experiment first.
 3. **Design** behind the smallest deep interface; one owner per changing fact.
 4. **Implement** the smallest coherent change; keep existing conventions.
 5. **Verify**: focused check, then `make done`, then the real artifact.
-6. **Critique**: the independent quality loop
-   ([`docs/verification.md`](./docs/verification.md#the-quality-loop)).
+6. **Critique** independently against acceptance.
 7. **Reconcile** issue, manifest, docs, and navigation in the same change.
 
 ## Self-organization (checked by `make check`)
