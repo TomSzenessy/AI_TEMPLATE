@@ -41,7 +41,33 @@ class TrialTests(unittest.TestCase):
         self.assertTrue(report["replay_equal"])
         self.assertEqual(len(report["target_digest"]), 64)
         self.assertIn("not real-target parity", report["limitations"])
-        self.assertTrue(report["traces"])
+        self.assertEqual(len(report["traces"]), 4)
+        comparison = report["agent_comparison"]
+        self.assertTrue(comparison["actions_equal"])
+        self.assertTrue(comparison["outputs_equal"])
+        self.assertEqual(comparison["observed"], comparison["predicted"])
+        self.assertEqual(len(comparison["observed"]["actions"]), 4)
+
+    def test_observation_drift_changes_independently_reacting_agent_actions(self):
+        report = self.trial().run_trial(approved=True, inject_observation_drift=True)
+        self.assertFalse(report["verified"], report)
+        self.assertEqual(report["status"], "compared")
+        self.assertIn("held-out-agent-actions", report["mismatches"])
+        comparison = report["agent_comparison"]
+        self.assertFalse(comparison["actions_equal"])
+        self.assertFalse(comparison["outputs_equal"])
+        self.assertEqual(comparison["observed"]["actions"], [
+            {"op": "reserve", "amount": 6}, {"op": "release", "amount": 6},
+            {"op": "reserve", "amount": 6}, {"op": "release", "amount": 6},
+        ])
+        self.assertEqual(comparison["predicted"]["actions"], [
+            {"op": "reserve", "amount": 6}, {"op": "reserve", "amount": 1},
+            {"op": "reserve", "amount": 1}, {"op": "reserve", "amount": 1},
+        ])
+        self.assertEqual(comparison["observed"]["trace"][0]["observation"]["available"], 0)
+        self.assertEqual(comparison["predicted"]["trace"][0]["observation"]["available"], 1)
+        self.assertEqual(comparison["predicted"]["trace"][1]["result"], "rejected")
+        self.assertNotIn("held-out-agent", [trace["case"] for trace in report["traces"]])
 
     def test_deliberately_wrong_model_is_detected(self):
         report = self.trial().run_trial(approved=True, inject_drift=True)
@@ -68,6 +94,17 @@ class TrialTests(unittest.TestCase):
         allowed = subprocess.run(command + ["--run-owned-fixture"], capture_output=True, text=True, timeout=5)
         self.assertEqual(allowed.returncode, 0, allowed.stdout + allowed.stderr)
         self.assertTrue(json.loads(allowed.stdout)["verified"])
+        for control in ("--inject-drift", "--inject-observation-drift"):
+            with self.subTest(control=control):
+                wrong = subprocess.run(command + ["--run-owned-fixture", control],
+                                       capture_output=True, text=True, timeout=5)
+                self.assertEqual(wrong.returncode, 1, wrong.stdout + wrong.stderr)
+                report = json.loads(wrong.stdout)
+                self.assertFalse(report["verified"])
+                self.assertEqual(report["status"], "compared")
+                self.assertTrue(report["mismatches"])
+                if control == "--inject-observation-drift":
+                    self.assertFalse(report["agent_comparison"]["actions_equal"])
 
 
 @template_only
