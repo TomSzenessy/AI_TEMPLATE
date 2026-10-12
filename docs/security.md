@@ -3,7 +3,7 @@
 <!-- index: design | Secure implementation baseline | Auth, secrets, CI, dependencies, deployment, or untrusted input changes. -->
 <!-- covers: .github/workflows/ci.yml .github/workflows/specialist-scans.yml .github/dependabot.yml .security/config.json tools/kit/docs.py -->
 
-The verify job runs `repoctl ci gate` on the interpreter `setup-python` configured; in an adopted project it runs only the toolchain-free `repoctl check` (see [`adopt.md`](./adopt.md#kit-ci-and-your-toolchains)), so CI installs no project toolchains.
+The verify job runs `repoctl ci gate` on the interpreter `setup-python` configured; in an adopted project it runs only the toolchain-free `repoctl check` (see [`adopt.md`](./adopt.md#kit-ci-and-your-toolchains)), so CI installs no project toolchains beyond a surface's own `setup` commands, which verification runs only under the workflow's `REPOCTL_SETUP=1`; pin them to a lockfile and disable install scripts (`npm ci --ignore-scripts`).
 
 CI logic lives in tested repository code, not in workflow YAML: workflows
 check out the repository and call `make verify`, `make test-future`, or `repoctl ci <check>`
@@ -99,6 +99,14 @@ rejects local MCP routes that run `npx`, `uvx`, or `pipx` without a pinned
 package version. Project plugins in `.agents/checks/*.py` and
 `.agents/commands/*.py` execute on every `repoctl` start, and `make new` is
 pre-approved for agents, so review a newly created plugin file like code.
+
+### Agent transcripts
+
+Agent transcripts, checkpoints, and session logs stay out of the repository
+by default (`.agent/` is ignored): they hold pasted output, paths, and
+sometimes keys. Sharing them is a recorded team decision, after a secret scan
+of exactly what is shared. Never type a secret into a prompt or onto a
+command line; put it in the ignored `.env` and name the variable.
 
 ## Disclosure
 

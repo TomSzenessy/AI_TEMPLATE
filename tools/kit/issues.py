@@ -278,8 +278,10 @@ def file_issue(
     gate: str | None,
     public_reviewed: bool,
     review_evidence: str | None,
+    repository: str | None = None,
 ) -> str:
-    """Validate and file (or write a Local-WAL draft); returns the issue URL or the draft notice."""
+    """Validate and file (or write a Local-WAL draft); returns the issue URL or the draft notice.
+    `repository`: file there instead of this checkout's target (`make kit-report` files on the template, #88)."""
     if body_file.is_absolute():
         raise RepoctlError(RELATIVE_BODY_FILE)
     body_file = root / body_file
@@ -302,7 +304,7 @@ def file_issue(
     # usable now. The full public contract applies when the draft is actually filed.
     if profile == "minimal":
         raise RepoctlError("minimal profile delegates issue filing and labels to the host organization")
-    local_draft = profile == "agent-first" and not github_target_configured(root, project)
+    local_draft = repository is None and profile == "agent-first" and not github_target_configured(root, project)
     if local_draft:
         validate_local_draft(body)
     else:
@@ -325,7 +327,7 @@ def file_issue(
     if not title.strip() or len(title) > 256:
         raise RepoctlError("issue title must contain 1-256 characters")
     try:
-        repository = resolve_github_repo(root)
+        repository = repository or resolve_github_repo(root)
     except RepoctlError as error:
         if github_target_configured(root, project):
             raise  # a configured target that fails is a real error, not "no remote yet"

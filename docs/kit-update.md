@@ -45,9 +45,31 @@ update refuses a dirty tree, so it lands as one reviewable change; run
 `make done` after it. `make garden` reports when the template has moved past
 the recorded `kit_version`.
 
-The other direction: an agent that finds a kit bug in a project fixes it there
-and reports it at `[template].source` (AGENTS.md), and the template's fix then
-reaches every project through `make kit-update`. Tests prove that init or adopt
+A template clone used as a project never locks its own files at `make init`
+(a clone older than `tools/kit-files.json` runs `make kit-update` first, which
+adds it). It keeps the lock an earlier kit-update wrote, else gets an empty one
+(the `kit-upstream` prompt for kit edits then starts after its first update):
+it may have edited kit files, so their content is not what the kit shipped. A
+project without a lock (such a clone, or one older than the lock) is not all
+hand merges: a file byte-identical to a version in the history of the offered
+kit commit (merge commits included, never another branch) was never edited
+there, so it is updated like an unchanged file (one `git log` of the kit per
+update, so the default clone of `[template].source` keeps its full history when
+there is no lock); only real edits are staged. Graduation records the kit version as `unknown`
+(the clone's own HEAD is not a template commit), so `make garden` waits for the
+first update instead of reporting the template as ahead.
+
+The other direction: a project that changes a kit file drafts a report for the
+template with `make kit-report` (ignored `.agent/kit-reports/`, nothing is
+sent), or records why the change is project-specific (a hand-merged kit update
+included) with `make kit-report REASON="..."`. The owner files a reviewed draft
+with `make kit-publish` (Claude Code asks the person first): an issue on
+`[template].source` with the same contract and duplicate check as `make issue`,
+naming the kit version and files but never the project's repository or commit,
+because the template may be public while the project is private. The `kit-upstream` check holds `make done` and the stop gate
+until each changed or deleted kit file version is drafted, reported, or explained (ignored
+`.agent/kit-reports.json`; another worktree asks again), so every project feeds
+the template, and its fix reaches every project through `make kit-update`. Tests prove that init or adopt
 followed by an update from the same kit changes nothing, and that an update
 applies fixes, additions, and removals while keeping the project's edits.
 

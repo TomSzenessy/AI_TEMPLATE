@@ -37,7 +37,9 @@ itself and this table cannot drift. Edit the line in the document, not here.
 | [`audit.md`](./audit.md) | Whole-repository audit protocol | Finding, prioritizing, and filing improvements without implementing them. |
 | [`bindings.md`](./bindings.md) | Doc-code bindings, staleness, owed docs, and the Docs-Unaffected trailer | A document and its code drift apart, or a commit must exempt a document. |
 | [`building.md`](./building.md) | Product driver: feature list, research record, make next phases, product done, UI review | building or judging a product |
+| [`collaboration.md`](./collaboration.md) | Sharing work: fetch, push, pull-first, CI after push, claims, issue comment types | several people or agents work on one repository |
 | [`delegation.md`](./delegation.md) | Orchestrator/subagent roles, brief, return, and critic verdict contract | Work is bounded enough to hand to a scout, implementer, critic, researcher, doc-gardener, or skill-scout. |
+| [`experiments.md`](./experiments.md) | Measured goals: true objective, evaluation ladder, local lab, experiment ledger | A goal is a measured score or metric, or real evaluations are slow, costly, or limited |
 | [`generated-files.md`](./generated-files.md) | Derived files, host adapters, and generated blocks | A generated file looks wrong, or a new agent host is added. |
 | [`hygiene.md`](./hygiene.md) | Deprecation markers, orphan files, change coupling, and product guardrails | Code or files look stale, duplicated, or ownerless. |
 | [`kit-update.md`](./kit-update.md) | The kit lock, make kit-update, and the golden-path test | A kit fix must reach projects, or a project updates from the template. |
@@ -56,6 +58,7 @@ itself and this table cannot drift. Edit the line in the document, not here.
 | [`../SECURITY.md`](../SECURITY.md) | Vulnerability disclosure and security contact | A vulnerability or security-sensitive change is involved. |
 | [`../.security/threat-model.md`](../.security/threat-model.md) | STRIDE threat model and accepted trust boundaries | A security-sensitive tool, CI path, or agent permission is reviewed. |
 | [`engineering.md`](./engineering.md) | Modular design, single source of truth, dependency, and cleanup rules | Code is being changed, refactored, or reviewed. |
+| [`model-integration.md`](./model-integration.md) | Confining a language model inside a product: code decides, the model reads and writes, votes, grounding, shadow mode, measured confidence | code calls a model at runtime or model output reaches a decision |
 | [`security.md`](./security.md) | Secure implementation baseline | Auth, secrets, CI, dependencies, deployment, or untrusted input changes. |
 | [`architecture/README.md`](./architecture/README.md) | Current structure, seams, kit module map, and design rules | Adding a surface, changing dependencies, or locating ownership. |
 

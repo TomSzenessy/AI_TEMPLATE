@@ -28,6 +28,9 @@ is_template = true
 # links to removed files are rewritten to `source` so nothing breaks.
 source = "https://github.com/TomSzenessy/AI_TEMPLATE"
 prune = ["docs/research/**", ".agents/trials/**"]
+# Digests of the template's own intake records: `make init` in a clone already used as a project keeps a record
+# that differs from these (the project wrote it) and resets one that matches (#75). A template test keeps them current.
+records = { "VISION.md" = "sha256:54cd11f15fea92efb8536336450fa30a5073563d72b73c8ead995b61e03a755b", "docs/STACK-DECISION.md" = "sha256:477676bd70f6eb7c05c5449ec13e2889142e127eafc8020daba519f19dfc0722" }
 
 [vision]
 status = "accepted"
@@ -75,7 +78,7 @@ measure = true
 [capabilities]
 # First-party skills written in this repository (`make new KIND=skill` adds
 # them here). Third-party skills instead need [[skills]] provenance below.
-local_skills = ["product-kickoff", "stack-foundation", "ux-quality"]
+local_skills = ["product-kickoff", "stack-foundation", "ux-quality", "experiment-lab", "pitch-from-evidence"]
 
 # [checks.<name>]  A project may downgrade one blocking check it disagrees with; it still runs.
 # severity = "advisory"  (the only value) and reason = "..." (required). Deleting the entry restores blocking.

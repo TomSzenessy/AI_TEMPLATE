@@ -102,10 +102,16 @@ def _git_ignored(root: Path, paths: set[str]) -> set[str]:
     return {line.strip().rstrip("/") for line in found.stdout.splitlines() if line.strip()}
 
 
-def validation_commands(surface: dict[str, object]) -> list[list[str]]:
-    commands = surface.get("verification", [])
+def in_ci() -> bool:
+    """Run surface `setup` installs: only on the explicit opt-in the kit CI workflow sets (#84), never on CI=true."""
+    return os.environ.get("REPOCTL_SETUP") == "1"
+
+
+def validation_commands(surface: dict[str, object], field: str = "verification") -> list[list[str]]:
+    """A surface's `verification` commands, or its `setup` commands (the toolchain install CI runs first, #76)."""
+    commands = surface.get(field, [])
     if not isinstance(commands, list):
-        raise RepoctlError(f"surface {surface.get('id', '<missing id>')} verification must be an array")
+        raise RepoctlError(f"surface {surface.get('id', '<missing id>')} {field} must be an array")
     normalized: list[list[str]] = []
     for position, command in enumerate(commands, start=1):
         if (
@@ -114,7 +120,7 @@ def validation_commands(surface: dict[str, object]) -> list[list[str]]:
             or not all(isinstance(argument, str) and argument for argument in command)
         ):
             raise RepoctlError(
-                f"surface {surface.get('id', '<missing id>')} verification command #{position} must contain non-empty strings"
+                f"surface {surface.get('id', '<missing id>')} {field} command #{position} must contain non-empty strings"
             )
         if command and command[0].rsplit("/", 1)[-1] in {"make", "gmake"} and "verify" in command[1:]:
             raise RepoctlError("surface verification must not call the aggregate make verify command")
@@ -426,6 +432,22 @@ def manifest_type_errors(project: dict[str, object]) -> list[str]:
     return errors
 
 
+# The template's own README sections (#75): a project README that still has them reads as the template.
+TEMPLATE_README_HEADINGS = ("## Why", "## Start a project", "### Already have a codebase?", "## How it stays healthy")
+
+
+def readme_template_sections(root: Path, project: dict[str, object]) -> list[str]:
+    """The template's own README headings left in an initialized project's README."""
+    if project.get("name") == "REPLACE_WITH_PROJECT_NAME" or is_template(project):
+        return []
+    try:
+        text = read_utf8(root / "README.md")
+    except (FileNotFoundError, OSError):
+        return []
+    lines = {line.strip() for line in text.splitlines()}
+    return [heading for heading in TEMPLATE_README_HEADINGS if heading in lines]
+
+
 def check_readme_identity(root: Path, project: dict[str, object]) -> None:
     if project.get("name") == "REPLACE_WITH_PROJECT_NAME" or is_template(project):
         return  # the template states template mode; only `make init` writes a project identity
@@ -474,6 +496,9 @@ def run_verification(root: Path) -> None:
         )
         surface_root = surface_path if surface_path.is_dir() else surface_path.parent
         commands = validation_commands(surface)
+        setup = validation_commands(surface, "setup")  # validated everywhere, run only in CI
+        if commands and in_ci():  # CI starts clean: install what the surface needs, as declared, before verifying
+            commands = setup + commands
         if not commands:
             if profile != "minimal":
                 validate_critic_evidence(root, surface)
@@ -534,3 +559,31 @@ def print_inventory(root: Path) -> None:
             )
     else:
         print("Declared surfaces: none")
+
+
+TEMPLATE_SURFACES = {"template", "template-bootstrap"}
+
+
+def template_in_use(root: Path, project: dict[str, object] | None = None) -> str | None:
+    """Why this checkout is the template used as a project (#75), or None.
+
+    `is_template = true` alone cannot tell the template from a clone of it: a project cloned from the template
+    and never `make init`-ed kept the template's name, GitHub target, README and next step for its whole life.
+    A checkout counts as a project when its origin is not the template source and it declares a surface of its
+    own; a fork made to improve the template declares none.
+    """
+    from .github import github_target_from_remote, origin_target
+
+    project = project if project is not None else load_project(root)
+    if not is_template(project):
+        return None
+    template = project.get("template", {})
+    source = github_target_from_remote(str(template.get("source", ""))) if isinstance(template, dict) else None
+    origin = origin_target(root)
+    own = [str(s.get("id")) for s in declared_surfaces(project) if s.get("id") not in TEMPLATE_SURFACES]
+    if not origin or not source or origin.lower() == source.lower() or not own:
+        return None
+    return (f"this checkout ({origin}) is the template ({source}) used as a project with surface(s) {', '.join(own)}: "
+            "run `make kit-update` if tools/kit-files.json is missing, then `make init NAME=<project> KIND=<kind> "
+            "OWNER=<handle>` so its name, GitHub target, README and next step become the project's (declared surfaces "
+            "are kept, never pruned)")

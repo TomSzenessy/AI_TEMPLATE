@@ -9,7 +9,8 @@ Nothing that can be generated is maintained by hand. `make sync` (also run by
 | Derived | Single source |
 |---|---|
 | `.claude/skills/*`, `.claude/agents/*` (redirect stubs) | `.agents/skills/*/SKILL.md`, `.agents/agents/*.md` frontmatter |
-| `.claude/settings.json` (hooks, pre-approved kit commands) | the kit, plus optional `project.toml [adapters.claude]`; in an adopted project a command whose target was renamed `kit-<name>` is pre-approved under that name ([`adopt.md`](./adopt.md)) |
+| `tools/kit-files.json` (the template's exact list of the files it ships as kit) | the template's own files minus `[template].prune` and project-owned paths; generated only in the template, shipped to projects as a kit file, so a clone that graduates with `make init` locks only these |
+| `.claude/settings.json` (hooks, pre-approved kit commands, and an `ask` rule for `make kit-publish`, so the person approves every filing on the template repository) | the kit, plus optional `project.toml [adapters.claude]`; in an adopted project a command whose target was renamed `kit-<name>` is pre-approved under that name ([`adopt.md`](./adopt.md)) |
 | `.mcp.json` | `.agents/mcp/*.toml` routes of enabled packs (servers are still approved per person) |
 | The command block in the `Makefile` (`kit.mk` after `make adopt`) and `make help` | each `@command` declaration in `tools/kit/commands.py` and `.agents/commands/` |
 | The project rules block in `AGENTS.md` | `.agents/rules/*.md` without a `scope` |

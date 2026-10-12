@@ -31,6 +31,7 @@ deliverable), **separable** (needs no running conversation), and **checkable**
 | [`researcher`](../.agents/agents/researcher.md) | web, balanced | Answers an external-knowledge question (current library APIs, platform rules, prior art, error messages) from primary sources using web search, docs MCP servers, and a browser, returning cited, version-specific findings. |
 | [`scout`](../.agents/agents/scout.md) | read-only, fast | Read-only locator. Use before reading many files yourself - finds where something lives, who owns it, how it is wired, and what broke there before, then returns a short map with file:line evidence. |
 | [`skill-scout`](../.agents/agents/skill-scout.md) | web, balanced | Finds and vets a missing capability (skill, MCP server, or tool) without installing it - checks overlap with existing skills first, inspects candidates for provenance and risk, and returns a ready-to-review provenance entry or a reuse recommendation. |
+| [`strategist`](../.agents/agents/strategist.md) | web, deep | Divergent ideas: generates genuinely different, out-of-the-box approaches and alternative strategies to a goal, each with its cheapest decisive test; Use at goal start and when a measured metric stops improving |
 <!-- /repoctl:roles -->
 
 The table is generated from each role's frontmatter by `make sync`, so a role
@@ -42,7 +43,7 @@ fresh context cannot rationalize its own work.
 ## The brief (orchestrator → subagent)
 
 ```text
-Role: <scout | implementer | critic | researcher | doc-gardener | skill-scout>
+Role: <scout | implementer | critic | researcher | doc-gardener | skill-scout | strategist>
 Goal: <one sentence; the user-visible outcome this serves>
 <the role's `## Brief` fields, e.g. the critic's Issue, Diff, Artifact, Scope, Done when>
 Context: <issue link, decisions already made, relevant file:line pointers>
@@ -100,6 +101,13 @@ Run subagents in parallel only when their write scopes are disjoint;
 implementers that might touch the same files work sequentially or in separate
 git worktrees. Merge results through the orchestrator, then run `make done`
 once on the combined change.
+
+The same holds for separate top-level sessions (two terminals, two hosts, a
+human and an agent): give each its own worktree (`git worktree add`). In a
+shared checkout, `git add` only the paths you changed, never `-A` or `.`, check
+`git diff --cached --name-only` and unstage any path you do not own, and
+treat changes you did not make as someone else's work in progress: one
+session's merge commit must not carry another session's half-finished edits.
 
 ## Adding or changing a role
 

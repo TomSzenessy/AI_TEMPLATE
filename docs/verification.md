@@ -91,3 +91,13 @@ Run `make done`, inspect the real artifact, generate a fresh review packet with
 `make review-packet ISSUE_FILE=...`, and resolve every blocker. Report skipped
 checks and external gates explicitly. “No issues found” means the declared scope
 was checked to the stated coverage—not that the entire universe is bug-free.
+
+Before an irreversible event (a launch, a deadline, an official submission, a
+migration), "ready" also lists what was not tested: every candidate improvement
+you ranked but did not measure and every known risk, each filed as an issue, so
+the owner decides with them in view. Routine changes with no such event need no
+disclosure.
+
+A long-running local server (a dev server, an inspection page) keeps the code it
+loaded: restart it after code changes, or have it report that its code is
+stale, before you or the owner trust what it shows.

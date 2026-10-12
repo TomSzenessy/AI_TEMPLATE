@@ -160,11 +160,17 @@ def _stack_accepted(root: Path) -> bool:
     return bool(re.search(r"(?im)^\W*status\W*:?\W*accepted\b", text))
 
 
+from .structure import template_in_use  # noqa: E402,F401  (owned by structure: no derive -> product cycle)
+
+
 def next_step(root: Path) -> dict[str, str]:
     """The single next step from repository state: phase, action, guide, verify."""
     from .uireview import review_status  # local import: uireview depends on this module
 
     project = load_project(root)
+    if (in_use := template_in_use(root, project)) is not None:
+        return {"phase": "initialize", "action": in_use[0].upper() + in_use[1:] + ".",
+                "guide": "docs/ADAPTATION.md", "verify": "make doctor"}
     if not is_product(project):
         return {"phase": "template", "action": "Maintain the template: fix `make garden` findings, keep evals green.",
                 "guide": "docs/self-healing.md", "verify": "make done"}

@@ -8,14 +8,21 @@ step), `make where Q="..."`, `make capabilities`, and `make done` before you cal
 
 ## Session protocol
 
-1. **Start.** Hooked hosts print a session brief; otherwise `make start`.
-   Read root `HANDOVER.md` when present; the working tree wins over it.
+1. **Start.** The session brief (hooked hosts; else `make start`) fetches and
+   fast-forwards a clean tree, else `git pull --rebase`. Read root
+   `HANDOVER.md` when present; the working tree wins. Again after a pause.
 2. **Orient.** `project.toml` owns shape, surfaces, checks, and provenance;
    obey the nearest scoped `AGENTS.md`.
 3. **Before editing:** `git status`, the current issue/PR, and `make risk`
-   (ceremony for this change: low, normal, or high).
+   (low, normal, or high ceremony). With others in the repository, claim the
+   issue and name overlaps ([`docs/collaboration.md`](./docs/collaboration.md)).
+   Parallel sessions use separate worktrees; stage only your paths.
 4. **Finish:** update every doc covering what you changed, run `make done`,
-   and observe the real artifact. When pausing, run `make handover`.
+   and observe the real artifact. Commit and push each working step, always
+   before you stop; never break the default branch. After a push,
+   `make ci-status` until green: a red run is yours. Before a run others rely
+   on (a release build, a benchmark), `make pull-first`. When pausing,
+   `make handover`.
 
 Code, tests, and runtime observations are evidence; a plausible explanation
 is not a diagnosis.
@@ -29,6 +36,11 @@ directly** otherwise — a subagent costs more than the change. Each role file i
 returns ([`docs/delegation.md`](./docs/delegation.md)). Reports cite `path:line`;
 keep raw dumps out of your context.
 
+**At the start of a goal**, and again when its measured result stops improving,
+run the `strategist` role for genuinely different approaches and the
+`skill-scout` role for capabilities that would reach the goal faster; record
+both answers in the goal's issue. A bounded fix needs neither.
+
 ## Extend the system
 
 When a task recurs or a capability would make work safer, improve the system.
@@ -40,8 +52,9 @@ file added the same way ([ADR 0002](./docs/adr/0002-one-capability-model.md)):
   `FILL-IN:` lines. Project additions go in `.agents/`, never in kit files.
 - Outside skills, MCP servers, tools: the `skill-scout` role vets them first
   ([`docs/skills.md`](./docs/skills.md)). Nothing third-party runs unreviewed.
-- **Kit bug** (`tools/`, `.agents/`, `.githooks/`, a kit doc): fix it here and
-  report it at `[template].source`; `make kit-update` carries the fix.
+- **Kit bug or improvement** (`tools/`, `.agents/`, `.githooks/`, a kit doc): fix
+  it here and `make kit-report` a draft for the template (`make kit-publish` is the owner's);
+  `make kit-update` carries the fix.
 
 Project rules (scoped rules arrive when you edit a matching path):
 
@@ -61,12 +74,14 @@ route is [`SECURITY.md`](./SECURITY.md).
 
 [`docs/README.md`](./docs/README.md) lists every document and when to read it:
 
-- **New product:** `product-kickoff` (headless with no owner answers: write the questions with your picks, then stop), then `stack-foundation`, then `make next` until launch ([`docs/building.md`](./docs/building.md)). **Anything users see:** `ux-quality` and `make ui-review`.
+- **New product:** `product-kickoff` (headless without owner answers: write the questions with your picks, stop), then `stack-foundation`, then `make next` until launch ([`docs/building.md`](./docs/building.md)). **Anything users see:** `ux-quality` and `make ui-review`.
+- **A metric or benchmark to improve, or costly real measurements:** `experiment-lab` ([`docs/experiments.md`](./docs/experiments.md)).
+- **Code acts on a model's answer:** [`docs/model-integration.md`](./docs/model-integration.md).
 - **Vocabulary, architecture, seams:** [`CONTEXT.md`](./CONTEXT.md), [`docs/architecture/README.md`](./docs/architecture/README.md).
 - **Bug or incident:** [`docs/operations.md`](./docs/operations.md); reproduce first. **Release or quality claim:** [`docs/verification.md`](./docs/verification.md), [`docs/production.md`](./docs/production.md).
 - **Auth, secrets, dependencies, CI, untrusted input:** [`docs/security.md`](./docs/security.md).
 - **Personal data, legal text, launch:** [`docs/privacy.md`](./docs/privacy.md), [`docs/legal/README.md`](./docs/legal/README.md).
-- **Skills, MCP, pasted resources:** [`docs/resources.md`](./docs/resources.md), [`docs/skills.md`](./docs/skills.md); discover, inspect, pin, record.
+- **Skills, MCP, pasted resources:** [`docs/resources.md`](./docs/resources.md), [`docs/skills.md`](./docs/skills.md).
 - **A failing check:** its message names the fix; mechanics in [`docs/self-healing.md`](./docs/self-healing.md).
 - **Audit or cleanup:** [`docs/audit.md`](./docs/audit.md) (report-only by default) and `make garden`.
 

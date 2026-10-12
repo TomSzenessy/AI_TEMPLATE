@@ -47,6 +47,34 @@ def _stage(root: Path, local: str, content: bytes) -> str:
     return staged.relative_to(root).as_posix()
 
 
+_HISTORY: dict[str, dict[str, set[str]]] = {}
+
+
+def _kit_history(kit: Path) -> dict[str, set[str]]:
+    """Every blob each path had in the history of the offered kit commit (never another branch of the checkout:
+    an experiment there was never shipped), merge commits included, from one `git log` per update (#89)."""
+    key = str(kit)
+    if key not in _HISTORY:
+        log = git(kit, "log", "HEAD", "-m", "--format=", "--raw", "--no-abbrev", "--no-renames") or ""
+        history: dict[str, set[str]] = {}
+        for line in log.splitlines():
+            meta, _, path = line.partition("\t")  # the path follows a tab and may contain spaces
+            fields = meta.split()
+            if line.startswith(":") and path and len(fields) >= 5:
+                history.setdefault(path, set()).add(fields[3])
+        _HISTORY[key] = history
+    return _HISTORY[key]
+
+
+def _past_kit_version(kit: Path, path: str, target: Path) -> bool:
+    """Is `target` byte-identical to a version of `path` anywhere in the kit checkout's history? (#89)"""
+    mine = git(target.parent, "hash-object", "--", target.name)
+    blobs = _kit_history(kit).get(path)
+    if not mine or not blobs:
+        return False  # no git, or a kit checkout without history: list it for a hand merge as before
+    return mine.strip() in blobs
+
+
 def update(root: Path, kit: Path) -> int:
     root, kit = root.resolve(), kit.resolve()
     if root == kit:
@@ -91,6 +119,11 @@ def update(root: Path, kit: Path) -> int:
         elif path in locked and offered == locked[path]:
             files[path] = locked[path]  # the kit did not change it; the project's edit stands
             continue
+        elif path not in locked and _past_kit_version(kit, path, target):
+            # #89: no lock (a clone never initialized, or a project older than the lock), but the file is
+            # byte-identical to a version the template once shipped, so the project never edited it.
+            target.write_bytes(content)
+            updated.append(local)
         else:  # changed by the project, or a file of its own where the kit now ships one
             conflicts.append(f"{local} (new version: {_stage(root, local, content)})")
             if path in locked:
@@ -137,7 +170,9 @@ def update_from_source(root: Path, kit: str | None, ref: str | None = None) -> i
     if ref and (ref.startswith("-") or not re.fullmatch(r"[0-9A-Za-z][0-9A-Za-z._/-]{0,199}", ref)):
         raise RepoctlError(f"KIT_REF {ref!r} is not a commit SHA, tag, or branch name")
     with tempfile.TemporaryDirectory() as folder:
-        cloning = ["clone", "-q", *([] if ref else ["--depth", "1"]), source, folder]
+        # Without a lock the update compares with every version the template ever shipped (#89): full history.
+        lockless = not read_lock(root).get("files")
+        cloning = ["clone", "-q", *([] if ref or lockless else ["--depth", "1"]), source, folder]
         result = run_git(None, *cloning, timeout=300)
         if result is None or result.returncode != 0:
             reason = result.stderr.strip()[-300:] if result else "git unavailable"

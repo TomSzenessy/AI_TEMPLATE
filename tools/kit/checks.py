@@ -49,6 +49,14 @@ def manifest_structure(context) -> list[str]:
         structure.check_readme_identity, context.root, context.project)
 
 
+@check("readme-template-sections", "An initialized project's README says what the project is, not what the template is; "
+       "after make init", blocks=False)
+def readme_template_sections(context) -> list[str]:
+    found = structure.readme_template_sections(context.root, context.project)
+    return [f"README.md still has the template's own section(s) {', '.join(found)}: replace them with what this "
+            "project does and how to run it (the template keeps them at [template].source)"] if found else []
+
+
 @check("skill-provenance", "Third-party skills carry source, revision, digest, and review; before trusting a skill",
        blocks=True, reason="Unreviewed third-party instructions are an injection path; the digest makes tampering visible.")
 def skill_provenance(context) -> list[str]:
@@ -362,3 +370,25 @@ def doc_coupling(context) -> list[str]:
               "loop the builder had missed. The gate reads the saved verdict so the claim is checkable.")
 def critic_evidence(context) -> list[str]:
     return gatechecks.critic_evidence(context)
+
+
+@check("kit-upstream", "A kit file changed in a project is reported to the template or recorded as local; asked by the stop and done gates",
+       blocks=True, reason="Kit fixes made in a project stayed there; every other project kept the bug (#88). Reporting "
+                           "is one command, and REASON records a project-specific change.")
+def kit_upstream(context) -> list[str]:
+    change = context.change
+    if change is None or change.kind != "finish":
+        return []
+    from .kitreport import upstream_findings
+    return upstream_findings(context.root, change.paths)
+
+
+@check("ci-red", "The CI run of a pushed HEAD this session committed is not red; asked by the stop and done gates",
+       blocks=True, reason="A red default branch went unnoticed for five pushes while every local gate passed (#76); "
+                           "only the pushed commit's CI shows what a clean environment sees.")
+def ci_red(context) -> list[str]:
+    change = context.change
+    if change is None or change.kind != "finish":
+        return []
+    from .cistatus import red_findings
+    return red_findings(context.root, change.since if change.scoped else None)

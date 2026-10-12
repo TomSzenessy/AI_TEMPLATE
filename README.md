@@ -4,6 +4,7 @@
 Self-healing starting point for AI-agent-built projects of any size: docs bound to code, generated host adapters, delegation roles, and deterministic gates for any agent or model.
 <!-- /repoctl:description -->
 
+<!-- repoctl:template-only -->
 A starting point for any project built mostly by AI coding agents: website,
 game, backend, native app, 3D or video pipeline, data product, documents, or
 something new. It works with any agent host (Claude Code, Codex, Copilot,
@@ -23,6 +24,8 @@ that compounds until every bug fix is archaeology. This template turns the
 upkeep into deterministic checks and hooks, so the repository heals itself and
 any agent can pick it up cold.
 
+<!-- /repoctl:template-only -->
+
 ## Start a project
 
 <!-- repoctl:quickstart -->
@@ -34,6 +37,7 @@ make check                            # everything green before the first change
 ```
 <!-- /repoctl:quickstart -->
 
+<!-- repoctl:template-only -->
 Then tell your agent what to build. It runs the `product-kickoff` skill first:
 one round of questions with recommendations (users, platforms, stack such as
 Next.js + Tailwind, Expo, Flutter, or SwiftUI, visual style), two or three
@@ -62,6 +66,8 @@ from your Makefile, with any target you already define renamed `kit-<name>`),
 your README, licence, docs, and workflows stay yours, and the kit's pieces are
 merged in beside them ([`docs/adopt.md`](./docs/adopt.md)).
 
+<!-- /repoctl:template-only -->
+
 <!-- repoctl:project-readme -->
 > **Template mode:** you are reading the template itself, not a project built
 > from it. The first command in "Start a project" above turns this repository
@@ -69,6 +75,7 @@ merged in beside them ([`docs/adopt.md`](./docs/adopt.md)).
 > with your own project's name and kind.
 <!-- /repoctl:project-readme -->
 
+<!-- repoctl:template-only -->
 ## How it stays healthy
 
 | What goes wrong in agent-built codebases | What this template does about it |
@@ -90,6 +97,8 @@ and hooks) and in one owner page per concern:
 [`docs/capabilities.md`](./docs/capabilities.md),
 [`docs/kit-update.md`](./docs/kit-update.md), [`docs/evals.md`](./docs/evals.md),
 and [`docs/delegation.md`](./docs/delegation.md).
+
+<!-- /repoctl:template-only -->
 
 ## Everyday commands
 
@@ -129,6 +138,12 @@ EXTEND THE SYSTEM (one path for every kind of capability)
 
 WHEN NEEDED
   make risk                          How much ceremony this change needs (low, normal, high)
+  make kit-report TITLE="..." BODY=path TYPE=... PRIORITY=... TOPIC=... | REASON="..."
+                                     Report a kit improvement made here as an issue on the template, or record why it is local
+  make kit-publish TITLE="..." BODY=.agent/kit-reports/<draft>.md TYPE=... PRIORITY=... TOPIC=...
+                                     File a reviewed kit-report draft on the template repository (the owner's step)
+  make ci-status                     The CI result of what you pushed: green, red, pending, or why it cannot tell
+  make pull-first [CHECK_ONLY=1]     Before a run others rely on: refuse a dirty or unpushed tree, pull new commits (exit 3: restart)
   make handover                      Write HANDOVER.md before pausing (git facts pre-filled)
   make map                           One-screen repository map
   make garden                        Full rot report: every check, advisory ones included

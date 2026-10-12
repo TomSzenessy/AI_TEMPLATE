@@ -47,6 +47,24 @@ claim a verified license from the manifest alone.
   paths, and documentation. File residual cleanup as an issue when it is
   independent.
 
+## Time budgets
+
+Every external call has a timeout, and all its attempts' timeouts, the backoff
+between them, and the work around them fit inside the deadline that encloses it (a request timeout,
+a job's time limit, a user-facing response budget). A call that can outlive its deadline
+loses the whole unit of work even when its retry succeeds. Degrade before the
+deadline (a safe default, a cached answer) instead of after it, and test
+the hung-call path, not only the slow one.
+
+## No silent fallbacks
+
+A fallback that hides a failure turns a broken run into a wrong result: a model
+call that failed and was replaced by a default answer, a configuration file that
+was refused and replaced by a built-in one. Every fallback is counted and shown
+where the result is read (the report, the run record, the settings page), and
+"which configuration is in effect" is visible, never inferred. A model call inside the product follows
+[`model-integration.md`](./model-integration.md).
+
 ## Dependencies and change safety
 
 A new dependency needs a recorded reason, license/provenance check, pinned

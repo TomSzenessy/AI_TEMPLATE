@@ -56,6 +56,9 @@ event; runs for the same issue cancel each other, so a filing with several label
 `topic:` label, or it shares at least two path-shaped tokens with the new body. The `Reviewer/date` must not be in
 the future, judged against the latest calendar day anywhere (UTC+14), so a reviewer's local date always passes;
 it never expires, because it records the review of that text.
+`make kit-report` files through the same contract and duplicate check on the
+template's repository (`[template].source`) instead of this one
+([`kit-update.md`](./kit-update.md)).
 What changed in the covered code last: `issues.py`, `github.py`, and `ci.py`
 now run every git call through one wrapper (`gitinfo.run_git`) and date records
 with `core.today()` (one UTC day); the contract above is unchanged.

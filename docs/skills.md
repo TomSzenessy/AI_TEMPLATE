@@ -10,6 +10,11 @@ routing, start with [`resources.md`](./resources.md).
 
 ## Discovery loop
 
+The loop runs on demand, and once at the start of every goal: the `skill-scout`
+role asks which skills, MCP servers, tools, datasets or prior art would reach
+this goal faster than the bundled ones, and its answer (including "nothing
+needed") goes into the goal's issue. A bounded fix skips it.
+
 1. Name the missing capability and its required interface in the issue.
 2. Search local project/global skills first. Prefer an already-reviewed skill
    whose source and revision are recorded.
@@ -83,7 +88,13 @@ rather than a large prompt collection:
   sets up a walking skeleton with strict types, lint, tests, CI, preview
   deploys, configuration, and error tracking before feature work. Its step 4
   declares the surface, including `extra_paths` for the entry files a generator
-  writes outside the app directory (Vite keeps `index.html` at the root).
+  writes outside the app directory (Vite keeps `index.html` at the root);
+- [`../.agents/skills/experiment-lab/SKILL.md`](../.agents/skills/experiment-lab/SKILL.md)
+  reaches a measured score through a deterministic core, a local lab, and a
+  ledger of one-change experiments before spending costly real measurements;
+- [`../.agents/skills/pitch-from-evidence/SKILL.md`](../.agents/skills/pitch-from-evidence/SKILL.md)
+  builds a pitch or results report from a claim table in which every number
+  has a source.
 
 They are first-party bundled skills: they are source-controlled with the
 repository and do not belong in the third-party `[[skills]]` provenance ledger.

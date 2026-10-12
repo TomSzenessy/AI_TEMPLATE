@@ -131,6 +131,54 @@ def risk(root: Path, args) -> None:
     print_risk(root, args.base)
 
 
+@command("kit-report", "Report a kit improvement made here as an issue on the template, or record why it is local",
+         group="when-needed", usage='make kit-report TITLE="..." BODY=path TYPE=... PRIORITY=... TOPIC=... | REASON="..."',  # drafts only
+         args=(
+    arg("--title", var="TITLE"),
+    arg("--body-file", type=Path, var="BODY"),
+    arg("--type", var="TYPE"),
+    arg("--priority", var="PRIORITY"),
+    arg("--topic", var="TOPIC"),
+    arg("--reason", var="REASON", help="the change is project-specific: record why instead of reporting it"),
+))
+def kit_report(root: Path, args) -> None:
+    from .kitreport import report
+    print(report(root, args))
+
+
+@command("kit-publish", "File a reviewed kit-report draft on the template repository (the owner's step)",
+         group="when-needed", usage='make kit-publish TITLE="..." BODY=.agent/kit-reports/<draft>.md TYPE=... PRIORITY=... TOPIC=...',
+         args=(
+    arg("--title", var="TITLE"),
+    arg("--body-file", type=Path, var="BODY"),
+    arg("--type", var="TYPE"),
+    arg("--priority", var="PRIORITY"),
+    arg("--topic", var="TOPIC"),
+))
+def kit_publish(root: Path, args) -> None:
+    from .kitreport import publish
+    print(publish(root, args))
+
+
+@command("ci-status", "The CI result of what you pushed: green, red, pending, or why it cannot tell", group="when-needed",
+         usage="make ci-status")
+def ci_status(root: Path, args) -> int:
+    from .cistatus import ci_status as status
+    state, detail = status(root)
+    print(f"{state}: {detail}")
+    return 1 if state == "red" else 0
+
+
+@command("pull-first", "Before a run others rely on: refuse a dirty or unpushed tree, pull new commits (exit 3: restart)",
+         group="when-needed", usage="make pull-first [CHECK_ONLY=1]",
+         args=(arg("--check-only", action="store_true", var="CHECK_ONLY", help="report, never pull"),))
+def pull_first(root: Path, args) -> int:
+    from .gitsync import pull_first as pull
+    code, message = pull(root, check_only=args.check_only)
+    print(message)
+    return code
+
+
 @command("handover", "Write HANDOVER.md before pausing (git facts pre-filled)", group="when-needed", usage="make handover")
 def handover(root: Path, args) -> None:
     print(session.write_handover(root))
