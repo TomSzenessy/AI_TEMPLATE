@@ -98,8 +98,10 @@ configuration error that stops `make check`; so is a glob such as `**` that
 exempts everything, or any key other than `glob` and `reason`. A matching file is
 skipped for the `.env`, key-file, and content findings only (a symlink that
 escapes the repository is never exemptable) and is listed by the advisory
-`file-hygiene-allowed` check with its reason, so the exemption stays visible; a
-glob that matches no file is listed too, to be deleted. `allow_paths` does not
+`file-hygiene-allowed` check with its reason in ordinary `make check`/verification
+output as well as `make garden`, even when another check fails. A glob that
+matches no file is listed too, to be deleted. With no entries, no extra advisory
+is printed; other ordinary advisories remain gardener-only. `allow_paths` does not
 downgrade the check, and it can be combined with `severity = "advisory"` only
 when the whole check really misfires. The content scan itself flags a credential
 only when a secret-looking literal is assigned (`api_key = "k3y9..."`, an

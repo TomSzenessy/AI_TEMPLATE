@@ -2,7 +2,8 @@
 
 A check is a function of a `checkrun.Context` that returns findings, each naming
 its fix. Blocking checks run in `make check`, `make verify`, the session brief,
-and CI; advisory ones only in `make garden`. The rule for blocking is in
+and CI; advisory ones run in `make garden`, with exemption visibility also
+selected by ordinary command gates. The rule for blocking is in
 docs/self-healing.md#when-a-check-may-block. A project adds its own check as a
 new file in `.agents/checks/` (`make new KIND=check`), never by editing this one.
 """

@@ -34,7 +34,7 @@ assumed. A new or changed check **blocks** only when all three hold:
 
 Otherwise it is **advisory** (`make garden`, the brief) or an
 **automatic fix** (`make sync`). Since #9 `markdown-links`, `command-references`,
-`markers`, `budgets` are advisory, as is `readme-template-sections`. `file-hygiene` stays blocking; `[checks.file-hygiene] allow_paths` exempts one path with a reason ([`capabilities.md`](./capabilities.md#exempting-one-path-from-file-hygiene)) and advisory `file-hygiene-allowed` lists it. Further rules:
+`markers`, `budgets` are advisory, as is `readme-template-sections`. `file-hygiene` stays blocking; `[checks.file-hygiene] allow_paths` exempts one path with a reason ([`capabilities.md`](./capabilities.md#exempting-one-path-from-file-hygiene)) and advisory `file-hygiene-allowed` lists it in ordinary check output too. Further rules:
 
 - **One blocking point per concern.** Each later gate fires only on what the
   earlier one let through (`--no-verify`, uncommitted work), never on a
