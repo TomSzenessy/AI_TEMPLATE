@@ -166,5 +166,78 @@ class AllowlistTests(Scratch):
             Registry(self.root).check_overrides  # noqa: B018
 
 
+class CliAdvisoryVisibilityTests(Scratch):
+    """#73: real check output keeps exemptions visible without making them blocking."""
+
+    MANIFEST = '''schema = 1
+name = "Demo"
+kind = "template"
+phase = "bootstrap"
+[repository]
+is_template = true
+[vision]
+status = "pending"
+[adapters]
+hosts = []
+[[surfaces]]
+id = "template"
+path = "."
+kind = "template"
+owner = "fixture"
+quality_oracle = "CLI advisory output"
+verification = [["true"]]
+'''
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.write("project.toml", self.MANIFEST)
+        self.write("docs/README.md", "# Docs\n\n<!-- repoctl:index -->\n<!-- /repoctl:index -->\n")
+        from kit import derive
+        derive.sync(self.root)
+
+    def configure(self, extra: str = "") -> None:
+        self.write("project.toml", self.MANIFEST + '\n[checks.file-hygiene]\nallow_paths = [\n'
+                   '{ glob = "fixtures/.env.production", reason = "publishable fixture value" },\n'
+                   '{ glob = "gone/**", reason = "obsolete fixture location" },\n]\n' + extra)
+        self.write("fixtures/.env.production", "PUBLIC_KEY=example\n")
+        from kit import derive
+        derive.sync(self.root)
+
+    def test_check_prints_exempt_path_reason_and_unused_glob(self) -> None:
+        self.configure()
+        result = self.cli("check")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("[file-hygiene-allowed]", result.stdout)
+        self.assertIn("fixtures/.env.production", result.stdout)
+        self.assertIn("publishable fixture value", result.stdout)
+        self.assertIn("gone/**", result.stdout)
+        self.assertIn("matches no file", result.stdout)
+
+    def test_check_without_allowlist_has_no_extra_advisory(self) -> None:
+        result = self.cli("check")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("file-hygiene-allowed", result.stdout)
+
+    def test_check_shows_exemptions_even_when_another_path_blocks(self) -> None:
+        self.configure()
+        self.write("fixtures/.env.other", "PUBLIC_KEY=example\n")
+        result = self.cli("check")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(".env.other", result.stderr)
+        self.assertIn("[file-hygiene-allowed]", result.stdout)
+
+    def test_other_advisories_stay_in_garden(self) -> None:
+        self.configure()
+        self.write("fixtures/no-newline.txt", "missing final newline")
+        from kit import derive
+        derive.sync(self.root)
+        result = self.cli("check")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(result.stdout.count("[file-hygiene-allowed]"), 2, result.stdout)
+        self.assertNotIn("[final-newline]", result.stdout)
+        _, advisory = run_checks(self.root, blocking_only=False, only=frozenset({"final-newline"}))
+        self.assertTrue(advisory, "the negative control must have an actual garden finding")
+
+
 if __name__ == "__main__":
     unittest.main()

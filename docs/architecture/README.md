@@ -23,8 +23,10 @@ Every capability is a file with the same declaration, read by one loader,
 `registry` ([ADR 0002](../adr/0002-one-capability-model.md)). Commands are
 declared with `@command` in `commands` (and a project's `.agents/commands/`),
 checks with `@check` in `checks` (and `.agents/checks/`). `tools/repoctl.py`
-only builds its parser from those declarations and dispatches; the
-`tools/repoctl` launcher picks Python 3.11+ for hooks and the git gate. The
+only builds its parser from those declarations and dispatches. The ordinary
+command gate selects blocking checks and project downgrades, plus the existing
+informational exemption check ([visibility rules](../capabilities.md#exempting-one-path-from-file-hygiene)); it does not run the full gardener.
+The `tools/repoctl` launcher picks Python 3.11+ for hooks and the git gate. The
 `Makefile` keeps five hand-written recipes (`done`, `verify`, `test`, which
 runs a smoke tier when `KIT_INNER=1`; `test-slow`, which adds the full inner
 runs; and `test-future`, the suite run with a shifted clock from

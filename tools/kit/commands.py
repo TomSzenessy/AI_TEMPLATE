@@ -22,6 +22,11 @@ def _require_self_heal(root: Path) -> None:
     from .registry import blocking_reasons
     context = Context(root)
     errors, advisory = run_checks(root, blocking_only=True, context=context)
+    # Safety exemptions stay visible in ordinary gates; other advisories stay in garden.
+    _, visible = run_checks(root, blocking_only=False, context=context,
+                            only=frozenset({"file-hygiene-allowed"}))
+    for line in visible:
+        print(f"advisory: {line}")
     downgraded = [item for item in advisory
                   if any(item.startswith(f"[{name}] ") for name in context.registry.check_overrides)]
     for line in downgraded:
