@@ -46,8 +46,10 @@ is in [`experiments.md`](./experiments.md).
 
 `make similar ... CODE=1` treats the embeddings endpoint like any model: code
 decides, vectors only rank. The embeddings path is a requested plan, not a
-ready feature: no real remote indexing of this repository, no provider
-trial, and actual vendor availability, cost, and runtime remain unknown. Every
+ready feature: the transport is built from the exact approved config, so
+model and endpoint are never re-read (no tuple A→B); no real remote
+indexing, no provider trial, and vendor availability, cost, and runtime
+remain unknown. Every
 response is validated before anything is cached — input count, unique indices,
 uniform dimension, finite numbers, nonzero vectors — and a partial or
 malformed response is rejected whole, falling back to lexical matching with

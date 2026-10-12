@@ -467,13 +467,18 @@ class OpenAITransport:
         raise SemanticError(f"embedding request failed: {detail}")
 
 
-def configured_transport(root: Path) -> OpenAITransport | None:
+def configured_transport(root: Path, config: dict | None = None) -> OpenAITransport | None:
     """The transport for the configured endpoint and key, or None when the key is absent.
 
     Key presence is never consent: a missing key means no outbound, and a present
     key still needs the per-scope confirmation.
+
+    `config` is the already-resolved [kit] snapshot; when omitted it is read once
+    here. Callers that resolved a config pass it so the transport uses exactly the
+    approved model/endpoint — no re-read, no tuple A→B.
     """
-    config = _config(root)
+    if config is None:
+        config = _config(root)
     key = os.environ.get(config["api_key_env"], "")
     if not key:
         return None
@@ -542,7 +547,7 @@ def build_index(root: Path, *, transport=None, consent: bool = False) -> list[st
     if not config["endpoint"] or not config["model"]:
         return ["semantic endpoint/model not configured ([kit].semantic_endpoint, [kit].semantic_model); index not built"]
     if transport is None:
-        transport = configured_transport(root)
+        transport = configured_transport(root, config)
     if transport is None:
         return [f"{config['api_key_env']} is not set; index not built (a key is never consent by itself)"]
     confirmed, reason = confirm_scope(root, config, snapshot, explicit=consent)
@@ -625,7 +630,7 @@ def code_matches(root: Path, query: str, *, transport=None, consent: bool = Fals
     if not config["endpoint"] or not config["model"]:
         return _lexical(root, query, config), ["semantic endpoint/model not configured ([kit].semantic_endpoint, [kit].semantic_model)"]
     if transport is None:
-        transport = configured_transport(root)
+        transport = configured_transport(root, config)
     if transport is None:
         return _lexical(root, query, config), [f"{config['api_key_env']} is not set; a missing key means no outbound"]
     if secret_matches(query):

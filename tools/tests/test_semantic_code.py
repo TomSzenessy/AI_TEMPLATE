@@ -10,6 +10,7 @@ unchanged alongside the new code results.
 from __future__ import annotations
 
 import json
+import os
 import sys
 import threading
 import unittest
@@ -582,3 +583,21 @@ class SimilarCodeTests(KitRepository):
         run_with_fake(self, FakeTransport(), "similar", "Q=render invoice", "--code", stdin="y\n")
         run_with_fake(self, FakeTransport(), "similar", "--code-index", stdin="y\n")
         self.assertEqual((self.root / "src" / "billing" / "invoice.py").read_text(encoding="utf-8"), before)
+
+
+class SemanticSnapshotTests(unittest.TestCase):
+    """Approved-snapshot invariant (#115): a supplied cfg is used exactly; _config is never re-read."""
+
+    def test_configured_transport_uses_the_supplied_cfg_without_a_reread(self) -> None:
+        approved = {
+            "api_key_env": KEY_ENV,
+            "endpoint": "https://approved-snapshot.example.test/v1",
+            "model": "approved-snapshot-model",
+        }
+        with mock.patch.object(semantic, "_config", side_effect=AssertionError("_config must not be re-read once a cfg is supplied")):
+            with mock.patch.dict(os.environ, {KEY_ENV: KEY_VALUE}):
+                transport = semantic.configured_transport(Path("/unused"), config=approved)
+        self.assertIs(transport.config, approved, "NoTuple A→B: the transport must use the exact approved cfg object")
+        self.assertEqual(transport.config["model"], "approved-snapshot-model")
+        self.assertEqual(transport.url, "https://approved-snapshot.example.test/v1/embeddings")
+        self.assertEqual(transport.key, KEY_VALUE, "only the known safe TEST-marker key is used")
