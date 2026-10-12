@@ -80,6 +80,11 @@ class ProactiveRoutingContractTests(unittest.TestCase):
         self.assertIn("needs context of its own", threshold)
         self.assertIn("**Do it directly otherwise**", threshold)
         self.assertIn("one-file change", threshold)
+        critic = delegation.split("## The critic's verdict and its evidence", 1)[1].split("## Model tiers", 1)[0]
+        self.assertNotIn("Because the gate binds the record to the current HEAD", critic)
+        self.assertIn("Commit the implementation before running the critic", critic)
+        self.assertIn("save the exact reviewed return block", critic)
+        self.assertIn("self-healing.md#critic-evidence-the-gate-can-read", critic)
         verification = (ROOT / "docs/verification.md").read_text(encoding="utf-8")
         quality = verification.split("## The quality loop", 1)[1].split("## Domain oracles", 1)[0]
         self.assertIn("before implementation", quality)

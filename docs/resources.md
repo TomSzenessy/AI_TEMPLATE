@@ -1,6 +1,6 @@
 # Resource routing for agents
 
-<!-- index: extend | Primary docs, MCP routes, licenses, and resource intake | A task needs a capability, example, current documentation, or external gate. -->
+<!-- index: extend | Sources and intake | Capability, example, current docs, external gate. -->
 <!-- covers: resources.toml .agents/mcp/** -->
 
 This is a **routing catalog**, not a bundled code library. Use it to find the

@@ -1,6 +1,6 @@
 # Verification and independent quality loop
 
-<!-- index: operate | Done, evidence ladder, quality loop | Plan substantial work before implementation; review or quality claim. -->
+<!-- index: operate | Evidence, quality loop | Substantial work before implementation; review or quality claim. -->
 
 “Done” means the issue's acceptance criteria have observable evidence. A build,
 lint run, or green return code is necessary but not sufficient.

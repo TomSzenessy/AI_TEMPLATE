@@ -1,6 +1,6 @@
 # Delegation: orchestrator and subagents
 
-<!-- index: operate | Orchestrator/subagent roles, brief, return, and critic verdict contract | Work is bounded enough to hand to a scout, implementer, critic, researcher, doc-gardener, or skill-scout. -->
+<!-- index: operate | Briefs, returns, verdicts | Work needs separate context or independence. -->
 <!-- covers: .agents/agents/** -->
 
 Large projects outgrow one context window. The orchestrator keeps the goal,
@@ -88,8 +88,8 @@ along in a commit) with `Commit:` set to the HEAD the critic read.
 That record is the evidence the completion gate reads; what the gate checks and
 how it fails is in
 [`self-healing.md`](./self-healing.md#critic-evidence-the-gate-can-read).
-Because the gate binds the record to the current HEAD, run the critic **after**
-the change is committed, then save the return, then finish.
+Commit the implementation before running the critic, then save the exact reviewed return block
+before finishing.
 
 ## Model tiers and cost
 
