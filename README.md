@@ -139,7 +139,7 @@ EXTEND THE SYSTEM (one path for every kind of capability)
 WHEN NEEDED
   make risk                          How much ceremony this change needs (low, normal, high)
   make kit-report TITLE="..." BODY=path TYPE=... PRIORITY=... TOPIC=... | REASON="..."
-                                     Report a kit improvement made here as an issue on the template, or record why it is local
+                                     Draft kit feedback locally for owner review, or record why it is local
   make kit-publish TITLE="..." BODY=.agent/kit-reports/<draft>.md TYPE=... PRIORITY=... TOPIC=...
                                      File a reviewed kit-report draft on the template repository (the owner's step)
   make ci-status                     The CI result of what you pushed: green, red, pending, or why it cannot tell

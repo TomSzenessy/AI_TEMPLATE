@@ -136,7 +136,7 @@ def risk(root: Path, args) -> None:
     print_risk(root, args.base)
 
 
-@command("kit-report", "Report a kit improvement made here as an issue on the template, or record why it is local",
+@command("kit-report", "Draft kit feedback locally for owner review, or record why it is local",
          group="when-needed", usage='make kit-report TITLE="..." BODY=path TYPE=... PRIORITY=... TOPIC=... | REASON="..."',  # drafts only
          args=(
     arg("--title", var="TITLE"),

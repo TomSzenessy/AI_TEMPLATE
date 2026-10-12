@@ -4,7 +4,7 @@ A project that changes a kit file (a file `tools/kit-lock.json` lists) found a k
 only in the project leaves every other project with the old version, so the change is reported upstream:
 `make kit-report` writes only a local draft (ignored `.agent/kit-reports/`). The owner reviews it and uses
 `make kit-publish` to file it on `[template].source` with the same contract, labels and duplicate check as
-`make issue`. Nothing leaves the project during drafting; a filed report never names the project's repository or commit. The `kit-upstream`
+`make issue`. Drafting sends nothing; the tooling never appends the project's repository or commit. User-authored text needs review. The `kit-upstream`
 gate check holds `make done` and the stop gate until each changed kit file is drafted, reported, or recorded as
 project-specific (`REASON="..."`). In the template itself there is no lock, so nothing is asked.
 """
