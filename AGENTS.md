@@ -20,7 +20,8 @@ step), `make where Q="..."`, `make capabilities`, and `make done` before you cal
 4. **Finish:** update every doc covering what you changed, run `make done`,
    and observe the real artifact. Commit and push each working step, always
    before you stop; never break the default branch. After a push,
-   `make ci-status` until green: a red run is yours. When pausing,
+   `make ci-status` until green: a red run is yours. Before a run others rely
+   on (a release build, a benchmark), `make pull-first`. When pausing,
    `make handover`.
 
 Code, tests, and runtime observations are evidence; a plausible explanation
