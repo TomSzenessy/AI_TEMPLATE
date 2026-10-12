@@ -112,29 +112,21 @@ independent critic. Tune the globs per project. Never widen `low` to dodge a gat
 
 ### Critic evidence the gate can read
 
-A critic is cheap to request and easy to skip, so the completion gate reads the
-record the critic contract defines (`.agent/critic.md`; see
-[`delegation.md`](./delegation.md#the-critics-verdict-and-its-evidence)). When
-this branch has **committed** `high` paths, `make done` and the stop hook
-(`tools/kit/session.py`) check that record field by field:
+For committed `high` paths, completion gates read `.agent/critic.md`
+([contract](./delegation.md#the-critics-verdict-and-its-evidence)):
 
-- **`Verdict:`** must be one of the two words the contract defines; the
-  `blocker` word fails the gate (fix what it lists, then ask again), and any
-  other word — prose, "looks good", `accept` — fails as an unknown verdict
-  rather than a softer pass.
-- **`Commit:`** names the current HEAD, or an ancestor whose subsequent
-  committed changes are **all `low`** under the current risk rules. Commit the
-  high-risk work first, then review and save the return. Later low-only commits
-  may reuse it; any `normal` or `high` change requires a fresh review.
-  History is checked commit by commit, including merge parents, reverted
-  changes, deletions, and both rename paths — not just the final net diff.
-- A missing record, `Verdict:`, commit line, non-ancestor commit, or unreadable
-  history fails with a message naming the fix. Ancestor reuse never accepts
-  `blocker` or an unknown verdict (including the legacy `ship` alias).
+- **`Verdict:`** must belong to the contract's vocabulary. `blocker` and
+  unknown verdicts (including legacy `ship`) fail, never pass softly.
+- **`Commit:`** names HEAD, or an ancestor whose subsequent committed paths
+  are **all `low`** under current risk rules. Commit high-risk work before
+  review; any later `normal` or `high` change requires a fresh review.
+  History includes every commit and merge parent, reverted changes,
+  deletions and both rename paths — not just the final net diff.
+- Missing records/fields, non-ancestor commits, and unreadable HEAD/history
+  fail with a named fix.
 
-Two exemptions keep the gate light: it reads committed paths only (a dirty tree is not a diff yet), and
-`[governance].profile = "minimal"` skips it, because that profile hands issues and
-review to the host.
+Only committed paths are judged; a dirty tree is not yet a reviewed diff.
+`[governance].profile = "minimal"` skips this gate, handing review to the host.
 
 ## Write-ahead issues
 
