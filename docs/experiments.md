@@ -48,9 +48,10 @@ Spend the cheapest evaluation that can decide the question:
 | scarce real | the counted evaluations | confirming a lab winner; the rehearsal |
 
 Budget the scarce tier up front, keep a reserve for a full rehearsal under the
-real conditions, and log what each spend bought. Before every run whose result
-matters, pull what the team pushed and run from a pushed, clean commit: a result
-measured on code nobody else has cannot be reproduced or credited.
+real conditions, and log what each spend bought. Every script that spends a run whose result
+matters starts with `make pull-first`: it refuses a dirty or unpushed tree and
+pulls new commits (exit 3: restart on the new code), because a result measured
+on code nobody else has cannot be reproduced or credited.
 
 Encode the task's rules (forbidden calls, freezes, rate and size limits) as
 guards and tests in the code, so no variant can break them by accident.

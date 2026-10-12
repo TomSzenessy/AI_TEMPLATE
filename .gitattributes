@@ -7,3 +7,4 @@
 *.mp4 binary
 *.mov binary
 *.blend binary
+docs/ERROR_LOG.md merge=union

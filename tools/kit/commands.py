@@ -169,6 +169,16 @@ def ci_status(root: Path, args) -> int:
     return 1 if state == "red" else 0
 
 
+@command("pull-first", "Before a run that counts: refuse a dirty or unpushed tree, pull new commits (exit 3: restart)",
+         group="when-needed", usage="make pull-first [CHECK_ONLY=1]",
+         args=(arg("--check-only", action="store_true", var="CHECK_ONLY", help="report, never pull"),))
+def pull_first(root: Path, args) -> int:
+    from .gitsync import pull_first as pull
+    code, message = pull(root, check_only=args.check_only)
+    print(message)
+    return code
+
+
 @command("handover", "Write HANDOVER.md before pausing (git facts pre-filled)", group="when-needed", usage="make handover")
 def handover(root: Path, args) -> None:
     print(session.write_handover(root))

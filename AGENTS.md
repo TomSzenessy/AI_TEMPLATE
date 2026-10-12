@@ -8,19 +8,21 @@ step), `make where Q="..."`, `make capabilities`, and `make done` before you cal
 
 ## Session protocol
 
-1. **Start.** Pull the team's latest (`git pull --rebase`); hooked hosts print a
-   session brief, otherwise `make start`. Read root `HANDOVER.md` when present;
-   the working tree wins over it. Again after any pause.
+1. **Start.** The session brief (hooked hosts; else `make start`) fetches and
+   fast-forwards a clean tree, else `git pull --rebase`. Read root
+   `HANDOVER.md` when present; the working tree wins. Again after a pause.
 2. **Orient.** `project.toml` owns shape, surfaces, checks, and provenance;
    obey the nearest scoped `AGENTS.md`.
 3. **Before editing:** `git status`, the current issue/PR, and `make risk`
-   (ceremony for this change: low, normal, or high). Parallel sessions work in
-   separate git worktrees; stage only the paths you changed.
+   (low, normal, or high ceremony). Claim the issue (assignee,
+   `status:in-progress`), naming overlaps. Parallel sessions use separate
+   worktrees; stage only your paths.
 4. **Finish:** update every doc covering what you changed, run `make done`,
-   and observe the real artifact. After a push, `make ci-status` until the CI of
-   what you pushed is green; a red run is yours to fix. Commit and push each
-   working step (at least every 30 minutes, always before you stop), never a
-   broken default branch; when pausing, run `make handover`.
+   and observe the real artifact. Commit and push each working step (every
+   30 minutes, always before you stop); never break the default branch. After
+   a push, `make ci-status` until green: a red run is yours. On a rebase
+   conflict keep both sides' intent, rerun the tests. A run that counts starts
+   with `make pull-first`. When pausing, `make handover`.
 
 Code, tests, and runtime observations are evidence; a plausible explanation
 is not a diagnosis.

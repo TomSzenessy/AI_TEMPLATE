@@ -88,7 +88,13 @@ rather than a large prompt collection:
   sets up a walking skeleton with strict types, lint, tests, CI, preview
   deploys, configuration, and error tracking before feature work. Its step 4
   declares the surface, including `extra_paths` for the entry files a generator
-  writes outside the app directory (Vite keeps `index.html` at the root).
+  writes outside the app directory (Vite keeps `index.html` at the root);
+- [`../.agents/skills/experiment-lab/SKILL.md`](../.agents/skills/experiment-lab/SKILL.md)
+  reaches a measured score through a deterministic core, a local lab, and a
+  ledger of one-change experiments before spending scarce real evaluations;
+- [`../.agents/skills/pitch-from-evidence/SKILL.md`](../.agents/skills/pitch-from-evidence/SKILL.md)
+  builds a pitch or results report from a claim table in which every number
+  has a source.
 
 They are first-party bundled skills: they are source-controlled with the
 repository and do not belong in the third-party `[[skills]]` provenance ledger.

@@ -100,6 +100,14 @@ package version. Project plugins in `.agents/checks/*.py` and
 `.agents/commands/*.py` execute on every `repoctl` start, and `make new` is
 pre-approved for agents, so review a newly created plugin file like code.
 
+### Agent transcripts
+
+Agent transcripts, checkpoints, and session logs stay out of the repository
+by default (`.agent/` is ignored): they hold pasted output, paths, and
+sometimes keys. Sharing them is a recorded team decision, after a secret scan
+of exactly what is shared. Never type a secret into a prompt or onto a
+command line; put it in the ignored `.env` and name the variable.
+
 ## Disclosure
 
 Report suspected vulnerabilities privately through the process in

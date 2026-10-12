@@ -23,6 +23,21 @@ State the outcome that matters and why it matters now.
 |---|---|---|---|
 | `<command or render>` | `<observed result>` | `<UTC/command>` | `source/test/deployed/provider/hardware/counsel` |
 
+Label each result **measured** (with its commit) or **hypothesis**.
+
+## Rejected — do not retry
+
+| Tried | Result | Commit / record |
+|---|---|---|
+| `<change>` | `<measured outcome>` | `<commit or link>` |
+
+Use `N/A — none`.
+
+## Budget and how to re-evaluate
+
+- **Scarce budget used / left:** `<runs, quota, money, or N/A>`
+- **Re-evaluate the current state with:** `<exact command>`
+
 ## Decisions and constraints
 
 Reference ADRs/issues. Record only decisions the next actor must honor and the

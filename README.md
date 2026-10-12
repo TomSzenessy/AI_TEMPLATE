@@ -143,6 +143,7 @@ WHEN NEEDED
   make kit-publish TITLE="..." BODY=.agent/kit-reports/<draft>.md TYPE=... PRIORITY=... TOPIC=...
                                      File a reviewed kit-report draft on the template repository (the owner's step)
   make ci-status                     The CI result of what you pushed: green, red, pending, or why it cannot tell
+  make pull-first [CHECK_ONLY=1]     Before a run that counts: refuse a dirty or unpushed tree, pull new commits (exit 3: restart)
   make handover                      Write HANDOVER.md before pausing (git facts pre-filled)
   make map                           One-screen repository map
   make garden                        Full rot report: every check, advisory ones included

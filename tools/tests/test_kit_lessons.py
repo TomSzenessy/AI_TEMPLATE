@@ -605,5 +605,96 @@ class LocklessKitUpdateTests(Scratch):
         self.assertTrue(kitupdate._past_kit_version(kit, "c.py", self.root / "d.py"))
 
 
+class GitSyncTests(Scratch):
+    """#90: fetch in the brief, the stop gate's push rule, and pull-first before a run that counts."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        import shutil
+        import tempfile
+        from fixtures import git_in
+        self.env = mock.patch.dict(os.environ, {"CI": "", "GITHUB_ACTIONS": ""})
+        self.env.start()
+        self.addCleanup(self.env.stop)
+        self.remote = Path(tempfile.mkdtemp())
+        self.other = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.remote, True)
+        self.addCleanup(shutil.rmtree, self.other, True)
+        git_in(self.remote, "init", "-q", "--bare", "-b", "main")
+        self.ci = ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q"]
+        self.git("init", "-q", "-b", "main")
+        self.write("a.txt", "1\n")
+        self.git("add", "-A")
+        self.git(*self.ci, "-m", "one")
+        self.git("remote", "add", "origin", str(self.remote))
+        self.git("push", "-q", "-u", "origin", "main")
+        git_in(self.other, "clone", "-q", str(self.remote), ".")
+
+    def teammate_pushes(self) -> None:
+        from fixtures import git_in
+        (self.other / "b.txt").write_text("2\n")
+        git_in(self.other, "add", "-A")
+        git_in(self.other, *self.ci, "-m", "two")
+        git_in(self.other, "push", "-q")
+
+    def test_the_brief_fast_forwards_a_clean_tree_that_is_only_behind(self) -> None:
+        from kit import gitsync
+        self.teammate_pushes()
+        lines = gitsync.brief_lines(self.root)
+        self.assertIn("pulled 1 new commit", lines[0])
+        self.assertTrue((self.root / "b.txt").is_file())
+
+    def test_the_brief_never_pulls_into_a_dirty_tree(self) -> None:
+        """Negative case: local edits are never merged into; the brief says to pull instead."""
+        from kit import gitsync
+        self.teammate_pushes()
+        self.write("a.txt", "mine\n")
+        lines = gitsync.brief_lines(self.root)
+        self.assertIn("1 commit(s) behind upstream", lines[0])
+        self.assertFalse((self.root / "b.txt").exists())
+
+    def test_the_stop_gate_names_uncommitted_and_unpushed_work_of_this_session(self) -> None:
+        from kit import gitsync
+        start = self.git("rev-parse", "HEAD").strip()
+        self.write("c.txt", "3\n")
+        self.assertIn("uncommitted work of this session (c.txt)",
+                      gitsync.unpushed_findings(self.root, ["c.txt"], start)[0])
+        self.git("add", "-A")
+        self.git(*self.ci, "-m", "three")
+        self.assertIn("1 commit(s) not pushed", gitsync.unpushed_findings(self.root, ["c.txt"], start)[0])
+        self.git("push", "-q")
+        self.assertEqual(gitsync.unpushed_findings(self.root, ["c.txt"], start), [])
+
+    def test_no_remote_or_ci_means_nothing_to_push(self) -> None:
+        """Negative case: without a remote, or inside CI, the push rule says nothing."""
+        from kit import gitsync
+        self.write("c.txt", "3\n")
+        with mock.patch.dict(os.environ, {"CI": "true"}):
+            self.assertEqual(gitsync.unpushed_findings(self.root, ["c.txt"], None), [])
+        self.git("remote", "remove", "origin")
+        self.assertEqual(gitsync.unpushed_findings(self.root, ["c.txt"], None), [])
+        self.assertEqual(gitsync.brief_lines(self.root), [])
+
+    def test_pull_first_exit_codes(self) -> None:
+        from kit import gitsync
+        self.assertEqual(gitsync.pull_first(self.root)[0], 0)
+        self.teammate_pushes()
+        self.assertEqual(gitsync.pull_first(self.root, check_only=True)[0], 1)
+        self.assertFalse((self.root / "b.txt").exists(), "check only never pulls")
+        self.assertEqual(gitsync.pull_first(self.root)[0], gitsync.PULLED)
+        self.write("a.txt", "dirty\n")
+        self.assertEqual(gitsync.pull_first(self.root)[0], 1)
+        self.git("checkout", "--", "a.txt")
+        self.git(*self.ci, "--allow-empty", "-m", "local")
+        self.assertIn("not pushed", gitsync.pull_first(self.root)[1])
+
+    def test_the_append_only_error_log_merges_by_union(self) -> None:
+        """#93: two branches that each append an ERROR_LOG entry merge without a conflict."""
+        root = Path(__file__).resolve().parents[2]
+        lines = (root / ".gitattributes").read_text(encoding="utf-8").splitlines()
+        self.assertIn("docs/ERROR_LOG.md merge=union", lines)
+        self.assertFalse(any("AGENTS.md" in line and "union" in line for line in lines), "never an edited file")
+
+
 if __name__ == "__main__":
     unittest.main()

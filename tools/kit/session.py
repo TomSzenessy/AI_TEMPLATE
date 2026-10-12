@@ -208,7 +208,8 @@ def _session_start(root: Path, event: dict[str, object] | None = None) -> None:
 
 
 def _attention(root: Path) -> list[str]:
-    """Repository facts no check owns: a template used as a project (#75), red CI on what was pushed (#76)."""
+    """Repository facts no check owns: a template used as a project (#75), red CI on what was pushed (#76),
+    and where this branch stands against its upstream (#90)."""
     from .cistatus import ci_status
     from .structure import template_in_use
     found = []
@@ -223,6 +224,11 @@ def _attention(root: Path) -> list[str]:
         state, detail = "unknown", ""
     if state == "red":
         found.append(f"{detail}: fix it before new work (`gh run view --log-failed`)")
+    from .gitsync import brief_lines
+    try:
+        found.extend(brief_lines(root))  # #90: fetch, and fast-forward a clean tree that is only behind
+    except Exception:  # noqa: BLE001 - the brief must survive anything git meets
+        pass
     from .cistatus import default_branch_red
     try:
         if (line := default_branch_red(root, default_branch(load_project(root)))) is not None:
@@ -468,6 +474,8 @@ def _stop_reason(root: Path, session: str) -> str | None:
         baseline = state.get("check_baseline")
         if isinstance(baseline, list):
             findings = [item for item in repository_findings(root) if item not in baseline]
+    from .gitsync import unpushed_findings
+    findings = findings + unpushed_findings(root, paths, since)  # #90: teammates and CI see only what is pushed
     if findings:
         reason = f"{GATE_STOP_BLOCKED}:\n" + "\n".join(f"- {item}" for item in findings[:12])
         return reason + "\nFix these (delegate doc work to the doc-gardener role if large), or explain to the user why they stay."
