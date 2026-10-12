@@ -19,6 +19,17 @@ the commands that prevent each. The session protocol in
 | After a push | `make ci-status` reads the CI of the pushed commit: green, red, pending, inconclusive, none, unpushed, or unknown (no `gh`, offline, inside CI). A red run on this session's pushed HEAD blocks `make done` and the stop gate; a green answer is cached for a day, anything else for five minutes. | `make ci-status` |
 | Before a run others will rely on (a release build, a deploy, a benchmark, an official submission) | Refuses a dirty tree, unpushed commits, a diverged branch, or an unreadable upstream (exit 1); pulls new commits and exits 3 so the caller restarts on the new code; exit 0 means run as is. `CHECK_ONLY=1` never pulls (a frozen release); inside CI it exits 0. | `make pull-first` |
 
+Commit verification excludes `issues` and `issue_comment` runs: GitHub attaches
+those runs to the default-branch SHA even though they validate issue activity,
+not that commit. Their independent validation results remain available in
+GitHub Actions. Push and pull-request failures still count; other events
+(including scheduled/manual runs) and runs with missing event metadata remain
+in scope conservatively. If only issue-event runs exist, status is `none`
+("no applicable commit verification"), never green. The query reads at most
+100 runs; it is a bounded status snapshot, not proof that every workflow ran.
+Cached answers carry this classification's scope version, so pre-isolation
+answers are discarded and queried again; the existing expiry windows remain.
+
 Push each working step, at least every 30 minutes and always before stopping.
 On a rebase conflict keep both sides' intent and rerun the tests; never
 resolve by dropping the other side. Shared documents change on the default
