@@ -376,8 +376,9 @@ class GraduationInitTests(Scratch):
         done = self.cli("init", "--name", "my-project", "--kind", "web")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         lock = _json.loads((self.root / "tools/kit-lock.json").read_text(encoding="utf-8"))
-        self.assertNotIn("app/main.py", lock["files"])
-        self.assertIn("tools/kit/core.py", lock["files"])
+        # Review finding: a clone may have edited kit files before init, so their content is not what the kit
+        # shipped; the first kit-update compares them with the template's history instead (empty lock).
+        self.assertEqual(lock["files"], {})
         from kit import kitreport
         self.write("app/main.py", "print('changed')\n")
         self.assertEqual(kitreport.upstream_findings(self.root, ["app/main.py"]), [], "project code is not kit")
@@ -386,6 +387,29 @@ class GraduationInitTests(Scratch):
         update = self.cli("kit-update", "--kit", str(Path(__file__).resolve().parents[2]))
         self.assertEqual(update.returncode, 0, update.stdout + update.stderr)
         self.assertTrue((self.root / "app/main.py").is_file(), update.stdout)
+
+    def test_graduation_keeps_the_lock_an_earlier_kit_update_wrote(self) -> None:
+        """Review finding: init once replaced the lock of the advised pre-init kit-update with current digests."""
+        import json as _json
+        self.clone_in_use()
+        earlier = {"kit_version": "abc123", "files": {"tools/kit/core.py": "0" * 64}, "bases": {"x": "1" * 64}}
+        self.write("tools/kit-lock.json", _json.dumps(earlier))
+        done = self.cli("init", "--name", "my-project", "--kind", "web")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertEqual(_json.loads((self.root / "tools/kit-lock.json").read_text(encoding="utf-8")), earlier)
+
+    def test_prune_never_touches_a_surface_extra_path(self) -> None:
+        """Review finding: a surface's extra_paths (a root index.html) were not protected from the prune."""
+        project = {"template": {"prune": ["index.html", "docs/old.md"]},
+                   "surfaces": [{"id": "web", "path": "app", "kind": "web", "extra_paths": ["index.html"]}]}
+        self.write("index.html", "<html></html>\n")
+        self.write("docs/old.md", "# old\n")
+        self.git("init", "-q")
+        self.git("add", "-A")
+        with self.assertRaises(RepoctlError):
+            bootstrap.guard_prune(project, ["index.html"])
+        bootstrap.guard_prune(project, ["docs/old.md"])  # negative: template material is still pruned
+        self.assertEqual(bootstrap.drop_surface_prune(self.root, project)["template"]["prune"], ["docs/old.md"])
 
     def test_graduation_does_not_record_the_projects_own_head_as_kit_version(self) -> None:
         import json as _json
@@ -556,6 +580,29 @@ class LocklessKitUpdateTests(Scratch):
         (target / "b.py").write_text("B = 1  # ours\n")  # edited by the project
         self.assertTrue(kitupdate._past_kit_version(kit, "tools/a.py", target / "a.py"))
         self.assertFalse(kitupdate._past_kit_version(kit, "tools/b.py", target / "b.py"))
+
+    def test_a_blob_only_on_another_branch_of_the_kit_is_not_shipped(self) -> None:
+        """Review finding: `--all` matched blobs of an unshipped experiment branch, so an edit was overwritten."""
+        import shutil
+        import tempfile
+        from fixtures import git_in
+        from kit import kitupdate
+        kit = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, kit, True)
+        commit = ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q"]
+        git_in(kit, "init", "-q", "-b", "main")
+        (kit / "c.py").write_text("C = 1\n")
+        git_in(kit, "add", "-A")
+        git_in(kit, *commit, "-m", "v1")
+        git_in(kit, "checkout", "-q", "-b", "experiment")
+        (kit / "c.py").write_text("C = 99\n")
+        git_in(kit, *commit, "-am", "experiment")
+        git_in(kit, "checkout", "-q", "main")
+        self.write("c.py", "C = 99\n")
+        self.write("d.py", "C = 1\n")
+        kitupdate._HISTORY.clear()
+        self.assertFalse(kitupdate._past_kit_version(kit, "c.py", self.root / "c.py"))
+        self.assertTrue(kitupdate._past_kit_version(kit, "c.py", self.root / "d.py"))
 
 
 if __name__ == "__main__":

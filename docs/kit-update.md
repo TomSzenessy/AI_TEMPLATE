@@ -45,15 +45,16 @@ update refuses a dirty tree, so it lands as one reviewable change; run
 `make done` after it. `make garden` reports when the template has moved past
 the recorded `kit_version`.
 
-A template clone used as a project locks, at `make init`, only the files the
-template lists in `tools/kit-files.json`, never its own; a clone older than the
-list runs `make kit-update` first, which adds it. A project without a lock (a
-clone of the template never initialized, or one older than the lock) is not all
-hand merges: a file byte-identical to any
-version in the template's git history was never edited there, so it is updated
-like an unchanged file (one `git log` of the kit per update, so the default
-clone of `[template].source` keeps its full history when there is no lock);
-only real edits are staged. Graduation records the kit version as `unknown`
+A template clone used as a project never locks its own files at `make init`
+(a clone older than `tools/kit-files.json` runs `make kit-update` first, which
+adds it). It keeps the lock an earlier kit-update wrote, else gets an empty one:
+it may have edited kit files, so their content is not what the kit shipped. A
+project without a lock (such a clone, or one older than the lock) is not all
+hand merges: a file byte-identical to a version in the history of the offered
+kit commit (merge commits included, never another branch) was never edited
+there, so it is updated like an unchanged file (one `git log` of the kit per
+update, so the default clone of `[template].source` keeps its full history when
+there is no lock); only real edits are staged. Graduation records the kit version as `unknown`
 (the clone's own HEAD is not a template commit), so `make garden` waits for the
 first update instead of reporting the template as ahead.
 

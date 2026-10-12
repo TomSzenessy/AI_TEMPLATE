@@ -19,7 +19,7 @@ from .core import (
     repository_files,
 )
 from .gitinfo import path_matches
-from .kitlock import localize_text, write_lock
+from .kitlock import localize_text, read_lock, write_lock
 from .names import STACK_DECISION, VISION
 
 
@@ -269,10 +269,17 @@ def reset_vision_for_project(root: Path, manifest: str, project_name: str, templ
     return manifest
 
 
+def _surface_owned(project: dict[str, object]) -> list[str]:
+    """Every path a project surface owns: its `path` and its `extra_paths` (a root `index.html`, #57)."""
+    from .core import surface_owned_paths
+    return [str(path).strip("/") for label, paths in surface_owned_paths(project).items()
+            if label not in {"template", "template-bootstrap"} for path in paths
+            if str(path).strip("/") not in {"", "."}]
+
+
 def guard_prune(project: dict[str, object], removed: list[str]) -> None:
     """#75: a project's own folders were once added to the template's prune list; never delete a surface's files."""
-    owned = [str(s.get("path", "")).strip("/") for s in declared_surfaces(project)
-             if s.get("id") not in {"template", "template-bootstrap"} and str(s.get("path", "")).strip("/") not in {"", "."}]
+    owned = _surface_owned(project)
     guarded = sorted({p for p in removed for o in owned if p == o or p.startswith(o + "/")})
     if guarded:
         raise RepoctlError(f"[template].prune would delete {len(guarded)} file(s) of declared surfaces "
@@ -301,8 +308,7 @@ def drop_surface_prune(root: Path, project: dict[str, object]) -> dict[str, obje
     template = project.get("template", {})
     if not isinstance(template, dict):
         return project
-    owned = [str(s.get("path", "")).strip("/") for s in declared_surfaces(project)
-             if s.get("id") not in {"template", "template-bootstrap"} and str(s.get("path", "")).strip("/") not in {"", "."}]
+    owned = _surface_owned(project)
     files = repository_files(root)
     keep, dropped = [], []
     for pattern in template.get("prune", []):
@@ -400,10 +406,9 @@ def initialize_project(root: Path, name: str, kind: str, owner: str | None = Non
         raise RepoctlError("project is already initialized; edit project.toml deliberately")
     from .structure import template_in_use
     in_use = template_in_use(root, current) is not None
-    shipped_kit: list[str] = []
     if in_use:  # a clone already used as a project: patterns over its own surfaces were never template material
         current = drop_surface_prune(root, current)
-        shipped_kit = listed_kit_files(root)
+        listed_kit_files(root)  # a clone older than the list is sent to kit-update first
     guard_prune(current, prune_matches(root, current))  # before any write: a refused init changes nothing
     keep = frozenset(r for r in (VISION, STACK_DECISION) if in_use and not shipped(root, current, r))
     old_owners = [str(o) for o in current.get("owners", []) if isinstance(o, str)]
@@ -438,10 +443,13 @@ def initialize_project(root: Path, name: str, kind: str, owner: str | None = Non
     update_readme_identity(root, name, kind, template_name)
     derive.sync(root)
     # What this project got from the kit, so make kit-update can tell your edits apart. A clone already used as a
-    # project locks only the files the template lists as its kit, never its own (a later kit-update would delete them).
-    # Its own HEAD is not a template commit: keep the version an earlier kit-update recorded, else "unknown"
-    # (garden's behind-template advice then waits for the first update instead of a false alarm).
-    write_lock(root, root, paths=shipped_kit if in_use else None, version="unknown" if in_use else None)
+    # project may have edited kit files, so its current content is not what the kit shipped: it keeps the lock an
+    # earlier kit-update wrote, else gets an empty one, and its first kit-update compares each kit file with the
+    # template's history instead (#89). Never its own files: a later kit-update would delete them.
+    if not in_use:
+        write_lock(root, root)
+    elif not read_lock(root).get("files"):
+        write_lock(root, root, paths=[], version="unknown")
     if removed:
         print(f"Moved {len(removed)} template-only file(s) to .agent/init-backup/; links now point to the template source.")
     print(f"Initialized {name} ({kind}). Declare real surfaces before implementation.")

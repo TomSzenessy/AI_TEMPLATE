@@ -51,10 +51,11 @@ _HISTORY: dict[str, dict[str, set[str]]] = {}
 
 
 def _kit_history(kit: Path) -> dict[str, set[str]]:
-    """Every blob each path ever had in the kit checkout, from one `git log` per update (#89)."""
+    """Every blob each path had in the history of the offered kit commit (never another branch of the checkout:
+    an experiment there was never shipped), merge commits included, from one `git log` per update (#89)."""
     key = str(kit)
     if key not in _HISTORY:
-        log = git(kit, "log", "--all", "--format=", "--raw", "--no-abbrev", "--no-renames") or ""
+        log = git(kit, "log", "HEAD", "-m", "--format=", "--raw", "--no-abbrev", "--no-renames") or ""
         history: dict[str, set[str]] = {}
         for line in log.splitlines():
             meta, _, path = line.partition("\t")  # the path follows a tab and may contain spaces
