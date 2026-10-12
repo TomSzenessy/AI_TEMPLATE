@@ -179,3 +179,12 @@ trust = "discovery"
 access = "read-only"
 scope = "reverse-engineering"
 summary = "Source-reviewed candidate for authorized shipped-artifact and behavior investigation; project-local runtime/package approval and trial remain separate."
+
+[[resources]]
+id = "api-anything-authorized-replay"
+kind = "skills"
+source = "https://github.com/goodnight000/api-anything/blob/4a785e8d9e72a00e2dddc0dc56569a86826df07b/README.md"
+trust = "discovery"
+access = "read-only"
+scope = "reverse-engineering"
+summary = "Pinned reference for authorized HTTP request learning/replay; inspect source, license, permissions, revision and data destinations before any use; link-only, not a default dependency."
