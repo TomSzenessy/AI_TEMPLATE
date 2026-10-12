@@ -38,7 +38,7 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - name: Run the verification gate on the matrix interpreter
-        # The adopted copy (kit-ci.yml) runs only `repoctl check`; docs/ADAPTATION.md says why.
+        # The adopted copy (kit-ci.yml) runs only `repoctl check`; docs/adopt.md says why.
         env:
           REPOCTL_SETUP: "1"  # runs each surface's declared setup (toolchain install) before its verification
         run: python3 tools/repoctl.py --root . ci gate

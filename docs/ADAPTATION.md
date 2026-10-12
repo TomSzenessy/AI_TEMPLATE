@@ -1,7 +1,7 @@
 # Project adaptation
 
 <!-- index: operate | Lean core, artifact lifecycle, packs, and capability patterns | Turning the template into a project without generating unnecessary structure. -->
-<!-- covers: tools/kit/bootstrap.py tools/kit/ci.py .github/workflows/ci.yml Makefile tools/repoctl -->
+<!-- covers: tools/kit/bootstrap.py tools/kit/ci.py tools/repoctl -->
 
 The template is a small kernel plus switchable packs (`.agents/packs/`;
 [`[packs]` switching rules](./capabilities.md)), not a universal application scaffold. `make init`
