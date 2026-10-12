@@ -164,12 +164,16 @@ for competitive analysis and "build our own version of X":
   against that matrix (weighted must/should/could) and layout-diffs screenshots
   with dependency-free tools.
 - [`design-tokens`](../.agents/skills/design-tokens/SKILL.md) measures a
-  reference interface into design tokens and gates them on WCAG contrast.
+  reference interface into design tokens and gates them on WCAG contrast; an
+  original-product mode builds tokens from the confirmed design brief when no
+  reference exists.
 - [`review-mining`](../.agents/skills/review-mining/SKILL.md) ranks what real
   users complain about from linked, verbatim quotes — never invented ones.
 - [`brand-sweep`](../.agents/skills/brand-sweep/SKILL.md) names and vets your
   own identity, then sweeps the codebase until nothing of the reference
-  product's name, domain, or colors remains.
+  product's name, domain, or colors remains; an original-product mode names
+  from the goal angle and records manual artifact checks when no reference
+  identity exists.
 
 Unlike first-party skills, these directories carry tools and tests and are
 recorded in the `[[skills]]` provenance ledger in `project.toml`: local

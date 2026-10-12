@@ -4,9 +4,10 @@ description: >-
   Names and rebrands the build so it is the user's own: name candidates with
   the trademark, domain, store and handle checks to run, a new palette checked
   for contrast, a logo brief, a voice guide, and a sweep tool that finds
-  anything of the reference product left in the codebase. Use when the user
-  says "name my app", "rebrand", "anything of X left", "trademark checks", or
-  "before launch".
+  anything of the reference product left in the codebase. Works for a product
+  you are matching a reference and for an original product with no reference.
+  Use when the user says "name my app", "rebrand", "anything of X left",
+  "trademark checks", or "before launch".
 ---
 
 # brand-sweep
@@ -14,8 +15,14 @@ description: >-
 Nothing launches under the reference product's identity. This skill is the
 line between a copy and your own product.
 
-Reads the angle from `reference/fixes.md` (review-mining) and the token roles
-in `reference/design/tokens.json` (design-tokens). Tool in this folder (commands run from the project root):
+Two modes. **Reference mode** reads the angle from `reference/fixes.md`
+(review-mining) and the token roles in `reference/design/tokens.json`
+(design-tokens). **Original mode** (your own product, no reference) reads the
+angle from the confirmed goal and users in `VISION.md` and `docs/design.md`,
+and skips only the reference comparisons, marking them not applicable.
+Original mode never invents a competitor: if the brief is missing, ask the
+owner the few blocking questions rather than fabricate one. Tool in this
+folder (commands run from the project root):
 
 ```bash
 python3 .agents/skills/brand-sweep/sweep.py . --avoid "Original Name,Its Company" --domains original.com --colors "#006bff"
@@ -30,13 +37,15 @@ silent "Clean".
 
 ## Step 1: the name
 
-Read the angle from `reference/fixes.md`. Generate 20 candidates across
+Reference mode reads the angle from `reference/fixes.md`; original mode reads
+it from `VISION.md` and `docs/design.md`. Generate 20 candidates across
 styles: descriptive (Booklink), compound (Slotwise), invented (Calvo),
 metaphor (Harbor), verb (Book). Then cut to 5 with these filters:
 
 - **Not confusingly similar to the reference product** in sound, look or
-  meaning, and not to any other app in the same category. That is the test
-  trademark offices use, so it is the test here. No puns on their name, no
+  meaning, and not to any other app in the same category. Trademark offices
+  consider confusion when assessing similarity; use that as a screening test,
+  not as legal clearance (see Step 2). No puns on their name, no
   "-ly" twin.
 - Short, spellable after hearing it once, no awkward meaning in big languages.
 - Says something about the angle, or at least does not fight it.
@@ -62,16 +71,21 @@ the name, a trademark lawyer should do a proper search.
 
 ## Step 3: palette
 
-A new palette, written into the same token roles design-tokens set up. Pick a
-primary brand hue from a different family than the reference product's (if
-theirs is blue, yours is not a nearby blue). Then:
+A new palette, written into the same token roles design-tokens set up
+(`reference/design/` or `docs/design/`). Reference mode: pick a primary brand
+hue from a different family than the reference product's (if theirs is blue,
+yours is not a nearby blue). Original mode: pick a hue that fits the goal
+angle and any colours the owner already chose; there is no reference to
+rotate away from. Then:
 
 ```bash
-python3 .agents/skills/design-tokens/contrast.py reference/design/tokens.json
+python3 .agents/skills/design-tokens/contrast.py reference/design/tokens.json   # or docs/design/
 ```
 
-Zero failures. Add the reference product's brand colours to
-`reference/brand.json` so the sweep catches any that survive.
+Zero failures. Reference mode: add the reference product's brand colours to
+`reference/brand.json` so the sweep catches any that survive. Original mode:
+if no reference colours exist, record that in `brand.json` and rely on the
+manual artifact checks in Step 6.
 
 ## Step 4: logo brief
 
@@ -83,8 +97,11 @@ model):
 - must work at 16px (favicon) and as a 1024px app icon
 - deliverables: SVG, app icon 1024x1024 with no transparency for iOS,
   favicon set, social image 1200x630
-- **must not resemble the reference product's mark**: no shared shape, colour
-  pair or letterform trick. Put their mark next to the drafts and check.
+- **must not resemble the reference product's mark** (reference mode): no
+  shared shape, colour pair or letterform trick. Put their mark next to the
+  drafts and check. Original mode: the mark must be your own — no copying of
+  any known brand's shape, colour pair or letterform; check against the
+  design references in `docs/product/research.md` if any exist.
 
 ## Step 5: voice
 
@@ -122,11 +139,21 @@ Exit 1 means something is left; exit 2 means bad input.
 Fix until it says clean. Also check by eye: the favicon, the page titles, the
 email templates, the OG image, the app icon.
 
+**Original mode with no reference product:** there is no reference name,
+domain or colour to sweep. Do not fabricate avoid-terms to force a clean CLI
+exit, and do not claim the sweep passed. Record in `brand.md` that no
+reference identity exists (not applicable), skip the `sweep.py` invocation,
+and run the manual artifact checks above by eye instead. The exit 1/2 gate
+is unchanged: it still blocks on leftover reference material when a reference
+does exist.
+
 ## Output
 
-`reference/brand.md` (name with checks, palette, logo brief, voice),
-`reference/brand.json`, updated tokens, rewritten strings, and a clean sweep.
-That clean sweep is the pre-launch gate: nothing ships while it exits 1.
+`brand.md` (name with checks, palette, logo brief, voice) and `brand.json`
+under `reference/` (reference mode) or `docs/design/` (original mode),
+updated tokens, rewritten strings, and a clean sweep (reference mode) or the
+manual artifact-check record (original mode). That clean sweep is the
+pre-launch gate: nothing ships while it exits 1.
 
 ## Source
 
