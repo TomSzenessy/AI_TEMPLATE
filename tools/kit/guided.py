@@ -3,18 +3,34 @@
 One shared question table feeds the terminal and JSON surfaces; `build_plan` is
 pure (answers in, plan out, nothing written); `apply_plan` is consent-gated,
 owner-hash-checked, and serialized. Identity init stays the first writer
-(bootstrap.py): this module only drafts pending record sections, records machine
-facts in project.toml, and reads — never writes — the MCP route owners. No
-provider, browser, or install calls; embeddings stay requested-not-ready.
+(bootstrap.py): this module drafts pending record sections, records machine
+facts in project.toml, and — only for the two vetted canonical routes — applies
+the browser/Exa choice to the route owner's top-level `enabled` boolean, then
+re-derives the host projection. No provider, browser, or install calls;
+embeddings stay requested-not-ready; logging stays selected-intent.
 
 The table's four optional capabilities (browser, Exa, logging, embeddings) are
 strict choice strings validated at the parser boundary — no True/False coercion,
 no arbitrary unknown choice. Their selected intent is recorded in the `[guided]`
-receipt and a pending STACK section as a NON-authoritative effect pending: a
-"request" is never an enabled route, and the route files stay route-owned until
-the owner apply phase. Browser/Exa default to preserve for an adopted project
-and off for a fresh template; embeddings default off (request records
-requested-not-ready, no source-outbound consent); logging defaults local-redacted.
+receipt and a pending STACK section. For browser/Exa the owner apply then turns
+an explicit `request` into `enabled = true` and an explicit `off` into
+`enabled = false` in the vetted canonical route owner; `preserve` writes
+nothing. The route owner's other facts (transport, url, command, env_headers)
+stay opaque and untouched, and the enabled field is a real TOML boolean, never a
+truthy string. A missing, malformed, symlinked, non-regular, outside-root, or
+unknown route is refused before any guided write, and the plan revision binds the
+entire raw route-file hash of every vetted route — preserved ones included — so
+a URL/args change after the plan refuses as stale before effects. The VISION/STACK
+owner-hash check repeats under the apply lock, before any write, so an owner edit
+while an apply waits is refused, never overwritten. Enabling is config-only: it is
+never a connection, a readiness signal, or a vendor call.
+
+Browser/Exa default to preserve when the route is currently enabled (irrespective
+of permanent new/adopt origin — a project created `new` can already ship enabled
+routes) and to off when it is disabled, so a later guided init with a missing or
+blank answer never switches an enabled route off; an explicit `off` still
+disables. Embeddings default off (request records requested-not-ready, no
+source-outbound consent); logging defaults local-redacted.
 
 `consent` and `reshape` are the module's only switches, so `answers_from_json`
 validates them as real JSON booleans before any guided write: a typed string
@@ -33,13 +49,20 @@ import time
 import tomllib
 from pathlib import Path
 
-from .core import RepoctlError, ensure_inside_root, read_text_file
+from .core import RepoctlError, ensure_inside_root, is_link_like, read_text_file
 from .names import STACK_DECISION, VISION
 
 LOCK = ".agent/guided.lock"
 ENV_EXAMPLE = ".env.example"
 MCP_DIR = ".agents/mcp"
 SECTION = re.compile(r"(?ms)^## [ \t]*.+[ \t]*\n")
+
+# The only canonical routes the guided owner apply may write: capability -> route
+# name. Both are vetted first-party route owners (Playwright browser, Exa search);
+# every other route (e.g. context7) stays route-owned and is never touched here.
+_VETTED_ROUTES = {"browser": "playwright", "exa": "exa"}
+# A top-level `enabled = <bool>` line in a canonical route owner.
+_ENABLED_LINE = re.compile(r"(?m)^[ \t]*enabled[ \t]*=[ \t]*(?:true|false)[ \t]*$")
 
 # The one table both surfaces read: id, prompt, options/recommendation (free-text)
 # or choices/default (strict optional capabilities), and the existing record section
@@ -105,10 +128,20 @@ def _is_adopted(root: Path) -> bool:
     return re.search(r'(?m)^project_mode\s*=\s*"adopt"', manifest) is not None
 
 
-def _choice_default(question_id: str, adopted: bool) -> str:
-    """The known-safe default: preserve for an adopted project, the table default for a fresh template."""
-    if question_id in ("browser", "exa") and adopted:
-        return "preserve"
+def _choice_default(question_id: str, adopted: bool, route_enabled: bool | None = None) -> str:
+    """The known-safe default: never switch an enabled route off, whatever the project origin.
+
+    `_is_adopted` reads a permanent `project_mode = "adopt"`, but a project created
+    `new` can already ship enabled routes. So the default follows the route's CURRENT
+    enabled state, not the origin: enabled -> preserve, disabled -> off. Only an
+    explicit `off` disables; `preserve` always writes nothing.
+    """
+    if question_id in ("browser", "exa"):
+        if route_enabled is True:
+            return "preserve"
+        if route_enabled is False:
+            return "off"
+        return "preserve" if adopted else "off"
     return _QUESTION_BY_ID[question_id]["default"]
 
 
@@ -126,18 +159,95 @@ def _route_facts(root: Path) -> list[dict[str, object]]:
     return facts
 
 
+def _mcp_projection(root: Path) -> dict[str, str]:
+    """The `[guided].mcp` projection: every route's current enabled state (a derived view, never a second SOT)."""
+    return {route["name"]: ("preserved" if route["enabled"] else "off-recommended")
+            for route in _route_facts(root)}
+
+
+def _read_route_owner(root: Path, route: str) -> tuple[bool, bytes]:
+    """Read one vetted canonical route owner: (enabled bool, raw bytes).
+
+    Refuses — before any guided write — a missing, malformed, symlinked,
+    non-regular, outside-root, or misnamed route. The enabled field must be a real
+    TOML boolean, never a truthy string.
+    """
+    path = ensure_inside_root(root, root / MCP_DIR / f"{route}.toml", f"MCP route {route} owner")
+    if is_link_like(path):
+        raise RepoctlError(f"MCP route {route} owner must not be a symlink or reparse point")
+    if not path.is_file():
+        raise RepoctlError(f"MCP route {route} owner is missing")
+    raw = path.read_bytes()
+    try:
+        spec = tomllib.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, tomllib.TOMLDecodeError) as error:
+        raise RepoctlError(f"MCP route {route} owner is malformed: {error}") from error
+    if spec.get("name") != route:
+        raise RepoctlError(f"MCP route {route} owner must name itself {route!r}")
+    enabled = spec.get("enabled")
+    if not isinstance(enabled, bool):
+        raise RepoctlError(f"MCP route {route} owner must set a real boolean enabled")
+    return enabled, raw
+
+
+def _vetted_route_hash(root: Path, route: str) -> str | None:
+    """Raw hash of a vetted route owner for the plan revision, or None when it is absent."""
+    try:
+        _, raw = _read_route_owner(root, route)
+    except RepoctlError:
+        return None
+    return _digest(raw)
+
+
+def _write_enabled(path: Path, enabled: bool) -> None:
+    """Flip a validated route owner's top-level `enabled` boolean, preserving comments and order."""
+    text = path.read_text(encoding="utf-8")
+    updated, count = _ENABLED_LINE.subn(f"enabled = {'true' if enabled else 'false'}", text, count=1)
+    if count != 1:
+        raise RepoctlError(f"MCP route {path.stem} owner has no top-level enabled field to set")
+    path.write_text(updated, encoding="utf-8")
+
+
+def _prepare_route_owners(root: Path, plan: dict[str, object]) -> dict[str, bool]:
+    """Validate and stale-check every vetted route the plan binds; return the needed edits.
+
+    `request` enables, `off` disables, `preserve` writes nothing. The full raw
+    route hash is the plan's binding for EVERY vetted route, preserved ones
+    included, so a URL/args change after the plan was built refuses before any
+    effect. Refusal happens before any guided write.
+    """
+    desired: dict[str, bool] = {}
+    bound = plan.get("routes", {})
+    for capability, route in _VETTED_ROUTES.items():
+        # Missing/malformed/symlink/misnamed/outside-root refusal for every bound route.
+        enabled, raw = _read_route_owner(root, route)
+        if bound.get(capability) != _digest(raw):
+            raise RepoctlError(f"plan is stale: .agents/mcp/{route}.toml changed after the plan was built")
+        choice = plan["answers"][capability]
+        if choice == "preserve":
+            continue  # writes nothing, but the drift check above still applies
+        want = choice == "request"
+        if enabled != want:
+            desired[capability] = want
+    return desired
+
+
 def build_plan(root: Path, answers: dict[str, str], *, consent: bool, reshape: bool = False) -> dict[str, object]:
     """Pure: answers in, plan out. Nothing is written and no record is read for writing."""
     unknown = sorted(set(answers) - {question["id"] for question in QUESTIONS})
     if unknown:
         raise RepoctlError(f"unknown intake answer(s): {', '.join(unknown)}")
     adopted = _is_adopted(root)
+    enabled_by_capability = {
+        capability: _read_route_owner(root, route)[0] for capability, route in _VETTED_ROUTES.items()
+    }
     resolved = dict(answers)
     for question in QUESTIONS:
         if "choices" not in question:
             continue
         if question["id"] not in resolved:
-            resolved[question["id"]] = _choice_default(question["id"], adopted)
+            resolved[question["id"]] = _choice_default(
+                question["id"], adopted, enabled_by_capability.get(question["id"]))
         elif resolved[question["id"]] not in question["choices"]:
             raise RepoctlError(
                 f'answer "{question["id"]}" must be one of {"/".join(question["choices"])}, '
@@ -151,8 +261,9 @@ def build_plan(root: Path, answers: dict[str, str], *, consent: bool, reshape: b
         records[relative] = "accepted" if re.search(r"(?im)^\W*status\W*:?\W*accepted\b", text) else "pending"
         owners[relative] = _digest(text.encode())
     routes = _route_facts(root)
+    route_hashes = {capability: _vetted_route_hash(root, route) for capability, route in _VETTED_ROUTES.items()}
     decisions = {
-        "mcp": {route["name"]: ("preserved" if route["enabled"] else "off-recommended") for route in routes},
+        "mcp": _mcp_projection(root),
         "env": sorted({name for route in routes for name in route["env"]}),
         "browser": _CHOICE_DECISIONS["browser"][resolved["browser"]],
         "exa": _CHOICE_DECISIONS["exa"][resolved["exa"]],
@@ -160,9 +271,9 @@ def build_plan(root: Path, answers: dict[str, str], *, consent: bool, reshape: b
         "logging": _CHOICE_DECISIONS["logging"][resolved["logging"]],
     }
     plan = {"answers": resolved, "consent": bool(consent), "reshape": bool(reshape),
-            "owners": owners, "records": records, "decisions": decisions}
+            "owners": owners, "records": records, "decisions": decisions, "routes": route_hashes}
     plan["revision"] = "sha256:" + hashlib.sha256(
-        json.dumps({key: plan[key] for key in ("answers", "consent", "reshape", "decisions")},
+        json.dumps({key: plan[key] for key in ("answers", "consent", "reshape", "decisions", "routes")},
                    sort_keys=True).encode()).hexdigest()
     return plan
 
@@ -221,14 +332,19 @@ def _lock(root: Path, timeout: float = 10):
         path.unlink(missing_ok=True)
 
 
-def apply_plan(root: Path, plan: dict[str, object]) -> list[str]:
-    """Consent-gated, revision-checked apply. Any refusal writes nothing."""
-    if not plan.get("consent"):
-        raise RepoctlError("no explicit consent: the plan is not applied (nothing written)")
+def _assert_owners_current(root: Path, plan: dict[str, object]) -> None:
+    """The one owner of the authoritative VISION/STACK owner-hash check (no second copy)."""
     for relative, digest in plan["owners"].items():
         text = read_text_file(root, relative)
         if text is None or _digest(text.encode()) != digest:
             raise RepoctlError(f"plan is stale: {relative} changed after the plan was built; rebuild and reconfirm")
+
+
+def apply_plan(root: Path, plan: dict[str, object]) -> list[str]:
+    """Consent-gated, revision-checked apply. Any refusal writes nothing."""
+    if not plan.get("consent"):
+        raise RepoctlError("no explicit consent: the plan is not applied (nothing written)")
+    _assert_owners_current(root, plan)  # fast refusal; the authoritative check repeats under the lock
     with _lock(root):
         return _write(root, plan)
 
@@ -236,6 +352,21 @@ def apply_plan(root: Path, plan: dict[str, object]) -> list[str]:
 def _write(root: Path, plan: dict[str, object]) -> list[str]:
     written: list[str] = []
     try:
+        # Authoritative owner check INSIDE the lock, before any write: a VISION/STACK
+        # edit while this apply waited for the lock must not be overwritten.
+        _assert_owners_current(root, plan)
+        # Canonical route owners first: an explicit request/off flips the top-level
+        # `enabled` boolean; preserve writes nothing. Validated and stale-checked
+        # before any guided write below, so a bad or changed route refuses first.
+        route_edits = _prepare_route_owners(root, plan)
+        for capability, route in _VETTED_ROUTES.items():
+            if capability not in route_edits:
+                continue
+            path = ensure_inside_root(root, root / MCP_DIR / f"{route}.toml", f"MCP route {route} owner")
+            _write_enabled(path, route_edits[capability])
+            written.append(path.relative_to(root).as_posix())
+        if route_edits:
+            plan["decisions"]["mcp"] = _mcp_projection(root)  # refresh the derived projection, no second SOT
         by_section: dict[tuple[str, str], list[str]] = {}
         for question in QUESTIONS:
             if question["id"] in plan["answers"]:
@@ -253,20 +384,38 @@ def _write(root: Path, plan: dict[str, object]) -> list[str]:
                 if relative not in written:
                     written.append(relative)
         env_path = root / ENV_EXAMPLE
-        if plan["decisions"]["env"] and not env_path.exists():  # placeholder names only, never values
-            lines = ["# Known environment-reference names only: fill values in your local environment;",
-                     "# never commit real keys."]
-            lines += [f"{name}=<set-your-own-key>" for name in plan["decisions"]["env"]]
-            env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-            written.append(ENV_EXAMPLE)
+        if plan["decisions"]["env"]:
+            written.extend(_write_env_example(env_path, plan["decisions"]["env"]))
         manifest = (root / "project.toml").read_text(encoding="utf-8")
         (root / "project.toml").write_text(_guided_table(manifest, plan), encoding="utf-8")
         written.append("project.toml")
+        if route_edits:
+            # Re-derive the host projection from the canonical owners (no host MCP connect, no startup).
+            from . import derive
+            written.extend(derive.sync(root))
     except RepoctlError:
         raise
     except OSError as error:  # a partial failure must not look like success
         raise RepoctlError(f"guided apply stopped after {', '.join(written) or 'nothing'}: {error}") from error
     return written
+
+
+def _write_env_example(env_path: Path, names: list[str]) -> list[str]:
+    """Placeholder env names only: create when absent, else append missing names without overwriting values."""
+    if not env_path.exists():
+        lines = ["# Known environment-reference names only: fill values in your local environment;",
+                 "# never commit real keys."]
+        lines += [f"{name}=<set-your-own-key>" for name in names]
+        env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        return [ENV_EXAMPLE]
+    existing = env_path.read_text(encoding="utf-8")
+    present = set(re.findall(r"(?m)^([A-Z][A-Z0-9_]*)=", existing))
+    missing = [name for name in names if name not in present]
+    if not missing:
+        return []
+    addition = "\n".join(f"{name}=<set-your-own-key>" for name in missing)
+    env_path.write_text(existing.rstrip("\n") + "\n" + addition + "\n", encoding="utf-8")
+    return [ENV_EXAMPLE]
 
 
 def _guided_table(manifest: str, plan: dict[str, object]) -> str:
@@ -312,12 +461,15 @@ def answers_from_json(text: str) -> dict[str, object]:
 def ask_terminal(root: Path) -> dict[str, str] | bool | None:
     """One bounded round in the terminal: dict = answers with consent, False = no consent, None = cancelled."""
     adopted = _is_adopted(root)
+    enabled_by_capability = {
+        capability: _read_route_owner(root, route)[0] for capability, route in _VETTED_ROUTES.items()
+    }
     print("Guided intake (#110): empty line takes the recommendation; 'cancel' writes nothing.")
     answers: dict[str, str] = {}
     for question in QUESTIONS:
         print(f"\n[{question['id']}] {question['prompt']}")
         if "choices" in question:
-            print(f"  choices: {'/'.join(question['choices'])} (default: {_choice_default(question['id'], adopted)})")
+            print(f"  choices: {'/'.join(question['choices'])} (default: {_choice_default(question['id'], adopted, enabled_by_capability.get(question['id']))})")
         else:
             print(f"  options: {'; '.join(question['options'])}")
             print(f"  recommendation: {question['recommendation']}")
@@ -328,7 +480,7 @@ def ask_terminal(root: Path) -> dict[str, str] | bool | None:
         if reply.lower() == "cancel":
             return None
         if "choices" in question:
-            answers[question["id"]] = reply or _choice_default(question["id"], adopted)
+            answers[question["id"]] = reply or _choice_default(question["id"], adopted, enabled_by_capability.get(question["id"]))
         else:
             answers[question["id"]] = reply or question["recommendation"]
     try:
@@ -342,9 +494,12 @@ def summarize(plan: dict[str, object]) -> str:
     records = ", ".join(f"{relative} {state}" for relative, state in sorted(plan["records"].items()))
     mcp = ", ".join(f"{name} {state}" for name, state in sorted(plan["decisions"]["mcp"].items())) or "no routes"
     decisions = plan["decisions"]
+    # An enabled route is config-only: never claim a connection, a vendor call, or readiness.
+    applied = [name for name in ("browser", "exa") if decisions[name] == "requested"]
+    note = ("; enabled (config only), connection not attempted" if applied else "")
     return (f"revision {plan['revision'][:18]}…; {records}; MCP {mcp}; "
             f"browser {decisions['browser']}; exa {decisions['exa']}; "
-            f"embeddings {decisions['embeddings']}; logging {decisions['logging']}")
+            f"embeddings {decisions['embeddings']}; logging {decisions['logging']}{note}")
 
 
 def guided_init(root: Path, answers: dict[str, str] | None, *, consent: bool, reshape: bool = False) -> str:

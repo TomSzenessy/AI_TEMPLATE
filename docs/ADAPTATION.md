@@ -30,7 +30,7 @@ a project small:
 | `docs/research/` | Keep as provenance while its guidance matters. | Archive/remove after the knowledge has been internalized and no decision cites it. |
 | `tools/kit-lock.json` | Written by `make init`, `make adopt`, and `make kit-update`: what the project got from the kit. | Never edit by hand; `make kit-update` maintains it; `KIT_REF=<sha>` pins an update to one template commit instead of its HEAD ([`kit-update.md`](./kit-update.md)). |
 | `project.mk` | Your own make targets; the kit Makefile includes it. | Keep project targets here, not in the kit's Makefile. |
-| Guided intake: `[guided]` table, `.env.example`, `<!-- guided-intake -->` draft paragraphs | Written only by a consent-gated apply after identity init: machine facts in `project.toml`, placeholder env names from the existing MCP route owners, pending record drafts. | Never hand-edit the table; cancel or a missing consent writes nothing; accepted records are preserved unless an explicit `--reshape` is supplied. MCP route files stay route-owned: intake only reads them, fresh projects are recommended off, and enabling needs separate explicit consent. The four shared optional choices (browser, Exa, logging, embeddings) are strict choice strings validated at the parser boundary; their selected intent is recorded as a NON-authoritative effect pending until the owner apply phase. |
+| Guided intake: `[guided]` table, `.env.example`, `<!-- guided-intake -->` draft paragraphs | Written only by a consent-gated apply after identity init: machine facts in `project.toml`, placeholder env names from the existing MCP route owners, pending record drafts. For the two vetted canonical routes (Playwright browser, Exa search) an explicit `request`/`off` also flips the route owner's top-level `enabled` boolean (config only); `preserve` writes nothing. | Never hand-edit the table; cancel or a missing consent writes nothing; accepted records are preserved unless an explicit `--reshape` is supplied. Only the two vetted canonical route owners are applied, and only their `enabled` flag: every other route stays route-owned; a missing, malformed, symlinked, misnamed, or outside-root route is refused before any write; and the plan binds each vetted route's full raw hash — preserved owners included — so post-plan URL/args drift refuses as stale. The VISION/STACK owner-hash check repeats under the apply lock before any write. Env placeholders are names only: the file is created when absent and missing names are appended when present, never overwriting existing values. Embeddings stay requested-not-ready; logging stays selected-intent; enabling a route is never a connection, a readiness signal, or a vendor call. |
 | `.agents/trials/` | Template maintenance: build-trial requests and seeds. | Pruned by `make init` and skipped by `make adopt`, together with any doc binding that only pointed at them; add your own requests to run `make trial`. |
 | `docs/ERROR_LOG.md` | Keep as an append-only solved-failure ledger. | Do not use it for open work; link open work to Issues. |
 | `.agents/skills/` | Keep the small first-party workflows and verified reusable capabilities. | Retain a reviewed skill while it remains trusted and useful; remove it only with a documented trust, permission, maintenance, or owner decision. |
@@ -53,22 +53,34 @@ its operating contract, history, or evidence.
 - **Risk:** decision intake must never confirm a product, enable a capability,
   or re-bootstrap an initialized repository. Cancellation, missing consent, a
   mistyped consent/reshape, an unknown choice, a stale plan, or changed owner
-  records write nothing; apply is locked, so cooperating callers serialize. A
-  selected `request` is recorded intent, never an enabled route: the route
-  files stay route-owned (SOT) until the owner apply phase.
+  records write nothing; apply is locked, so cooperating callers serialize, and
+  the VISION/STACK owner-hash check repeats under that lock before any write,
+  so an owner edit while an apply waits is refused, never overwritten.
+- **Owner apply (vetted routes only):** an explicit `request` sets
+  `enabled = true` and an explicit `off` sets `enabled = false` in the two
+  vetted canonical route owners (Playwright browser, Exa search); `preserve`
+  writes nothing. Only the top-level `enabled` boolean is rewritten — a real
+  TOML boolean, never a truthy string — and url/command/env_headers stay
+  opaque. A missing, malformed, symlinked, misnamed, or outside-root route is
+  refused before any guided write, and the plan binds every vetted route's
+  full raw hash (preserved owners included), so a URL/args change after the
+  plan refuses as stale before effects. Defaults follow the route's current
+  state — enabled preserves, disabled recommends off — so a blank answer
+  never switches an enabled route off; an explicit `off` still disables.
+  After an edit the `[guided].mcp` mirror and the host projection are
+  re-derived from `.agents/mcp` owners only: no connection, no startup, no
+  embedding activation.
 - **Golden path:** `make init NAME=x KIND=web` (unattended, unchanged), then
   `make init ... --answers file.json` (or `--guided` for the terminal round);
-  the same answers through either surface produce identical owner files. Drafts
-  stay pending for `product-kickoff`; embeddings stay requested-not-ready.
-- **Four shared choices (working, activation pending):** browser and Exa take
-  `off`/`request`/`preserve` (default `preserve` for an adopted project, `off`
-  for a fresh template); logging takes `off`/`local-redacted`/`plan-external`
-  (default `local-redacted`); embeddings takes `off`/`request` (default `off`).
-  The selected intent is persisted in the `[guided]` receipt and a pending STACK
-  section as a NON-authoritative effect pending — no route file is written, no
-  MCP connection is made, and no embedding transfer is consented. The owner
-  apply phase that turns a `request` into an enabled route remains a separate,
-  explicitly-authorized next step.
+  the same 11 answers through either surface produce identical owner files.
+  Drafts stay pending for `product-kickoff`; embeddings stay
+  requested-not-ready.
+- **Four shared choices (working):** browser and Exa take
+  `off`/`request`/`preserve`; logging takes
+  `off`/`local-redacted`/`plan-external` (default `local-redacted`); embeddings
+  takes `off`/`request` (default `off`). The selected intent is persisted in
+  the `[guided]` receipt and a pending STACK section; only the browser/Exa
+  `request`/`off` choices reach the vetted route owners, as config only.
 
 ## Adopting an existing repository
 

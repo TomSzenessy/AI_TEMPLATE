@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import re
 import shutil
 import subprocess
 import sys
 import tempfile
+import tomllib
 import unittest
 from pathlib import Path
 
@@ -33,6 +35,9 @@ ANSWERS = {
     "logging": "local-redacted",
     "embeddings": "off",
 }
+
+# The shared answers without the two vetted route choices, so a scenario can set its own.
+_BASE_ANSWERS = {key: value for key, value in ANSWERS.items() if key not in ("browser", "exa")}
 
 
 @template_only  # every test initializes a copy of the uninitialized template
@@ -73,7 +78,11 @@ class GuidedInitTests(Scratch):
             self.assertEqual((json_root / relative).read_bytes(), (terminal_root / relative).read_bytes(), relative)
 
     def test_optional_choices_parity_terminal_vs_json(self) -> None:
-        """The four shared choices produce identical owner files via terminal and JSON (off/request)."""
+        """The four shared choices produce identical owner files via terminal and JSON (off/request).
+
+        `request` is now applied to the vetted route owner's enabled boolean (config only);
+        the owner files still match across both surfaces.
+        """
         choices = {"browser": "off", "exa": "request", "logging": "plan-external", "embeddings": "request"}
         json_root = self.copy_working_tree()
         self.assertEqual(self.init_with_json(json_root, {**ANSWERS, **choices}).returncode, 0)
@@ -167,11 +176,34 @@ class GuidedInitTests(Scratch):
         self.assertEqual(self.init_with_json(root, ANSWERS).returncode, 0)
         plan = guided.build_plan(root, {**ANSWERS, "users_goal": "Changed after the plan"}, consent=True)
         path = root / "VISION.md"
+        # Drift before the lock: refused by the pre-lock check, the edit stands.
         path.write_text(path.read_text(encoding="utf-8") + "\nAn edit after the plan was built.\n", encoding="utf-8")
         with self.assertRaises(RepoctlError) as raised:
             guided.apply_plan(root, plan)
         self.assertIn("stale", str(raised.exception))
         self.assertIn("An edit after the plan was built.", path.read_text(encoding="utf-8"))
+        # Drift under the lock: the authoritative in-lock check must refuse the same
+        # way, so an owner edit while an apply waits is never overwritten.
+        plan = guided.build_plan(root, {**ANSWERS, "users_goal": "Changed after the plan"}, consent=True)
+        original_lock = guided._lock
+
+        @contextlib.contextmanager
+        def drifting_lock(locked_root: Path, timeout: float = 10):
+            with original_lock(locked_root, timeout=timeout):
+                path.write_text(path.read_text(encoding="utf-8")
+                                + "\nAn edit while the apply held the lock.\n", encoding="utf-8")
+                yield
+
+        guided._lock = drifting_lock
+        try:
+            with self.assertRaises(RepoctlError) as raised:
+                guided.apply_plan(root, plan)
+        finally:
+            guided._lock = original_lock
+        self.assertIn("stale", str(raised.exception))
+        manifest = (root / "project.toml").read_text(encoding="utf-8")
+        self.assertNotIn("Changed after the plan", manifest)  # nothing written under the drifted plan
+        self.assertIn("An edit while the apply held the lock.", path.read_text(encoding="utf-8"))
 
     def test_concurrent_apply_callers_serialize(self) -> None:
         root = self.copy_working_tree()
@@ -198,16 +230,46 @@ class GuidedInitTests(Scratch):
         self.assertIn("already initialized", result.stdout + result.stderr)
 
     def test_no_provider_browser_or_install_calls(self) -> None:
+        """The owner apply edits config only: no process, network, package, or browser call.
+
+        The vetted route-name stem ("playwright") is a config reference, not a call; the
+        forbidden tokens are the execution/install forms.
+        """
         source = (ROOT / "tools/kit/guided.py").read_text(encoding="utf-8")
-        for forbidden in ("subprocess", "urllib", "requests", "npx", "playwright", "pip install"):
+        for forbidden in ("subprocess", "urllib", "requests", "npx", "pip install",
+                          "@playwright", "playwright install", "import playwright"):
             self.assertNotIn(forbidden, source)
 
     def test_route_owners_keep_mcp_enablement(self) -> None:
+        """Explicit choices apply to the vetted owners; other routes stay route-owned."""
         root = self.copy_working_tree()
-        self.assertEqual(self.init_with_json(root, ANSWERS).returncode, 0)
-        for route in (root / ".agents/mcp").glob("*.toml"):
-            self.assertIn("enabled = true", route.read_text(encoding="utf-8"))  # guided init only reads them
+        self.assertEqual(self.init_with_json(root, ANSWERS).returncode, 0)  # browser/exa = off
+        mcp = root / ".agents/mcp"
+        self.assertIn("enabled = false", (mcp / "playwright.toml").read_text(encoding="utf-8"))
+        self.assertIn("enabled = false", (mcp / "exa.toml").read_text(encoding="utf-8"))
+        self.assertIn("enabled = true", (mcp / "context7.toml").read_text(encoding="utf-8"))  # route-owned
+        # The [guided] derived mirror matches the owners: no second SOT.
+        manifest = (root / "project.toml").read_text(encoding="utf-8")
+        self.assertIn('playwright = "off-recommended"', manifest)
+        self.assertIn('exa = "off-recommended"', manifest)
+        self.assertIn('context7 = "preserved"', manifest)
         self.assertEqual((root / ".env.example").read_text(encoding="utf-8").count("<set-your-own-key>"), 2)
+
+    def test_preserved_route_url_drift_refuses_before_any_write(self) -> None:
+        """The plan binds every vetted route's raw hash: preserved URL drift refuses all writes."""
+        root = self.copy_working_tree()
+        self.assertEqual(run_cli(root, "init", "--name", "x", "--kind", "web").returncode, 0)
+        plan = guided.build_plan(root, {**_BASE_ANSWERS, "browser": "preserve", "exa": "preserve"}, consent=True)
+        route = root / ".agents/mcp/exa.toml"
+        drifted = route.read_text(encoding="utf-8").replace("https://mcp.exa.ai/mcp", "https://drifted.example/mcp")
+        route.write_text(drifted, encoding="utf-8")  # URL edit after the plan was built
+        with self.assertRaises(RepoctlError) as raised:
+            guided.apply_plan(root, plan)
+        self.assertIn("stale", str(raised.exception))
+        self.assertIn("exa.toml", str(raised.exception))
+        self.assertEqual(route.read_text(encoding="utf-8"), drifted)  # preserve wrote nothing
+        self.assertNotIn("[guided]", (root / "project.toml").read_text(encoding="utf-8"))
+        self.assertFalse((root / ".env.example").exists())  # and no other guided write happened
 
 
 if __name__ == "__main__":
