@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -113,6 +114,13 @@ class GuidedInitTests(Scratch):
         self.assertIn("embeddings requested-not-ready", result.stdout)
         self.assertIn("logging local-redacted", result.stdout)
         self.assertIn("[guided]", (root / "project.toml").read_text(encoding="utf-8"))
+        # Read the actual owner projection (no guess): browser requested -> enabled,
+        # exa off. The applied summary keys the actually-enabled name, not every path.
+        projection = guided._mcp_projection(root)
+        self.assertEqual(projection["playwright"], "preserved")
+        self.assertEqual(projection["exa"], "off-recommended")
+        self.assertIn("enabled (config only): browser", result.stdout)
+        self.assertNotIn("enabled (config only): exa", result.stdout)
 
     def test_terminal_cancel_writes_nothing(self) -> None:
         root = self.copy_working_tree()
@@ -130,6 +138,23 @@ class GuidedInitTests(Scratch):
         result = self.init_with_json(root, ANSWERS, consent=False)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("NOT applied", result.stdout)
+        self.assert_same_owner_files(root, plain)
+
+    def test_missing_consent_preview_does_not_claim_enabled(self) -> None:
+        """A no-consent preview reports planned configuration only, never "enabled".
+
+        A requested route is intent, not an applied effect: the preview must not claim
+        "enabled (config only)" before any apply, and it writes nothing.
+        """
+        root = self.copy_working_tree()
+        plain = self.copy_working_tree()
+        self.assertEqual(run_cli(plain, "init", "--name", "x", "--kind", "web").returncode, 0)
+        result = self.init_with_json(root, {**ANSWERS, "browser": "request", "exa": "request"}, consent=False)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("NOT applied", result.stdout)
+        self.assertIn("planned configuration only", result.stdout)
+        self.assertIn("no connection", result.stdout)
+        self.assertNotIn("enabled (config only)", result.stdout)
         self.assert_same_owner_files(root, plain)
 
     def test_accepted_records_are_preserved_unless_an_explicit_reshape_is_supplied(self) -> None:
@@ -270,6 +295,40 @@ class GuidedInitTests(Scratch):
         self.assertEqual(route.read_text(encoding="utf-8"), drifted)  # preserve wrote nothing
         self.assertNotIn("[guided]", (root / "project.toml").read_text(encoding="utf-8"))
         self.assertFalse((root / ".env.example").exists())  # and no other guided write happened
+
+    def test_env_example_link_or_nonregular_target_refuses_before_any_guided_write(self) -> None:
+        """A symlinked or non-regular .env.example target refuses before any guided write.
+
+        Parameterized over the refusal shapes (symlink to an outside sentinel, fifo,
+        directory): the sentinel and every guided-owned file stay unchanged, so the
+        refusal lands before any route/record/manifest write. The regular-file
+        append path stays covered by the existing controls, not duplicated here.
+        """
+        for kind in ("symlink", "fifo", "directory"):
+            with self.subTest(kind=kind):
+                root = self.copy_working_tree()
+                plain = self.copy_working_tree()
+                self.assertEqual(run_cli(plain, "init", "--name", "x", "--kind", "web").returncode, 0)
+                sentinel = root.parent / f"sentinel-{kind}.txt"  # outside root, like a pre-planted link target
+                self.addCleanup(sentinel.unlink, missing_ok=True)
+                sentinel.write_text("SENTINEL-ORIGINAL-CONTENT\n", encoding="utf-8")
+                before = sentinel.read_bytes()
+                target = root / ".env.example"
+                if kind == "symlink":
+                    target.symlink_to(sentinel)
+                elif kind == "fifo":
+                    os.mkfifo(target)
+                else:
+                    target.mkdir()
+                result = self.init_with_json(root, ANSWERS)
+                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn("env example", result.stderr)
+                self.assertEqual(sentinel.read_bytes(), before)  # never written through
+                for relative in ("VISION.md", "docs/STACK-DECISION.md", "project.toml"):
+                    self.assertEqual((root / relative).read_bytes(), (plain / relative).read_bytes(), relative)
+                self.assertNotIn("[guided]", (root / "project.toml").read_text(encoding="utf-8"))
+                self.assertEqual((root / ".agents/mcp/exa.toml").read_bytes(),
+                                 (plain / ".agents/mcp/exa.toml").read_bytes())  # exa=off would flip enabled
 
 
 if __name__ == "__main__":

@@ -45,6 +45,7 @@ import hashlib
 import json
 import os
 import re
+import stat
 import time
 import tomllib
 from pathlib import Path
@@ -208,6 +209,26 @@ def _write_enabled(path: Path, enabled: bool) -> None:
     path.write_text(updated, encoding="utf-8")
 
 
+def _prepare_env_example(root: Path) -> Path:
+    """Preflight the canonical env target before any guided write; return its path.
+
+    The established root guard plus a regular-file check when the target is
+    present: a directory, FIFO, symlink/reparse point, or broken link at the
+    target is refused, never written through. Absent is fine: the writer
+    creates it. No env content is read here.
+    """
+    path = ensure_inside_root(root, root / ENV_EXAMPLE, "env example")
+    try:
+        mode = os.lstat(path).st_mode
+    except FileNotFoundError:
+        return path
+    except OSError as error:
+        raise RepoctlError(f"env example target is not readable: {error}") from error
+    if not stat.S_ISREG(mode):
+        raise RepoctlError("env example target must be a regular file, not a link, directory, or fifo")
+    return path
+
+
 def _prepare_route_owners(root: Path, plan: dict[str, object]) -> dict[str, bool]:
     """Validate and stale-check every vetted route the plan binds; return the needed edits.
 
@@ -359,6 +380,10 @@ def _write(root: Path, plan: dict[str, object]) -> list[str]:
         # `enabled` boolean; preserve writes nothing. Validated and stale-checked
         # before any guided write below, so a bad or changed route refuses first.
         route_edits = _prepare_route_owners(root, plan)
+        # Preflight the canonical env target before any guided write when the plan
+        # carries env names: the established root guard + regular-file check owns
+        # the refusal, so a link/non-regular target is never written through.
+        env_path = _prepare_env_example(root) if plan["decisions"]["env"] else None
         for capability, route in _VETTED_ROUTES.items():
             if capability not in route_edits:
                 continue
@@ -383,7 +408,6 @@ def _write(root: Path, plan: dict[str, object]) -> list[str]:
                 path.write_text(drafted, encoding="utf-8")
                 if relative not in written:
                     written.append(relative)
-        env_path = root / ENV_EXAMPLE
         if plan["decisions"]["env"]:
             written.extend(_write_env_example(env_path, plan["decisions"]["env"]))
         manifest = (root / "project.toml").read_text(encoding="utf-8")
@@ -490,13 +514,18 @@ def ask_terminal(root: Path) -> dict[str, str] | bool | None:
         return False
 
 
-def summarize(plan: dict[str, object]) -> str:
+def summarize(plan: dict[str, object], applied: bool = False) -> str:
     records = ", ".join(f"{relative} {state}" for relative, state in sorted(plan["records"].items()))
     mcp = ", ".join(f"{name} {state}" for name, state in sorted(plan["decisions"]["mcp"].items())) or "no routes"
     decisions = plan["decisions"]
-    # An enabled route is config-only: never claim a connection, a vendor call, or readiness.
-    applied = [name for name in ("browser", "exa") if decisions[name] == "requested"]
-    note = ("; enabled (config only), connection not attempted" if applied else "")
+    # One owning fact: the capability names the user explicitly requested. An enabled
+    # route is config-only — never a connection, a vendor call, or readiness — and a
+    # preview must never claim "enabled".
+    requested = [name for name in ("browser", "exa") if decisions[name] == "requested"]
+    if applied:
+        note = f"; enabled (config only): {', '.join(requested)}, connection not attempted" if requested else ""
+    else:
+        note = "; planned configuration only, no connection"
     return (f"revision {plan['revision'][:18]}…; {records}; MCP {mcp}; "
             f"browser {decisions['browser']}; exa {decisions['exa']}; "
             f"embeddings {decisions['embeddings']}; logging {decisions['logging']}{note}")
@@ -509,4 +538,5 @@ def guided_init(root: Path, answers: dict[str, str] | None, *, consent: bool, re
     plan = build_plan(root, answers, consent=consent, reshape=reshape)
     if not consent:
         return f"Plan built, NOT applied (no explicit consent): {summarize(plan)}"
-    return f"Applied {summarize(plan)}: {', '.join(apply_plan(root, plan))}."
+    written = apply_plan(root, plan)
+    return f"Applied {summarize(plan, applied=True)}: {', '.join(written)}."
