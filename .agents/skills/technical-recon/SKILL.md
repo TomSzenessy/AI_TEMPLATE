@@ -32,8 +32,8 @@ needs normal code navigation, not a disassembler.
    trigger, not an admission: separate learned user inputs from auth, session
    and nonce values before reuse; browser credential or profile imports need
    their own explicit scope recorded in step 1 even at tier 1 — tier 1 neither
-   forbids nor permits browser-profile access; treat transport 2xx as delivery,
-   not business completion; and require held-out, error and business-state
+   forbids nor permits browser-profile access; HTTP 2xx alone is not proof of
+   business completion; and require held-out, error and business-state
    evidence before claiming the learned request contract works.
 3. **Probe one hypothesis.** List the distinguishing inputs and expected outcomes
    before collecting observations. Change one factor at a time: valid/invalid
