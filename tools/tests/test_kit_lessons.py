@@ -241,6 +241,157 @@ class CiCacheTests(Scratch):
             return json.dumps(list(items))
         return calls, (lambda root: runner)
 
+    def test_brief_reports_head_and_default_from_one_session_cached_query(self) -> None:
+        """#83: green HEAD and pending default are visible, not only failures."""
+        from kit import session
+        head, default = "a" * 40, "b" * 40
+        self.write("project.toml", 'schema = 1\nname = "x"\nkind = "template"\n[repository]\ndefault_branch = "trunk"\n')
+        self.write(".agent/hook-state.json", json.dumps({"session": "real-hook-session"}))
+        calls, factory = self.counting(
+            {"headSha": head, "event": "push", "workflowName": "ci", "status": "completed", "conclusion": "success"},
+            {"headSha": default, "event": "push", "workflowName": "ci", "status": "in_progress"},
+        )
+        def refs(root, *args):
+            return head if args[-1] == "HEAD" else default
+        with mock.patch.dict(os.environ, {"GITHUB_ACTIONS": "", "CI": ""}), \
+             mock.patch.object(cistatus, "pushed_head", return_value=head), \
+             mock.patch.object(cistatus, "git", side_effect=refs), \
+             mock.patch.object(cistatus, "_gh_runner", side_effect=lambda root, **kwargs: factory(root)), \
+             mock.patch.object(structure, "template_in_use", return_value=None):
+            first = session._attention(self.root)
+            self.assertTrue(any("HEAD" in line and "green" in line for line in first), first)
+            self.assertTrue(any("default branch trunk" in line and "pending" in line for line in first), first)
+            self.assertEqual(session._attention(self.root), first)
+        self.assertEqual(len(calls), 1)
+
+    def brief_fixture(self):
+        self.write("project.toml", 'schema = 1\nname = "x"\nkind = "template"\n[repository]\ndefault_branch = "trunk"\n')
+        identity = self.write(".agent/hook-state.json", json.dumps({"session": "host-session"}))
+        return "a" * 40, "b" * 40, identity
+
+    def test_brief_session_cache_survives_retry_window_but_requeries_changed_targets(self) -> None:
+        import time
+        head, default, identity = self.brief_fixture()
+        calls, factory = self.counting({"headSha": head, "event": "push", "status": "completed", "conclusion": "success"})
+        def refs(root, *args):
+            return head if args[-1] == "HEAD" else default
+        with mock.patch.dict(os.environ, {"GITHUB_ACTIONS": "", "CI": ""}), \
+             mock.patch.object(cistatus, "pushed_head", side_effect=lambda root: head), \
+             mock.patch.object(cistatus, "git", side_effect=refs):
+            first = cistatus.brief_ci_lines(self.root, identity, factory(self.root))
+            with mock.patch("time.time", return_value=time.time() + cistatus.GREEN_S + 1):
+                self.assertEqual(cistatus.brief_ci_lines(self.root, identity, factory(self.root)), first)
+            self.assertEqual(len(calls), 1, "same actual session/target pair does not ask again")
+            default = "c" * 40
+            cistatus.brief_ci_lines(self.root, identity, factory(self.root))
+            head = "d" * 40
+            cistatus.brief_ci_lines(self.root, identity, factory(self.root))
+            identity.write_text(json.dumps({"session": "next-host-session"}))
+            cistatus.brief_ci_lines(self.root, identity, factory(self.root))
+        self.assertEqual(len(calls), 4)
+
+    def test_brief_without_real_hook_identity_uses_bounded_fallback_cache(self) -> None:
+        import time
+        head, default, identity = self.brief_fixture()
+        identity.write_text(json.dumps({"session": "local"}))
+        calls, factory = self.counting()
+        with mock.patch.dict(os.environ, {"GITHUB_ACTIONS": "", "CI": ""}), \
+             mock.patch.object(cistatus, "pushed_head", return_value=head), \
+             mock.patch.object(cistatus, "git", side_effect=lambda root, *args: head if args[-1] == "HEAD" else default):
+            cistatus.brief_ci_lines(self.root, identity, factory(self.root))
+            cistatus.brief_ci_lines(self.root, identity, factory(self.root))
+            self.assertEqual(len(calls), 1)
+            with mock.patch("time.time", return_value=time.time() + cistatus.RETRY_S + 1):
+                cistatus.brief_ci_lines(self.root, identity, factory(self.root))
+        self.assertEqual(len(calls), 2, "local is not a real host session ID")
+
+    def test_brief_preserves_event_failure_scope_and_omitted_targets_are_none(self) -> None:
+        head, default, identity = self.brief_fixture()
+        for index, (items, expected_head, expected_default) in enumerate((
+            ([{"headSha": head, "event": "push", "status": "completed", "conclusion": "success"},
+              {"headSha": default, "event": "pull_request", "status": "completed", "conclusion": "failure"}], "green", "red"),
+            ([{"headSha": head, "status": "completed", "conclusion": "failure"},
+              {"headSha": default, "event": "push", "status": "queued"}], "red", "pending"),
+            ([{"headSha": default, "event": "issues", "status": "completed", "conclusion": "success"},
+              {"headSha": default, "event": "issue_comment", "status": "completed", "conclusion": "failure"}], "none", "none"),
+            ([{"headSha": "f" * 40, "event": "push", "status": "completed", "conclusion": "success"}] * 100, "none", "none"),
+        )):
+            with self.subTest(index=index), mock.patch.dict(os.environ, {"GITHUB_ACTIONS": "", "CI": ""}), \
+                 mock.patch.object(cistatus, "pushed_head", return_value=head), \
+                 mock.patch.object(cistatus, "git", side_effect=lambda root, *args: head if args[-1] == "HEAD" else default):
+                identity.write_text(json.dumps({"session": f"scope-case-{index}"}))
+                lines = cistatus.brief_ci_lines(self.root, identity, runs(*items))
+                self.assertIn(f"HEAD: {expected_head}", lines[0])
+                self.assertIn(f": {expected_default} —", lines[1])
+
+    def test_brief_missing_default_ref_and_unpushed_head_never_claim_green(self) -> None:
+        head, default, identity = self.brief_fixture()
+        with mock.patch.dict(os.environ, {"GITHUB_ACTIONS": "", "CI": ""}), \
+             mock.patch.object(cistatus, "pushed_head", return_value=None), \
+             mock.patch.object(cistatus, "git", side_effect=lambda root, *args: head if args[-1] == "HEAD" else None):
+            runner = mock.Mock()
+            lines = cistatus.brief_ci_lines(self.root, identity, runner)
+            self.assertIn("HEAD: unpushed", lines[0])
+            self.assertIn(": unknown —", lines[1])
+            runner.assert_not_called()
+
+    def test_brief_failures_are_unknown_and_do_not_poison_targeted_results(self) -> None:
+        head, default, identity = self.brief_fixture()
+        with mock.patch.dict(os.environ, {"GITHUB_ACTIONS": "", "CI": ""}), \
+             mock.patch.object(cistatus, "pushed_head", return_value=head), \
+             mock.patch.object(cistatus, "git", side_effect=lambda root, *args: head if args[-1] == "HEAD" else default):
+            for index, response in enumerate(("not-json", "{}", "null")):
+                identity.write_text(json.dumps({"session": f"invalid-input-{index}"}))
+                lines = cistatus.brief_ci_lines(self.root, identity, lambda args: response)
+                self.assertTrue(all("unknown" in line for line in lines), lines)
+            identity.write_text(json.dumps({"session": "green-brief-session"}))
+            lines = cistatus.brief_ci_lines(self.root, identity, runs(
+                {"headSha": head, "event": "push", "status": "completed", "conclusion": "success"},
+            ))
+            self.assertIn("HEAD: green", lines[0])
+            self.assertFalse((self.root / cistatus.CACHE).exists(), "brief never seeds targeted cache")
+            failure = runs({"event": "push", "workflowName": "real CI", "status": "completed", "conclusion": "failure"})
+            with mock.patch.object(cistatus, "_gh_runner", return_value=failure):
+                self.assertEqual(cistatus.ci_status(self.root, sha=head)[0], "red")
+                self.assertEqual(len(cistatus.red_findings(self.root)), 1)
+
+    def test_slow_offline_cli_is_bounded_and_not_repeated_in_known_session(self) -> None:
+        import time
+        head, default, identity = self.brief_fixture()
+        script = self.write("fake-bin/gh", "#!/bin/sh\nexec /bin/sleep 2\n")
+        script.chmod(0o755)
+        with mock.patch.dict(os.environ, {"GITHUB_ACTIONS": "", "CI": "", "PATH": str(script.parent)}), \
+             mock.patch.object(cistatus, "pushed_head", return_value=head), \
+             mock.patch.object(cistatus, "git", side_effect=lambda root, *args: head if args[-1] == "HEAD" else default), \
+             mock.patch.object(cistatus, "BRIEF_TIMEOUT_S", 0.2), \
+             mock.patch.object(cistatus.subprocess, "run", wraps=cistatus.subprocess.run) as invocation:
+            started = time.monotonic()
+            first = cistatus.brief_ci_lines(self.root, identity)
+            second = cistatus.brief_ci_lines(self.root, identity)
+            self.assertLess(time.monotonic() - started, 1.5)
+            self.assertTrue(all("unknown" in line for line in first), first)
+            self.assertEqual(second, first)
+        self.assertEqual(invocation.call_count, 1)
+        self.assertEqual(invocation.call_args.kwargs["timeout"], 0.2)
+
+    def test_missing_cli_and_same_head_default_snapshot_are_explicit(self) -> None:
+        head, default, identity = self.brief_fixture()
+        with mock.patch.dict(os.environ, {"GITHUB_ACTIONS": "", "CI": ""}), \
+             mock.patch.object(cistatus, "pushed_head", return_value=head), \
+             mock.patch.object(cistatus, "git", return_value=head):
+            missing = mock.Mock(side_effect=FileNotFoundError("gh"))
+            lines = cistatus.brief_ci_lines(self.root, identity, missing)
+            self.assertTrue(all("unknown" in line for line in lines), lines)
+            self.assertEqual(cistatus.brief_ci_lines(self.root, identity, missing), lines)
+            self.assertEqual(missing.call_count, 1)
+            identity.write_text(json.dumps({"session": "next-session"}))
+            runner = mock.Mock(return_value=json.dumps([
+                {"headSha": head, "event": "push", "status": "completed", "conclusion": "success"},
+            ]))
+            lines = cistatus.brief_ci_lines(self.root, identity, runner)
+            self.assertTrue(all("green" in line for line in lines), lines)
+            self.assertEqual(runner.call_count, 1)
+
     def test_a_final_answer_is_asked_once_per_commit(self) -> None:
         calls, factory = self.counting({"workflowName": "ci", "status": "completed", "conclusion": "success"})
         with mock.patch.dict(os.environ, {"GITHUB_ACTIONS": "", "CI": ""}), \

@@ -1,8 +1,9 @@
 """The CI outcome of what was pushed (issue #76).
 
 A red run on the default branch went unnoticed for five pushes in a project built from this kit: every
-local gate passed and no step read CI. `ci_status` asks `gh` for the runs of one commit; the session brief,
-the `ci-red` stop/done check and `make ci-status` share it. Every failure to ask (no `gh`, no remote, offline,
+local gate passed and no step read CI. `ci_status` targets one commit for `ci-red` and `make ci-status`;
+the brief classifies HEAD/default from one bounded diagnostic snapshot. Both share event classification.
+Every failure to ask (no `gh`, no remote, offline,
 inside CI itself) degrades to a state of its own instead of a finding, so it never blocks unfairly.
 """
 
@@ -17,13 +18,13 @@ from pathlib import Path
 from .gitinfo import git
 
 Runner = Callable[[list[str]], str]
-TIMEOUT_S = 8  # the session brief waits for it once; offline it must not stall the start
+TIMEOUT_S = 8  # targeted manual/gate queries; the diagnostic brief has a shorter bound
 RED = {"failure", "timed_out", "startup_failure"}  # cancelled or awaiting approval is not a defect of the commit
 
 
-def _gh_runner(root: Path) -> Runner:
+def _gh_runner(root: Path, timeout_s: float = TIMEOUT_S) -> Runner:
     def run(args: list[str]) -> str:
-        result = subprocess.run(["gh", *args], cwd=root, capture_output=True, text=True, timeout=TIMEOUT_S, check=False)
+        result = subprocess.run(["gh", *args], cwd=root, capture_output=True, text=True, timeout=timeout_s, check=False)
         if result.returncode != 0:
             raise RuntimeError(result.stderr.strip()[-200:] or f"gh exited {result.returncode}")
         return result.stdout
@@ -106,6 +107,11 @@ def _ask(root: Path, sha: str, runner: Runner | None) -> tuple[str, str]:
         return "unknown", "GitHub CLI (gh) is not installed"
     except (RuntimeError, OSError, subprocess.TimeoutExpired, json.JSONDecodeError) as error:
         return "unknown", f"cannot read CI: {error}"
+    return _classify(sha, runs)
+
+
+def _classify(sha: str, runs: object) -> tuple[str, str]:
+    """The shared commit-verification classification for targeted and brief queries."""
     if isinstance(runs, list):
         # Issue validation uses the default-branch SHA, but does not verify that commit (#97).
         # Keep every other event (including missing metadata) so real CI failures stay visible.
@@ -124,13 +130,68 @@ def _ask(root: Path, sha: str, runner: Runner | None) -> tuple[str, str]:
     return "green", f"CI passed on {sha[:7]}"
 
 
-def default_branch_red(root: Path, default: str, runner: Runner | None = None) -> str | None:
-    """The brief's second line: the default branch's last pushed commit is red (a feature branch inherits it)."""
-    sha = (git(root, "rev-parse", "--verify", "-q", f"origin/{default}") or "").strip()
-    if not sha or sha == (git(root, "rev-parse", "HEAD") or "").strip():
-        return None
-    state, detail = ci_status(root, sha=sha, runner=runner)
-    return f"default branch {default} (as of the last fetch): {detail}" if state == "red" else None
+BRIEF_CACHE = ".agent/ci-brief.json"  # diagnostic snapshot only; never feeds targeted gate/manual results
+BRIEF_TIMEOUT_S = 2
+
+
+def brief_ci_lines(root: Path, hook_state: Path | None = None, runner: Runner | None = None) -> list[str]:
+    """HEAD/default conclusions from one bounded run list, cached by existing hook session and target pair."""
+    import time
+    from .core import RepoctlError, load_project
+    if os.environ.get("GITHUB_ACTIONS") == "true" or os.environ.get("CI") == "true":
+        return ["CI brief: unknown (running inside CI)"]
+    head = (git(root, "rev-parse", "HEAD") or "").strip()
+    pushed = pushed_head(root)
+    try:
+        repository = load_project(root).get("repository", {})
+        default = repository.get("default_branch") if isinstance(repository, dict) else None
+    except (RepoctlError, OSError):
+        default = None
+    # No main/master guess: only an explicitly configured branch and its actual local remote ref.
+    default = default if isinstance(default, str) and default else None
+    default_sha = (git(root, "rev-parse", "--verify", "-q", f"refs/remotes/origin/{default}^{{commit}}") or "").strip() if default else ""
+    session = None
+    try:
+        identity = json.loads(hook_state.read_text(encoding="utf-8")).get("session") if hook_state else None
+        if isinstance(identity, str) and identity and identity != "local":
+            session = identity  # existing host identity, never an invented global no-query flag
+    except (OSError, ValueError, AttributeError):
+        pass
+    key = [CACHE_SCOPE, session, head, pushed, default, default_sha]
+    path = root / BRIEF_CACHE
+    try:
+        cached = json.loads(path.read_text(encoding="utf-8"))
+        age = time.time() - float(cached["at"])
+        lines = cached["lines"]
+        if (cached["key"] == key and isinstance(lines, list) and len(lines) == 2
+                and all(isinstance(line, str) for line in lines) and age >= 0
+                and (session is not None or age < RETRY_S)):
+            return lines
+    except (OSError, ValueError, TypeError, KeyError):
+        pass
+    results = {}
+    targets = {sha for sha in (pushed, default_sha) if sha}
+    if targets:
+        try:
+            raw = (runner or _gh_runner(root, timeout_s=BRIEF_TIMEOUT_S))(
+                ["run", "list", "--limit", "100", "--json", "workflowName,status,conclusion,url,event,headSha"])
+            runs = json.loads(raw or "[]")
+            if not isinstance(runs, list):
+                raise ValueError("run list is not an array")
+            results = {sha: _classify(sha, [r for r in runs if isinstance(r, dict) and r.get("headSha") == sha])
+                       for sha in targets}
+        except (FileNotFoundError, RuntimeError, OSError, subprocess.TimeoutExpired, ValueError, TypeError) as error:
+            results = {sha: ("unknown", f"cannot read CI: {error}") for sha in targets}
+    head_result = results.get(pushed, ("unpushed", "HEAD is not on its upstream yet")) if head else ("unknown", "cannot resolve HEAD")
+    default_result = results.get(default_sha, ("unknown", "cannot resolve configured default-branch remote ref"))
+    lines = [f"HEAD: {head_result[0]} — {head_result[1]}",
+             f"default branch {default or '(unconfigured)'} (as of the last fetch): {default_result[0]} — {default_result[1]}"]
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"key": key, "at": time.time(), "lines": lines}), encoding="utf-8")
+    except OSError:
+        pass  # an unwritable cache costs another bounded query, never changes the verdict
+    return lines
 
 
 def red_findings(root: Path, since: str | None = None, runner: Runner | None = None) -> list[str]:
