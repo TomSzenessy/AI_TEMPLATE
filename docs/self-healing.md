@@ -1,7 +1,7 @@
 # Self-healing mechanics
 
 <!-- index: operate | When a check may block, lifecycle hooks, failure output, ceremony by risk, and the gardener | A check fails, a gate blocks, or the kit itself changes. -->
-<!-- covers: tools/kit/checks.py tools/kit/checkrun.py tools/kit/session.py tools/kit/risk.py tools/kit/garden.py tools/kit/navigate.py .githooks/** .github/workflows/garden.yml -->
+<!-- covers: tools/kit/checks.py tools/kit/checkrun.py tools/kit/session.py tools/kit/gatechecks.py tools/kit/risk.py tools/kit/garden.py tools/kit/navigate.py .githooks/** .github/workflows/garden.yml -->
 
 Agents follow written rules well at the start of a session and worst at the end,
 after compaction, which is when cleanup and documentation get skipped. So the
@@ -122,12 +122,15 @@ this branch has **committed** `high` paths, `make done` and the stop hook
   `blocker` word fails the gate (fix what it lists, then ask again), and any
   other word — prose, "looks good", `accept` — fails as an unknown verdict
   rather than a softer pass.
-- **`Commit:`** must be the current HEAD, so evidence about older work cannot
-  vouch for today's change set. That fixes the order: commit the change, then run
-  the critic on that commit, then save its return — a record written before the
-  commit goes stale the moment the commit lands.
-- A missing record, `Verdict:`, or a record bound to another commit each fails
-  with a message naming the fix.
+- **`Commit:`** names the current HEAD, or an ancestor whose subsequent
+  committed changes are **all `low`** under the current risk rules. Commit the
+  high-risk work first, then review and save the return. Later low-only commits
+  may reuse it; any `normal` or `high` change requires a fresh review.
+  History is checked commit by commit, including merge parents, reverted
+  changes, deletions, and both rename paths — not just the final net diff.
+- A missing record, `Verdict:`, commit line, non-ancestor commit, or unreadable
+  history fails with a message naming the fix. Ancestor reuse never accepts
+  `blocker` or an unknown verdict (including the legacy `ship` alias).
 
 Two exemptions keep the gate light: it reads committed paths only (a dirty tree is not a diff yet), and
 `[governance].profile = "minimal"` skips it, because that profile hands issues and

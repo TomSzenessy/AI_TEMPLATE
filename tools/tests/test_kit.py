@@ -267,6 +267,113 @@ class CriticRecordGateTests(KitRepository):
         self.commit("docs: clarify billing")
         self.assertEqual(self.findings(), "", "the gate only judges high-risk changes")
 
+    def test_an_ancestor_review_is_reused_for_low_only_committed_changes(self) -> None:
+        """#74: later documentation commits do not invalidate reviewed high-risk work."""
+        self.high_risk_change()
+        reviewed = self.head()
+        self.write("docs/billing.md", "# Billing\n\nClarify the already-reviewed behavior.\n")
+        self.commit("docs: clarify reviewed behavior")
+        self.write(".agent/critic.md", f"Verdict: ship-with-residuals\nCommit: {reviewed}\n")
+        self.assertNotEqual(self.head(), reviewed)
+        self.assertEqual(self.findings(), "")
+
+    def test_a_normal_delta_still_requires_a_new_review(self) -> None:
+        self.high_risk_change()
+        reviewed = self.head()
+        self.write("src/billing/invoice.py", "def render_invoice():\n    return 4\n")
+        self.commit("normal-risk behavior change")
+        self.write(".agent/critic.md", f"Verdict: ship-with-residuals\nCommit: {reviewed}\n")
+        self.assertIn("the critic read older work", self.findings())
+
+    def test_a_high_delta_still_requires_a_new_review(self) -> None:
+        self.high_risk_change()
+        reviewed = self.head()
+        self.write("src/auth/login.py", "def login():\n    return 'new behavior'\n")
+        self.commit("high-risk behavior change")
+        self.write(".agent/critic.md", f"Verdict: ship-with-residuals\nCommit: {reviewed}\n")
+        self.assertIn("the critic read older work", self.findings())
+
+    def test_reverted_high_changes_do_not_become_a_low_only_delta(self) -> None:
+        self.high_risk_change()
+        reviewed = self.head()
+        self.write("src/auth/login.py", "def login():\n    return 'temporary change'\n")
+        self.commit("high change after review")
+        self.write("src/auth/login.py", "def login():\n    return 'changed'\n")
+        self.write("docs/billing.md", "# Billing\n\nDocs-only net delta.\n")
+        self.commit("restore high path and clarify docs")
+        self.write(".agent/critic.md", f"Verdict: ship-with-residuals\nCommit: {reviewed}\n")
+        self.assertIn("the critic read older work", self.findings())
+
+    def test_merging_reverted_high_changes_still_requires_review(self) -> None:
+        self.high_risk_change()
+        reviewed = self.head()
+        self.git("checkout", "-q", "-b", "side")
+        self.write("src/auth/login.py", "def login():\n    return 'side change'\n")
+        self.commit("high side-branch change")
+        self.write("src/auth/login.py", "def login():\n    return 'changed'\n")
+        self.write("docs/side.md", "# Side documentation\n")
+        self.commit("restore side high path")
+        self.git("checkout", "-q", "feature")
+        self.write("docs/billing.md", "# Feature documentation\n")
+        self.commit("feature docs delta")
+        self.git("merge", "--no-ff", "-m", "merge side changes", "side")
+        self.write(".agent/critic.md", f"Verdict: ship-with-residuals\nCommit: {reviewed}\n")
+        self.assertIn("the critic read older work", self.findings())
+
+    def test_renaming_a_high_path_into_docs_still_requires_review(self) -> None:
+        self.high_risk_change()
+        reviewed = self.head()
+        self.git("mv", "src/auth/login.py", "docs/login.md")
+        self.commit("move high-risk path into low-risk directory")
+        self.write(".agent/critic.md", f"Verdict: ship-with-residuals\nCommit: {reviewed}\n")
+        self.assertIn("the critic read older work", self.findings())
+
+    def test_deleting_a_high_path_still_requires_review(self) -> None:
+        self.high_risk_change()
+        reviewed = self.head()
+        self.git("rm", "src/auth/login.py")
+        self.commit("delete reviewed high-risk path")
+        self.write(".agent/critic.md", f"Verdict: ship-with-residuals\nCommit: {reviewed}\n")
+        self.assertIn("the critic read older work", self.findings())
+
+    def test_a_real_nonancestor_record_is_refused(self) -> None:
+        self.high_risk_change()
+        self.git("checkout", "-q", "-b", "other", "main")
+        self.write("docs/billing.md", "# Other branch\n")
+        self.commit("unrelated review target")
+        reviewed = self.head()
+        self.git("checkout", "-q", "feature")
+        self.write("docs/billing.md", "# Feature branch\n")
+        self.commit("low delta on feature")
+        self.write(".agent/critic.md", f"Verdict: ship-with-residuals\nCommit: {reviewed}\n")
+        self.assertIn("the critic read older work", self.findings())
+
+    def test_ancestor_reuse_does_not_accept_blocker_or_unknown_verdicts(self) -> None:
+        self.high_risk_change()
+        reviewed = self.head()
+        self.write("docs/billing.md", "# Low delta\n")
+        self.commit("docs after review")
+        for verdict in ("blocker", "ship", "unknown"):
+            with self.subTest(verdict=verdict):
+                self.write(".agent/critic.md", f"Verdict: {verdict}\nCommit: {reviewed}\n")
+                self.assertNotEqual(self.findings(), "")
+
+    def test_unreadable_delta_history_or_head_cannot_reuse_review(self) -> None:
+        from unittest import mock
+        from kit import gatechecks
+        self.high_risk_change()
+        reviewed = self.head()
+        self.write("docs/billing.md", "# Low delta\n")
+        self.commit("docs after review")
+        self.write(".agent/critic.md", f"Verdict: ship-with-residuals\nCommit: {reviewed}\n")
+        real_git = gatechecks.git
+        for failed_command in ("log", "rev-parse", "merge-base"):
+            with self.subTest(failed_command=failed_command):
+                def unreadable(root, *args):
+                    return None if args[0] == failed_command else real_git(root, *args)
+                with mock.patch.object(gatechecks, "git", side_effect=unreadable):
+                    self.assertNotEqual(self.findings(), "")
+
     def test_a_high_risk_change_with_no_record_is_refused(self) -> None:
         self.high_risk_change()
         finding = self.findings()
