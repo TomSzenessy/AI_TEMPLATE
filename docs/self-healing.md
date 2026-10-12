@@ -164,12 +164,9 @@ findings, one root cause per change (see [`delegation.md`](./delegation.md)).
   committed since (no snapshot, or a start commit no longer an ancestor: the whole tree), with the
   commits' `Docs-Unaffected` trailers ([`bindings.md`](./bindings.md)) as `make done` does. A
   finding is raised once per turn until fixed or exempted; `make done` judges the whole branch.
-  On resume, only a clean automatic fast-forward while the session has committed nothing proves
-  foreign provenance: the hook refreshes content hashes only for paths that subsequent regeneration
-  actually writes or removes. Regeneration errors are not paths. Own canonical source edits,
-  own commits, unrelated dirty work, and healing without that pull keep their original ownership;
-  ambiguous provenance is never an exemption. This session ownership rule is owned here; generated
-  inputs and outputs are catalogued in [`generated-files.md`](./generated-files.md).
+  Resume refreshes only regenerated writes/removals after a proven clean automatic fast-forward
+  with no session commits. Errors are not paths; own/dirty work and other healing stay owned.
+  Input/output catalog: [`generated-files.md`](./generated-files.md).
 - Hooks, the git gate, and `make` run through `tools/repoctl`, which picks the
   newest Python 3.11+ on `PATH` even when `python3` is an older system
   interpreter (override with `REPOCTL_PYTHON` or `make PYTHON=...`). Windows
