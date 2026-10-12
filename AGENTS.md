@@ -14,15 +14,14 @@ step), `make where Q="..."`, `make capabilities`, and `make done` before you cal
 2. **Orient.** `project.toml` owns shape, surfaces, checks, and provenance;
    obey the nearest scoped `AGENTS.md`.
 3. **Before editing:** `git status`, the current issue/PR, and `make risk`
-   (low, normal, or high ceremony). Claim the issue (assignee,
-   `status:in-progress`), naming overlaps. Parallel sessions use separate
-   worktrees; stage only your paths.
+   (low, normal, or high ceremony). With others in the repository, claim the
+   issue and name overlaps ([`docs/collaboration.md`](./docs/collaboration.md)).
+   Parallel sessions use separate worktrees; stage only your paths.
 4. **Finish:** update every doc covering what you changed, run `make done`,
-   and observe the real artifact. Commit and push each working step (every
-   30 minutes, always before you stop); never break the default branch. After
-   a push, `make ci-status` until green: a red run is yours. On a rebase
-   conflict keep both sides' intent, rerun the tests. A run that counts starts
-   with `make pull-first`. When pausing, `make handover`.
+   and observe the real artifact. Commit and push each working step, always
+   before you stop; never break the default branch. After a push,
+   `make ci-status` until green: a red run is yours. When pausing,
+   `make handover`.
 
 Code, tests, and runtime observations are evidence; a plausible explanation
 is not a diagnosis.
@@ -75,7 +74,7 @@ route is [`SECURITY.md`](./SECURITY.md).
 [`docs/README.md`](./docs/README.md) lists every document and when to read it:
 
 - **New product:** `product-kickoff` (headless without owner answers: write the questions with your picks, stop), then `stack-foundation`, then `make next` until launch ([`docs/building.md`](./docs/building.md)). **Anything users see:** `ux-quality` and `make ui-review`.
-- **A score, metric, benchmark, or scarce real evaluations:** `experiment-lab` ([`docs/experiments.md`](./docs/experiments.md)): objective, deterministic core, local lab, ledger.
+- **A metric or benchmark to improve, or costly real measurements:** `experiment-lab` ([`docs/experiments.md`](./docs/experiments.md)).
 - **Code acts on a model's answer:** [`docs/model-integration.md`](./docs/model-integration.md).
 - **Vocabulary, architecture, seams:** [`CONTEXT.md`](./CONTEXT.md), [`docs/architecture/README.md`](./docs/architecture/README.md).
 - **Bug or incident:** [`docs/operations.md`](./docs/operations.md); reproduce first. **Release or quality claim:** [`docs/verification.md`](./docs/verification.md), [`docs/production.md`](./docs/production.md).

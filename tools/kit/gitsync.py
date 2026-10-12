@@ -1,9 +1,9 @@
-"""Work stays shared: fetch at the start, push before stopping, pull before a run that counts (issue #90).
+"""Work stays shared: fetch at the start, push before stopping, pull before a run others rely on (issue #90).
 
-AGENTS.md said "pull at start, push each step", but nothing enforced it, and a team member once ran and reported
-on code nobody else had. The session brief fetches (bounded, never in CI) and fast-forwards a clean tree that is
+AGENTS.md said "pull at start, push each step", but nothing enforced it, and a team member once measured and
+reported a result on code nobody else had. The session brief fetches (bounded, never in CI) and fast-forwards a clean tree that is
 only behind; the stop gate names this session's uncommitted and unpushed work; `make pull-first` is the one call a
-script that spends scarce evaluations makes before it starts. Without a remote there is nothing to share, so none
+script makes before a run whose result others rely on (a release build, a deploy, a benchmark). Without a remote there is nothing to share, so none
 of this says anything.
 """
 
@@ -99,7 +99,7 @@ def unpushed_findings(root: Path, session_paths: list[str] | None, since: str | 
 
 
 def pull_first(root: Path, check_only: bool = False) -> tuple[int, str]:
-    """Before a run that counts: (exit code, message). 0 run as is, PULLED new code was pulled (restart on it),
+    """Before a run others rely on: (exit code, message). 0 run as is, PULLED new code was pulled (restart on it),
     1 refuse (dirty tree, unpushed commits, diverged, or the upstream cannot be read)."""
     if _off():
         return 0, "inside CI: the checked-out commit is the one that runs"

@@ -169,7 +169,7 @@ def ci_status(root: Path, args) -> int:
     return 1 if state == "red" else 0
 
 
-@command("pull-first", "Before a run that counts: refuse a dirty or unpushed tree, pull new commits (exit 3: restart)",
+@command("pull-first", "Before a run others rely on: refuse a dirty or unpushed tree, pull new commits (exit 3: restart)",
          group="when-needed", usage="make pull-first [CHECK_ONLY=1]",
          args=(arg("--check-only", action="store_true", var="CHECK_ONLY", help="report, never pull"),))
 def pull_first(root: Path, args) -> int:

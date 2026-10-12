@@ -91,7 +91,7 @@ rather than a large prompt collection:
   writes outside the app directory (Vite keeps `index.html` at the root);
 - [`../.agents/skills/experiment-lab/SKILL.md`](../.agents/skills/experiment-lab/SKILL.md)
   reaches a measured score through a deterministic core, a local lab, and a
-  ledger of one-change experiments before spending scarce real evaluations;
+  ledger of one-change experiments before spending costly real measurements;
 - [`../.agents/skills/pitch-from-evidence/SKILL.md`](../.agents/skills/pitch-from-evidence/SKILL.md)
   builds a pitch or results report from a claim table in which every number
   has a source.

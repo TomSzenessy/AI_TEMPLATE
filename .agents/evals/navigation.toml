@@ -91,7 +91,7 @@ expect = '''make ci-status'''
 
 [[tasks]]
 id = "pull-before-run"
-prompt = "Your script is about to spend one of the few real evaluations that count. Which make command must it run first? Reply with the command only."
+prompt = "Your script is about to run a benchmark (or a release build) whose result the team will rely on. Which make command must it run first? Reply with the command only."
 expect = '''make pull-first'''
 
 [[tasks]]

@@ -26,11 +26,11 @@ evaluation condition: one attempt or best-of, hidden or known cases), `Context`
    one deterministic or rule-based core with a model only at the edges; one that
    builds a cheap local evaluator or simulator to search many variants; one
    reframing (change the unit, the order, or what is optimised); one taken from
-   prior art or a competitor's published work (search; ask for `skill-scout`
+   prior art or others' published work (search; ask for `skill-scout`
    when an outside capability would carry it).
 3. For each: why it could win, how it fails, the cheapest decisive test (cost in
    real evaluations versus free ones), and the expected gain against the
-   current best. Rank by expected gain per unit of scarce budget.
+   current best. Rank by expected gain per unit of costly budget (real measurements, time, money).
 4. Name what the current approach is overfitting to, if anything.
 
 ## Never

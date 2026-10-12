@@ -21,7 +21,7 @@ is in [`experiments.md`](./experiments.md).
   new instance on the same state.
 - **Strict in tests, safe in production.** A switch makes an internal error
   raise under tests; in production the same error becomes a safe, counted
-  default move, shown in the run record
+  default, shown in the run record
   ([no silent fallbacks](./engineering.md#no-silent-fallbacks)).
 
 ## Getting a trustworthy answer
@@ -63,6 +63,6 @@ before trusting a score.
 Parallel decisions must equal sequential ones on the same states: test it.
 Warm shared caches before load, guard a shared connection with a lock, and
 never queue a second call behind a hung one; give each decision its own
-deadline and a holding move when it passes. Cache model calls by a hash of the
+deadline and a safe fallback when it passes. Cache model calls by a hash of the
 full prompt only in labs and tests, and check the cache is stable (cached and
 fresh answers agree in kind).
