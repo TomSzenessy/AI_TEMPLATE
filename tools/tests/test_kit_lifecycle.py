@@ -9,11 +9,13 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # `fixtures`, however this file is invoked (#33)
-from fixtures import (TOOLS, Scratch, clean_env, git_in, run_cli, template_only)  # noqa: E402
+from fixtures import (TOOLS, Scratch, clean_env, copy_template_sources, git_in, run_cli,  # noqa: E402
+                      template_only)
 
 from kit import (core, docmeta)  # noqa: E402
 
@@ -420,7 +422,7 @@ class AdoptTests(Scratch):
         self.git("commit", "-qam", "edit our rules")
         kit = Path(tempfile.mkdtemp()) / "kit"
         self.addCleanup(shutil.rmtree, kit.parent, True)
-        shutil.copytree(TOOLS.parent, kit, ignore=shutil.ignore_patterns(".git"))
+        copy_template_sources(TOOLS.parent, kit)
         (kit / "AGENTS.md").write_text((kit / "AGENTS.md").read_text() + "\n- NEWROUTERRULE applies to everything.\n")
         git_in(kit, "init", "-q", "-b", "main")
         git_in(kit, "add", "-A")
@@ -468,6 +470,59 @@ class AdoptTests(Scratch):
     def test_adopt_refuses_uncommitted_work(self) -> None:
         (self.root / "notes/new.py").write_text("X = 1\n")
         self.assertIn("commit or stash", self.adopt().stderr)
+
+
+class FixtureCopyTests(Scratch):
+    """#118: the kit copy carries real kit source and leaves host-local state behind, cycle-safe."""
+
+    def write_host_local_template(self) -> Path:
+        """A tiny template root: canonical kit source plus the host-local state #118 is about."""
+        source = self.root / "template"
+        (source / ".agents/skills/demo-skill").mkdir(parents=True)
+        (source / ".agents/skills/demo-skill/SKILL.md").write_text(
+            "---\nname: demo-skill\ndescription: Render invoices.\n---\n\n# Demo\n", encoding="utf-8")
+        (source / "tools").mkdir()
+        (source / "tools/example.py").write_text("def hello():\n    return 'kit source'\n", encoding="utf-8")
+        (source / "AGENTS.md").write_text("# Agents\n", encoding="utf-8")
+        (source / ".git").mkdir()
+        (source / ".git/config").write_text("[core]\n", encoding="utf-8")
+        (source / ".agent").mkdir()
+        (source / ".agent/loop").symlink_to(".", target_is_directory=True)
+        (source / "node_modules").mkdir()
+        (source / "node_modules/cycle").symlink_to(".", target_is_directory=True)
+        return source
+
+    def test_copy_template_sources_copies_kit_source_and_leaves_host_local_state_behind(self) -> None:
+        """The tiny root holds real kit source (`.agents/`, `tools/`) and host-local state
+        (`.git`, `.agent/loop -> .`, `node_modules/cycle -> .`); the helper copies the first and
+        ignores the second, while the previous `ignore=shutil.ignore_patterns(".git")` pattern
+        descends into the cycle and dies."""
+        source = self.write_host_local_template()
+        # RED: the previous pattern follows `.agent/loop -> .` into itself and fails; a bounded
+        # subprocess proves it without ever copying the real template root.
+        old_kit = self.root / "kit-old"
+        self.addCleanup(shutil.rmtree, old_kit, True)
+        previous = ("import shutil, sys\n"
+                    "shutil.copytree(sys.argv[1], sys.argv[2], ignore=shutil.ignore_patterns('.git'))\n")
+        try:
+            result = subprocess.run([sys.executable, "-c", previous, str(source), str(old_kit)],
+                                    capture_output=True, text=True, timeout=10)
+            self.assertNotEqual(result.returncode, 0,
+                                "the previous pattern must not succeed on host-local state:\n"
+                                + result.stdout + result.stderr)
+        except subprocess.TimeoutExpired:
+            pass  # killed: the cycle never terminates
+        # GREEN: the helper copies the kit source, leaves the host-local entries behind, and is bounded.
+        kit = self.root / "kit"
+        self.addCleanup(shutil.rmtree, kit, True)
+        started = time.monotonic()
+        copy_template_sources(source, kit)
+        self.assertLess(time.monotonic() - started, 10.0, "the copy must be bounded, never a cycle walk")
+        self.assertTrue((kit / ".agents/skills/demo-skill/SKILL.md").is_file(), "canonical .agents kept")
+        self.assertTrue((kit / "tools/example.py").is_file(), "real tools source kept")
+        self.assertTrue((kit / "AGENTS.md").is_file(), "the kit contract kept")
+        for ignored in (".git", ".agent", "node_modules"):
+            self.assertFalse((kit / ignored).exists(), f"{ignored} must be left behind")
 
 
 if __name__ == "__main__":
