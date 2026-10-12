@@ -170,3 +170,12 @@ trust = "reviewed"
 access = "read-only"
 scope = "ux"
 summary = "Catalogue of deceptive (dark) patterns to avoid in onboarding, pricing, and consent."
+
+[[resources]]
+id = "rea-authorized-analysis"
+kind = "skills"
+source = "https://github.com/morluto/rea/tree/79156e5bed1d72b83ade0483246f457b337b7e59"
+trust = "discovery"
+access = "read-only"
+scope = "reverse-engineering"
+summary = "Source-reviewed candidate for authorized shipped-artifact and behavior investigation; project-local runtime/package approval and trial remain separate."

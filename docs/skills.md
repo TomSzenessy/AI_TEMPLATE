@@ -89,6 +89,9 @@ rather than a large prompt collection:
   deploys, configuration, and error tracking before feature work. Its step 4
   declares the surface, including `extra_paths` for the entry files a generator
   writes outside the app directory (Vite keeps `index.html` at the root);
+- [`../.agents/skills/technical-recon/SKILL.md`](../.agents/skills/technical-recon/SKILL.md)
+  recovers authorized app/protocol/environment behavior contracts and compares a
+  bounded reconstruction before handing it to the experiment lab;
 - [`../.agents/skills/experiment-lab/SKILL.md`](../.agents/skills/experiment-lab/SKILL.md)
   reaches a measured score through a deterministic core, a local lab, and a
   ledger of one-change experiments before spending costly real measurements;
@@ -96,9 +99,9 @@ rather than a large prompt collection:
   builds a pitch or results report from a claim table in which every number
   has a source.
 
-They are first-party bundled skills: they are source-controlled with the
-repository and do not belong in the third-party `[[skills]]` provenance ledger.
-`tools/kit/skills.py:BUNDLED_SKILLS` lists the template's defaults; `project.toml [capabilities].local_skills` declares which first-party skills the project actually uses.
+First-party skills are source-controlled, declared in
+`project.toml [capabilities].local_skills`, not third-party `[[skills]]`.
+Core defaults: `tools/kit/skills.py:BUNDLED_SKILLS`.
 Third-party skills added later must include exact package/source match, an
 immutable revision, a matching whole-tree `content_digest`, a real review date,
 least-privilege permissions, and a rollback action. Add a new skill only when

@@ -111,9 +111,20 @@ Decide in this order: does a real task's trigger match it? Is it the primary
 source or the closest one? Is it already covered? Can it be pinned, reviewed,
 and rolled back? Keep the registry lean: one route per topic, and popularity is
 not trust. When torn between link and vendor, link — a route costs one entry
-and no provenance surface. The intake is done when `make resources` and
-`make check` pass and the issue records what was linked, vendored, updated, or
-excluded and why.
+and no provenance surface. For each supplied resource, the issue records the named gap, intake decision,
+pinned source/license and rollback, then a **trial outcome or specific non-trial
+reason**. Trial the smallest useful capability in a disposable environment after
+admission/approval, and observe the artifact against its stated oracle. If it
+adds no capability, exceeds the budget/permissions, or cannot yet be admitted,
+name that reason and the next action; link-only is not proof of utility. Reading
+and applying a source can be useful without installing its tool stack. Never
+install a package merely to satisfy this record.
+
+The intake is done when `make resources` and `make check` pass and every supplied
+item has that observed result or reason. The `skill-scout` proposes the trial;
+the orchestrator owns approval, execution and recording. REA's optional path and
+source/release distinction are in the
+[technical-recon reference](../.agents/skills/technical-recon/references/rea.md).
 
 ## First-party resource map
 
@@ -168,7 +179,6 @@ or account system may face store or regulatory review:
 Useful primary references include Apple's [Before You Submit and App Review
 Guidelines](https://developer.apple.com/app-store/review/guidelines/), Apple's
 [Human Interface Guidelines](https://developer.apple.com/design/human-interface-guidelines/),
-the [FTC privacy and security guidance](https://www.ftc.gov/business-guidance/privacy-security),
 the [UK ICO data-protection guidance](https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/),
 and the [U.S. Copyright Office DMCA](https://www.copyright.gov/dmca/) portal.
 

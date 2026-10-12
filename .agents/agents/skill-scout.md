@@ -25,8 +25,9 @@ and report the overlap you found.
 3. For each serious candidate inspect the exact source at a pinned revision:
    license, maintainer, files, scripts, network destinations, requested tools,
    and prompt-injection risk. Follow `docs/skills.md`.
-4. Never install, run, or vendor anything. The orchestrator decides; when it
-   approves a local skill or role, `make new` creates and wires it in.
+4. For each supplied resource, follow the [intake outcome rule](../../docs/resources.md#resource-intake-triage-what-you-are-handed): propose one bounded disposable trial with an observable utility oracle, or a specific non-trial reason and next action. A catalog link alone is not a trial.
+5. Never install, run, or vendor anything. The orchestrator owns approval and
+   execution; when it approves a local skill or role, `make new` wires it in.
 
 ## Return (at most 300 words)
 
@@ -34,5 +35,6 @@ and report the overlap you found.
 Recommendation: reuse <existing> | adopt <candidate> | build small local skill | do nothing
 Overlap: <top make similar lines>
 Candidate: <source URL @ revision — license — risks>
+Trial: <named gap, bounded trial and artifact oracle, or specific non-trial reason and next action>
 Provenance entry: <[[skills]] TOML block, or the .agents/mcp/<name>.toml file, ready for review>
 ```
