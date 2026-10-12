@@ -134,7 +134,7 @@ BRIEF_CACHE = ".agent/ci-brief.json"  # diagnostic snapshot only; never feeds ta
 BRIEF_TIMEOUT_S = 2
 
 
-def brief_ci_lines(root: Path, hook_state: Path | None = None, runner: Runner | None = None) -> list[str]:
+def brief_ci_lines(root: Path, session_id: str | None = None, runner: Runner | None = None) -> list[str]:
     """HEAD/default conclusions from one bounded run list, cached by existing hook session and target pair."""
     import time
     from .core import RepoctlError, load_project
@@ -150,13 +150,8 @@ def brief_ci_lines(root: Path, hook_state: Path | None = None, runner: Runner | 
     # No main/master guess: only an explicitly configured branch and its actual local remote ref.
     default = default if isinstance(default, str) and default else None
     default_sha = (git(root, "rev-parse", "--verify", "-q", f"refs/remotes/origin/{default}^{{commit}}") or "").strip() if default else ""
-    session = None
-    try:
-        identity = json.loads(hook_state.read_text(encoding="utf-8")).get("session") if hook_state else None
-        if isinstance(identity, str) and identity and identity != "local":
-            session = identity  # existing host identity, never an invented global no-query flag
-    except (OSError, ValueError, AttributeError):
-        pass
+    # Only the current invocation owns this identity; an unwritable baseline may belong to an older host.
+    session = session_id if isinstance(session_id, str) and session_id and session_id != "local" else None
     key = [CACHE_SCOPE, session, head, pushed, default, default_sha]
     path = root / BRIEF_CACHE
     try:

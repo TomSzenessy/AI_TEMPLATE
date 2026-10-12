@@ -37,8 +37,9 @@ One `gh run list` request reads at most 100 recent repository runs with a
 not green. Missing branch metadata/ref reports `unknown`, never a guessed
 main/master status. Missing/offline `gh` also reports `unknown`.
 The ignored diagnostic snapshot is reused for the same existing host hook
-session ID and unchanged HEAD/default target pair; changed targets or a new
-session requery. Without a real host ID (`make start` uses `local`), reuse is
+session ID from the current start invocation and unchanged HEAD/default target
+pair; changed targets or a new session requery. A failed baseline write cannot
+substitute an older persisted host ID. Without a real host ID (`make start` uses `local`), reuse is
 limited to five minutes, not a claim of once-per-session behavior. This brief
 can remain stale within a known session; it is not completion evidence.
 Its separate cache never feeds targeted `make ci-status` or stop/done checks:

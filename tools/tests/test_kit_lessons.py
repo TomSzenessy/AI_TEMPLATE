@@ -258,16 +258,71 @@ class CiCacheTests(Scratch):
              mock.patch.object(cistatus, "git", side_effect=refs), \
              mock.patch.object(cistatus, "_gh_runner", side_effect=lambda root, **kwargs: factory(root)), \
              mock.patch.object(structure, "template_in_use", return_value=None):
-            first = session._attention(self.root)
+            first = session._attention(self.root, "real-hook-session")
             self.assertTrue(any("HEAD" in line and "green" in line for line in first), first)
             self.assertTrue(any("default branch trunk" in line and "pending" in line for line in first), first)
-            self.assertEqual(session._attention(self.root), first)
+            self.assertEqual(session._attention(self.root, "real-hook-session"), first)
         self.assertEqual(len(calls), 1)
+
+    def test_new_session_with_unwritable_snapshot_does_not_replay_previous_session_green(self) -> None:
+        """#83: the current lifecycle invocation owns cache identity even when persistence fails."""
+        import contextlib
+        import io
+        from kit import session
+        self.write("project.toml", 'schema = 1\nname = "x"\nkind = "template"\n[repository]\ndefault_branch = "trunk"\n')
+        self.write(".gitignore", ".agent/\n")
+        self.git("init", "-q")
+        self.git("add", "-A")
+        self.git("commit", "-qm", "fixture")
+        sha = self.git("rev-parse", "HEAD").strip()
+        self.git("remote", "add", "origin", "https://github.com/example/project.git")
+        self.git("update-ref", "refs/remotes/origin/trunk", sha)
+        self.git("branch", "--set-upstream-to=origin/trunk")
+        calls = []
+        def runner(args):
+            calls.append(args)
+            return json.dumps([{"headSha": sha, "event": "push", "status": "completed",
+                                "conclusion": "success" if len(calls) == 1 else "failure"}])
+        state = session.state_path(self.root)
+        original_write = Path.write_text
+        denied = []
+        def cannot_save_baseline(path, *args, **kwargs):
+            if path == state:
+                denied.append(path)
+                raise PermissionError("session baseline is unwritable")
+            return original_write(path, *args, **kwargs)
+        with mock.patch.dict(os.environ, {"GITHUB_ACTIONS": "", "CI": ""}), \
+             mock.patch.object(cistatus, "_gh_runner", return_value=runner), \
+             mock.patch.object(session, "_pull_at_start", return_value=[]), \
+             mock.patch.object(session, "_heal_derived", return_value=[]), \
+             mock.patch.object(session, "repository_findings", return_value=[]), \
+             mock.patch.object(session, "install_git_hooks", return_value=None), \
+             mock.patch.object(session, "print_map"), \
+             mock.patch.object(session, "self_heal_errors", side_effect=lambda root: []), \
+             mock.patch.object(session, "_product_on", return_value=False), \
+             mock.patch.object(session, "project_plugin_files", return_value=[]), \
+             mock.patch.object(structure, "template_in_use", return_value=None):
+            with contextlib.redirect_stdout(io.StringIO()):
+                session._session_start(self.root, {"session_id": "previous-host-session"})
+            self.assertEqual(json.loads(state.read_text())["session"], "previous-host-session")
+            output = io.StringIO()
+            with mock.patch.object(Path, "write_text", cannot_save_baseline), contextlib.redirect_stdout(output):
+                session._session_start(self.root, {"session_id": "current-host-session"})
+            self.assertEqual(len(denied), 1, "real snapshot persistence was attempted and failed")
+            self.assertIn("HEAD: red", output.getvalue())
+            self.assertIn("default branch trunk (as of the last fetch): red", output.getvalue())
+            self.assertEqual(len(calls), 2, "new invocation does not reuse previous host's diagnostic snapshot")
+            resumed = io.StringIO()
+            with mock.patch.object(Path, "write_text", cannot_save_baseline), contextlib.redirect_stdout(resumed):
+                session._session_start(self.root, {"session_id": "current-host-session"})
+            self.assertEqual(len(denied), 2)
+            self.assertEqual(len(calls), 2, "same current host/pair is still reused despite failed baseline persistence")
+            self.assertIn("HEAD: red", resumed.getvalue())
+            self.assertNotIn("HEAD: green", resumed.getvalue())
 
     def brief_fixture(self):
         self.write("project.toml", 'schema = 1\nname = "x"\nkind = "template"\n[repository]\ndefault_branch = "trunk"\n')
-        identity = self.write(".agent/hook-state.json", json.dumps({"session": "host-session"}))
-        return "a" * 40, "b" * 40, identity
+        return "a" * 40, "b" * 40, "host-session"
 
     def test_brief_session_cache_survives_retry_window_but_requeries_changed_targets(self) -> None:
         import time
@@ -286,14 +341,14 @@ class CiCacheTests(Scratch):
             cistatus.brief_ci_lines(self.root, identity, factory(self.root))
             head = "d" * 40
             cistatus.brief_ci_lines(self.root, identity, factory(self.root))
-            identity.write_text(json.dumps({"session": "next-host-session"}))
+            identity = "next-host-session"
             cistatus.brief_ci_lines(self.root, identity, factory(self.root))
         self.assertEqual(len(calls), 4)
 
     def test_brief_without_real_hook_identity_uses_bounded_fallback_cache(self) -> None:
         import time
         head, default, identity = self.brief_fixture()
-        identity.write_text(json.dumps({"session": "local"}))
+        identity = "local"
         calls, factory = self.counting()
         with mock.patch.dict(os.environ, {"GITHUB_ACTIONS": "", "CI": ""}), \
              mock.patch.object(cistatus, "pushed_head", return_value=head), \
@@ -319,7 +374,7 @@ class CiCacheTests(Scratch):
             with self.subTest(index=index), mock.patch.dict(os.environ, {"GITHUB_ACTIONS": "", "CI": ""}), \
                  mock.patch.object(cistatus, "pushed_head", return_value=head), \
                  mock.patch.object(cistatus, "git", side_effect=lambda root, *args: head if args[-1] == "HEAD" else default):
-                identity.write_text(json.dumps({"session": f"scope-case-{index}"}))
+                identity = f"scope-case-{index}"
                 lines = cistatus.brief_ci_lines(self.root, identity, runs(*items))
                 self.assertIn(f"HEAD: {expected_head}", lines[0])
                 self.assertIn(f": {expected_default} —", lines[1])
@@ -341,10 +396,10 @@ class CiCacheTests(Scratch):
              mock.patch.object(cistatus, "pushed_head", return_value=head), \
              mock.patch.object(cistatus, "git", side_effect=lambda root, *args: head if args[-1] == "HEAD" else default):
             for index, response in enumerate(("not-json", "{}", "null")):
-                identity.write_text(json.dumps({"session": f"invalid-input-{index}"}))
+                identity = f"invalid-input-{index}"
                 lines = cistatus.brief_ci_lines(self.root, identity, lambda args: response)
                 self.assertTrue(all("unknown" in line for line in lines), lines)
-            identity.write_text(json.dumps({"session": "green-brief-session"}))
+            identity = "green-brief-session"
             lines = cistatus.brief_ci_lines(self.root, identity, runs(
                 {"headSha": head, "event": "push", "status": "completed", "conclusion": "success"},
             ))
@@ -384,7 +439,7 @@ class CiCacheTests(Scratch):
             self.assertTrue(all("unknown" in line for line in lines), lines)
             self.assertEqual(cistatus.brief_ci_lines(self.root, identity, missing), lines)
             self.assertEqual(missing.call_count, 1)
-            identity.write_text(json.dumps({"session": "next-session"}))
+            identity = "next-session"
             runner = mock.Mock(return_value=json.dumps([
                 {"headSha": head, "event": "push", "status": "completed", "conclusion": "success"},
             ]))
