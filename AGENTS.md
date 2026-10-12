@@ -8,8 +8,9 @@ step), `make where Q="..."`, `make capabilities`, and `make done` before you cal
 
 ## Session protocol
 
-1. **Start.** Hooked hosts print a session brief; otherwise `make start`.
-   Read root `HANDOVER.md` when present; the working tree wins over it.
+1. **Start.** Pull the team's latest (`git pull --rebase`); hooked hosts print a
+   session brief, otherwise `make start`. Read root `HANDOVER.md` when present;
+   the working tree wins over it. Again after any pause.
 2. **Orient.** `project.toml` owns shape, surfaces, checks, and provenance;
    obey the nearest scoped `AGENTS.md`.
 3. **Before editing:** `git status`, the current issue/PR, and `make risk`
@@ -17,8 +18,9 @@ step), `make where Q="..."`, `make capabilities`, and `make done` before you cal
    separate git worktrees; stage only the paths you changed.
 4. **Finish:** update every doc covering what you changed, run `make done`,
    and observe the real artifact. After a push, `make ci-status` until the CI of
-   what you pushed is green; a red run is yours to fix. When pausing, run
-   `make handover`.
+   what you pushed is green; a red run is yours to fix. Commit and push each
+   working step (at least every 30 minutes, always before you stop), never a
+   broken default branch; when pausing, run `make handover`.
 
 Code, tests, and runtime observations are evidence; a plausible explanation
 is not a diagnosis.
