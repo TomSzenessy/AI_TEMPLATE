@@ -644,6 +644,26 @@ class GitSyncTests(Scratch):
         self.assertIn("pulled 1 new commit", lines[0])
         self.assertTrue((self.root / "b.txt").is_file())
 
+    def test_commits_the_brief_pulled_are_not_this_sessions_work(self) -> None:
+        """Critic blocker: the pull ran after the snapshot, so the stop gate judged a teammate's commits."""
+        import contextlib
+        import io
+        from test_plugin_isolation import MANIFEST
+        from kit import session
+        self.write("project.toml", MANIFEST)
+        self.write("docs/README.md", "# Docs\n")
+        self.git("add", "-A")
+        self.git(*self.ci, "-m", "manifest")
+        self.git("push", "-q")
+        from fixtures import git_in
+        git_in(self.other, "pull", "-q")
+        self.teammate_pushes()
+        with contextlib.redirect_stdout(io.StringIO()) as brief:
+            session.session_start(self.root, {"session_id": "s"})
+        self.assertIn("pulled 1 new commit", brief.getvalue())
+        self.assertTrue((self.root / "b.txt").is_file())
+        self.assertEqual(session.session_changes(self.root, "s"), [])
+
     def test_the_brief_never_pulls_into_a_dirty_tree(self) -> None:
         """Negative case: local edits are never merged into; the brief says to pull instead."""
         from kit import gitsync
@@ -674,6 +694,12 @@ class GitSyncTests(Scratch):
         self.git("remote", "remove", "origin")
         self.assertEqual(gitsync.unpushed_findings(self.root, ["c.txt"], None), [])
         self.assertEqual(gitsync.brief_lines(self.root), [])
+
+    def test_pull_first_inside_ci_runs_the_checked_out_commit(self) -> None:
+        from kit import gitsync
+        self.write("a.txt", "dirty\n")
+        with mock.patch.dict(os.environ, {"CI": "true"}):
+            self.assertEqual(gitsync.pull_first(self.root)[0], 0)
 
     def test_pull_first_exit_codes(self) -> None:
         from kit import gitsync

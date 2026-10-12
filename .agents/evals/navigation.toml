@@ -88,3 +88,13 @@ expect = '''make kit-report'''
 id = "ci-after-push"
 prompt = "You just pushed a commit. Which make command tells you whether CI passed for what you pushed? Reply with the command only."
 expect = '''make ci-status'''
+
+[[tasks]]
+id = "pull-before-run"
+prompt = "Your script is about to spend one of the few real evaluations that count. Which make command must it run first? Reply with the command only."
+expect = '''make pull-first'''
+
+[[tasks]]
+id = "model-output-trust"
+prompt = "Code is about to act on a language model's answer inside the product. Which document says how to confine the model? Reply with the file path only."
+expect = '''model-integration\.md'''

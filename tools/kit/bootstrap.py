@@ -409,6 +409,7 @@ def initialize_project(root: Path, name: str, kind: str, owner: str | None = Non
     if in_use:  # a clone already used as a project: patterns over its own surfaces were never template material
         current = drop_surface_prune(root, current)
         listed_kit_files(root)  # a clone older than the list is sent to kit-update first
+        read_lock(root)  # a damaged lock is refused before init writes anything
     guard_prune(current, prune_matches(root, current))  # before any write: a refused init changes nothing
     keep = frozenset(r for r in (VISION, STACK_DECISION) if in_use and not shipped(root, current, r))
     old_owners = [str(o) for o in current.get("owners", []) if isinstance(o, str)]

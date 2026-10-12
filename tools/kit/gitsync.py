@@ -36,7 +36,16 @@ def fetch(root: Path) -> bool:
     upstream = _upstream(root)
     if _off() or upstream is None:
         return False
-    done = run_git(root, "fetch", "-q", upstream.split("/", 1)[0], timeout=FETCH_S)
+    prompt = os.environ.get("GIT_TERMINAL_PROMPT")
+    os.environ["GIT_TERMINAL_PROMPT"] = "0"  # a credential prompt would wait out the timeout unseen
+    try:
+        done = run_git(root, "-c", "credential.interactive=false", "fetch", "-q", upstream.split("/", 1)[0],
+                       timeout=FETCH_S)
+    finally:
+        if prompt is None:
+            os.environ.pop("GIT_TERMINAL_PROMPT", None)
+        else:
+            os.environ["GIT_TERMINAL_PROMPT"] = prompt
     return done is not None and done.returncode == 0
 
 
@@ -80,8 +89,10 @@ def unpushed_findings(root: Path, session_paths: list[str] | None, since: str | 
     head = (git(root, "rev-parse", "HEAD") or "").strip()
     if since and head and not head.startswith(since):
         counts = ahead_behind(root)
-        if counts is None:
+        if counts is None and (git(root, "symbolic-ref", "-q", "HEAD") or "").strip():
             found.append("this session's commits are on a branch without upstream: `git push -u origin HEAD`")
+        elif counts is None:
+            found.append("this session committed on a detached HEAD: `git switch -c <branch>`, then push it")
         elif counts[0]:
             found.append(f"{counts[0]} commit(s) not pushed: push them (teammates and CI see only what is pushed)")
     return found
@@ -90,6 +101,8 @@ def unpushed_findings(root: Path, session_paths: list[str] | None, since: str | 
 def pull_first(root: Path, check_only: bool = False) -> tuple[int, str]:
     """Before a run that counts: (exit code, message). 0 run as is, PULLED new code was pulled (restart on it),
     1 refuse (dirty tree, unpushed commits, diverged, or the upstream cannot be read)."""
+    if _off():
+        return 0, "inside CI: the checked-out commit is the one that runs"
     if changed_paths(root):
         return 1, "uncommitted changes: commit and push first, so the result names a commit others have"
     if _upstream(root) is None:

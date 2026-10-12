@@ -14,9 +14,9 @@ the commands that prevent each. The session protocol in
 | When | What the kit does | Command |
 |---|---|---|
 | Session start | The brief fetches the upstream (at most 10 s, never in CI), fast-forwards a clean tree that is only behind, and otherwise says how far behind or ahead the branch is. | `make start` |
-| Stop | The stop gate names this session's uncommitted paths and its commits that are not pushed (once per change; explaining why something stays local ends it). Without a remote it says nothing. | hook |
+| Stop | The stop gate names this session's uncommitted paths and its commits that are not pushed, once per turn; say why something stays local and stop. Commits the brief pulled are never counted as the session's. Without a remote, or inside CI, it says nothing. | hook |
 | After a push | `make ci-status` reads the CI of the pushed commit: green, red, pending, inconclusive, none, unpushed, or unknown (no `gh`, offline, inside CI). A red run on this session's pushed HEAD blocks `make done` and the stop gate; a green answer is cached for a day, anything else for five minutes. | `make ci-status` |
-| Before a run that counts | Refuses a dirty tree, unpushed commits, a diverged branch, or an unreadable upstream (exit 1); pulls new commits and exits 3 so the caller restarts on the new code; exit 0 means run as is. `CHECK_ONLY=1` never pulls (a frozen final run). | `make pull-first` |
+| Before a run that counts | Refuses a dirty tree, unpushed commits, a diverged branch, or an unreadable upstream (exit 1); pulls new commits and exits 3 so the caller restarts on the new code; exit 0 means run as is. `CHECK_ONLY=1` never pulls (a frozen final run); inside CI it exits 0. | `make pull-first` |
 
 Push each working step, at least every 30 minutes and always before stopping.
 On a rebase conflict keep both sides' intent and rerun the tests; never

@@ -143,6 +143,12 @@ def session_start(root: Path, event: dict[str, object] | None = None) -> None:
 
 
 def _session_start(root: Path, event: dict[str, object] | None = None) -> None:
+    from .gitsync import brief_lines
+    try:
+        # #90: fetch and fast-forward before the snapshot, so pulled commits are never judged as this session's.
+        synced = brief_lines(root)
+    except Exception:  # noqa: BLE001 - the brief must survive anything git meets
+        synced = []
     project = load_project(root)
     changed = changed_paths(root)
     try:
@@ -176,7 +182,7 @@ def _session_start(root: Path, event: dict[str, object] | None = None) -> None:
         findings = [str(error)]
     if healed:
         findings.insert(0, "regenerated derived files: " + ", ".join(healed))
-    findings[:0] = _attention(root)
+    findings[:0] = synced + _attention(root)
     if hooks_note:
         findings.insert(0, hooks_note)
     try:
@@ -208,8 +214,7 @@ def _session_start(root: Path, event: dict[str, object] | None = None) -> None:
 
 
 def _attention(root: Path) -> list[str]:
-    """Repository facts no check owns: a template used as a project (#75), red CI on what was pushed (#76),
-    and where this branch stands against its upstream (#90)."""
+    """Repository facts no check owns: a template used as a project (#75), red CI on what was pushed (#76)."""
     from .cistatus import ci_status
     from .structure import template_in_use
     found = []
@@ -224,11 +229,6 @@ def _attention(root: Path) -> list[str]:
         state, detail = "unknown", ""
     if state == "red":
         found.append(f"{detail}: fix it before new work (`gh run view --log-failed`)")
-    from .gitsync import brief_lines
-    try:
-        found.extend(brief_lines(root))  # #90: fetch, and fast-forward a clean tree that is only behind
-    except Exception:  # noqa: BLE001 - the brief must survive anything git meets
-        pass
     from .cistatus import default_branch_red
     try:
         if (line := default_branch_red(root, default_branch(load_project(root)))) is not None:

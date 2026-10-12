@@ -47,7 +47,8 @@ the recorded `kit_version`.
 
 A template clone used as a project never locks its own files at `make init`
 (a clone older than `tools/kit-files.json` runs `make kit-update` first, which
-adds it). It keeps the lock an earlier kit-update wrote, else gets an empty one:
+adds it). It keeps the lock an earlier kit-update wrote, else gets an empty one
+(the `kit-upstream` prompt for kit edits then starts after its first update):
 it may have edited kit files, so their content is not what the kit shipped. A
 project without a lock (such a clone, or one older than the lock) is not all
 hand merges: a file byte-identical to a version in the history of the offered

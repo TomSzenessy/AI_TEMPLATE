@@ -74,13 +74,14 @@ route is [`SECURITY.md`](./SECURITY.md).
 
 [`docs/README.md`](./docs/README.md) lists every document and when to read it:
 
-- **New product:** `product-kickoff` (headless with no owner answers: write the questions with your picks, then stop), then `stack-foundation`, then `make next` until launch ([`docs/building.md`](./docs/building.md)). **Anything users see:** `ux-quality` and `make ui-review`.
-- **A score, metric, benchmark, or scarce real evaluations:** `experiment-lab` ([`docs/experiments.md`](./docs/experiments.md)): objective first, deterministic core, a local lab before tuning, a ledger.
+- **New product:** `product-kickoff` (headless without owner answers: write the questions with your picks, stop), then `stack-foundation`, then `make next` until launch ([`docs/building.md`](./docs/building.md)). **Anything users see:** `ux-quality` and `make ui-review`.
+- **A score, metric, benchmark, or scarce real evaluations:** `experiment-lab` ([`docs/experiments.md`](./docs/experiments.md)): objective, deterministic core, local lab, ledger.
+- **Code acts on a model's answer:** [`docs/model-integration.md`](./docs/model-integration.md).
 - **Vocabulary, architecture, seams:** [`CONTEXT.md`](./CONTEXT.md), [`docs/architecture/README.md`](./docs/architecture/README.md).
 - **Bug or incident:** [`docs/operations.md`](./docs/operations.md); reproduce first. **Release or quality claim:** [`docs/verification.md`](./docs/verification.md), [`docs/production.md`](./docs/production.md).
 - **Auth, secrets, dependencies, CI, untrusted input:** [`docs/security.md`](./docs/security.md).
 - **Personal data, legal text, launch:** [`docs/privacy.md`](./docs/privacy.md), [`docs/legal/README.md`](./docs/legal/README.md).
-- **Skills, MCP, pasted resources:** [`docs/resources.md`](./docs/resources.md), [`docs/skills.md`](./docs/skills.md); discover, inspect, pin, record.
+- **Skills, MCP, pasted resources:** [`docs/resources.md`](./docs/resources.md), [`docs/skills.md`](./docs/skills.md).
 - **A failing check:** its message names the fix; mechanics in [`docs/self-healing.md`](./docs/self-healing.md).
 - **Audit or cleanup:** [`docs/audit.md`](./docs/audit.md) (report-only by default) and `make garden`.
 
