@@ -8,6 +8,9 @@
   off and identity from the environment: `commit.gpgsign`, `core.hooksPath` or
   `fsmonitor` in ~/.gitconfig must neither break nor change a fixture commit,
   and the suite must pass under any of them.
+- `copy_template_sources` copies a template root into a throwaway kit while
+  leaving host-local state behind, so a developer's `.agent/` checkout can never
+  be walked into the scratch tree (#118).
 
 Nothing here depends on wall-clock, network, ambient environment, or ordering.
 """
@@ -121,6 +124,23 @@ def git_in(root: Path, *arguments: str, check: bool = True) -> subprocess.Comple
     """One git command in `root` under the isolated git environment."""
     return subprocess.run(["git", "-C", str(root), *arguments], check=check,
                           capture_output=True, text=True, env=clean_env())
+
+
+def copy_template_sources(source: Path, destination: Path) -> None:
+    """Copy a template root into a throwaway kit, leaving host-local state behind (#118).
+
+    The kit's own walks already classify `.git`, `.agent`, and `node_modules` as ignored
+    (`kit.core.DIRECTORY_ROLES`); the AdoptTests kit copy used to bypass that classification
+    and copy the whole root, so a host whose `.agent/` held a fork checkout (with
+    `node_modules` and symlink cycles) exhausted the volume. Symlinks are copied as symlinks,
+    never dereferenced, so a cycle cannot recurse; the source itself must be a real directory
+    rather than a link to a foreign tree.
+    """
+    source = Path(source)
+    if source.is_symlink() or not source.is_dir():
+        raise core.RepoctlError(f"template source must be a real directory, not a link: {source}")
+    shutil.copytree(source, Path(destination), symlinks=True,
+                    ignore=shutil.ignore_patterns(".git", ".agent", "node_modules"))
 
 
 class Scratch(unittest.TestCase):
