@@ -121,7 +121,7 @@ and applying a source can be useful without installing its tool stack. Never
 install a package merely to satisfy this record.
 
 The intake is done when `make resources` and `make check` pass and every supplied
-item has that observed result or reason. The `skill-scout` proposes the trial;
+item has that observed result or reason. The `skill-scout` proposes the trial. When approved,
 the orchestrator ensures approval, execution and recorded evidence. A scoped
 builder may execute the approved trial under the
 [delegation contract](./delegation.md#when-to-delegate); accountability stays with
