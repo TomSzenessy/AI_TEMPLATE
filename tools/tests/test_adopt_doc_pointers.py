@@ -42,8 +42,8 @@ class AdoptDocPointersTests(Scratch):
 
     def test_adopted_workflow_source_points_to_the_adopt_owner(self) -> None:
         workflow = (REPO / ".github/workflows/ci.yml").read_text(encoding="utf-8")
-        self.assertIn("docs/adopt.md says why", workflow)
-        self.assertNotIn("docs/ADAPTATION.md says why", workflow)
+        self.assertIn("docs/adopt.md", workflow)
+        self.assertNotIn("docs/ADAPTATION.md", workflow)
 
 
 if __name__ == "__main__":
