@@ -17,7 +17,8 @@ skill is the order of work.
 1. **Objective.** Write the evaluator's formula, the averaging unit and the
    conditions of the run that counts into the project's context doc; implement
    it as a local function and check it against one real result. List every tip
-   in the task text as a requirement.
+   in the task text as a requirement, rebuild the evaluator's checks locally,
+   and write the plan into the goal's issue (`docs/experiments.md` section 1).
 2. **Options before code.** Run the [`strategist`](../../agents/strategist.md)
    role with the goal and constraints; ask `skill-scout` for the capabilities
    its top options need. Pick by expected gain per scarce evaluation, and
@@ -30,18 +31,19 @@ skill is the order of work.
    scenarios, and report the must-be-zero counts. Add the stress tests (hung
    calls, caps, quitting counterparts, parallel load) before the first tuning.
 5. **Ledger.** Create `experiments/ledger.md`; each row names hypothesis,
-   change, commit, tier, cases, result and verdict. Commit and push before a run
-   whose result matters.
+   change, commit, tier, cases, lab prediction, result and verdict. Every
+   script that spends a run whose result matters starts with `make pull-first`.
 6. **Loop.** One change per experiment, cheapest deciding tier first (offline
-   replay, lab, free sandbox, then scarce real). Promote a switch only when the
+   replay, lab, free sandbox, then scarce real; real runs only on the cases the
+   replay shows changing), judged by the paired verdict. Promote a switch only when the
    held-out lab and a real confirmation agree. After three experiments without
    a gain, stop and rerun step 2 with the results so far, including what
    competitors or prior art published.
 7. **Learnings.** Move each durable finding into its owner doc with a
    confidence tag (confirmed, computed, reported, hypothesis); mark refuted ones.
 8. **Rehearse.** Run the full real conditions once from the machine and commit
-   that will be used, then make the readiness disclosure in
-   `docs/verification.md` before the irreversible run.
+   that will be used, with the preflight script of section 8, then make the
+   readiness disclosure in `docs/verification.md` before the irreversible run.
 
 ## Done when
 

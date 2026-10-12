@@ -62,7 +62,8 @@ A fallback that hides a failure turns a broken run into a wrong result: a model
 call that failed and was replaced by a default move, a configuration file that
 was refused and replaced by a built-in one. Every fallback is counted and shown
 where the result is read (the report, the run record, the settings page), and
-"which configuration is in effect" is visible, never inferred.
+"which configuration is in effect" is visible, never inferred. A model call inside the product follows
+[`model-integration.md`](./model-integration.md).
 
 ## Dependencies and change safety
 

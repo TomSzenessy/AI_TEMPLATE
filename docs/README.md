@@ -58,6 +58,7 @@ itself and this table cannot drift. Edit the line in the document, not here.
 | [`../SECURITY.md`](../SECURITY.md) | Vulnerability disclosure and security contact | A vulnerability or security-sensitive change is involved. |
 | [`../.security/threat-model.md`](../.security/threat-model.md) | STRIDE threat model and accepted trust boundaries | A security-sensitive tool, CI path, or agent permission is reviewed. |
 | [`engineering.md`](./engineering.md) | Modular design, single source of truth, dependency, and cleanup rules | Code is being changed, refactored, or reviewed. |
+| [`model-integration.md`](./model-integration.md) | Confining a language model inside a product: code decides, the model reads and writes, votes, grounding, shadow mode, measured confidence | code calls a model at runtime or model output reaches a decision |
 | [`security.md`](./security.md) | Secure implementation baseline | Auth, secrets, CI, dependencies, deployment, or untrusted input changes. |
 | [`architecture/README.md`](./architecture/README.md) | Current structure, seams, kit module map, and design rules | Adding a surface, changing dependencies, or locating ownership. |
 
