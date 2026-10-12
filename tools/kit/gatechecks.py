@@ -86,6 +86,15 @@ def critic_evidence(context) -> list[str]:
     if not reviewed:
         return [f"{CRITIC_RECORD} has no 'Commit: <40-hex>' line, so it is not bound to a reviewed change set"]
     current = (git(root, "rev-parse", "HEAD") or "").strip()
-    if current and reviewed.group(1) != current:
-        return [f"{CRITIC_RECORD} reviews {reviewed.group(1)[:12]}, not HEAD {current[:12]}: the critic read older work"]
+    if not current:
+        return [f"{CRITIC_RECORD}: cannot read HEAD to verify the reviewed commit"]
+    if reviewed.group(1) != current:
+        ancestor = git(root, "merge-base", "--is-ancestor", reviewed.group(1), current)
+        # Inspect every commit, including merge parents and reverted changes; renames expose both paths.
+        delta = git(root, "log", "--format=", "--name-only", "-z", "--no-renames", "-m",
+                    f"{reviewed.group(1)}..{current}") if ancestor is not None else None
+        if delta is not None and all(classify(path, rules) == "low" for path in delta.split("\0") if path):
+            return []
+        return [f"{CRITIC_RECORD} reviews {reviewed.group(1)[:12]}, not HEAD {current[:12]}: the critic read older work"
+                " (reuse requires an ancestor review and readable low-risk-only committed changes)"]
     return []

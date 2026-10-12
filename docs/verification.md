@@ -83,7 +83,11 @@ or other measurable oracle.
 How much of this loop a change needs is set by its risk tier
 ([`self-healing.md`](./self-healing.md#ceremony-by-risk)); the independent
 reviewer a tier may require is the `critic` role
-([`delegation.md`](./delegation.md)) before completion.
+([`delegation.md`](./delegation.md)) before completion. A passing critic
+record may cover later commits only when its commit is an ancestor of HEAD
+and every subsequent committed path is `low`; normal/high deltas require a
+new review. The gate's history and refusal rules live in
+[`self-healing.md`](./self-healing.md#critic-evidence-the-gate-can-read).
 
 ## Before completion
 

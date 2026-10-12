@@ -1,7 +1,7 @@
 # Self-healing mechanics
 
 <!-- index: operate | When a check may block, lifecycle hooks, failure output, ceremony by risk, and the gardener | A check fails, a gate blocks, or the kit itself changes. -->
-<!-- covers: tools/kit/checks.py tools/kit/checkrun.py tools/kit/session.py tools/kit/risk.py tools/kit/garden.py tools/kit/navigate.py .githooks/** .github/workflows/garden.yml -->
+<!-- covers: tools/kit/checks.py tools/kit/checkrun.py tools/kit/session.py tools/kit/gatechecks.py tools/kit/risk.py tools/kit/garden.py tools/kit/navigate.py .githooks/** .github/workflows/garden.yml -->
 
 Agents follow written rules well at the start of a session and worst at the end,
 after compaction, which is when cleanup and documentation get skipped. So the
@@ -112,26 +112,21 @@ independent critic. Tune the globs per project. Never widen `low` to dodge a gat
 
 ### Critic evidence the gate can read
 
-A critic is cheap to request and easy to skip, so the completion gate reads the
-record the critic contract defines (`.agent/critic.md`; see
-[`delegation.md`](./delegation.md#the-critics-verdict-and-its-evidence)). When
-this branch has **committed** `high` paths, `make done` and the stop hook
-(`tools/kit/session.py`) check that record field by field:
+For committed `high` paths, completion gates read `.agent/critic.md`
+([contract](./delegation.md#the-critics-verdict-and-its-evidence)):
 
-- **`Verdict:`** must be one of the two words the contract defines; the
-  `blocker` word fails the gate (fix what it lists, then ask again), and any
-  other word — prose, "looks good", `accept` — fails as an unknown verdict
-  rather than a softer pass.
-- **`Commit:`** must be the current HEAD, so evidence about older work cannot
-  vouch for today's change set. That fixes the order: commit the change, then run
-  the critic on that commit, then save its return — a record written before the
-  commit goes stale the moment the commit lands.
-- A missing record, `Verdict:`, or a record bound to another commit each fails
-  with a message naming the fix.
+- **`Verdict:`** must belong to the contract's vocabulary. `blocker` and
+  unknown verdicts (including legacy `ship`) fail, never pass softly.
+- **`Commit:`** names HEAD, or an ancestor whose subsequent committed paths
+  are **all `low`** under current risk rules. Commit high-risk work before
+  review; any later `normal` or `high` change requires a fresh review.
+  History includes every commit and merge parent, reverted changes,
+  deletions and both rename paths — not just the final net diff.
+- Missing records/fields, non-ancestor commits, and unreadable HEAD/history
+  fail with a named fix.
 
-Two exemptions keep the gate light: it reads committed paths only (a dirty tree is not a diff yet), and
-`[governance].profile = "minimal"` skips it, because that profile hands issues and
-review to the host.
+Only committed paths are judged; a dirty tree is not yet a reviewed diff.
+`[governance].profile = "minimal"` skips this gate, handing review to the host.
 
 ## Write-ahead issues
 
