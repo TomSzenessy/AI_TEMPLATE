@@ -153,6 +153,7 @@
 "tools/repoctl.py",
 "tools/tests/clockshift/sitecustomize.py",
 "tools/tests/fixtures.py",
+"tools/tests/test_adopt_doc_pointers.py",
 "tools/tests/test_check_crash.py",
 "tools/tests/test_check_override.py",
 "tools/tests/test_ci_gate.py",

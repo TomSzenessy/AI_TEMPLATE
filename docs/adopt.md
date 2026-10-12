@@ -1,6 +1,6 @@
 # Adopting an existing repository
 
-<!-- index: operate | `make adopt`: what it merges, renames, and keeps in an existing repository | Bringing the kit into a repo that already has files. -->
+<!-- index: operate | make adopt: what it merges, renames, and keeps in an existing repository | Bringing the kit into a repo that already has files. -->
 <!-- covers: tools/kit/adopt.py -->
 
 `make -f <kit>/Makefile adopt NAME=... KIND=... OWNER=...`, run from a clean
