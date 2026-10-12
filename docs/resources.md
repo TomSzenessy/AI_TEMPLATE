@@ -179,7 +179,6 @@ or account system may face store or regulatory review:
 Useful primary references include Apple's [Before You Submit and App Review
 Guidelines](https://developer.apple.com/app-store/review/guidelines/), Apple's
 [Human Interface Guidelines](https://developer.apple.com/design/human-interface-guidelines/),
-the [FTC privacy and security guidance](https://www.ftc.gov/business-guidance/privacy-security/data-security),
 the [UK ICO data-protection guidance](https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/),
 and the [U.S. Copyright Office DMCA](https://www.copyright.gov/dmca/) portal.
 
