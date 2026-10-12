@@ -58,16 +58,20 @@ user-configured OpenAI-compatible embeddings endpoint: an outbound transfer
 of code, so it is consent-gated. Enablement (`[kit].semantic_enabled`), a
 present API key, and an embedding request are each necessary but never
 sufficient — only an explicit per-scope confirmation (`CONSENT=1`, or an
-interactive yes) authorizes a transfer. That confirmation is bound to the
-resolved endpoint, model, git-tracked eligible-file inventory, and every
-budget, and a changed policy, root, or budget invalidates it. Eligible code
-excludes `.agents`/`.agent`/`.claude`/`.github`/generated trees, key and
-`.env` files, symlinks, binaries, and hygiene-flagged files; request,
-response, file, chunk, and cache bounds are all finite. Redirects are never
-followed, so the `Authorization` header cannot reach another endpoint, and
-errors redact the key. A missing or stale index is never embedded. Similarity
-never authorizes deleting or rewriting code, and no provider quality or
-fitness is claimed. See
+interactive yes) authorizes a transfer. A present API key is never itself
+code-export consent. That confirmation is bound to the resolved endpoint,
+model, git-tracked eligible-file inventory, and every budget, and a changed
+policy, root, or budget invalidates it. A physical root change — even a
+clone of the same origin and branch at a different path — requires a fresh
+confirmation. Eligible code excludes `.agents`/`.agent`/`.claude`/`.github`/
+generated trees, key and `.env` files, symlinks, binaries, and
+hygiene-flagged files; request, response, file, chunk, and cache bounds are
+all finite. Redirects are never followed, so the `Authorization` header
+cannot reach another endpoint, and errors redact the key. A missing or stale
+index is never embedded. Similarity never authorizes deleting or rewriting
+code, and no provider quality or fitness is claimed. Cached plaintext code
+stays local under the ignored `.agent/` cache; a future STRIDE review of
+that cache is pending and no waiver is granted. See
 [`privacy.md`](./privacy.md#semantic-code-search-cache-and-consent) and
 [`capabilities.md`](./capabilities.md).
 

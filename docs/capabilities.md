@@ -16,10 +16,13 @@ An optional `CODE=1` (issue #115) also ranks eligible source-code chunks
 against the query. It is off by default (`[kit].semantic_enabled`; standard
 library only) and consent-gated: outbound code transfer needs an explicit
 per-scope confirmation, and neither enablement, a present API key, nor an
-embedding request is itself consent. Every disabled, unconsented, stale, or
-failing path falls back to honest lexical matching with a printed reason, and
-a missing or stale index is never embedded. Similarity never authorizes
-deleting or rewriting code. See
+embedding request is itself consent. This canonical code-scope consent is
+distinct from onboarding intent: guided init (#110) records embeddings as
+requested-not-ready and is not modified here. Every disabled, unconsented,
+stale, or failing path falls back to honest lexical matching with a printed
+reason, and a missing or stale index is never embedded. Only opt-in, finite,
+code-root-scoped, model-content-aware caches are used. Similarity never
+authorizes deleting or rewriting code. See
 [`security.md`](./security.md#semantic-code-search-115),
 [`privacy.md`](./privacy.md#semantic-code-search-cache-and-consent), and
 [`model-integration.md`](./model-integration.md#embedding-responses-are-untrusted).

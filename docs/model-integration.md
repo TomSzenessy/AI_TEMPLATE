@@ -45,14 +45,16 @@ is in [`experiments.md`](./experiments.md).
 ### Embedding responses are untrusted
 
 `make similar ... CODE=1` treats the embeddings endpoint like any model: code
-decides, vectors only rank. Every response is validated before anything is
-cached — input count, unique indices, uniform dimension, finite numbers,
-nonzero vectors — and a partial or malformed response is rejected whole,
-falling back to lexical matching with an honest reason. A failed, timed-out, or
-over-budget call returns an empty result that code handles, never a guess, and
-nothing is cached on failure. No claim is made about provider quality,
-availability, cost, or runtime, and no similarity score authorizes deleting or
-rewriting code. See
+decides, vectors only rank. The embeddings path is a requested plan, not a
+ready feature: no real remote indexing of this repository, no provider
+trial, and actual vendor availability, cost, and runtime remain unknown. Every
+response is validated before anything is cached — input count, unique indices,
+uniform dimension, finite numbers, nonzero vectors — and a partial or
+malformed response is rejected whole, falling back to lexical matching with
+an honest reason. A failed, timed-out, or over-budget call returns an empty
+result that code handles, never a guess, and nothing is cached on failure.
+No claim is made about provider quality or fitness, and no similarity score
+authorizes deleting or rewriting code. See
 [`security.md`](./security.md#semantic-code-search-115) and
 [`privacy.md`](./privacy.md#semantic-code-search-cache-and-consent).
 

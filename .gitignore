@@ -36,6 +36,7 @@ vendor/
 # Local tool state
 .review/
 .agent/
+WT.agent/
 /HANDOVER.md
 .security/findings.json
 .security/validated-findings.json

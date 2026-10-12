@@ -31,8 +31,10 @@ Record exceptions, owner, trigger, maximum period, and release condition.
 `make similar ... CODE=1` writes its local vector index under the ignored
 `.agent/` cache: vectors, paths, line/byte ranges, source hashes, model,
 endpoint, scope, and schema — never code or keys. That cache is private to the
-resolved root (a different clone re-confirms) and is sent nowhere except the
-consent-gated embeddings call. A stored consent is withdrawn automatically
+resolved root: a physical root change — even a clone of the same origin and
+branch at a different path — requires a fresh confirmation. The cache is
+sent nowhere except the consent-gated embeddings call; a query export
+confirms the same consent. A stored consent is withdrawn automatically
 when the endpoint, model, eligible-file inventory, or any budget changes. A
 code edit does not re-prompt; it only makes cached vectors stale by content
 hash, so future eligible code is indexed under the stated policy while
