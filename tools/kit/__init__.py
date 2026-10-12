@@ -15,7 +15,7 @@ local):
   bootstrap, adopt, kitupdate
 - self-healing: docmeta, docsync, hygiene, reachability, coupling, signatures,
   adapters, derive, scaffold, navigate, risk, session, garden, capabilities,
-  evals, trial
+  evals, trial, semantic
 - product driver: product, uireview (docs/building.md)
 
 Each module owns one concern; tools/repoctl.py only builds its parser from the

@@ -42,6 +42,20 @@ is in [`experiments.md`](./experiments.md).
   output, measure how often it is right and write the rule that uses it; one
   measured kind does not license another.
 
+### Embedding responses are untrusted
+
+`make similar ... CODE=1` treats the embeddings endpoint like any model: code
+decides, vectors only rank. Every response is validated before anything is
+cached — input count, unique indices, uniform dimension, finite numbers,
+nonzero vectors — and a partial or malformed response is rejected whole,
+falling back to lexical matching with an honest reason. A failed, timed-out, or
+over-budget call returns an empty result that code handles, never a guess, and
+nothing is cached on failure. No claim is made about provider quality,
+availability, cost, or runtime, and no similarity score authorizes deleting or
+rewriting code. See
+[`security.md`](./security.md#semantic-code-search-115) and
+[`privacy.md`](./privacy.md#semantic-code-search-cache-and-consent).
+
 ## Rolling out model influence
 
 1. **Shadow.** The model's verdict is logged next to the decision code made,

@@ -101,12 +101,34 @@ def new(root: Path, args) -> None:
         print(line)
 
 
-@command("similar", "Does a similar capability (any kind, any pack) already exist?", group="extend",
-         usage='make similar Q="release notes"',
-         args=(arg("description", nargs="+", var="Q", hint='Describe the capability: make similar Q="draft release notes"'),))
+@command("similar", "Does a similar capability (any kind, any pack) already exist? Optional CODE=1 adds consent-gated semantic code results (#115)",
+         group="extend", usage='make similar Q="release notes"',
+         make=('$(if $(KIT_IN_CODE_INDEX)$(KIT_IN_CODE_STATUS),,$(if $(KIT_IN_Q),,$(error Describe the capability: make similar Q="draft release notes")))\n'
+               '\t@$(REPOCTL) similar $(if $(filter 1 yes true,$(KIT_IN_CODE)),--code,) $(if $(filter 1 yes true,$(KIT_IN_CODE_INDEX)),--code-index,) '
+               '$(if $(filter 1 yes true,$(KIT_IN_CODE_STATUS)),--code-status,) $(if $(filter 1 yes true,$(KIT_IN_CONSENT)),--consent,)'
+               '$(if $(KIT_IN_Q), -- "$${KIT_IN_Q}",)'),
+         args=(arg("description", nargs="*", var="Q", hint='Describe the capability: make similar Q="draft release notes"'),
+               arg("--code", action="store_true", var="CODE",
+                   hint='Also rank eligible source code (consent-gated, #115): make similar Q="..." CODE=1'),
+               arg("--code-index", action="store_true", var="CODE_INDEX",
+                   hint="Build the local code index (consent-gated): make similar CODE_INDEX=1"),
+               arg("--code-status", action="store_true", var="CODE_STATUS",
+                   hint="Show local index/consent status (no outbound): make similar CODE_STATUS=1"),
+               arg("--consent", action="store_true", var="CONSENT",
+                   hint="Confirm the code scope without a prompt (explicit owner consent): CONSENT=1"),))
 def similar(root: Path, args) -> None:
     from .config import setting
     from .navigate import skill_overlap
+    if args.code_index:
+        from . import semantic
+        for line in semantic.build_index(root, consent=args.consent):
+            print(line)
+        return
+    if args.code_status:
+        from . import semantic
+        for line in semantic.status_lines(root):
+            print(line)
+        return
     matches = skill_overlap(root, " ".join(args.description))
     limit = float(setting(root, "overlap_limit"))
     for score, name, text in matches:
@@ -118,6 +140,18 @@ def similar(root: Path, args) -> None:
     else:
         print("Verdict: nothing similar here. Outside capabilities: ask the skill-scout role (docs/skills.md); "
               'then make new KIND=<kind> NAME=... DESC="...; ..."')
+    if args.code:
+        from . import semantic
+        query = " ".join(args.description)
+        if query.startswith("Q="):
+            query = query[2:]
+        code_matches, reasons = semantic.code_matches(root, query, consent=args.consent)
+        if reasons:
+            print(f"lexical code matches (semantic unavailable: {'; '.join(reasons)}):")
+        else:
+            print("semantic code matches:")
+        for score, label, snippet in code_matches:
+            print(f"{score:.2f}  {label}: {snippet}")
 
 
 @command("capabilities", "Every capability by kind and pack, plus tools, agent hosts, and MCP routes", group="extend",

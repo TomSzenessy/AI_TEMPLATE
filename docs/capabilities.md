@@ -12,6 +12,17 @@ how the kit works with them.
 
 `make similar Q="<need>"` answers first, across every kind and pack; the
 reuse-or-create thresholds are owned by [`skills.md`](./skills.md).
+An optional `CODE=1` (issue #115) also ranks eligible source-code chunks
+against the query. It is off by default (`[kit].semantic_enabled`; standard
+library only) and consent-gated: outbound code transfer needs an explicit
+per-scope confirmation, and neither enablement, a present API key, nor an
+embedding request is itself consent. Every disabled, unconsented, stale, or
+failing path falls back to honest lexical matching with a printed reason, and
+a missing or stale index is never embedded. Similarity never authorizes
+deleting or rewriting code. See
+[`security.md`](./security.md#semantic-code-search-115),
+[`privacy.md`](./privacy.md#semantic-code-search-cache-and-consent), and
+[`model-integration.md`](./model-integration.md#embedding-responses-are-untrusted).
 `make new KIND=skill|agent|doc|rule|check|command|mcp|pack NAME=<kebab> DESC="<what>; <when>" [PACK=<pack>]`
 is the one way to add one. It refuses a near-duplicate of the same kind
 (`FORCE=1` overrides), writes valid metadata, registers a first-party skill in

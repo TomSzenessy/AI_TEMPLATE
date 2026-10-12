@@ -51,6 +51,26 @@ copy it into every prompt.
 - Make retries idempotent and observable; never acknowledge deletion, payment,
   or rights work without checking the underlying state/provider.
 
+### Semantic code search (#115)
+
+`make similar ... CODE=1` may send eligible source-code chunks to a
+user-configured OpenAI-compatible embeddings endpoint: an outbound transfer
+of code, so it is consent-gated. Enablement (`[kit].semantic_enabled`), a
+present API key, and an embedding request are each necessary but never
+sufficient — only an explicit per-scope confirmation (`CONSENT=1`, or an
+interactive yes) authorizes a transfer. That confirmation is bound to the
+resolved endpoint, model, git-tracked eligible-file inventory, and every
+budget, and a changed policy, root, or budget invalidates it. Eligible code
+excludes `.agents`/`.agent`/`.claude`/`.github`/generated trees, key and
+`.env` files, symlinks, binaries, and hygiene-flagged files; request,
+response, file, chunk, and cache bounds are all finite. Redirects are never
+followed, so the `Authorization` header cannot reach another endpoint, and
+errors redact the key. A missing or stale index is never embedded. Similarity
+never authorizes deleting or rewriting code, and no provider quality or
+fitness is claimed. See
+[`privacy.md`](./privacy.md#semantic-code-search-cache-and-consent) and
+[`capabilities.md`](./capabilities.md).
+
 ## CI and local tooling layers
 
 `repoctl` is a portable policy/contract checker, not a replacement for mature

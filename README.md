@@ -133,7 +133,7 @@ EVERY SESSION (this is all most tasks need)
 EXTEND THE SYSTEM (one path for every kind of capability)
   make new KIND=skill|agent|doc|rule|check|command|mcp|pack NAME=x DESC="what; when"
                                      Create any capability with valid metadata and wire it in
-  make similar Q="release notes"     Does a similar capability (any kind, any pack) already exist?
+  make similar Q="release notes"     Does a similar capability (any kind, any pack) already exist? Optional CODE=1 adds consent-gated semantic code results (#115)
   make capabilities                  Every capability by kind and pack, plus tools, agent hosts, and MCP routes
 
 WHEN NEEDED
