@@ -6,6 +6,11 @@ owner-hash-checked, and serialized. Identity init stays the first writer
 (bootstrap.py): this module only drafts pending record sections, records machine
 facts in project.toml, and reads — never writes — the MCP route owners. No
 provider, browser, or install calls; embeddings stay requested-not-ready.
+
+`consent` and `reshape` are the module's only switches, so `answers_from_json`
+validates them as real JSON booleans before any guided write: a typed string
+such as `"false"` is rejected, never coerced — Python truthiness would read any
+non-empty string as explicit consent and apply the plan (#110).
 """
 
 from __future__ import annotations
@@ -210,12 +215,26 @@ def _guided_table(manifest: str, plan: dict[str, object]) -> str:
 
 
 def answers_from_json(text: str) -> dict[str, object]:
+    """The shared JSON intake schema, validated before any guided write.
+
+    `consent`/`reshape` must be real JSON booleans: a typed string like `"false"`
+    is a refusal, not a value to coerce — Python truthiness would read any
+    non-empty string as explicit consent and apply the plan (#110). `answers`
+    values must be strings. Raises RepoctlError on the first violation.
+    """
     try:
         payload = json.loads(text)
     except ValueError as error:
         raise RepoctlError(f"answers are not valid JSON: {error}") from error
     if not isinstance(payload, dict) or not isinstance(payload.get("answers"), dict):
         raise RepoctlError('answers JSON needs {"consent": bool, "answers": {question id: text}}')
+    for key in ("consent", "reshape"):
+        if key in payload and not isinstance(payload[key], bool):
+            raise RepoctlError(
+                f'answers JSON "{key}" must be a JSON boolean true/false, not a typed string or number')
+    for key, value in payload["answers"].items():
+        if not isinstance(value, str):
+            raise RepoctlError(f'answers JSON answer "{key}" must be a string')
     return payload
 
 

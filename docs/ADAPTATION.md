@@ -44,15 +44,28 @@ its operating contract, history, or evidence.
 ## Guided intake after identity init (#110)
 
 - **Status:** shipped in `tools/kit/guided.py`; identity init stays the first
-  writer and guided intake applies only with explicit consent.
+  writer and guided intake applies only with explicit consent. `consent` and
+  `reshape` are validated as real JSON booleans in the shared schema
+  (`answers_from_json`) before any guided write: a typed string such as
+  `"false"` is rejected, never coerced, so Python truthiness cannot read a
+  string as consent. Answers values must be strings.
 - **Risk:** decision intake must never confirm a product, enable a capability,
   or re-bootstrap an initialized repository. Cancellation, missing consent, a
-  stale plan, or changed owner records write nothing; apply is locked, so
-  cooperating callers serialize.
+  mistyped consent/reshape, a stale plan, or changed owner records write
+  nothing; apply is locked, so cooperating callers serialize.
 - **Golden path:** `make init NAME=x KIND=web` (unattended, unchanged), then
   `make init ... --answers file.json` (or `--guided` for the terminal round);
   the same answers through either surface produce identical owner files. Drafts
   stay pending for `product-kickoff`; embeddings stay requested-not-ready.
+- **Not yet implemented (next step, not a reduction):** the original #110
+  criteria ask for full optional capability choices — browser, Exa, embeddings,
+  and logging — with recommended defaults. Today `embeddings` is recorded
+  `requested-not-ready` and `logging` `local-redacted` as static metadata
+  placeholders, and the 7 intake questions are all product/stack. That matches
+  #110 #6 verbatim but is only the first working step: the optional-choice
+  questions, their recommended defaults, and the owner-file apply path for them
+  are a separate, explicitly-authorized next implementation, not a silent scope
+  reduction.
 
 ## Adopting an existing repository
 

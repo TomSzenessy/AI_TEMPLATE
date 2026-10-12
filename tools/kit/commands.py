@@ -300,8 +300,10 @@ def init(root: Path, args) -> None:
         text = sys.stdin.read() if args.answers == "-" else Path(args.answers).read_text(encoding="utf-8")
         payload = answers_from_json(text)
         answers = payload["answers"]
-        consent = consent or bool(payload.get("consent", False))
-        reshape = reshape or bool(payload.get("reshape", False))
+        # answers_from_json already validated consent/reshape as real booleans, so
+        # there is no truthiness coercion here: a typed string would have raised above.
+        consent = consent or payload.get("consent", False)
+        reshape = reshape or payload.get("reshape", False)
     if answers is not None:
         print(guided_init(root, answers, consent=consent, reshape=reshape))
 

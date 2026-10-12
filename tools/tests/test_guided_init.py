@@ -101,6 +101,30 @@ class GuidedInitTests(Scratch):
         self.assertIn("Reshaped goal", text)
         self.assertNotIn("Demo for testers", text)  # a reshape replaces the earlier draft, never duplicates it
 
+    def test_string_typed_consent_is_rejected_before_any_guided_write(self) -> None:
+        root = self.copy_working_tree()
+        plain = self.copy_working_tree()
+        self.assertEqual(run_cli(plain, "init", "--name", "x", "--kind", "web").returncode, 0)
+        answers = {"consent": "false", "answers": ANSWERS}  # a typed string is a refusal, never consent
+        path = root / "answers.json"
+        path.write_text(json.dumps(answers), encoding="utf-8")
+        result = run_cli(root, "init", "--name", "x", "--kind", "web", "--answers", str(path))
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("boolean", result.stderr)
+        self.assert_same_owner_files(root, plain)  # identity init stands; no guided draft or [guided] facts
+
+    def test_string_typed_reshape_is_rejected_before_any_guided_write(self) -> None:
+        root = self.copy_working_tree()
+        plain = self.copy_working_tree()
+        self.assertEqual(run_cli(plain, "init", "--name", "x", "--kind", "web").returncode, 0)
+        answers = {"consent": True, "reshape": "false", "answers": ANSWERS}
+        path = root / "answers.json"
+        path.write_text(json.dumps(answers), encoding="utf-8")
+        result = run_cli(root, "init", "--name", "x", "--kind", "web", "--answers", str(path))
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("boolean", result.stderr)
+        self.assert_same_owner_files(root, plain)  # valid consent still fails: reshape is mistyped
+
     def test_stale_plan_refuses_and_writes_nothing(self) -> None:
         root = self.copy_working_tree()
         self.assertEqual(self.init_with_json(root, ANSWERS).returncode, 0)
