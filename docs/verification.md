@@ -1,6 +1,6 @@
 # Verification and independent quality loop
 
-<!-- index: operate | Definition of done, evidence ladder, and quality loop | A change is ready for review or a quality claim is made. -->
+<!-- index: operate | Done, evidence ladder, quality loop | Plan substantial work before implementation; review or quality claim. -->
 
 “Done” means the issue's acceptance criteria have observable evidence. A build,
 lint run, or green return code is necessary but not sufficient.
@@ -45,7 +45,9 @@ head SHA. Never call the mutable issue itself an immutable audit log.
 
 ## The quality loop
 
-For a substantial or subjective deliverable:
+For a substantial or subjective deliverable, start during framing, before implementation;
+use the [delegation threshold](./delegation.md#when-to-delegate) for skill selection
+and scoped owners:
 
 1. Split the issue into independently verifiable deliverables.
 2. Give each deliverable a builder brief with its oracle and constraints.

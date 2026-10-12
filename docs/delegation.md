@@ -18,6 +18,13 @@ context cannot rationalize its own work). **Do it directly otherwise** — a
 subagent costs a brief, a context, and a round trip, so a one-file change whose
 brief would be longer than the change is a net loss.
 
+For substantial, separable work, plan before code: record applicable reviewed skills
+(or a specific no-match reason) in the issue, then assign scoped owners using the
+builder brief below. Each builder owns a substantive artifact with an oracle,
+write scope, and constraints; the orchestrator integrates the returns before
+independent critique. Resource trial policy stays in
+[`resources.md`](./resources.md#resource-intake-triage-what-you-are-handed).
+
 Within that threshold, delegate work that is **bounded** (one question or one
 deliverable), **separable** (needs no running conversation), and **checkable**
 (has an observable result). Typical triggers:
