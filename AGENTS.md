@@ -2,8 +2,7 @@
 
 <!-- index: operate | Agent operating contract and trigger router | Any change is requested. -->
 
-The router for every coding agent. These rules always apply; detail lives in
-the linked owner documents. **Golden path:** `make start`, `make next` (the next
+These rules always apply; detail: owner docs. **Golden path:** `make start`, `make next` (the next
 step), `make where Q="..."`, `make capabilities`, and `make done` before you call any work complete.
 
 ## Session protocol
@@ -44,8 +43,8 @@ both answers in the goal's issue. A bounded fix needs neither.
 ## Extend the system
 
 When a task recurs or a capability would make work safer, improve the system.
-Every skill, agent role, doc, rule, check, command, MCP route, and pack is one
-file added the same way ([ADR 0002](./docs/adr/0002-one-capability-model.md)):
+Every capability is a file, admitted the same way
+([ADR 0002](./docs/adr/0002-one-capability-model.md)):
 
 - `make similar Q="..."` first; extend the closest match by editing its file.
 - Else `make new KIND=<kind> NAME=... DESC="<what>; <when>"`; replace its
@@ -76,6 +75,7 @@ route is [`SECURITY.md`](./SECURITY.md).
 
 - **New product:** `product-kickoff` (headless without owner answers: write the questions with your picks, stop), then `stack-foundation`, then `make next` until launch ([`docs/building.md`](./docs/building.md)). **Anything users see:** `ux-quality` and `make ui-review`.
 - **A metric or benchmark to improve, or costly real measurements:** `experiment-lab` ([`docs/experiments.md`](./docs/experiments.md)).
+- **Reverse engineering:** `product-recon` for public UX; `technical-recon` for authorized app/protocol internals or an environment to run agents against.
 - **Code acts on a model's answer:** [`docs/model-integration.md`](./docs/model-integration.md).
 - **Vocabulary, architecture, seams:** [`CONTEXT.md`](./CONTEXT.md), [`docs/architecture/README.md`](./docs/architecture/README.md).
 - **Bug or incident:** [`docs/operations.md`](./docs/operations.md); reproduce first. **Release or quality claim:** [`docs/verification.md`](./docs/verification.md), [`docs/production.md`](./docs/production.md).

@@ -78,7 +78,7 @@ measure = true
 [capabilities]
 # First-party skills written in this repository (`make new KIND=skill` adds
 # them here). Third-party skills instead need [[skills]] provenance below.
-local_skills = ["product-kickoff", "stack-foundation", "ux-quality", "experiment-lab", "pitch-from-evidence"]
+local_skills = ["product-kickoff", "stack-foundation", "ux-quality", "experiment-lab", "pitch-from-evidence", "technical-recon"]
 
 # [checks.<name>]  A project may downgrade one blocking check it disagrees with; it still runs.
 # severity = "advisory"  (the only value) and reason = "..." (required). Deleting the entry restores blocking.

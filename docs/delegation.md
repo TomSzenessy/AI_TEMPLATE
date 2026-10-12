@@ -62,7 +62,9 @@ packet, or stop and report).
 Each role file fixes its own `## Return` block and word limit — a fixed shape,
 not prose, so two runs of the same role are comparable. Shared rules: claims cite
 `path:line`, commands, or URLs; unknowns are listed rather than guessed; no raw
-dumps; residual work is named so the orchestrator can file it.
+dumps; residual work is named so the orchestrator can file it. The skill-scout's
+trial proposal feeds [resource intake](./resources.md#resource-intake-triage-what-you-are-handed);
+the orchestrator records the actual outcome or non-trial reason.
 
 ## The critic's verdict and its evidence
 
