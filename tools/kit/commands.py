@@ -51,7 +51,7 @@ def next_step(root: Path, args) -> None:
     print_next(root)
 
 
-@command("where", "Find files, symbols, owning docs, rules, capabilities, and past failures", group="session",
+@command("where", "Find files, symbols, owning docs, indexed doc triggers, rules, capabilities, read-only resources, and past failures", group="session",
          usage='make where Q="login form"',
          args=(arg("query", nargs="+", var="Q", hint='Add what to look for: make where Q="login form"'),))
 def where(root: Path, args) -> None:

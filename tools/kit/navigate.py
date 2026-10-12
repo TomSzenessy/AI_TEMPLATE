@@ -10,11 +10,12 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from .core import declared_surfaces, governance_profile, load_project, read_text_file, repository_files
-from .docmeta import bindings, owners
+from .core import RepoctlError, declared_surfaces, governance_profile, load_project, read_text_file, repository_files
+from .docmeta import bindings, doc_meta, owners
 from .gitinfo import git, is_repository, path_matches
 from .names import ERROR_LOG
 from .registry import Registry
+from .skills import load_resource_registry
 
 SYMBOL = re.compile(
     r"^\s*(?:export\s+)?(?:default\s+)?(?:async\s+)?(?:pub(?:\([^)]*\))?\s+)?"
@@ -110,12 +111,14 @@ def _candidate_lines(root: Path, files: list[str], terms: list[str]):
 
 
 def where(root: Path, query: str, limit: int = 20) -> list[str]:
-    """Rank paths, symbols, headings, and failure-memory lines matching the query."""
+    """Rank paths, symbols, headings, indexed doc descriptions and triggers,
+    read-only resource entries, and failure-memory lines matching the query."""
     terms = [term for term in WORD.findall(query.lower()) if len(term) > 1]
     if not terms:
         return []
     files = [path for path in repository_files(root) if not path.startswith(SKIP_PREFIXES)]
-    doc_bindings = bindings(root, files)
+    meta = doc_meta(root, files)
+    doc_bindings = {path: list(entry["covers"]) for path, entry in meta.items() if entry["covers"]}
     hits: list[tuple[int, str]] = []
     for relative in files:
         path_score = _score(terms, relative)
@@ -141,9 +144,60 @@ def where(root: Path, query: str, limit: int = 20) -> list[str]:
         if score:
             weight = {"symbol": 3, "heading": 2, "seen-before": 3}[kind]
             hits.append((score * weight, f"{relative}:{number}  [{kind}] {_short(label)}"))
+    hits += _doc_index_hits(root, meta, terms)
+    hits += _resource_hits(root, terms)
     hits += _capability_hits(root, terms, query)
     hits.sort(key=lambda hit: (-hit[0], hit[1]))
     return [line for _, line in hits[:limit]]
+
+
+def _doc_index_hits(root: Path, meta: dict[str, dict[str, object]], terms: list[str]) -> list[tuple[int, str]]:
+    """Indexed doc descriptions and read-when triggers (the `<!-- index: -->` declaration)."""
+    hits = []
+    for relative, entry in sorted(meta.items()):
+        index = entry.get("index")
+        if not relative.startswith("docs/") or not isinstance(index, list) or len(index) != 3:
+            continue
+        description, trigger = str(index[1]), str(index[2])
+        score = _score(terms, f"{description} {trigger}")
+        if score:
+            line = _declaration_line(root, relative, "index")
+            hits.append((score * 2, f"{relative}:{line}  [doc] {_short(description, 90)}"))
+    return hits
+
+
+def _resource_hits(root: Path, terms: list[str]) -> list[tuple[int, str]]:
+    """Read-only resource registry entries: id, summary, and provenance source."""
+    try:
+        entries = load_resource_registry(root)
+    except RepoctlError:
+        return []
+    project = load_project(root)
+    resources = project.get("resources", {})
+    registry = resources.get("registry", "resources.toml") if isinstance(resources, dict) else "resources.toml"
+    hits = []
+    for entry in entries:
+        identifier, summary, source = str(entry.get("id", "")), str(entry.get("summary", "")), str(entry.get("source", ""))
+        score = _score(terms, f"{identifier} {summary} {source}")
+        if score:
+            line = _declaration_line(root, str(registry), "id", pattern=identifier, limit=None)
+            hits.append((score * 2, f"{registry}:{line}  [resource] {identifier}: {_short(summary, 80)} ({source})"))
+    return hits
+
+
+def _declaration_line(root: Path, relative: str, marker: str, limit: int | None = 10, pattern: str = "") -> int:
+    """The 1-based line of a declaration in a file: an index comment near the top,
+    or a resource id row anywhere in the registry."""
+    text = read_text_file(root, relative, limit=400_000) or ""
+    if pattern:
+        expression = re.compile(rf"^\s*{marker}\s*=\s*['\"]{re.escape(pattern)}['\"]")
+    else:
+        expression = re.compile(rf"<!--\s*{marker}:\s*")
+    lines = text.splitlines()
+    for number, line in enumerate(lines if limit is None else lines[:limit], 1):
+        if expression.search(line):
+            return number
+    return 1
 
 
 def _capability_hits(root: Path, terms: list[str], query: str) -> list[tuple[int, str]]:
