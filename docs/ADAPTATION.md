@@ -30,7 +30,7 @@ a project small:
 | `docs/research/` | Keep as provenance while its guidance matters. | Archive/remove after the knowledge has been internalized and no decision cites it. |
 | `tools/kit-lock.json` | Written by `make init`, `make adopt`, and `make kit-update`: what the project got from the kit. | Never edit by hand; `make kit-update` maintains it; `KIT_REF=<sha>` pins an update to one template commit instead of its HEAD ([`kit-update.md`](./kit-update.md)). |
 | `project.mk` | Your own make targets; the kit Makefile includes it. | Keep project targets here, not in the kit's Makefile. |
-| Guided intake: `[guided]` table, `.env.example`, `<!-- guided-intake -->` draft paragraphs | Written only by a consent-gated apply after identity init: machine facts in `project.toml`, placeholder env names from the existing MCP route owners, pending record drafts. For the two vetted canonical routes (Playwright browser, Exa search) an explicit `request`/`off` also flips the route owner's top-level `enabled` boolean (config only); `preserve` writes nothing. | Never hand-edit the table; cancel or a missing consent writes nothing; accepted records are preserved unless an explicit `--reshape` is supplied. Only the two vetted canonical route owners are applied, and only their `enabled` flag: every other route stays route-owned; a missing, malformed, symlinked, misnamed, or outside-root route is refused before any write; and the plan binds each vetted route's full raw hash — preserved owners included — so post-plan URL/args drift refuses as stale. The VISION/STACK owner-hash check repeats under the apply lock before any write. Env placeholders are names only: the file is created when absent and missing names are appended when present, never overwriting existing values. Embeddings stay requested-not-ready; logging stays selected-intent; enabling a route is never a connection, a readiness signal, or a vendor call. |
+| `[guided]` | Placeholder env names, pending record drafts. See [Guided intake below](#guided-intake-after-identity-init-110) for canonical route/hash/lock/default rules. | Env: names only, create absent, append missing, never overwrite values; accepted records preserved except explicit `--reshape`; table generated, never hand-edit. |
 | `.agents/trials/` | Template maintenance: build-trial requests and seeds. | Pruned by `make init` and skipped by `make adopt`, together with any doc binding that only pointed at them; add your own requests to run `make trial`. |
 | `docs/ERROR_LOG.md` | Keep as an append-only solved-failure ledger. | Do not use it for open work; link open work to Issues. |
 | `.agents/skills/` | Keep the small first-party workflows and verified reusable capabilities. | Retain a reviewed skill while it remains trusted and useful; remove it only with a documented trust, permission, maintenance, or owner decision. |
@@ -43,44 +43,41 @@ its operating contract, history, or evidence.
 
 ## Guided intake after identity init (#110)
 
-- **Status:** shipped in `tools/kit/guided.py`; identity init stays the first
-  writer and guided intake applies only with explicit consent. `consent` and
-  `reshape` are validated as real JSON booleans in the shared schema
-  (`answers_from_json`) before any guided write: a typed string such as
-  `"false"` is rejected, never coerced, so Python truthiness cannot read a
-  string as consent. Answers values must be strings; the four optional
-  capability answers must be one of their table's choice strings.
-- **Risk:** decision intake must never confirm a product, enable a capability,
-  or re-bootstrap an initialized repository. Cancellation, missing consent, a
-  mistyped consent/reshape, an unknown choice, a stale plan, or changed owner
-  records write nothing; apply is locked, so cooperating callers serialize, and
-  the VISION/STACK owner-hash check repeats under that lock before any write,
-  so an owner edit while an apply waits is refused, never overwritten.
-- **Owner apply (vetted routes only):** an explicit `request` sets
-  `enabled = true` and an explicit `off` sets `enabled = false` in the two
-  vetted canonical route owners (Playwright browser, Exa search); `preserve`
-  writes nothing. Only the top-level `enabled` boolean is rewritten — a real
-  TOML boolean, never a truthy string — and url/command/env_headers stay
-  opaque. A missing, malformed, symlinked, misnamed, or outside-root route is
-  refused before any guided write, and the plan binds every vetted route's
-  full raw hash (preserved owners included), so a URL/args change after the
-  plan refuses as stale before effects. Defaults follow the route's current
-  state — enabled preserves, disabled recommends off — so a blank answer
-  never switches an enabled route off; an explicit `off` still disables.
-  After an edit the `[guided].mcp` mirror and the host projection are
-  re-derived from `.agents/mcp` owners only: no connection, no startup, no
+- **Status:** shipped in `tools/kit/guided.py`; identity init stays first
+  writer, guided intake applies only with explicit consent. `consent` and
+  `reshape` are validated as real JSON booleans in `answers_from_json`
+  before any write: a typed string like `"false"` is rejected, never coerced.
+  Answers values must be strings; the four optional capability answers must
+  be valid choice strings.
+- **Risk:** decision intake must never confirm a product or re-bootstrap.
+  Cancellation, missing/mistyped consent, unknown choice, stale plan, or
+  changed owners write nothing; apply is
+  locked (cooperating callers serialize), and the VISION/STACK owner-hash
+  check repeats under that lock before any write — an owner edit while apply
+  waits is refused, never overwritten.
+- **Owner apply (vetted routes only):** explicit `request` sets `enabled = true`,
+  explicit `off` sets `enabled = false` in the two vetted canonical route owners
+  (Playwright browser, Exa search); `preserve` writes nothing. Only the
+  top-level `enabled` boolean is rewritten — a real TOML boolean, never a
+  truthy string — and url/command/env_headers stay opaque. A missing,
+  malformed, symlinked, misnamed, or outside-root route is refused before any
+  write; the plan binds every vetted route's full raw hash (preserved owners
+  included), so post-plan URL/args drift refuses as stale. Defaults follow the
+  route's current state — enabled preserves, disabled recommends off — so a
+  blank answer never switches an enabled route off; explicit `off` still
+  disables. After an edit the `[guided].mcp` mirror and host projection are
+  re-derived from `.agents/mcp` owners only: no connection, startup, or
   embedding activation.
 - **Golden path:** `make init NAME=x KIND=web` (unattended, unchanged), then
   `make init ... --answers file.json` (or `--guided` for the terminal round);
   the same 11 answers through either surface produce identical owner files.
-  Drafts stay pending for `product-kickoff`; embeddings stay
-  requested-not-ready.
+  Drafts stay pending for `product-kickoff`; embeddings stay requested-not-ready.
+
 - **Four shared choices (working):** browser and Exa take
   `off`/`request`/`preserve`; logging takes
   `off`/`local-redacted`/`plan-external` (default `local-redacted`); embeddings
-  takes `off`/`request` (default `off`). The selected intent is persisted in
-  the `[guided]` receipt and a pending STACK section; only the browser/Exa
-  `request`/`off` choices reach the vetted route owners, as config only.
+  takes `off`/`request` (default `off`). Selected intent is persisted in the
+  `[guided]` receipt and pending STACK section, as config only.
 
 ## Adopting an existing repository
 
