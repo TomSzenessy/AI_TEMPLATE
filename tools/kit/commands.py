@@ -291,7 +291,7 @@ def init(root: Path, args) -> None:
     initialize_project(root, args.name, args.kind, args.owner)
     answers, consent, reshape = None, args.consent, args.reshape
     if args.guided:
-        result = ask_terminal()
+        result = ask_terminal(root)
         if result is None:
             print("Cancelled: identity init stands; no intake was applied.")
             return

@@ -28,6 +28,10 @@ ANSWERS = {
     "stack": "React + Next.js + Tailwind",
     "stack_alternatives": "SvelteKit lost on ecosystem",
     "stack_verification": "make check and make verify",
+    "browser": "off",
+    "exa": "off",
+    "logging": "local-redacted",
+    "embeddings": "off",
 }
 
 
@@ -67,6 +71,39 @@ class GuidedInitTests(Scratch):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         for relative in OWNER_FILES:
             self.assertEqual((json_root / relative).read_bytes(), (terminal_root / relative).read_bytes(), relative)
+
+    def test_optional_choices_parity_terminal_vs_json(self) -> None:
+        """The four shared choices produce identical owner files via terminal and JSON (off/request)."""
+        choices = {"browser": "off", "exa": "request", "logging": "plan-external", "embeddings": "request"}
+        json_root = self.copy_working_tree()
+        self.assertEqual(self.init_with_json(json_root, {**ANSWERS, **choices}).returncode, 0)
+        terminal_root = self.copy_working_tree()
+        lines = [choices.get(question["id"], ANSWERS[question["id"]]) for question in guided.QUESTIONS]
+        result = run_cli(terminal_root, "init", "--name", "x", "--kind", "web", "--guided",
+                         stdin="\n".join(lines + ["y"]) + "\n")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        for relative in OWNER_FILES:
+            self.assertEqual((json_root / relative).read_bytes(), (terminal_root / relative).read_bytes(), relative)
+        manifest = (json_root / "project.toml").read_text(encoding="utf-8")
+        self.assertIn('browser = "off"', manifest)
+        self.assertIn('exa = "requested"', manifest)  # intent recorded, route file untouched
+        self.assertIn('embeddings = "requested-not-ready"', manifest)
+        self.assertIn('logging = "plan-external"', manifest)
+
+    def test_cli_json_all_four_choices_prints_plan_metadata(self) -> None:
+        """A real first-party CLI run with all four choices prints the plan/metadata; no lingering process."""
+        root = self.copy_working_tree()
+        choices = {"browser": "request", "exa": "off", "logging": "local-redacted", "embeddings": "request"}
+        path = root / "answers.json"
+        path.write_text(json.dumps({"consent": True, "answers": {**ANSWERS, **choices}}), encoding="utf-8")
+        result = run_cli(root, "init", "--name", "x", "--kind", "web", "--answers", str(path))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("Applied", result.stdout)
+        self.assertIn("browser requested", result.stdout)
+        self.assertIn("exa off", result.stdout)
+        self.assertIn("embeddings requested-not-ready", result.stdout)
+        self.assertIn("logging local-redacted", result.stdout)
+        self.assertIn("[guided]", (root / "project.toml").read_text(encoding="utf-8"))
 
     def test_terminal_cancel_writes_nothing(self) -> None:
         root = self.copy_working_tree()

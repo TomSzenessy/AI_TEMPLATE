@@ -30,7 +30,7 @@ a project small:
 | `docs/research/` | Keep as provenance while its guidance matters. | Archive/remove after the knowledge has been internalized and no decision cites it. |
 | `tools/kit-lock.json` | Written by `make init`, `make adopt`, and `make kit-update`: what the project got from the kit. | Never edit by hand; `make kit-update` maintains it; `KIT_REF=<sha>` pins an update to one template commit instead of its HEAD ([`kit-update.md`](./kit-update.md)). |
 | `project.mk` | Your own make targets; the kit Makefile includes it. | Keep project targets here, not in the kit's Makefile. |
-| Guided intake: `[guided]` table, `.env.example`, `<!-- guided-intake -->` draft paragraphs | Written only by a consent-gated apply after identity init: machine facts in `project.toml`, placeholder env names from the existing MCP route owners, pending record drafts. | Never hand-edit the table; cancel or a missing consent writes nothing; accepted records are preserved unless an explicit `--reshape` is supplied. MCP route files stay route-owned: intake only reads them, fresh projects are recommended off, and enabling needs separate explicit consent. |
+| Guided intake: `[guided]` table, `.env.example`, `<!-- guided-intake -->` draft paragraphs | Written only by a consent-gated apply after identity init: machine facts in `project.toml`, placeholder env names from the existing MCP route owners, pending record drafts. | Never hand-edit the table; cancel or a missing consent writes nothing; accepted records are preserved unless an explicit `--reshape` is supplied. MCP route files stay route-owned: intake only reads them, fresh projects are recommended off, and enabling needs separate explicit consent. The four shared optional choices (browser, Exa, logging, embeddings) are strict choice strings validated at the parser boundary; their selected intent is recorded as a NON-authoritative effect pending until the owner apply phase. |
 | `.agents/trials/` | Template maintenance: build-trial requests and seeds. | Pruned by `make init` and skipped by `make adopt`, together with any doc binding that only pointed at them; add your own requests to run `make trial`. |
 | `docs/ERROR_LOG.md` | Keep as an append-only solved-failure ledger. | Do not use it for open work; link open work to Issues. |
 | `.agents/skills/` | Keep the small first-party workflows and verified reusable capabilities. | Retain a reviewed skill while it remains trusted and useful; remove it only with a documented trust, permission, maintenance, or owner decision. |
@@ -48,24 +48,27 @@ its operating contract, history, or evidence.
   `reshape` are validated as real JSON booleans in the shared schema
   (`answers_from_json`) before any guided write: a typed string such as
   `"false"` is rejected, never coerced, so Python truthiness cannot read a
-  string as consent. Answers values must be strings.
+  string as consent. Answers values must be strings; the four optional
+  capability answers must be one of their table's choice strings.
 - **Risk:** decision intake must never confirm a product, enable a capability,
   or re-bootstrap an initialized repository. Cancellation, missing consent, a
-  mistyped consent/reshape, a stale plan, or changed owner records write
-  nothing; apply is locked, so cooperating callers serialize.
+  mistyped consent/reshape, an unknown choice, a stale plan, or changed owner
+  records write nothing; apply is locked, so cooperating callers serialize. A
+  selected `request` is recorded intent, never an enabled route: the route
+  files stay route-owned (SOT) until the owner apply phase.
 - **Golden path:** `make init NAME=x KIND=web` (unattended, unchanged), then
   `make init ... --answers file.json` (or `--guided` for the terminal round);
   the same answers through either surface produce identical owner files. Drafts
   stay pending for `product-kickoff`; embeddings stay requested-not-ready.
-- **Not yet implemented (next step, not a reduction):** the original #110
-  criteria ask for full optional capability choices — browser, Exa, embeddings,
-  and logging — with recommended defaults. Today `embeddings` is recorded
-  `requested-not-ready` and `logging` `local-redacted` as static metadata
-  placeholders, and the 7 intake questions are all product/stack. That matches
-  #110 #6 verbatim but is only the first working step: the optional-choice
-  questions, their recommended defaults, and the owner-file apply path for them
-  are a separate, explicitly-authorized next implementation, not a silent scope
-  reduction.
+- **Four shared choices (working, activation pending):** browser and Exa take
+  `off`/`request`/`preserve` (default `preserve` for an adopted project, `off`
+  for a fresh template); logging takes `off`/`local-redacted`/`plan-external`
+  (default `local-redacted`); embeddings takes `off`/`request` (default `off`).
+  The selected intent is persisted in the `[guided]` receipt and a pending STACK
+  section as a NON-authoritative effect pending — no route file is written, no
+  MCP connection is made, and no embedding transfer is consented. The owner
+  apply phase that turns a `request` into an enabled route remains a separate,
+  explicitly-authorized next step.
 
 ## Adopting an existing repository
 

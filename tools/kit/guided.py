@@ -7,6 +7,15 @@ owner-hash-checked, and serialized. Identity init stays the first writer
 facts in project.toml, and reads — never writes — the MCP route owners. No
 provider, browser, or install calls; embeddings stay requested-not-ready.
 
+The table's four optional capabilities (browser, Exa, logging, embeddings) are
+strict choice strings validated at the parser boundary — no True/False coercion,
+no arbitrary unknown choice. Their selected intent is recorded in the `[guided]`
+receipt and a pending STACK section as a NON-authoritative effect pending: a
+"request" is never an enabled route, and the route files stay route-owned until
+the owner apply phase. Browser/Exa default to preserve for an adopted project
+and off for a fresh template; embeddings default off (request records
+requested-not-ready, no source-outbound consent); logging defaults local-redacted.
+
 `consent` and `reshape` are the module's only switches, so `answers_from_json`
 validates them as real JSON booleans before any guided write: a typed string
 such as `"false"` is rejected, never coerced — Python truthiness would read any
@@ -32,8 +41,9 @@ ENV_EXAMPLE = ".env.example"
 MCP_DIR = ".agents/mcp"
 SECTION = re.compile(r"(?ms)^## [ \t]*.+[ \t]*\n")
 
-# The one table both surfaces read: id, prompt, options, recommendation, and the
-# existing record section the answer drafts deterministically.
+# The one table both surfaces read: id, prompt, options/recommendation (free-text)
+# or choices/default (strict optional capabilities), and the existing record section
+# the answer drafts deterministically.
 QUESTIONS = (
     {"id": "users_goal", "prompt": "Who is it for, which problem, and what success looks like?",
      "options": ("one sentence, one success metric",), "recommendation": "See product-kickoff question 1",
@@ -59,7 +69,47 @@ QUESTIONS = (
     {"id": "stack_verification", "prompt": "Which commands prove it works, and how do we back out?",
      "options": ("make check and make verify",), "recommendation": "make check and make verify; git revert rolls back",
      "record": STACK_DECISION, "section": "Verification and rollback"},
+    {"id": "browser", "prompt": "Enable the browser route (Playwright)?",
+     "choices": ("off", "request", "preserve"), "default": "off",
+     "recommendation": "off for a fresh template; preserve keeps an existing project's route",
+     "record": STACK_DECISION, "section": "Optional capabilities"},
+    {"id": "exa", "prompt": "Enable the Exa search route?",
+     "choices": ("off", "request", "preserve"), "default": "off",
+     "recommendation": "off for a fresh template; preserve keeps an existing project's route",
+     "record": STACK_DECISION, "section": "Optional capabilities"},
+    {"id": "logging", "prompt": "How should the product log?",
+     "choices": ("off", "local-redacted", "plan-external"), "default": "local-redacted",
+     "recommendation": "local-redacted",
+     "record": STACK_DECISION, "section": "Optional capabilities"},
+    {"id": "embeddings", "prompt": "Enable embeddings (vector search)?",
+     "choices": ("off", "request"), "default": "off",
+     "recommendation": "off",
+     "record": STACK_DECISION, "section": "Optional capabilities"},
 )
+
+_QUESTION_BY_ID = {question["id"]: question for question in QUESTIONS}
+
+# Selected intent -> recorded decision. "request" is intent, never an enabled route:
+# the route files stay route-owned (SOT) until the owner apply phase.
+_CHOICE_DECISIONS = {
+    "browser": {"off": "off", "request": "requested", "preserve": "preserved"},
+    "exa": {"off": "off", "request": "requested", "preserve": "preserved"},
+    "embeddings": {"off": "not-requested", "request": "requested-not-ready"},
+    "logging": {"off": "off", "local-redacted": "local-redacted", "plan-external": "plan-external"},
+}
+
+
+def _is_adopted(root: Path) -> bool:
+    """True when the product already existed (`make adopt`); a fresh template is 'new'."""
+    manifest = read_text_file(root, "project.toml") or ""
+    return re.search(r'(?m)^project_mode\s*=\s*"adopt"', manifest) is not None
+
+
+def _choice_default(question_id: str, adopted: bool) -> str:
+    """The known-safe default: preserve for an adopted project, the table default for a fresh template."""
+    if question_id in ("browser", "exa") and adopted:
+        return "preserve"
+    return _QUESTION_BY_ID[question_id]["default"]
 
 
 def _digest(data: bytes) -> str:
@@ -81,6 +131,17 @@ def build_plan(root: Path, answers: dict[str, str], *, consent: bool, reshape: b
     unknown = sorted(set(answers) - {question["id"] for question in QUESTIONS})
     if unknown:
         raise RepoctlError(f"unknown intake answer(s): {', '.join(unknown)}")
+    adopted = _is_adopted(root)
+    resolved = dict(answers)
+    for question in QUESTIONS:
+        if "choices" not in question:
+            continue
+        if question["id"] not in resolved:
+            resolved[question["id"]] = _choice_default(question["id"], adopted)
+        elif resolved[question["id"]] not in question["choices"]:
+            raise RepoctlError(
+                f'answer "{question["id"]}" must be one of {"/".join(question["choices"])}, '
+                f'not "{resolved[question["id"]]}"')
     records = {}
     owners = {}
     for relative in (VISION, STACK_DECISION):
@@ -93,10 +154,12 @@ def build_plan(root: Path, answers: dict[str, str], *, consent: bool, reshape: b
     decisions = {
         "mcp": {route["name"]: ("preserved" if route["enabled"] else "off-recommended") for route in routes},
         "env": sorted({name for route in routes for name in route["env"]}),
-        "embeddings": "requested-not-ready",
-        "logging": "local-redacted",
+        "browser": _CHOICE_DECISIONS["browser"][resolved["browser"]],
+        "exa": _CHOICE_DECISIONS["exa"][resolved["exa"]],
+        "embeddings": _CHOICE_DECISIONS["embeddings"][resolved["embeddings"]],
+        "logging": _CHOICE_DECISIONS["logging"][resolved["logging"]],
     }
-    plan = {"answers": dict(answers), "consent": bool(consent), "reshape": bool(reshape),
+    plan = {"answers": resolved, "consent": bool(consent), "reshape": bool(reshape),
             "owners": owners, "records": records, "decisions": decisions}
     plan["revision"] = "sha256:" + hashlib.sha256(
         json.dumps({key: plan[key] for key in ("answers", "consent", "reshape", "decisions")},
@@ -114,8 +177,9 @@ def _draft(text: str, section: str, pieces: list[str]) -> str:
         return text
     heading = re.compile(r"(?ms)^## " + re.escape(section) + r"[ \t]*\n")
     match = heading.search(text)
-    if not match:
-        return text
+    if not match:  # a section the skeleton does not carry yet: append it, still pending
+        body = "\n\n".join(pieces)
+        return text.rstrip("\n") + f"\n\n## {section}\n\n{MARK}\n{body}\n"
     found = SECTION.search(text, match.end())
     end = found.start() if found else len(text)
     block = text[match.end():end]
@@ -175,7 +239,9 @@ def _write(root: Path, plan: dict[str, object]) -> list[str]:
         by_section: dict[tuple[str, str], list[str]] = {}
         for question in QUESTIONS:
             if question["id"] in plan["answers"]:
-                by_section.setdefault((question["record"], question["section"]), []).append(plan["answers"][question["id"]])
+                value = plan["answers"][question["id"]]
+                piece = f"{question['id']}: {value}" if "choices" in question else value
+                by_section.setdefault((question["record"], question["section"]), []).append(piece)
         for (relative, section), pieces in by_section.items():
             if plan["records"][relative] == "accepted" and not plan["reshape"]:
                 continue  # an accepted record is preserved unless an explicit reshape is supplied
@@ -209,6 +275,7 @@ def _guided_table(manifest: str, plan: dict[str, object]) -> str:
     env = ", ".join(f'"{name}"' for name in plan["decisions"]["env"])
     table = (f"[guided]\nrevision = \"{plan['revision']}\"\nstatus = \"applied\"\nconsent = \"explicit\"\n"
              f"records = [{records}]\nmcp = {{ {mcp} }}\nenv = [{env}]\n"
+             f"browser = \"{plan['decisions']['browser']}\"\nexa = \"{plan['decisions']['exa']}\"\n"
              f"embeddings = \"{plan['decisions']['embeddings']}\"\nlogging = \"{plan['decisions']['logging']}\"\n")
     updated, count = re.subn(r"(?ms)^\[guided\]\s*.*?(?=^\[|\Z)", table, manifest, count=1)
     return updated if count else manifest.rstrip("\n") + "\n\n" + table
@@ -235,24 +302,35 @@ def answers_from_json(text: str) -> dict[str, object]:
     for key, value in payload["answers"].items():
         if not isinstance(value, str):
             raise RepoctlError(f'answers JSON answer "{key}" must be a string')
+        question = _QUESTION_BY_ID.get(key)
+        if question and "choices" in question and value not in question["choices"]:
+            raise RepoctlError(
+                f'answers JSON answer "{key}" must be one of {"/".join(question["choices"])}, not "{value}"')
     return payload
 
 
-def ask_terminal() -> dict[str, str] | bool | None:
+def ask_terminal(root: Path) -> dict[str, str] | bool | None:
     """One bounded round in the terminal: dict = answers with consent, False = no consent, None = cancelled."""
+    adopted = _is_adopted(root)
     print("Guided intake (#110): empty line takes the recommendation; 'cancel' writes nothing.")
     answers: dict[str, str] = {}
     for question in QUESTIONS:
         print(f"\n[{question['id']}] {question['prompt']}")
-        print(f"  options: {'; '.join(question['options'])}")
-        print(f"  recommendation: {question['recommendation']}")
+        if "choices" in question:
+            print(f"  choices: {'/'.join(question['choices'])} (default: {_choice_default(question['id'], adopted)})")
+        else:
+            print(f"  options: {'; '.join(question['options'])}")
+            print(f"  recommendation: {question['recommendation']}")
         try:
             reply = input("> ").strip()
         except EOFError:
             return None
         if reply.lower() == "cancel":
             return None
-        answers[question["id"]] = reply or question["recommendation"]
+        if "choices" in question:
+            answers[question["id"]] = reply or _choice_default(question["id"], adopted)
+        else:
+            answers[question["id"]] = reply or question["recommendation"]
     try:
         print("\nApply this plan now? [y/N]")
         return answers if input("> ").strip().lower() in {"y", "yes"} else False
@@ -263,8 +341,10 @@ def ask_terminal() -> dict[str, str] | bool | None:
 def summarize(plan: dict[str, object]) -> str:
     records = ", ".join(f"{relative} {state}" for relative, state in sorted(plan["records"].items()))
     mcp = ", ".join(f"{name} {state}" for name, state in sorted(plan["decisions"]["mcp"].items())) or "no routes"
-    return (f"revision {plan['revision'][:18]}…; {records}; MCP {mcp}; embeddings requested-not-ready; "
-            "logging local-redacted")
+    decisions = plan["decisions"]
+    return (f"revision {plan['revision'][:18]}…; {records}; MCP {mcp}; "
+            f"browser {decisions['browser']}; exa {decisions['exa']}; "
+            f"embeddings {decisions['embeddings']}; logging {decisions['logging']}")
 
 
 def guided_init(root: Path, answers: dict[str, str] | None, *, consent: bool, reshape: bool = False) -> str:
