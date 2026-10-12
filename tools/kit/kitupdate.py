@@ -169,7 +169,9 @@ def update_from_source(root: Path, kit: str | None, ref: str | None = None) -> i
     if ref and (ref.startswith("-") or not re.fullmatch(r"[0-9A-Za-z][0-9A-Za-z._/-]{0,199}", ref)):
         raise RepoctlError(f"KIT_REF {ref!r} is not a commit SHA, tag, or branch name")
     with tempfile.TemporaryDirectory() as folder:
-        cloning = ["clone", "-q", *([] if ref else ["--depth", "1"]), source, folder]
+        # Without a lock the update compares with every version the template ever shipped (#89): full history.
+        lockless = not read_lock(root).get("files")
+        cloning = ["clone", "-q", *([] if ref or lockless else ["--depth", "1"]), source, folder]
         result = run_git(None, *cloning, timeout=300)
         if result is None or result.returncode != 0:
             reason = result.stderr.strip()[-300:] if result else "git unavailable"

@@ -32,7 +32,7 @@ def _recorded(root: Path) -> dict[str, str]:
 
 def _key(root: Path, path: str) -> str:
     """One kit file version: a later, different edit of a recorded path is asked about again."""
-    return f"{path}@{digest(root / path)[:16]}" if (root / path).is_file() else path
+    return f"{path}@{digest(root / path)[:16]}" if (root / path).is_file() else f"{path}@deleted"
 
 
 def _record(root: Path, paths: list[str], note: str) -> None:
@@ -59,7 +59,8 @@ def changed_kit_paths(root: Path, paths: list[str] | None = None) -> list[str]:
     moved = moved if isinstance(moved, dict) else {}
     local = {path: project_path(root, path, moved) for path in files if path not in own}
     wanted = local if paths is None else {k: v for k, v in local.items() if k in paths or v in paths}
-    return sorted(v for k, v in wanted.items() if (root / v).is_file() and digest(root / v) != files[k])
+    # A deleted kit file is a change too: the template may need to know it is not wanted.
+    return sorted(v for k, v in wanted.items() if not (root / v).is_file() or digest(root / v) != files[k])
 
 
 def _owed(root: Path, paths: list[str] | None = None) -> list[str]:

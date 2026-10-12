@@ -217,7 +217,10 @@ def _attention(root: Path) -> list[str]:
             found.append(in_use)
     except Exception:  # noqa: BLE001 - the brief must survive a broken manifest; the checks report it
         pass
-    state, detail = ci_status(root)
+    try:
+        state, detail = ci_status(root)
+    except Exception:  # noqa: BLE001 - the brief must survive anything the CI lookup meets
+        state, detail = "unknown", ""
     if state == "red":
         found.append(f"{detail}: fix it before new work (`gh run view --log-failed`)")
     from .cistatus import default_branch_red

@@ -177,14 +177,15 @@ def project_path(root: Path, path: str, moved: dict[str, str] | None = None) -> 
 
 
 def write_lock(root: Path, kit: Path, paths: list[str] | None = None, kept: list[str] = (),
-               merged: dict[str, str] | None = None, moved: dict[str, str] | None = None) -> None:
+               merged: dict[str, str] | None = None, moved: dict[str, str] | None = None,
+               version: str | None = None) -> None:
     """Record what the project now has from the kit (init and adopt). `kept` are the project's own files
     at kit paths (make adopt never overwrites them); only the kit's version of those is remembered."""
     shipped = paths if paths is not None else kit_paths(kit)
     moved = moved or {}
     files = {path: digest(root / project_path(root, path, moved)) for path in shipped
              if (root / project_path(root, path, moved)).is_file()}
-    _save_lock(root, _kit_version(kit), files, {path: digest_bytes(_new_content(kit, root, path)) for path in kept},
+    _save_lock(root, version or _kit_version(kit), files, {path: digest_bytes(_new_content(kit, root, path)) for path in kept},
                merged=merged, moved=moved)
 
 

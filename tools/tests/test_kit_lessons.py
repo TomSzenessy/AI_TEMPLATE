@@ -253,6 +253,15 @@ class ShippedCrlfTests(Scratch):
         self.assertFalse(bootstrap.shipped(self.root, {"template": {"records": {"VISION.md": digest}}}, "VISION.md"))
 
 
+class CiCacheDamageTests(Scratch):
+    def test_a_damaged_cache_entry_is_asked_again_not_trusted(self) -> None:
+        """A non-numeric timestamp in the cache must never break the session brief."""
+        sha = "9" * 40
+        (self.root / ".agent").mkdir()
+        (self.root / cistatus.CACHE).write_text(json.dumps({sha: ["green", "ok", "not-a-time"]}))
+        self.assertIsNone(cistatus._cached(self.root, sha))
+
+
 class PruneBackupTests(Scratch):
     def test_pruned_files_move_into_the_backup(self) -> None:
         """#82: an undeclared project folder listed in prune is kept in the ignored backup, not lost."""
@@ -378,6 +387,14 @@ class GraduationInitTests(Scratch):
         self.assertEqual(update.returncode, 0, update.stdout + update.stderr)
         self.assertTrue((self.root / "app/main.py").is_file(), update.stdout)
 
+    def test_graduation_does_not_record_the_projects_own_head_as_kit_version(self) -> None:
+        import json as _json
+        self.clone_in_use()
+        done = self.cli("init", "--name", "my-project", "--kind", "web")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        lock = _json.loads((self.root / "tools/kit-lock.json").read_text(encoding="utf-8"))
+        self.assertEqual(lock["kit_version"], "unknown")
+
     def test_a_clone_without_the_kit_list_is_told_to_update_first(self) -> None:
         """Negative case: without tools/kit-files.json init refuses before any write and names kit-update."""
         vision = self.clone_in_use()
@@ -483,6 +500,15 @@ class KitUpstreamTests(Scratch):
         self.assertIn("Bash(make kit-publish:*)", settings["permissions"]["ask"])
         self.assertIn("Bash(tools/repoctl kit-publish:*)", settings["permissions"]["ask"])
         self.assertNotIn("Bash(make kit-publish:*)", settings["permissions"]["allow"])
+
+    def test_a_deleted_kit_file_is_asked_about_too(self) -> None:
+        from kit import kitreport
+        self.project()
+        (self.root / "tools/kit/x.py").unlink()
+        self.assertEqual(len(kitreport.upstream_findings(self.root, ["tools/kit/x.py"])), 1)
+        self.git("init", "-q")
+        kitreport.report(self.root, mock.Mock(reason="removed on purpose"))
+        self.assertEqual(kitreport.upstream_findings(self.root, ["tools/kit/x.py"]), [])
 
     def test_publish_refuses_a_body_that_is_not_a_draft(self) -> None:
         """Negative case: kit-publish files only what kit-report drafted, never an arbitrary file."""

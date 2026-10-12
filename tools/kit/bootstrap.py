@@ -439,7 +439,9 @@ def initialize_project(root: Path, name: str, kind: str, owner: str | None = Non
     derive.sync(root)
     # What this project got from the kit, so make kit-update can tell your edits apart. A clone already used as a
     # project locks only the files the template lists as its kit, never its own (a later kit-update would delete them).
-    write_lock(root, root, paths=shipped_kit if in_use else None)
+    # Its own HEAD is not a template commit: keep the version an earlier kit-update recorded, else "unknown"
+    # (garden's behind-template advice then waits for the first update instead of a false alarm).
+    write_lock(root, root, paths=shipped_kit if in_use else None, version="unknown" if in_use else None)
     if removed:
         print(f"Moved {len(removed)} template-only file(s) to .agent/init-backup/; links now point to the template source.")
     print(f"Initialized {name} ({kind}). Declare real surfaces before implementation.")

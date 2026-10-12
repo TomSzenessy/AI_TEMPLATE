@@ -59,7 +59,10 @@ def _cached(root: Path, sha: str) -> tuple[str, str] | None:
     if not isinstance(entry, list) or len(entry) != 3:
         return None
     state, detail, at = entry
-    age = time.time() - float(at)
+    try:
+        age = time.time() - float(at)
+    except (TypeError, ValueError):
+        return None  # a damaged entry is asked again, never trusted
     return (state, detail) if age < (GREEN_S if state in FINAL else RETRY_S) else None
 
 
@@ -96,7 +99,7 @@ def ci_status(root: Path, sha: str | None = None, runner: Runner | None = None,
 def _ask(root: Path, sha: str, runner: Runner | None) -> tuple[str, str]:
     try:
         raw = (runner or _gh_runner(root))(
-            ["run", "list", "--commit", sha, "--limit", "20", "--json", "workflowName,status,conclusion,url"])
+            ["run", "list", "--commit", sha, "--limit", "100", "--json", "workflowName,status,conclusion,url"])
         runs = json.loads(raw or "[]")
     except FileNotFoundError:
         return "unknown", "GitHub CLI (gh) is not installed"

@@ -51,8 +51,11 @@ list runs `make kit-update` first, which adds it. A project without a lock (a
 clone of the template never initialized, or one older than the lock) is not all
 hand merges: a file byte-identical to any
 version in the template's git history was never edited there, so it is updated
-like an unchanged file (one `git log` of the kit per update); only real edits
-are staged.
+like an unchanged file (one `git log` of the kit per update, so the default
+clone of `[template].source` keeps its full history when there is no lock);
+only real edits are staged. Graduation records the kit version as `unknown`
+(the clone's own HEAD is not a template commit), so `make garden` waits for the
+first update instead of reporting the template as ahead.
 
 The other direction: a project that changes a kit file drafts a report for the
 template with `make kit-report` (ignored `.agent/kit-reports/`, nothing is
@@ -62,7 +65,7 @@ with `make kit-publish` (Claude Code asks the person first): an issue on
 `[template].source` with the same contract and duplicate check as `make issue`,
 naming the kit version and files but never the project's repository or commit,
 because the template may be public while the project is private. The `kit-upstream` check holds `make done` and the stop gate
-until each changed kit file version is drafted, reported, or explained (ignored
+until each changed or deleted kit file version is drafted, reported, or explained (ignored
 `.agent/kit-reports.json`; another worktree asks again), so every project feeds
 the template, and its fix reaches every project through `make kit-update`. Tests prove that init or adopt
 followed by an update from the same kit changes nothing, and that an update
