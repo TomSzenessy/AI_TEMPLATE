@@ -1,6 +1,6 @@
 # Delegation: orchestrator and subagents
 
-<!-- index: operate | Orchestrator/subagent roles, brief, return, and critic verdict contract | Work is bounded enough to hand to a scout, implementer, critic, researcher, doc-gardener, or skill-scout. -->
+<!-- index: operate | Briefs, returns, verdicts | Work needs separate context or independence. -->
 <!-- covers: .agents/agents/** -->
 
 Large projects outgrow one context window. The orchestrator keeps the goal,
@@ -17,6 +17,13 @@ independence** (the critic is the case the independence matters most: a fresh
 context cannot rationalize its own work). **Do it directly otherwise** — a
 subagent costs a brief, a context, and a round trip, so a one-file change whose
 brief would be longer than the change is a net loss.
+
+For substantial, separable work, plan before code: record applicable reviewed skills
+(or a specific no-match reason) in the issue, then assign scoped owners using the
+builder brief below. Each builder owns a substantive artifact with an oracle,
+write scope, and constraints; the orchestrator integrates the returns before
+independent critique. Resource trial policy stays in
+[`resources.md`](./resources.md#resource-intake-triage-what-you-are-handed).
 
 Within that threshold, delegate work that is **bounded** (one question or one
 deliverable), **separable** (needs no running conversation), and **checkable**
@@ -81,8 +88,8 @@ along in a commit) with `Commit:` set to the HEAD the critic read.
 That record is the evidence the completion gate reads; what the gate checks and
 how it fails is in
 [`self-healing.md`](./self-healing.md#critic-evidence-the-gate-can-read).
-Because the gate binds the record to the current HEAD, run the critic **after**
-the change is committed, then save the return, then finish.
+Commit the implementation before running the critic, then save the exact reviewed return block
+before finishing.
 
 ## Model tiers and cost
 

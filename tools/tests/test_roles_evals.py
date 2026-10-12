@@ -50,6 +50,61 @@ class RoleTests(unittest.TestCase):
             self.assertTrue(path.read_text(encoding="utf-8").endswith("\n"), path.name)
 
 
+class ProactiveRoutingContractTests(unittest.TestCase):
+    """Instruction-source contracts (#101), not evidence of model behavior."""
+
+    def test_quality_loop_is_routed_during_framing_not_only_critique(self) -> None:
+        root = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+        loop = root.split("## Build and repair loop", 1)[1].split("## Self-organization", 1)[0]
+        frame = loop.split("2. **Reproduce**", 1)[0]
+        self.assertIn("docs/verification.md#the-quality-loop", frame)
+        self.assertIn("before implementation", frame)
+        self.assertEqual(loop.count("docs/verification.md#the-quality-loop"), 1)
+        verification = (ROOT / "docs/verification.md").read_text(encoding="utf-8")
+        index = next(line for line in verification.splitlines() if line.startswith("<!-- index:"))
+        self.assertIn("before implementation", index)
+        self.assertIn("review", index)
+        self.assertIn("quality claim", index)
+
+    def test_builder_planning_keeps_substantive_scope_and_direct_exception(self) -> None:
+        delegation = (ROOT / "docs/delegation.md").read_text(encoding="utf-8")
+        threshold = delegation.split("## When to delegate", 1)[1].split("<!-- repoctl:roles -->", 1)[0]
+        for contract in (
+            "substantial, separable work", "before code", "reviewed skills",
+            "specific no-match reason", "scoped owners", "builder brief",
+            "artifact", "integrates", "independent critique",
+        ):
+            with self.subTest(contract=contract):
+                self.assertIn(contract, threshold)
+        # A real deliverable/context gain, not blanket all-task delegation.
+        self.assertIn("needs context of its own", threshold)
+        self.assertIn("**Do it directly otherwise**", threshold)
+        self.assertIn("one-file change", threshold)
+        critic = delegation.split("## The critic's verdict and its evidence", 1)[1].split("## Model tiers", 1)[0]
+        self.assertNotIn("Because the gate binds the record to the current HEAD", critic)
+        self.assertIn("Commit the implementation before running the critic", critic)
+        self.assertIn("save the exact reviewed return block", critic)
+        self.assertIn("self-healing.md#critic-evidence-the-gate-can-read", critic)
+        verification = (ROOT / "docs/verification.md").read_text(encoding="utf-8")
+        quality = verification.split("## The quality loop", 1)[1].split("## Domain oracles", 1)[0]
+        self.assertIn("before implementation", quality)
+        self.assertIn("delegation.md#when-to-delegate", quality)
+        self.assertIn("builder brief with its oracle and constraints", quality)
+        self.assertIn("fresh, demanding critic", quality)
+
+    def test_trial_execution_ownership_is_accountability_not_personal_execution(self) -> None:
+        resources = (ROOT / "docs/resources.md").read_text(encoding="utf-8")
+        intake = " ".join(resources.split("## Resource intake:", 1)[1].split("## First-party", 1)[0].split())
+        for contract in (
+            "trial outcome or specific non-trial reason", "Never install a package merely",
+            "ensures approval, execution and recorded evidence",
+            "scoped builder may execute the approved trial", "delegation.md#when-to-delegate",
+        ):
+            with self.subTest(contract=contract):
+                self.assertIn(contract, intake)
+        self.assertNotIn("orchestrator owns approval, execution and recording", intake)
+
+
 class EvalTests(unittest.TestCase):
     def tasks(self) -> dict[str, dict[str, str]]:
         return {task["id"]: task for task in evals.load_tasks(ROOT)}
