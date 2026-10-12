@@ -35,6 +35,11 @@ class AdoptDocPointersTests(Scratch):
             self.assertNotIn("docs/ADAPTATION.md", docmeta.owners(bindings, path))
         self.assertEqual(docsync.stale_documents(self.root, bindings), [])
 
+    def test_runtime_adoption_reminder_points_to_the_existing_section(self) -> None:
+        source = (REPO / "tools/kit/adopt.py").read_text(encoding="utf-8")
+        self.assertIn("docs/adopt.md#kit-ci-and-your-toolchains", source)
+        self.assertNotIn("docs/ADAPTATION.md#kit-ci-and-your-toolchains", source)
+
     def test_adopted_workflow_source_points_to_the_adopt_owner(self) -> None:
         workflow = (REPO / ".github/workflows/ci.yml").read_text(encoding="utf-8")
         self.assertIn("docs/adopt.md says why", workflow)

@@ -29,7 +29,8 @@ It therefore calls `repoctl ci gate`, which in a project with
 (structure, docs, issue contracts); the template and `make init` projects keep
 the full `make verify`. Your surfaces' own tests belong to your project's CI,
 with the toolchains it installs; `make adopt` prints this reminder. `make
-verify` and `make done` still run the surfaces locally.
+verify` and `make done` still run the surfaces locally. The adoption command's
+CI reminder links to this section, as does the adopted workflow's comment.
 
 The Python the gate and the Makefile use is the one the environment configured:
 an explicit `PYTHON=`, else `python3` when it is 3.11 or newer (what
