@@ -48,8 +48,8 @@ deleting or rewriting code, and nothing here is legal advice.
 Consent binds the file scope (paths, counts, budgets, endpoint, model), not file
 content: confirming a scope means "these files may be indexed", and every send
 is an explicit `make similar CODE_INDEX=1` run that prints that scope. A file
-edited after the scope was confirmed is skipped as stale rather than indexed
-under a mismatched hash.
+edited while an index build runs is skipped as stale rather than recorded under
+a mismatched hash.
 See [`security.md`](./security.md#semantic-code-search-115) and
 [`capabilities.md`](./capabilities.md).
 
