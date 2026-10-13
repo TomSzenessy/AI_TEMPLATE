@@ -179,6 +179,17 @@ trust = "discovery"
 access = "read-only"
 scope = "reverse-engineering"
 summary = "Source-reviewed candidate for authorized shipped-artifact and behavior investigation; project-local runtime/package approval and trial remain separate."
+repo = "morluto/rea"
+revision = "79156e5bed1d72b83ade0483246f457b337b7e59"
+license = "MIT"
+reviewed_on = "2026-10-13"
+adapted_into = [".agents/skills/technical-recon/SKILL.md"]
+files = [
+  { path = "docs/android-analysis.md", when = "analyzing an authorized Android artifact" },
+  { path = "docs/browser-observation.md", when = "observing a web app's behavior under authorization" },
+  { path = "docs/javascript-recovery.md", when = "recovering behavior from bundled JavaScript" },
+  { path = "docs/reconstruction-obligation-ledgers.md", when = "tracking reconstruction obligations as evidence" },
+]
 
 [[resources]]
 id = "api-anything-authorized-replay"
@@ -188,6 +199,14 @@ trust = "discovery"
 access = "read-only"
 scope = "reverse-engineering"
 summary = "Pinned reference for authorized HTTP request learning/replay; inspect source, license, permissions, revision and data destinations before any use; link-only, not a default dependency."
+repo = "goodnight000/api-anything"
+revision = "4a785e8d9e72a00e2dddc0dc56569a86826df07b"
+license = "MIT"
+reviewed_on = "2026-10-13"
+adapted_into = [".agents/skills/technical-recon/SKILL.md"]
+files = [
+  { path = "README.md", when = "learning and replaying authorized HTTP requests" },
+]
 
 [[resources]]
 id = "ponytail-lazy-senior"
@@ -197,6 +216,16 @@ trust = "discovery"
 access = "read-only"
 scope = "agent"
 summary = "Use when you want minimal-diff discipline or a quick repo audit/review. Provides a smallest-change coding mode, ranked audit/review prompts and a shortcut-debt ledger."
+repo = "DietrichGebert/ponytail"
+revision = "9b58c1ffb790c075ca32e70a89cf1d80588f4abf"
+license = "MIT"
+reviewed_on = "2026-10-13"
+files = [
+  { path = "skills/ponytail/SKILL.md", when = "applying the smallest-change coding mode" },
+  { path = "skills/ponytail-audit/SKILL.md", when = "running a ranked repo audit with minimal-diff lens" },
+  { path = "skills/ponytail-debt/SKILL.md", when = "keeping a shortcut-debt ledger" },
+  { path = "examples/README.md", when = "seeing worked minimal-solution examples" },
+]
 
 [[resources]]
 id = "archify-diagrams"
@@ -206,6 +235,15 @@ trust = "discovery"
 access = "read-only"
 scope = "web"
 summary = "Use when an architecture, sequence, data-flow or state diagram must be explorable. Provides a standalone HTML+inline-SVG diagram generator with themes and PNG/SVG/WebM export."
+repo = "tt-a1i/archify"
+revision = "58ab0b98d2d0def8e49dced705c7b566936723ec"
+license = "MIT"
+reviewed_on = "2026-10-13"
+files = [
+  { path = "archify/SKILL.md", when = "generating an explorable architecture or sequence diagram" },
+  { path = "docs/authoring-cookbook.md", when = "authoring diagram specs, themes and exports" },
+  { path = "DESIGN.md", when = "matching archify's visual conventions" },
+]
 
 [[resources]]
 id = "graphify-code-graph"
@@ -215,6 +253,15 @@ trust = "discovery"
 access = "read-only"
 scope = "agent"
 summary = "Use when orienting in a large unfamiliar codebase or corpus beyond make where. Provides a queryable knowledge graph of code, docs and relationships (graphify-out/)."
+repo = "Graphify-Labs/graphify"
+revision = "a5ba60ddf6293d9f380321965ecf1084391dcc2b"
+license = "Apache-2.0"
+reviewed_on = "2026-10-13"
+files = [
+  { path = "graphify/skill.md", when = "using graphify to build and query a code knowledge graph" },
+  { path = "ARCHITECTURE.md", when = "understanding how the graph is extracted and stored" },
+  { path = "docs/how-it-works.md", when = "judging what the graph can and cannot answer" },
+]
 
 [[resources]]
 id = "understand-anything-graph"
@@ -224,6 +271,17 @@ trust = "discovery"
 access = "read-only"
 scope = "agent"
 summary = "Use when onboarding to a codebase or reviewing a PR's blast radius. Provides a knowledge-graph dashboard, file explainer, diff-impact, domain-flow and onboarding-guide skills."
+repo = "Egonex-AI/Understand-Anything"
+revision = "000fbf3f36b5e534a0a8d3461cf24f5dc9ae43fe"
+license = "MIT"
+reviewed_on = "2026-10-13"
+files = [
+  { path = "understand-anything-plugin/skills/understand/SKILL.md", when = "building the codebase knowledge graph" },
+  { path = "understand-anything-plugin/skills/understand-diff/SKILL.md", when = "assessing a diff's blast radius" },
+  { path = "understand-anything-plugin/skills/understand-onboard/SKILL.md", when = "producing an onboarding guide for a codebase" },
+  { path = "understand-anything-plugin/skills/understand-explain/SKILL.md", when = "explaining one file or component in context" },
+  { path = "understand-anything-plugin/skills/understand-domain/SKILL.md", when = "mapping business domains and flows" },
+]
 
 [[resources]]
 id = "caveman-token-economy"
@@ -233,6 +291,15 @@ trust = "discovery"
 access = "read-only"
 scope = "agent"
 summary = "Use when cutting agent token cost or output verbosity. Provides terse-output modes, compressed review/commit, a session token-stats view and a cost-lowering learn pass."
+repo = "JuliusBrussee/caveman"
+revision = "2e08b9177c07bb7249a8a2d1a6758e5db281d002"
+license = "Apache-2.0"
+reviewed_on = "2026-10-13"
+files = [
+  { path = "docs/HONEST-NUMBERS.md", when = "quoting token-savings claims honestly" },
+  { path = "skills/caveman-compress/SKILL.md", when = "compressing memory or context files to cut tokens" },
+  { path = "skills/caveman-review/SKILL.md", when = "writing terse review findings" },
+]
 
 [[resources]]
 id = "skills-sh-find-skills"
@@ -242,6 +309,13 @@ trust = "discovery"
 access = "read-only"
 scope = "agent"
 summary = "Use when looking for candidate skills for a named capability gap. Provides the skills.sh ecosystem search (npx skills find <query>); search only, never auto-install."
+repo = "vercel-labs/skills"
+revision = "13e4063a1cf913f5606d57d42ab83a86f5001e04"
+license = "MIT"
+reviewed_on = "2026-10-13"
+files = [
+  { path = "skills/find-skills/SKILL.md", when = "searching the skills.sh ecosystem for a capability gap" },
+]
 
 [[resources]]
 id = "ui-ux-pro-max-design-intel"
@@ -251,6 +325,21 @@ trust = "discovery"
 access = "read-only"
 scope = "ux"
 summary = "Use when seeking style, palette, type-pairing or stack-specific UI ideas beyond ux-quality. Provides searchable design-intelligence data plus brand, slide and banner skills."
+repo = "nextlevelbuilder/ui-ux-pro-max-skill"
+revision = "026b6e172c47fa09246b89b6e1d414b8e15f1057"
+license = "MIT"
+reviewed_on = "2026-10-13"
+adapted_into = [".agents/skills/ux-quality/SKILL.md"]
+files = [
+  { path = "src/ui-ux-pro-max/data/styles.csv", when = "picking a visual style direction with concrete attributes" },
+  { path = "src/ui-ux-pro-max/data/typography.csv", when = "choosing font pairings with use-case notes" },
+  { path = "src/ui-ux-pro-max/data/colors.csv", when = "seeking product-type color palettes" },
+  { path = "src/ui-ux-pro-max/data/ux-guidelines.csv", when = "checking a screen against concrete do/don't UX rules" },
+  { path = "src/ui-ux-pro-max/data/ui-reasoning.csv", when = "mapping a product category to style, color and layout rules" },
+  { path = "src/ui-ux-pro-max/data/charts.csv", when = "choosing a chart type for a data shape" },
+  { path = "src/ui-ux-pro-max/data/motion.csv", when = "choosing animation timing and motion patterns" },
+  { path = "src/ui-ux-pro-max/scripts/search.py", when = "understanding how the dataset is queried (read only; do not run unreviewed)" },
+]
 
 [[resources]]
 id = "impeccable-frontend-polish"
@@ -260,6 +349,23 @@ trust = "discovery"
 access = "read-only"
 scope = "ux"
 summary = "Use when a frontend needs critique or polish passes (audit, harden, animate, clarify, colorize, adapt). Provides one design skill with command-style refinement steps."
+repo = "pbakaus/impeccable"
+revision = "c63b8dd7dd5a5f3c32eaabe1af76d0694f863ed2"
+license = "Apache-2.0"
+reviewed_on = "2026-10-13"
+adapted_into = [".agents/skills/ux-quality/SKILL.md"]
+files = [
+  { path = "skill/reference/typeset.md", when = "choosing, pairing or fixing typography and type scale" },
+  { path = "skill/reference/layout.md", when = "fixing spacing, rhythm, grid or visual hierarchy" },
+  { path = "skill/reference/colorize.md", when = "a UI reads flat or needs purposeful color beyond tokens" },
+  { path = "skill/reference/animate.md", when = "adding motion or micro-interactions with purpose" },
+  { path = "skill/reference/harden.md", when = "hardening a UI for errors, i18n, overflow and edge cases" },
+  { path = "skill/reference/adapt.md", when = "adapting a design across breakpoints, devices or contexts" },
+  { path = "skill/reference/clarify.md", when = "UX copy, labels or error messages are unclear" },
+  { path = "skill/reference/polish.md", when = "running a final pre-ship polish pass" },
+  { path = "skill/reference/audit.md", when = "running a technical quality audit of a UI" },
+  { path = "skill/reference/critique.md", when = "giving a structured design critique with severity" },
+]
 
 [[resources]]
 id = "composio-awesome-claude-skills"
@@ -269,3 +375,84 @@ trust = "discovery"
 access = "read-only"
 scope = "agent"
 summary = "Use when a task needs a MCP-server guide, webapp-testing, internal-comms or file-organizer pattern, or an app-API wrapper (composio-skills/*-automation catalog, ~830, one route)."
+repo = "ComposioHQ/awesome-claude-skills"
+revision = "be2a406907dbc61b73e6827ded415c96139d13a2"
+license = "Apache-2.0"
+reviewed_on = "2026-10-13"
+adapted_into = [".agents/skills/web-quality/SKILL.md"]
+files = [
+  { path = "README.md", when = "browsing the catalog of skills and app wrappers" },
+]
+
+[[resources]]
+id = "superpowers-workflow"
+kind = "skills"
+source = "https://github.com/obra/superpowers/tree/bb92a77741419a4ab5f06e711a283343f1ada0c3"
+trust = "discovery"
+access = "read-only"
+scope = "agent"
+summary = "Use when a workflow needs the full original debugging, review or skill-testing depth. Provides root-cause tracing, condition-based waiting, reviewer prompt templates and skill pressure-testing guides."
+repo = "obra/superpowers"
+revision = "bb92a77741419a4ab5f06e711a283343f1ada0c3"
+license = "MIT"
+reviewed_on = "2026-10-13"
+adapted_into = [".agents/skills/plan-and-build/SKILL.md", ".agents/skills/systematic-debugging/SKILL.md", ".agents/skills/review-practice/SKILL.md", "docs/skills.md"]
+files = [
+  { path = "skills/systematic-debugging/root-cause-tracing.md", when = "a bug surfaces deep in a call stack and the source is unclear" },
+  { path = "skills/systematic-debugging/condition-based-waiting.md", when = "replacing sleeps or timeouts in flaky async tests" },
+  { path = "skills/systematic-debugging/defense-in-depth.md", when = "a fix for invalid data needs validation at several layers" },
+  { path = "skills/systematic-debugging/find-polluter.sh", when = "a test pollutes state and you must find which one (read only)" },
+  { path = "skills/requesting-code-review/code-reviewer.md", when = "writing the brief for a reviewer subagent" },
+  { path = "skills/subagent-driven-development/task-reviewer-prompt.md", when = "reviewing one task's diff for spec compliance and quality" },
+  { path = "skills/test-driven-development/writing-good-tests.md", when = "writing or changing tests, mocks or helpers" },
+  { path = "skills/writing-skills/testing-skills-with-subagents.md", when = "pressure-testing a skill before relying on it" },
+]
+
+[[resources]]
+id = "addyosmani-agent-skills"
+kind = "skills"
+source = "https://github.com/addyosmani/agent-skills/tree/1be8e34187e34647bb83adc3a1323b26ae6f6abe"
+trust = "discovery"
+access = "read-only"
+scope = "agent"
+summary = "Use when a task needs an engineering checklist deeper than our compact skills. Provides security, performance, accessibility, testing, observability and definition-of-done checklists plus orchestration patterns."
+repo = "addyosmani/agent-skills"
+revision = "1be8e34187e34647bb83adc3a1323b26ae6f6abe"
+license = "MIT"
+reviewed_on = "2026-10-13"
+adapted_into = [".agents/skills/plan-and-build/SKILL.md", ".agents/skills/systematic-debugging/SKILL.md", ".agents/skills/review-practice/SKILL.md", ".agents/skills/stack-foundation/SKILL.md", "docs/engineering.md", "docs/security.md", "docs/verification.md", "docs/resources.md", "docs/adr/README.md"]
+files = [
+  { path = "references/security-checklist.md", when = "reviewing a change for security before merge" },
+  { path = "references/performance-checklist.md", when = "checking performance of a change" },
+  { path = "references/accessibility-checklist.md", when = "checking accessibility of a UI change" },
+  { path = "references/testing-patterns.md", when = "choosing test patterns for a new feature" },
+  { path = "references/observability-checklist.md", when = "adding logging, metrics or tracing" },
+  { path = "references/orchestration-patterns.md", when = "splitting work across parallel agents" },
+  { path = "references/definition-of-done.md", when = "deciding whether work is genuinely complete" },
+  { path = "skills/security-and-hardening/references/hardening-patterns.md", when = "hardening code against common vulnerability classes" },
+]
+
+[[resources]]
+id = "addyosmani-web-quality-skills"
+kind = "skills"
+source = "https://github.com/addyosmani/web-quality-skills/tree/afa8da942115f2961fdbfa80807ea0b232ff6c00"
+trust = "discovery"
+access = "read-only"
+scope = "ux"
+summary = "Use when auditing or fixing web performance, Core Web Vitals, accessibility, SEO or security headers. Provides per-metric LCP, INP and CLS guides, WCAG patterns, measurement and structured-data references."
+repo = "addyosmani/web-quality-skills"
+revision = "afa8da942115f2961fdbfa80807ea0b232ff6c00"
+license = "MIT"
+reviewed_on = "2026-10-13"
+adapted_into = [".agents/skills/web-quality/SKILL.md"]
+files = [
+  { path = "skills/core-web-vitals/references/LCP.md", when = "fixing slow Largest Contentful Paint" },
+  { path = "skills/core-web-vitals/references/INP.md", when = "fixing poor Interaction to Next Paint" },
+  { path = "skills/core-web-vitals/references/CLS.md", when = "fixing layout shift" },
+  { path = "skills/accessibility/references/WCAG.md", when = "mapping a finding to a WCAG criterion" },
+  { path = "skills/accessibility/references/A11Y-PATTERNS.md", when = "implementing an accessible widget pattern" },
+  { path = "skills/performance/references/MEASUREMENT.md", when = "setting up lab measurement and budgets" },
+  { path = "skills/performance/references/RUM.md", when = "collecting field data with real-user monitoring" },
+  { path = "skills/seo/references/STRUCTURED-DATA.md", when = "adding or validating structured data" },
+  { path = "skills/best-practices/references/SECURITY.md", when = "auditing web security headers and practices" },
+]

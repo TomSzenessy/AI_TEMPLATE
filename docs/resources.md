@@ -1,7 +1,7 @@
 # Resource routing for agents
 
 <!-- index: extend | Sources and intake | Absorb notes/URLs; capability, example, docs, gate. -->
-<!-- covers: resources.toml .agents/mcp/** -->
+<!-- covers: resources.toml .agents/mcp/** tools/kit/upstream.py -->
 
 This is a **routing catalog**, not a bundled code library. Use it to find the
 smallest set of primary documentation, examples, and specialist capabilities
@@ -58,8 +58,8 @@ reviewed local skill/resource
 → community example
 ```
 
-Keep MCP, filesystem, and network permissions read-only and credential-free by
-default, and record the source, version, license, and decision.
+Keep MCP, filesystem and network permissions read-only and credential-free;
+record source, version, license and decision.
 
 For a new task:
 
@@ -79,10 +79,6 @@ For a new task:
 5. Implement the smallest relevant idea in the project's chosen stack. Run the
    real artifact oracle and the focused regression; do not report a copied
    example as product evidence.
-
-The useful question is not “Which popular library should I install?” It is
-“Which reviewed capability or primary source closes this named gap, under what
-license, with what rollback and quality evidence?”
 
 ## Resource intake: triage what you are handed
 
@@ -117,19 +113,15 @@ A pasted MCP server becomes a disabled route (`make new KIND=mcp`, pinned, keys
 via `env_headers`) until it is reviewed under the MCP routes rules above; ask the
 `skill-scout` role to vet it.
 
-Decide in this order: does a real task's trigger match it? Is it the primary
-source or the closest one? Is it already covered? Can it be pinned, reviewed,
-and rolled back? Keep the registry lean: one route per topic, and popularity is
-not trust. When torn between link and vendor, link — a route costs one entry
-and no provenance surface. For each supplied item, record the named goal or gap,
+Decide in order: does a real task's trigger match it, is it the primary
+source, is it already covered, can it be pinned, reviewed and rolled back?
+One route per topic; popularity is not trust. When torn, link. For each supplied item, record the named goal or gap,
 intake decision, and **trial outcome or specific non-trial reason**. Record pinned
 source/license and rollback when introducing external code or a capability.
 Trial the smallest useful capability in a disposable environment after
 admission/approval, and observe the artifact against its stated oracle. If it
 adds no capability, exceeds the budget/permissions, or cannot yet be admitted,
-name that reason and the next action; link-only is not proof of utility. Reading
-and applying a source can be useful without installing its tool stack. Never
-install a package merely to satisfy this record.
+name that reason and the next action. Never install a package merely to satisfy this record.
 
 The intake is done when `make resources` and `make check` pass and every supplied
 item has that observed result or reason. The `skill-scout` proposes the trial. When approved,
@@ -148,9 +140,21 @@ source's current version, accessibility, licenses, and dependencies; compare
 against the already-reviewed local skills first; and verify the exact interaction 
 path and quality oracle rather than relying on popularity or descriptions.
 
-The current research note at
-[`research/primary-source-hardening-2026-09-25.md`](./research/primary-source-hardening-2026-09-25.md)
-contains the provenance boundary for this template.
+Provenance boundary:
+[`research/primary-source-hardening-2026-09-25.md`](./research/primary-source-hardening-2026-09-25.md).
+
+### Upstream records
+
+An entry may pin its reviewed upstream: `repo`, 40-hex `revision`, `license`,
+`reviewed_on` (all four together), optional `adapted_into` (local owners) and
+`files` (`{ path, when }`: fetch that file at the pin only when `when` fits).
+
+- `make upstream [ID=<id>]` lists records or prints pinned raw URLs (offline);
+  `CHECK=1` runs `git ls-remote` (network, advisory) and names owners to revisit.
+- `make garden` (offline) flags records older than `skill_review_days`;
+  `make check` requires a record for every adapted source in the notices.
+- `make kit-report UPSTREAM=<id> TITLE=... BODY=path` drafts an upstream issue
+  in ignored `.agent/upstream-reports/`; it never files. The owner files it.
 
 ## Skill and example acceptance gate
 
@@ -165,10 +169,9 @@ when the issue records:
 - a focused disposable trial and the real-artifact oracle;
 - the resulting project-local decision, which may be “do not adopt.”
 
-Retain a verified capability for future reuse when it remains useful. Remove or
-disable it when its source is no longer trusted, its permissions are excessive,
-its maintenance state is unacceptable, or the project owner chooses to retire
-it. “No current task uses it” is not, by itself, a reason to delete it.
+Keep a verified capability while it stays useful; remove or disable it when
+its source is untrusted, its permissions excessive, or the owner retires it.
+“No current task uses it” is not a reason to delete it.
 
 For code copied from an example, preserve required attribution and licensing
 notice, adapt it to the project's conventions, and add a regression/quality

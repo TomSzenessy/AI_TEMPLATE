@@ -49,3 +49,5 @@ Evidence: <observable oracle and bounded application/trial proposal, or specific
 Next action: <owner, approval/access needed, or stop>
 Provenance (when adoption needs it): <source/revision, license, risks and rollback for review; otherwise not applicable>
 ```
+
+Upstream depth: `make upstream` lists pinned sources and files; fetch only what a step needs.

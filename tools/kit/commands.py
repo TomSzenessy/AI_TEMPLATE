@@ -180,10 +180,21 @@ def risk(root: Path, args) -> None:
     arg("--priority", var="PRIORITY"),
     arg("--topic", var="TOPIC"),
     arg("--reason", var="REASON", help="the change is project-specific: record why instead of reporting it"),
+    arg("--upstream", var="UPSTREAM", help="draft a local report for this upstream record's repository (never filed)"),
 ))
 def kit_report(root: Path, args) -> None:
     from .kitreport import report
     print(report(root, args))
+
+
+@command("upstream", "List pinned upstream records, print commit-pinned raw URLs for one, or CHECK=1 compare pins with the remote (network)",
+         group="when-needed", usage="make upstream [ID=<id>] [CHECK=1]",
+         args=(arg("--id", var="ID"),
+               arg("--check", action="store_true", var="CHECK", help="compare pins with the remote (network)")))
+def upstream_command(root: Path, args) -> None:
+    from . import upstream
+    for line in (upstream.check_lines(root, args.id) if args.check else upstream.list_lines(root, args.id)):
+        print(line)
 
 
 @command("kit-publish", "File a reviewed kit-report draft on the template repository (the owner's step)",

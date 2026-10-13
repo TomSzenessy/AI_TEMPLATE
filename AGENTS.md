@@ -51,9 +51,9 @@ Every capability is a file, admitted the same way
   `FILL-IN:` lines. Project additions go in `.agents/`, never in kit files.
 - Outside skills, MCP servers, tools: the `skill-scout` role vets them first
   ([`docs/skills.md`](./docs/skills.md)). Nothing third-party runs unreviewed.
-- **Kit bug or improvement** (`tools/`, `.agents/`, `.githooks/`, a kit doc): fix
-  it here and `make kit-report` a draft for the template (`make kit-publish` is the owner's);
-  `make kit-update` carries the fix.
+- **Kit bug or improvement** (`tools/`, `.agents/`, `.githooks/`, kit docs): fix
+  it here and `make kit-report` a draft (`make kit-publish` is the owner's);
+  `make kit-update` ships it. Upstream bug: `UPSTREAM=<id>`.
 
 Project rules (scoped rules arrive when you edit a matching path):
 

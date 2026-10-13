@@ -61,6 +61,7 @@ returns `None`), without another value reader or a guessed branch:
 | Check blocking rule, hooks, failure output, ceremony by risk, garden report, navigation | `checks`, `session`, `garden`, `navigate`, `risk` | [`../self-healing.md`](../self-healing.md) |
 | Consent-gated semantic code similarity | `semantic` | [`../capabilities.md`](../capabilities.md) |
 | OpenAI-compatible embeddings transport (standard library only, behind `.embed`) | `semantic_transport` | [`../capabilities.md`](../capabilities.md) |
+| Pinned upstream records: file index, drift check, notice coverage | `upstream` | [`../resources.md`](../resources.md#upstream-records) |
 | Doc-code bindings and staleness | `docmeta`, `docsync` | [`../bindings.md`](../bindings.md) |
 | Markers, orphan files, change coupling | `hygiene`, `reachability`, `coupling` | [`../hygiene.md`](../hygiene.md) |
 | Derived files and host adapters | `derive`, `adapters` | [`../generated-files.md`](../generated-files.md) |

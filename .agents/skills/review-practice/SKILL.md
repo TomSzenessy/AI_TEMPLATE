@@ -139,3 +139,5 @@ response.
 | "Its tests passed, so the feedback is moot" | Passing proves what ran, not what was missed. |
 | "I will review my own diff, it is small" | Same blind spots as the author; use the critic at high risk. |
 | "Add the proper version it suggests" | Check use first; unused code stays unbuilt. |
+
+Upstream depth: `make upstream ID=addyosmani-agent-skills` lists pinned files (e.g. security → security-checklist.md); fetch only the one your step needs.

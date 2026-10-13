@@ -9,6 +9,7 @@ from datetime import timedelta
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from . import upstream
 from .config import project_setting
 from .core import (
     KEBAB, RepoctlError, check_failed, date_is_future, ensure_inside_root, is_link_like, is_placeholder,
@@ -77,6 +78,7 @@ def load_resource_registry(root: Path, project: dict[str, object] | None = None)
             errors.append(f"resource #{position} summary is required")
         if mcp and (not isinstance(mcp, str) or not KEBAB.fullmatch(mcp)):
             errors.append(f"resource #{position} mcp must be a kebab-case adapter name")
+        errors.extend(upstream.validate(entry, position, root))
     if errors:
         raise check_failed("resource registry", errors)
     return entries
