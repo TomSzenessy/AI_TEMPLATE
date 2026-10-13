@@ -67,6 +67,9 @@ export KIT_IN_AREA = $(if $(filter command line,$(origin AREA)),$(value AREA))
 export KIT_IN_BODY = $(if $(filter command line,$(origin BODY)),$(value BODY))
 export KIT_IN_BUDGET = $(if $(filter command line,$(origin BUDGET)),$(value BUDGET))
 export KIT_IN_CHECK_ONLY = $(if $(filter command line,$(origin CHECK_ONLY)),$(value CHECK_ONLY))
+export KIT_IN_CODE = $(if $(filter command line,$(origin CODE)),$(value CODE))
+export KIT_IN_CODE_INDEX = $(if $(filter command line,$(origin CODE_INDEX)),$(value CODE_INDEX))
+export KIT_IN_CODE_STATUS = $(if $(filter command line,$(origin CODE_STATUS)),$(value CODE_STATUS))
 export KIT_IN_CONSENT = $(if $(filter command line,$(origin CONSENT)),$(value CONSENT))
 export KIT_IN_COVERS = $(if $(filter command line,$(origin COVERS)),$(value COVERS))
 export KIT_IN_DESC = $(if $(filter command line,$(origin DESC)),$(value DESC))
@@ -120,8 +123,8 @@ new: python-check
 	@$(REPOCTL) new $(if $(KIT_IN_KIND),--kind "$${KIT_IN_KIND}",) $(if $(KIT_IN_NAME),--name "$${KIT_IN_NAME}",) $(if $(KIT_IN_DESC),--description "$${KIT_IN_DESC}",) $(if $(KIT_IN_PACK),--pack "$${KIT_IN_PACK}",) $(if $(KIT_IN_GROUP),--group "$${KIT_IN_GROUP}",) $(if $(KIT_IN_COVERS),--covers "$${KIT_IN_COVERS}",) $(if $(KIT_IN_ACCESS),--access "$${KIT_IN_ACCESS}",) $(if $(KIT_IN_TIER),--tier "$${KIT_IN_TIER}",) $(if $(filter 1 yes true,$(KIT_IN_FORCE)),--force,)
 
 similar: python-check
-	$(if $(KIT_IN_Q),,$(error Describe the capability: make similar Q="draft release notes"))
-	@$(REPOCTL) similar -- "$${KIT_IN_Q}"
+	$(if $(KIT_IN_CODE_INDEX)$(KIT_IN_CODE_STATUS),,$(if $(KIT_IN_Q),,$(error Describe the capability: make similar Q="draft release notes")))
+	@$(REPOCTL) similar $(if $(filter 1 yes true,$(KIT_IN_CODE)),--code,) $(if $(filter 1 yes true,$(KIT_IN_CODE_INDEX)),--code-index,) $(if $(filter 1 yes true,$(KIT_IN_CODE_STATUS)),--code-status,) $(if $(filter 1 yes true,$(KIT_IN_CONSENT)),--consent,)$(if $(KIT_IN_Q), -- "$${KIT_IN_Q}",)
 
 capabilities: python-check
 	@$(REPOCTL) capabilities

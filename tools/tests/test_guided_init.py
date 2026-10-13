@@ -7,6 +7,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -266,7 +267,8 @@ class GuidedInitTests(Scratch):
         self.assertEqual(run_cli(root, "init", "--name", "x", "--kind", "web").returncode, 0)
         manifest = (root / "project.toml").read_text(encoding="utf-8")
         self.assertNotIn("[guided]", manifest)
-        self.assertFalse((root / ".env.example").exists())
+        # The kit ships a tracked .env.example; unattended init must leave it untouched.
+        self.assertEqual((root / ".env.example").read_bytes(), (ROOT / ".env.example").read_bytes())
         self.assertIn("Status: pending", (root / "VISION.md").read_text(encoding="utf-8"))
 
     def test_guided_initialized_repository_is_not_rebootstrapped(self) -> None:
@@ -300,7 +302,9 @@ class GuidedInitTests(Scratch):
         self.assertIn('playwright = "off-recommended"', manifest)
         self.assertIn('exa = "off-recommended"', manifest)
         self.assertIn('context7 = "preserved"', manifest)
-        self.assertEqual((root / ".env.example").read_text(encoding="utf-8").count("<set-your-own-key>"), 2)
+        # The kit ships a tracked .env.example that already carries both plan env names;
+        # guided init must leave it byte-identical rather than append or overwrite.
+        self.assertEqual((root / ".env.example").read_bytes(), (ROOT / ".env.example").read_bytes())
 
     def test_preserved_route_url_drift_refuses_before_any_write(self) -> None:
         """The plan binds every vetted route's raw hash: preserved URL drift refuses all writes."""
@@ -316,15 +320,18 @@ class GuidedInitTests(Scratch):
         self.assertIn("exa.toml", str(raised.exception))
         self.assertEqual(route.read_text(encoding="utf-8"), drifted)  # preserve wrote nothing
         self.assertNotIn("[guided]", (root / "project.toml").read_text(encoding="utf-8"))
-        self.assertFalse((root / ".env.example").exists())  # and no other guided write happened
+        # and no other guided write happened: the tracked kit .env.example stands untouched
+        self.assertEqual((root / ".env.example").read_bytes(), (ROOT / ".env.example").read_bytes())
 
     def test_env_example_link_or_nonregular_target_refuses_before_any_guided_write(self) -> None:
         """A symlinked or non-regular .env.example target refuses before any guided write.
 
         Parameterized over the refusal shapes (symlink to an outside sentinel, fifo,
         directory): the sentinel and every guided-owned file stay unchanged, so the
-        refusal lands before any route/record/manifest write. The regular-file
-        append path stays covered by the existing controls, not duplicated here.
+        refusal lands before any route/record/manifest write. The kit ships a tracked
+        .env.example, so the non-regular target replaces it (as a user's own planted
+        link would); the planted target must survive the refused apply intact. The
+        regular-file path stays covered by the existing controls, not duplicated here.
         """
         for kind in ("symlink", "fifo", "directory"):
             with self.subTest(kind=kind):
@@ -336,6 +343,7 @@ class GuidedInitTests(Scratch):
                 sentinel.write_text("SENTINEL-ORIGINAL-CONTENT\n", encoding="utf-8")
                 before = sentinel.read_bytes()
                 target = root / ".env.example"
+                target.unlink(missing_ok=True)  # replace the shipped file with the planted non-regular target
                 if kind == "symlink":
                     target.symlink_to(sentinel)
                 elif kind == "fifo":
@@ -346,6 +354,15 @@ class GuidedInitTests(Scratch):
                 self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
                 self.assertIn("env example", result.stderr)
                 self.assertEqual(sentinel.read_bytes(), before)  # never written through
+                # The planted non-regular target survives the refused apply, never deleted or replaced.
+                mode = os.lstat(target).st_mode
+                if kind == "symlink":
+                    self.assertTrue(stat.S_ISLNK(mode))
+                    self.assertEqual(os.readlink(target), str(sentinel))
+                elif kind == "fifo":
+                    self.assertTrue(stat.S_ISFIFO(mode))
+                else:
+                    self.assertTrue(stat.S_ISDIR(mode))
                 for relative in ("VISION.md", "docs/STACK-DECISION.md", "project.toml"):
                     self.assertEqual((root / relative).read_bytes(), (plain / relative).read_bytes(), relative)
                 self.assertNotIn("[guided]", (root / "project.toml").read_text(encoding="utf-8"))

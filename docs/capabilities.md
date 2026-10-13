@@ -1,7 +1,7 @@
 # Adding a capability
 
 <!-- index: extend | How to add, find, or switch off a capability or pack, and the configuration policy | You add, find, or switch off a skill, role, doc, rule, check, command, MCP route, or pack. -->
-<!-- covers: tools/kit/capabilities.py tools/kit/scaffold.py tools/kit/config.py -->
+<!-- covers: tools/kit/capabilities.py tools/kit/scaffold.py tools/kit/config.py tools/kit/semantic.py tools/kit/semantic_transport.py -->
 
 Skills, agent roles, docs, rules, checks, commands, MCP routes, and packs are
 all capabilities: one file each, read by one loader
@@ -12,6 +12,26 @@ how the kit works with them.
 
 `make similar Q="<need>"` answers first, across every kind and pack; the
 reuse-or-create thresholds are owned by [`skills.md`](./skills.md).
+An optional `CODE=1` (issue #115) ranks eligible source-code chunks against the
+query. Off by default (`[kit].semantic_enabled`; standard library only) and
+consent-gated: outbound code transfer needs explicit per-scope confirmation;
+enablement, a present key, or a request is never itself consent. Every disabled,
+unconsented, stale, or failing path falls back to honest lexical matching with a
+printed reason; a missing or stale index is never embedded. Similarity never
+authorizes deleting or rewriting code. Guided init (#110) is distinct and
+unmodified. See [`security.md`](./security.md#semantic-code-search-115),
+[`privacy.md`](./privacy.md#semantic-code-search-cache-and-consent), and
+[`model-integration.md`](./model-integration.md#embedding-responses-are-untrusted).
+
+**Module card — `tools/kit/semantic.py` + `tools/kit/semantic_transport.py`.**
+- **Purpose:** consent-gated semantic code similarity for `make similar --code`.
+- **PublicInterface:** `build_index`, `code_matches`, `status_lines`; transport `.embed`.
+- **Invariants:** bounds root; eligible scope digest (paths + chunk count, never content
+  hashes/bytes/code); approved endpoint/model tuple cached, no re-read; cache holds no
+  code or keys; lexical fallback on every failure.
+- **Owner:** `[kit]` semantic_* policy (`config.py`); `semantic.py` owns inventory,
+  cache, consent, ranking, and private key resolution.
+- **Performance:** finite existing config budgets (files/chunks/bytes/requests/response).
 `make new KIND=skill|agent|doc|rule|check|command|mcp|pack NAME=<kebab> DESC="<what>; <when>" [PACK=<pack>]`
 is the one way to add one. It refuses a near-duplicate of the same kind
 (`FORCE=1` overrides), writes valid metadata, registers a first-party skill in
