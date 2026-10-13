@@ -1,11 +1,9 @@
 """Optional consent-gated semantic code similarity for `make similar --code` (#115).
 
-One owner for the eligible-code inventory, the local vector cache, the
-OpenAI-compatible transport, and ranking. Standard library only: no new
-catalog, framework, or provider dependency. Off by default
-(`[kit].semantic_enabled = false`), and every disabled, unconsented, stale,
-or failing semantic path falls back to honest lexical matching with a printed
-reason. Similarity never authorizes deleting or rewriting code.
+Owns the eligible-code inventory, local vector cache, and ranking; the
+OpenAI-compatible transport lives in `semantic_transport.py`. Standard library
+only. Off by default; every disabled/unconsented/stale/failing path falls back to
+honest lexical matching with a printed reason. Never authorizes code deletion.
 """
 
 from __future__ import annotations
@@ -16,12 +14,8 @@ import math
 import os
 import re
 import stat
-import time
-import urllib.error
-import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import urlsplit
 
 from .core import (
     DIRECTORY_ROLES, RepoctlError, code_secret_matches, ensure_inside_root, has_link_component, is_link_like,
@@ -30,6 +24,7 @@ from .core import (
 from .docs import BINARY_SUFFIXES
 from .gitinfo import git, is_repository
 from .navigate import _jaccard, _tokens
+from .semantic_transport import OpenAITransport, SemanticError, _valid_endpoint, validated_embeddings
 
 SCHEMA_VERSION = "semantic-cache-v1"
 CONSENT_SCHEMA = "semantic-consent-v1"
@@ -50,9 +45,7 @@ SKIP_NAMES = frozenset({".mcp.json", ".DS_Store", ".gitignore", ".gitattributes"
 # Every directory the kit already treats as ignored, generated, or infrastructure
 # (tools/kit/core.py DIRECTORY_ROLES): product code is what remains.
 SKIP_DIRS = frozenset(DIRECTORY_ROLES)
-# The policy budgets in the short key names `_config` returns (config.py owns the
-# semantic_* spelling); scope_digest reads them with exactly these keys. Every finite
-# policy bound is included: a change to any of them invalidates stored consent.
+# Every finite [kit] semantic_* budget (config.py owns the spelling); a change to any invalidates stored consent.
 BUDGET_KEYS = (
     "batch", "chunk_bytes", "chunk_lines", "max_files",
     "max_chunks", "max_file_bytes", "cache_max_bytes", "top_k",
@@ -60,17 +53,8 @@ BUDGET_KEYS = (
 )
 
 
-class SemanticError(Exception):
-    """A refused or failed semantic operation; the message is safe to print (never a key or code)."""
-
-
-# --- Safe environment value resolver -------------------------------------------
-# Internal SEM env-value resolver: no global dotenv framework, no dependency.
-# Values are plain data — never sourced, executed, evaluated, interpolated, or
-# command-substituted. Process environment by presence (including blank)
-# overrides the private root .env. Credentials (the API key) are never written
-# to logs, caches, consent records, argv, or error messages; endpoint/model
-# values are bound and stored exactly as approved.
+# --- Safe environment value resolver (plain data, never executed) --------------
+# Process env by presence overrides the private root .env; the key is never logged or stored.
 
 # Strict NAME ASCII env grammar: letter or underscore, then letters/digits/underscores.
 _ENV_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
@@ -97,11 +81,8 @@ def _env_name(name: str) -> str:
 
 
 def _parse_env_value(value: str) -> str:
-    """Parse a .env value: strip whitespace; matching quotes; inline # comments.
-
-    A # inside matching quotes is literal; a # outside quotes starts an inline
-    comment. An unmatched quote is left as-is so `_is_not_ready` refuses it.
-    No eval, source, interpolation, or command substitution — plain data only.
+    """Parse a .env value: strip; matching quotes; inline # comments (literal in
+    quotes). An unmatched quote is left for `_is_not_ready` to refuse. Plain data only.
     """
     value = value.strip()
     if value[:1] in ("'", '"'):
@@ -117,13 +98,9 @@ def _parse_env_value(value: str) -> str:
 
 
 def _read_dotenv(root: Path, names: frozenset[str]) -> dict[str, str]:
-    """Read only the requested names from the root's private .env file.
-
-    The file is validated BEFORE reading: it must be a regular file inside the
-    root (no alias, no broken link, no directory), and at most 64 KiB. Values
-    are plain data — never sourced, executed, evaluated, interpolated, or
-    command-substituted. Unrelated names are ignored; a requested name bound
-    twice is rejected as ambiguous. No raw value appears in any error.
+    """Read only the requested names from the root's private .env (regular file
+    inside root, <=64 KiB). Plain data, never executed. Unrelated names ignored;
+    a name bound twice is ambiguous. No raw value in any error.
     """
     try:
         path = ensure_inside_root(root, root / ".env", ".env file")
@@ -172,10 +149,7 @@ def _read_dotenv(root: Path, names: frozenset[str]) -> dict[str, str]:
 
 def _resolve_env_value(root: Path, value: str) -> str:
     """Resolve a [kit] semantic value: a literal, or an explicit env:NAME reference.
-
-    Process environment by presence (including blank) overrides the private
-    root .env. Values are plain data — never executed. A missing binding
-    resolves to "" (not ready).
+    Process env by presence (incl. blank) overrides the root .env; a missing binding is "".
     """
     if not value.startswith(_ENV_REF_PREFIX):
         return value
@@ -192,18 +166,6 @@ def _is_not_ready(value: str) -> bool:
     if value[:1] in ("'", '"') and value.find(value[0], 1) == -1:
         return True  # unmatched quote: refuse rather than send a malformed value
     return bool(_PLACEHOLDER_RE.search(value) or _DYNAMIC_SHELL_RE.search(value))
-
-
-def _valid_endpoint(endpoint: str) -> str:
-    """The endpoint must be HTTPS with no credentials, query, or fragment."""
-    parsed = urlsplit(endpoint)
-    if parsed.scheme != "https" or not parsed.hostname:
-        raise SemanticError("semantic endpoint must be an HTTPS URL")
-    if parsed.username or parsed.password:
-        raise SemanticError("semantic endpoint must not contain credentials")
-    if parsed.query or parsed.fragment:
-        raise SemanticError("semantic endpoint must not contain a query or fragment")
-    return endpoint
 
 
 def _config(root: Path) -> dict[str, object]:
@@ -245,11 +207,8 @@ def _now() -> str:
 
 
 def _root_id(root: Path) -> str:
-    """Opaque root binding: the resolved local path plus git provenance (origin URL + branch).
-
-    Same origin/branch clones at different physical paths produce different root IDs,
-    so consent and cache cannot be reused across clones. The hash is opaque: no remote
-    URL, auth userinfo, or filesystem path is logged, stored, or returned in clear.
+    """Opaque root binding: resolved path + git provenance (origin URL + branch).
+    Distinct physical clones get distinct IDs; the hash leaks no URL, userinfo, or path.
     """
     resolved = str(root.resolve())
     remote = git(root, "remote", "get-url", "origin")
@@ -370,16 +329,10 @@ def chunk_text(text: str, config: dict) -> list[dict]:
 def scope_digest(config: dict, inventory: dict) -> str:
     """Bind provider, model, ignores, budgets, and the eligible inventory.
 
-    The digest carries the sorted eligible PATHS (each `path:sha256` inventory
-    entry split on the last colon, so paths containing colons survive intact),
-    the eligible file count, and the chunk count — never content hashes, byte
-    counts, or code text. Any inventory change — a file added, removed,
-    renamed, or a chunk-count change — starts a new consent scope and requires
-    a fresh confirmation, because the set of files that may leave the machine
-    changed. A code edit that preserves the eligible path set and the chunk
-    count does NOT re-prompt: it only makes the cached vectors stale
-    (index_state detects that by content hash). Consent is about which files
-    may go and under which bounds, not each edit.
+    Carries sorted eligible PATHS, file count, and chunk count — never content
+    hashes, byte counts, or code text. Any path-set or chunk-count change requires
+    fresh consent; a code edit preserving both does NOT re-prompt (index_state
+    detects staleness by content hash instead).
     """
     canonical = json.dumps({
         "endpoint": config["endpoint"], "model": config["model"],
@@ -412,9 +365,7 @@ def save_consent(root: Path, record: dict) -> None:
 
 def _consent_matches(root: Path, config: dict, inventory: dict) -> bool:
     """The one consent checker: schema, scope digest, and root binding must all match.
-
-    This is the single authority for consent validity; confirm_scope and status_lines
-    both call it. No second auth logic exists.
+    confirm_scope and status_lines both call it; no second auth logic exists.
     """
     record = load_consent(root)
     if not record or record.get("schema") != CONSENT_SCHEMA:
@@ -427,10 +378,8 @@ def _consent_matches(root: Path, config: dict, inventory: dict) -> bool:
 
 
 def confirm_scope(root: Path, config: dict, inventory: dict, *, explicit: bool) -> tuple[bool, str]:
-    """(confirmed, reason). `explicit` is the user's --consent flag; otherwise ask at the terminal.
-
-    A stored consent is accepted only when schema, scope digest, and root binding all
-    match. Legacy consent without a root_id is refused: the user must re-confirm.
+    """(confirmed, reason). `explicit` is the --consent flag; otherwise prompt.
+    A stored consent matches only on schema + scope digest + root binding; legacy consent is refused.
     """
     digest = scope_digest(config, inventory)
     if _consent_matches(root, config, inventory):
@@ -518,131 +467,13 @@ def index_state(root: Path, config: dict, inventory: dict) -> tuple[dict | None,
     return raw, "valid", ""
 
 
-# --- Transport --------------------------------------------------------------------
-
-
-def _reject_json_constant(value: str) -> float:
-    raise ValueError(f"non-finite JSON value {value}")
-
-
-class _NoRedirect(urllib.request.HTTPRedirectHandler):
-    """Never follow a redirect: the Authorization header must not reach another endpoint."""
-
-    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: N802 - the urllib hook signature
-        return None
-
-
-def _retryable(error: Exception) -> bool:
-    if isinstance(error, TimeoutError):
-        return True
-    if isinstance(error, urllib.error.HTTPError):
-        return error.code == 429 or error.code >= 500
-    return isinstance(error, urllib.error.URLError)
-
-
-def validated_embeddings(payload: object, input_count: int) -> list[list[float]]:
-    """Strict validation before anything is cached: count, unique indices, dimension, finite, nonzero.
-
-    A partial or malformed response is rejected whole: partial success is not complete.
-    """
-    if not isinstance(payload, dict) or not isinstance(payload.get("data"), list):
-        raise SemanticError("embedding response has no data list")
-    data = payload["data"]
-    if len(data) != input_count:
-        raise SemanticError(f"embedding count {len(data)} != input count {input_count}")
-    vectors: list[list[float] | None] = [None] * input_count
-    dimension = 0
-    for item in data:
-        if not isinstance(item, dict):
-            raise SemanticError("embedding entry is not an object")
-        index = item.get("index")
-        if isinstance(index, bool) or not isinstance(index, int) or not 0 <= index < input_count:
-            raise SemanticError(f"embedding index {index!r} is out of range")
-        if vectors[index] is not None:
-            raise SemanticError(f"duplicate embedding index {index}")
-        embedding = item.get("embedding")
-        if not isinstance(embedding, list) or not embedding:
-            raise SemanticError(f"embedding {index} is empty or not a list")
-        if not dimension:
-            dimension = len(embedding)
-        elif len(embedding) != dimension:
-            raise SemanticError(f"embedding {index} has dimension {len(embedding)}, expected {dimension}")
-        clean: list[float] = []
-        for value in embedding:
-            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
-                raise SemanticError(f"embedding {index} holds a non-finite or non-numeric value")
-            clean.append(float(value))
-        if not any(clean):
-            raise SemanticError(f"embedding {index} is an all-zero vector")
-        vectors[index] = clean
-    return [vector for vector in vectors if vector is not None]
-
-
-class OpenAITransport:
-    """OpenAI-compatible embeddings POST over the standard library only.
-
-    The endpoint and model are the user's documented choice in [kit]; vendor
-    availability, cost, and runtime are unknown and no price or certificate
-    claim is made here. Redirects are never followed, so the Authorization
-    header cannot leak to another endpoint.
-    """
-
-    def __init__(self, endpoint: str, key: str, config: dict) -> None:
-        self.url = endpoint.rstrip("/") + "/embeddings"
-        self.key = key
-        self.config = config
-        self.requests = 0
-
-    def embed(self, texts: list[str]) -> list[list[float]]:
-        if not texts:
-            return []
-        self.requests += 1
-        if self.requests > self.config["max_requests"]:
-            raise SemanticError(f"request budget exhausted ({self.config['max_requests']} requests)")
-        body = json.dumps({"model": self.config["model"], "input": texts}).encode("utf-8")
-        request = urllib.request.Request(self.url, data=body, method="POST")
-        request.add_header("Content-Type", "application/json")
-        request.add_header("Accept", "application/json")
-        request.add_header("Authorization", "Bearer " + self.key)
-        opener = urllib.request.build_opener(_NoRedirect)
-        error: Exception | None = None
-        for attempt in range(self.config["retries"] + 1):
-            try:
-                with opener.open(request, timeout=self.config["timeout"]) as response:
-                    raw = response.read(self.config["max_response_bytes"] + 1)
-                if len(raw) > self.config["max_response_bytes"]:
-                    raise SemanticError("embedding response exceeds the response byte budget")
-                try:
-                    payload = json.loads(raw.decode("utf-8"), parse_constant=_reject_json_constant)
-                except ValueError as parse_error:
-                    raise SemanticError(f"embedding response is not valid JSON ({parse_error})") from parse_error
-                return validated_embeddings(payload, len(texts))
-            except SemanticError:
-                raise
-            except Exception as transport_error:  # noqa: BLE001 - every failure becomes one honest reason
-                error = transport_error
-                if attempt < self.config["retries"] and _retryable(transport_error):
-                    time.sleep(0.1 * (attempt + 1))
-                    continue
-                break
-        detail = "timeout" if isinstance(error, TimeoutError) else type(error).__name__
-        raise SemanticError(f"embedding request failed: {detail}")
-
-
 def configured_transport(root: Path, config: dict | None = None) -> OpenAITransport | None:
     """The transport for the configured endpoint and key, or None when the key is absent.
 
-    Key presence is never consent: a missing key means no outbound, and a present
-    key still needs the per-scope confirmation.
-
-    `config` is the already-resolved [kit] snapshot; when omitted it is read once
-    here. Callers that resolved a config pass it so the transport uses exactly the
-    approved model/endpoint — no re-read, no tuple A→B.
-
-    The key is looked up from the safe env resolver when no process key is set;
-    credentials are never added to cfg, consent records, or caches. Reading the
-    key from a file may separately look it up, but the approved endpoint/model
-    tuple is never re-resolved here.
+    Key presence is never consent. `config` is the resolved [kit] snapshot: the
+    transport uses exactly the approved model/endpoint — no re-read, no tuple A→B.
+    The key comes from the safe env resolver and is never added to cfg, consent
+    records, or caches; the approved endpoint/model tuple is never re-resolved.
     """
     if config is None:
         config = _config(root)
@@ -668,10 +499,8 @@ def configured_transport(root: Path, config: dict | None = None) -> OpenAITransp
 
 
 def _index_inventory(root: Path, config: dict, inventory: dict, transport) -> dict:
-    """Embed every eligible chunk in bounded batches; partial success is not complete (nothing is cached).
-
-    Batching is global across all files: chunks from different files share a batch
-    when they fit, minimizing outbound requests.
+    """Embed every eligible chunk in bounded batches; partial success caches nothing.
+    Batching is global across files to minimize outbound requests.
     """
     all_chunks: list[tuple[str, dict]] = []
     for item in inventory["files"]:
@@ -803,6 +632,8 @@ def code_matches(root: Path, query: str, *, transport=None, consent: bool = Fals
     config = _config(root)
     if not config["enabled"]:
         return _lexical(root, query, config), ["semantic code search is disabled ([kit].semantic_enabled is false)"]
+    if not query.strip():
+        return _lexical(root, query, config), ["no query; no outbound (lexical fallback)"]
     snapshot = inventory(root, config)
     if not snapshot["files"]:
         return _lexical(root, query, config), [f"no eligible code files ({snapshot['reason']})"]
@@ -814,9 +645,9 @@ def code_matches(root: Path, query: str, *, transport=None, consent: bool = Fals
         return _lexical(root, query, config), [f"{config['api_key_env']} is not set; a missing key means no outbound"]
     if secret_matches(query):
         return _lexical(root, query, config), ["the query may contain key material; it was not sent (lexical fallback)"]
-    # Index state is evaluated BEFORE consent and BEFORE any outbound call: a missing,
-    # stale, or invalid index means there is nothing to search, so the query is never
-    # embedded and no consent is prompted. The user is told how to build the index.
+    # Index state is checked BEFORE consent and any outbound call: a missing/stale/
+    # invalid index means nothing to search, so the query is never embedded and no
+    # consent is prompted.
     index, state, state_reason = index_state(root, config, snapshot)
     if index is None:
         if state == "missing":

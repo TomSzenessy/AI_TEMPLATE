@@ -470,6 +470,15 @@ class SemanticTransportTests(KitRepository):
         payload = json.loads(body)
         self.assertEqual(payload["model"], MODEL)
         self.assertEqual(payload["input"], ["render invoice", "other text"])
+        # A failure message must not leak the key.
+        failing = _LocalEmbeddingServer(lambda body: (500, b""))
+        self.addCleanup(failing.close)
+        cfg = self.transport_config(failing.url)
+        cfg["retries"] = 0
+        redacted = semantic.OpenAITransport(failing.url, KEY_VALUE, cfg)
+        with self.assertRaises(semantic.SemanticError) as caught:
+            redacted.embed(["render invoice"])
+        self.assertNotIn(KEY_VALUE, str(caught.exception))
 
     def test_redirect_is_never_followed(self) -> None:
         server = _LocalEmbeddingServer(lambda body: (302, b""))
@@ -586,6 +595,14 @@ class SimilarCodeTests(KitRepository):
         run_with_fake(self, FakeTransport(), "similar", "Q=render invoice", "--code", stdin="y\n")
         run_with_fake(self, FakeTransport(), "similar", "--code-index", stdin="y\n")
         self.assertEqual((self.root / "src" / "billing" / "invoice.py").read_text(encoding="utf-8"), before)
+
+    def test_blank_query_makes_no_outbound_call(self) -> None:
+        enable(self.root)
+        fake = FakeTransport()
+        result = run_with_fake(self, fake, "similar", "Q=", "--code", stdin="y\n")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("no query", result.stdout)
+        self.assertEqual(fake.calls, [], "a blank query must not reach the transport")
 
 
 class SemanticSnapshotTests(unittest.TestCase):
