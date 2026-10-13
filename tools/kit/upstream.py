@@ -121,3 +121,16 @@ def notice_findings(root: Path) -> list[str]:
     return [f"{NOTICES} lists {repo}@{short} with no matching upstream record in resources.toml: add repo/revision/"
             "license/reviewed_on to its entry (docs/resources.md#upstream-records)"
             for repo, short in rows if (repo.lower(), short) not in have]
+
+
+def discoverability_findings(root: Path) -> list[str]:
+    """Every pinned record's id must appear in an agent-facing file (not the registry, not generated output)."""
+    try:
+        pinned = records(root)
+    except RepoctlError:
+        return []
+    files = [root / "AGENTS.md", *sorted((root / ".agents").glob("**/*.md")), *sorted((root / "docs").glob("**/*.md"))]
+    text = "\n".join(f.read_text(encoding="utf-8", errors="replace") for f in files if f.is_file())
+    return [f"{e['id']} has no pointer: name it (`make upstream ID={e['id']}`) in the skill, role or doc where its need "
+            "arises, with what it is and when to pull it (docs/resources.md#upstream-records)"
+            for e in pinned if e["id"] not in text]

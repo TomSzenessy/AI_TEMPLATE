@@ -150,12 +150,14 @@ An entry may pin its reviewed upstream: `repo`, 40-hex `revision`, `license`,
 `files` (`{ path, when }`: fetch that file at the pin only when `when` fits).
 
 - `make upstream [ID=<id>]` lists records or prints pinned raw URLs (offline);
-  `CHECK=1` runs `git ls-remote` (network, advisory) and names owners to revisit.
-- `make garden` (offline) flags records older than `skill_review_days`;
+  `CHECK=1` runs `git ls-remote` (network, advisory), naming owners.
+- `make garden` flags (offline) records older than `skill_review_days`;
   `make check` requires a record for every source in the notices' distilled
-  table (vendored replica-skill is pinned by `[[skills]]` provenance instead).
+  table (replica-skill: `[[skills]]` provenance).
+- `make check` requires each id in AGENTS.md, `.agents/**/*.md` or `docs/**/*.md`
+  (say what and when).
 - `make kit-report UPSTREAM=<id> TITLE=... BODY=path` drafts an upstream issue
-  in ignored `.agent/upstream-reports/`; it never files. The owner files it.
+  in ignored `.agent/upstream-reports/`; never filed by it.
 
 ## Skill and example acceptance gate
 

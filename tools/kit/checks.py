@@ -307,6 +307,13 @@ def upstream_notices(context) -> list[str]:
     return upstream.notice_findings(context.root)
 
 
+@check("upstream-discoverability", "Every pinned upstream record is named in an agent-facing skill, role or doc",
+       blocks=True, reason="A record no agent file names is never pulled when its need arises; the fix is a pointer.")
+def upstream_discoverability(context) -> list[str]:
+    from . import upstream
+    return upstream.discoverability_findings(context.root)
+
+
 @check("github-metadata", "GitHub description and topics match project.toml; run make github-sync", blocks=False)
 def github_metadata(context) -> list[str]:
     try:
