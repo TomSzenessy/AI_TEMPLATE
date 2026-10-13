@@ -8,6 +8,7 @@ A project adds its own command as a new file in `.agents/commands/`
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 from . import ci, derive, scaffold, session
@@ -304,16 +305,44 @@ def incident(root: Path, args) -> None:
 
 # --- Project setup and maintenance --------------------------------------------------
 
-@command("init", "Turn the template into your project", group="setup", usage="make init NAME=my-project KIND=web [OWNER=you]",
-         args=(
+@command("init", "Turn the template into your project", group="setup",
+          usage="make init NAME=my-project KIND=web [OWNER=you] [--answers file] [--guided] [--consent] [--reshape]",
+          args=(
     arg("--name", required=True, var="NAME", hint="Name the project: make init NAME=my-project KIND=web"),
     arg("--kind", required=True, var="KIND", help="lowercase kebab-case project kind",
         hint="Give its kind: make init NAME=my-project KIND=web"),
     arg("--owner", var="OWNER", help="accountable owner handle or team (replaces the project-owner placeholder)"),
+    arg("--answers", var="ANSWERS", help="guided intake: JSON answers file (- reads stdin)"),
+    arg("--guided", action="store_true", var="GUIDED", help="ask the intake questions in the terminal"),
+    arg("--consent", action="store_true", var="CONSENT", help="explicitly consent to applying the plan now"),
+    arg("--reshape", action="store_true", var="RESHAPE", help="explicitly reshape accepted records too"),
 ))
 def init(root: Path, args) -> None:
     from .bootstrap import initialize_project
+    from .guided import answers_from_json, ask_terminal, guided_init
+    # Identity init is always first and unattended; guided intake (#110) collects
+    # answers only after it and applies nothing without explicit consent.
     initialize_project(root, args.name, args.kind, args.owner)
+    answers, consent, reshape = None, args.consent, args.reshape
+    if args.guided:
+        result = ask_terminal(root)
+        if result is None:
+            print("Cancelled: identity init stands; no intake was applied.")
+            return
+        if result is False:
+            print("Declined: identity init stands; no intake was applied.")
+            return
+        answers, consent = result, True
+    if args.answers:
+        text = sys.stdin.read() if args.answers == "-" else Path(args.answers).read_text(encoding="utf-8")
+        payload = answers_from_json(text)
+        answers = payload["answers"]
+        # answers_from_json already validated consent/reshape as real booleans, so
+        # there is no truthiness coercion here: a typed string would have raised above.
+        consent = consent or payload.get("consent", False)
+        reshape = reshape or payload.get("reshape", False)
+    if answers is not None:
+        print(guided_init(root, answers, consent=consent, reshape=reshape))
 
 
 @command("adopt", "Bring this kit into an existing repository (--root) without overwriting it", group="setup",

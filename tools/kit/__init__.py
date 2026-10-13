@@ -13,6 +13,8 @@ local):
 - governance: github, docs, skills, structure, issues, ci, cistatus, gitsync, kitreport, launch
 - project setup: kitlock (what the kit ships and the lock that records it),
   bootstrap, adopt, kitupdate
+- guided intake: guided (shared questions, pure plan, consent-gated apply;
+  docs/ADAPTATION.md)
 - self-healing: docmeta, docsync, hygiene, reachability, coupling, signatures,
   adapters, derive, scaffold, navigate, risk, session, garden, capabilities,
   evals, trial, semantic
