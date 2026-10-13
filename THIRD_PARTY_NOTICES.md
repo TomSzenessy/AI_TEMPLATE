@@ -28,7 +28,35 @@ Test suites in `.agents/skills/*/tests/` are adapted from upstream `tests/`
 with regression tests added for the hardened defects. Files adapted for this
 repository carry SPDX headers identifying the upstream source and revision.
 
-## License
+
+## Workflow material distilled from public skill collections
+
+Reviewed 2026-10-13 under issue #100. These sources were read in full at the
+pinned revisions below; their ideas were merged by trigger and rewritten in
+this repository's voice, so no local file is a copy of an upstream file.
+Local skills carry no per-file notices; this section is the single record.
+
+| Upstream (pinned revision) | License | Local owners it shaped |
+| --- | --- | --- |
+| [obra/superpowers](https://github.com/obra/superpowers) `bb92a77` | MIT, (c) 2025 Jesse Vincent | `plan-and-build`, `systematic-debugging`, `review-practice`, `docs/skills.md` |
+| [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) `1be8e34` | MIT, (c) 2025 Addy Osmani | `plan-and-build`, `systematic-debugging`, `review-practice`, `stack-foundation`, `docs/engineering.md`, `docs/security.md`, `docs/verification.md`, `docs/resources.md`, `docs/adr/README.md` |
+| [addyosmani/web-quality-skills](https://github.com/addyosmani/web-quality-skills) `afa8da9` | MIT, (c) 2026 Addy Osmani | `web-quality` |
+| [JuliusBrussee/caveman](https://github.com/JuliusBrussee/caveman) `2e08b91` | Apache-2.0, Copyright 2026 Julius Brussee (upstream `NOTICE`: "Caveman / Copyright 2026 Julius Brussee") | `review-practice` (finding format), `docs/engineering.md` |
+| [pbakaus/impeccable](https://github.com/pbakaus/impeccable) `c63b8dd` | Apache-2.0 | `ux-quality` (anti-pattern list, audit/critique/polish vocabulary) |
+| [ComposioHQ/awesome-claude-skills](https://github.com/ComposioHQ/awesome-claude-skills) `be2a406`, `webapp-testing` | Apache-2.0 | `web-quality` (one testing line) |
+
+Change statement for the Apache-2.0 sources (Caveman, Impeccable, webapp-testing): guidance was condensed and
+rewritten; no file, code, or asset was copied. License text:
+<https://www.apache.org/licenses/LICENSE-2.0>.
+
+The other reviewed collections (Ponytail, Archify, Graphify, Understand
+Anything, UI UX Pro Max, vercel-labs/skills, REA, API Anything) are linked as
+routes in [`resources.toml`](./resources.toml), not copied.
+
+The MIT License text below applies to each MIT source above (Superpowers and
+both Addy Osmani repositories), with its own copyright line from the table.
+
+## License (replica-skill; same MIT text for the sources above)
 
 Copyright (c) 2026 Jake Schincariol
 

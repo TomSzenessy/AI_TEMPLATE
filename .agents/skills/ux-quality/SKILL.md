@@ -39,6 +39,30 @@ silently: record deliberate deviations there.
   `docs/product/research.md`. If yours would look out of place among them,
   iterate before moving on.
 
+## Avoid the generic AI look
+
+Defaults a model reaches for when the brief leaves the look free; each needs a
+reason from the product, not habit. A recorded brief in `docs/design.md` wins.
+
+- **Palette:** purple/indigo gradients; near-black with one neon accent and
+  glowing edges; warm cream ground with serif display and a terracotta
+  accent. If the look can be guessed from the category alone, redo it. Pick
+  light or dark from where and when it is used, not the category.
+- **Type:** one overused display face (Inter as display, Space Grotesk,
+  Fraunces, Playfair, DM Sans), gradient text, a kicker/eyebrow above every
+  heading, mono type as a "technical" costume, 01/02/03 section numbers.
+- **Layout:** rows of same-size icon + heading + text cards, nested cards,
+  the big-number hero-metric block, a modal for a task that needs no
+  interruption, oversized padding everywhere.
+- **Surface:** decorative glass/blur, coloured `border-left` accents on cards
+  and alerts, hard offset shadows outside a deliberately neobrutalist world,
+  maximum rounding on everything, sparkline/ring filler instead of content.
+- **Icons:** emoji or unicode glyphs as icons; mix of stroke weights.
+- **Unthemed defaults:** browser text selection, caret, scrollbars, focus
+  rings, and untabulated numerals in data tables; style them from the tokens.
+- **Motion:** the same entrance animation on every section; one authored
+  moment beats scattered effects.
+
 ## Every screen has every state
 
 Empty, loading (skeletons over spinners), error (what happened and how to
@@ -70,6 +94,15 @@ what to do next; no blame, no jargon.
 
 ## Review loop (vision-capable reviewer)
 
+Vocabulary: **audit** is measurable (contrast, states, targets, responsive,
+performance via `web-quality`) and fixes nothing; **critique** is judgment
+(hierarchy, fit to the product, specificity, cognitive load: more than four
+visible choices at a decision point is a finding; run it with the `critic`
+role, not the builder); **polish** fixes what both found, in this order:
+blocked or inaccessible tasks, missing states, system drift, visual detail.
+Steps 1-2 below are audit and critique, step 3 is polish.
+
+
 1. Run `make ui-review` (mechanics in `docs/building.md`). For native apps
    use the simulator or emulator. Without a browser, say so and ask the owner for
    screenshots; never claim a visual review you did not do.
@@ -83,6 +116,12 @@ what to do next; no blame, no jargon.
    colour and text).
 4. For key flows, walk through as a first-time user: count steps and time to
    the first moment of value.
+
+Optional external catalogs (not installed; vet with `skill-scout` first):
+[UI UX Pro Max](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill)
+(searchable styles, palettes, font pairings) and
+[Impeccable](https://github.com/pbakaus/impeccable) (design commands with an
+anti-pattern detector).
 
 ## Done when
 
