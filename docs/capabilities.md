@@ -89,7 +89,7 @@ A skill nobody finds or follows is dead weight. Before `make new KIND=skill`:
 
 ## Where to look for an outside capability
 
-After `make similar` finds nothing local, and only through `skill-scout`:
+After `make similar` finds nothing local; every candidate is vetted by `skill-scout`:
 
 - **skills.sh** (`make upstream ID=skills-sh-find-skills`): the open skill
   ecosystem's search (`npx skills find <query>`, a read-only listing). Use
