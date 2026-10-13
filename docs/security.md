@@ -48,8 +48,42 @@ copy it into every prompt.
   attributes from the actual threat model.
 - Run untrusted code with least privilege, no host credentials, bounded egress,
   resource limits, and a real isolation boundary.
+- Trust follows who wrote a value, not the channel that delivered it: another
+  process's command line, a path in a job payload, model output, and a fetched
+  page are all untrusted. Server-side fetches of a URL users influence (SSRF)
+  allowlist scheme and host, reject private, loopback, and link-local
+  addresses for every resolved record, and forbid redirects.
+- Before a delete, move, or overwrite on a derived path, resolve symlinks and
+  require the target to sit under an allowlisted root, below it, with ownership
+  evidence read first; on refusal log and stop, never widen to a default path.
+- Rate limits that must hold across instances need a shared store; in-memory
+  counters silently multiply by instance count.
 - Make retries idempotent and observable; never acknowledge deletion, payment,
   or rights work without checking the underlying state/provider.
+
+### Semantic code search (#115)
+
+`make similar ... CODE=1` may send eligible source-code chunks to a
+user-configured OpenAI-compatible embeddings endpoint: an outbound transfer
+of code, so it is consent-gated. Enablement (`[kit].semantic_enabled`), a
+present API key, and an embedding request are each necessary but never
+sufficient — only an explicit per-scope confirmation (`CONSENT=1`, or an
+interactive yes) authorizes a transfer. A present API key is never itself
+code-export consent. That confirmation is bound to the resolved endpoint,
+model, git-tracked eligible-file inventory, and every budget, and a changed
+policy, root, or budget invalidates it. A physical root change — even a
+clone of the same origin and branch at a different path — requires a fresh
+confirmation. Eligible code excludes `.agents`/`.agent`/`.claude`/`.github`/
+generated trees, key and `.env` files, symlinks, binaries, and
+hygiene-flagged files; request, response, file, chunk, and cache bounds are
+all finite. Redirects are never followed, so the `Authorization` header
+cannot reach another endpoint, and errors redact the key. A missing or stale
+index is never embedded. Similarity never authorizes deleting or rewriting
+code, and no provider quality or fitness is claimed. Cached plaintext code
+stays local under the ignored `.agent/` cache; a future STRIDE review of
+that cache is pending and no waiver is granted. See
+[`privacy.md`](./privacy.md#semantic-code-search-cache-and-consent) and
+[`capabilities.md`](./capabilities.md).
 
 ## CI and local tooling layers
 
@@ -65,7 +99,12 @@ organization license is not exposed to fork PRs) and credential-free Lychee for
 Markdown links: pull requests scan only the Markdown they add or change (file
 names filtered to a safe character set, since they are untrusted input), and a
 weekly schedule or manual run scans everything, so third-party outages and link
-rot surface as a failed scheduled run instead of failing unrelated changes;
+rot surface as a failed scheduled run instead of failing unrelated changes; the
+Lychee step sets `failIfEmpty: ${{ github.event_name != 'pull_request' }}`
+because a changed file may legitimately contain no links (the pinned action's
+default fails such pull requests on its `Total | 0` summary), while scheduled
+and manual full scans keep failing when they find none, and `fail: true` still
+fails broken links, malformed URLs, and unreadable files;
 organization-owned repositories must provide the trusted `GITLEAKS_LICENSE`
 secret for the pinned action. Enable the provider's fork-PR secret scanning as
 well. The link job accepts only successful response classes and excludes the
@@ -78,6 +117,13 @@ known slow German legal site with a documented manual-review exception; a 403,
   install scripts; enable dependency/security updates.
 - Give CI least privilege, no unnecessary secrets, read-only credentials by
   default, and isolated untrusted pull-request execution.
+- Run the package manager's native audit on the committed lockfile before a
+  release; triage by reachability and record each deferral with a reason and
+  date. Never apply forced fixes (`npm audit fix --force`) automatically. An
+  audit matches only known advisories: review new packages and script-policy
+  changes for typosquats and ownership, and approve install scripts one by one.
+- A secret that reached a remote is compromised: rotate it first, then purge
+  history.
 - Treat lockfile changes, install hooks, generated binaries, and workflow edits
   as security-sensitive changes.
 - Keep `repoctl check` in CI and make the aggregate verification command cover

@@ -30,7 +30,7 @@ a project small:
 | `docs/research/` | Keep as provenance while its guidance matters. | Archive/remove after the knowledge has been internalized and no decision cites it. |
 | `tools/kit-lock.json` | Written by `make init`, `make adopt`, and `make kit-update`: what the project got from the kit. | Never edit by hand; `make kit-update` maintains it; `KIT_REF=<sha>` pins an update to one template commit instead of its HEAD ([`kit-update.md`](./kit-update.md)). |
 | `project.mk` | Your own make targets; the kit Makefile includes it. | Keep project targets here, not in the kit's Makefile. |
-| `[guided]` | Placeholder env names, pending record drafts. See [Guided intake below](#guided-intake-after-identity-init-110) for canonical route/hash/lock/default rules. | Env: names only, create absent, append missing, never overwrite values; target preflight refuses a link/non-regular target before any write (no env-follow-alias); accepted records preserved except explicit `--reshape`; table generated, never hand-edit. |
+| `[guided]` | Placeholder env names, pending record drafts. Rules: [Guided intake](#guided-intake-after-identity-init-110). | Env: names only, create absent, append missing, never overwrite values; target preflight refuses a link/non-regular target before any write (no env-follow-alias); accepted records preserved except explicit `--reshape`; table generated, never hand-edit. |
 | `.agents/trials/` | Template maintenance: build-trial requests and seeds. | Pruned by `make init` and skipped by `make adopt`, together with any doc binding that only pointed at them; add your own requests to run `make trial`. |
 | `docs/ERROR_LOG.md` | Keep as an append-only solved-failure ledger. | Do not use it for open work; link open work to Issues. |
 | `.agents/skills/` | Keep the small first-party workflows and verified reusable capabilities. | Retain a reviewed skill while it remains trusted and useful; remove it only with a documented trust, permission, maintenance, or owner decision. |
@@ -67,10 +67,11 @@ its operating contract, history, or evidence.
   owners only: no connection, startup, or embedding activation.
 - **Preview vs applied:** no-consent reports `planned configuration only, no
   connection`; applied names the enabled route from the owner projection.
-- **Golden path:** `make init NAME=x KIND=web` (unattended, unchanged), then
+- **Golden path:** `make init NAME=x KIND=web` (unattended), then
   `make init ... --answers file.json` (or `--guided` for the terminal round);
   both surfaces produce identical owner files. Drafts stay pending for
-  `product-kickoff`; embeddings stay requested-not-ready.
+  `product-kickoff`; embeddings stay requested until `[kit].semantic_enabled`
+  plus `make similar CODE_INDEX=1`.
 - **Four shared choices:** browser and Exa take `off`/`request`/`preserve`;
   logging takes `off`/`local-redacted`/`plan-external` (default `local-redacted`);
   embeddings takes `off`/`request` (default `off`). Intent is persisted in the

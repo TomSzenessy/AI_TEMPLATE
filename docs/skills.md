@@ -48,8 +48,7 @@ video surface may need a renderer/export skill. Those are decisions recorded in
 the issue and `[[skills]]` provenance, not permanent template dependencies.
 
 A useful capability request names the trigger, input/output interface, least
-privilege, real artifact oracle, and rollback. If a host already offers a
-reviewed skill such as `find-skills`, use that discovery route.
+privilege, real artifact oracle, and rollback.
 
 
 - Popularity, install counts, and stars are discovery signals, not trust.
@@ -94,6 +93,13 @@ rather than a large prompt collection:
 - [`../.agents/skills/pitch-from-evidence/SKILL.md`](../.agents/skills/pitch-from-evidence/SKILL.md)
   builds a pitch or results report from a claim table in which every number
   has a source.
+- [`plan-and-build`](../.agents/skills/plan-and-build/SKILL.md),
+  [`systematic-debugging`](../.agents/skills/systematic-debugging/SKILL.md),
+  [`review-practice`](../.agents/skills/review-practice/SKILL.md) and
+  [`web-quality`](../.agents/skills/web-quality/SKILL.md) carry the everyday
+  engineering loop, merged from public collections
+  ([notices](../THIRD_PARTY_NOTICES.md)); other collections are routes in
+  `resources.toml`.
 
 First-party skills are source-controlled, declared in
 `project.toml [capabilities].local_skills`, not third-party `[[skills]]`.
@@ -190,11 +196,3 @@ loop in `AGENTS.md` and `tdd`), `replica-backend` (see
 store-listing linter `listing.py`, which only pays off once a project has an
 App Store or Google Play surface — then discover it from the pinned upstream
 revision.
-
-## Useful capability branches
-
-Use the installed/global skill only when its source is reviewed and the task
-matches its trigger: bug diagnosis, TDD, architecture/deep modules, frontend
-design, security review, research, domain modeling, or pre-commit setup. For
-React/Next, Supabase, Blender, video, or other specialized work, discover a
-reputable current skill rather than copying an unverified prompt collection.

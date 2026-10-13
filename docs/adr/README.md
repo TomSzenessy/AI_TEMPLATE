@@ -13,6 +13,10 @@ Context, decision, and why this tradeoff was selected. Link the issue, source
 research, and consequences that a future maintainer needs.
 ```
 
+Never delete or rewrite an accepted ADR: a changed decision gets a new ADR that
+names and supersedes the old one, and the old one's first line gains
+`Superseded by NNNN`.
+
 Add an ADR to this directory and to [`../README.md`](../README.md) when it becomes
 part of the durable architecture. Do not put routine tasks, status, or open
 questions in an ADR; those belong in GitHub Issues.
