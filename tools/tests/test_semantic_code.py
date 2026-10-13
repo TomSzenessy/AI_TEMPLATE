@@ -612,7 +612,8 @@ class SemanticEnvResolverTests(unittest.TestCase):
     Every test uses its own controlled temp Root with a fake .env; the actual
     repository Root.env is never read. No test contacts a provider or sends
     anything outbound: the only transport is an injected first-party fake —
-    no HTTP, no real credentials.
+    no HTTP, no real credentials. The inventory-scope proofs below likewise
+    use a controlled temp git root, never the repository's own tree.
     """
 
     def setUp(self) -> None:
@@ -762,3 +763,147 @@ class SemanticEnvResolverTests(unittest.TestCase):
             config_b = semantic._config(self.root)
             digest_b = semantic.scope_digest(config_b, semantic.inventory(self.root, config_b))
             self.assertNotEqual(digest_a, digest_b, "scope digest must change with model/endpoint")
+
+    def test_eligible_path_replacement_same_count_invalidates_consent(self) -> None:
+        """Same file count, new eligible path → new scope: re-prompt, zero outbound.
+
+        In-process proof only (no CLI, no subprocess): build an index bound to
+        the original paths, rename one eligible file (SAME count), then verify
+        the scope digest changed, code_matches refuses with an invalid cache
+        (FakeTransport.calls == 0), build_index with EOF stdin refuses BEFORE
+        the transport, the stored consent is untouched until an explicit
+        re-confirmation, and that re-confirmation re-indexes with real fake
+        calls. A path change is a new consent scope, not a content edit.
+        """
+        git_in(self.root, "init", "-q", "-b", "main")
+        git_in(self.root, "config", "user.email", "test@example.com")
+        git_in(self.root, "config", "user.name", "Test")
+        (self.root / "src").mkdir(parents=True, exist_ok=True)
+        (self.root / "src" / "alpha.py").write_text("def alpha():\n    return 1\n", encoding="utf-8")
+        (self.root / "src" / "beta.py").write_text("def beta():\n    return 2\n", encoding="utf-8")
+        (self.root / "project.toml").write_text('schema = 1\nname = "Fixture"\nkind = "web"\n', encoding="utf-8")
+        git_in(self.root, "add", "project.toml", "src")
+        git_in(self.root, "commit", "-q", "-m", "initial")
+        enable(self.root)
+        fake_a = FakeTransport()
+        summary = semantic.build_index(self.root, transport=fake_a, consent=True)
+        self.assertIn("index built", "\n".join(summary))
+        config = semantic._config(self.root)
+        snapshot_a = semantic.inventory(self.root, config)
+        digest_a = semantic.scope_digest(config, snapshot_a)
+        consent_path = self.root / ".agent" / "semantic-code-consent.json"
+        consent_a = json.loads(consent_path.read_text(encoding="utf-8"))
+        self.assertEqual(consent_a["scope_digest"], digest_a)
+        # Rename: SAME eligible file count, NEW eligible path.
+        git_in(self.root, "mv", "src/alpha.py", "src/renamed_alpha.py")
+        git_in(self.root, "commit", "-q", "-m", "rename alpha")
+        snapshot_b = semantic.inventory(self.root, config)
+        self.assertEqual(len(snapshot_b["files"]), len(snapshot_a["files"]), "same file count")
+        self.assertNotEqual([item.split(":", 1)[0] for item in snapshot_b["files"]],
+                            [item.split(":", 1)[0] for item in snapshot_a["files"]], "new eligible path")
+        digest_b = semantic.scope_digest(config, snapshot_b)
+        self.assertNotEqual(digest_b, digest_a, "a renamed eligible file must start a new consent scope")
+        # code_matches: the rename makes the cache stale → lexical fallback, ZERO outbound.
+        fake_b = FakeTransport()
+        matches, reasons = semantic.code_matches(self.root, "alpha", transport=fake_b)
+        self.assertTrue(matches, "lexical matches must be available without a valid index")
+        self.assertTrue(any("changed since indexing" in reason for reason in reasons),
+                        f"expected an invalid-cache reason, got: {reasons}")
+        self.assertEqual(fake_b.calls, [], "zero outbound with an invalid cache after a rename")
+        # build_index with EOF stdin: refused BEFORE the transport; consent A untouched.
+        fake_c = FakeTransport()
+        with mock.patch("builtins.input", side_effect=EOFError):
+            refused = semantic.build_index(self.root, transport=fake_c)
+        self.assertTrue(any("no consent" in line for line in refused), f"expected no-consent refusal, got: {refused}")
+        self.assertEqual(fake_c.calls, [], "zero outbound on refused rebuild after a rename")
+        self.assertEqual(json.loads(consent_path.read_text(encoding="utf-8")), consent_a,
+                         "stored consent A is untouched until B is explicitly approved")
+        # Explicit re-confirmation of B: positive fake calls, record now bound to B.
+        fake_d = FakeTransport()
+        rebuilt = semantic.build_index(self.root, transport=fake_d, consent=True)
+        self.assertIn("index built", "\n".join(rebuilt))
+        self.assertGreater(len(fake_d.calls), 0, "explicit re-confirmation re-indexes")
+        consent_b = json.loads(consent_path.read_text(encoding="utf-8"))
+        self.assertEqual(consent_b["scope_digest"], digest_b, "the approved record is bound to the new scope")
+
+    def test_new_file_and_chunk_count_change_invalidate_consent(self) -> None:
+        """New eligible path or changed chunk count → new scope; a same-path,
+        same-chunk-count code edit keeps the stored consent (vectors only stale).
+        """
+        git_in(self.root, "init", "-q", "-b", "main")
+        git_in(self.root, "config", "user.email", "test@example.com")
+        git_in(self.root, "config", "user.name", "Test")
+        (self.root / "src").mkdir(parents=True, exist_ok=True)
+        (self.root / "src" / "alpha.py").write_text("def alpha():\n    return 1\n", encoding="utf-8")
+        (self.root / "src" / "beta.py").write_text("def beta():\n    return 2\n", encoding="utf-8")
+        (self.root / "project.toml").write_text('schema = 1\nname = "Fixture"\nkind = "web"\n', encoding="utf-8")
+        git_in(self.root, "add", "project.toml", "src")
+        git_in(self.root, "commit", "-q", "-m", "initial")
+        enable(self.root)
+        fake_a = FakeTransport()
+        summary = semantic.build_index(self.root, transport=fake_a, consent=True)
+        self.assertIn("index built", "\n".join(summary))
+        config = semantic._config(self.root)
+        consent_path = self.root / ".agent" / "semantic-code-consent.json"
+        consent_a = json.loads(consent_path.read_text(encoding="utf-8"))
+        digest_a = semantic.scope_digest(config, semantic.inventory(self.root, config))
+        # Case 1 (control): same path set, same chunk count → consent kept, vectors stale only.
+        (self.root / "src" / "alpha.py").write_text("def alpha():\n    return 11\n", encoding="utf-8")
+        git_in(self.root, "add", "-A")
+        git_in(self.root, "commit", "-q", "-m", "edit alpha")
+        snapshot_e = semantic.inventory(self.root, config)
+        self.assertEqual(semantic.scope_digest(config, snapshot_e), digest_a,
+                         "a content edit that preserves the path set and chunk count must not re-prompt")
+        self.assertTrue(semantic._consent_matches(self.root, config, snapshot_e),
+                        "the stored consent still matches after a same-scope content edit")
+        fake_e = FakeTransport()
+        with mock.patch("builtins.input", side_effect=EOFError):
+            kept = semantic.build_index(self.root, transport=fake_e)
+        self.assertIn("index built", "\n".join(kept))
+        self.assertGreater(len(fake_e.calls), 0, "the stored consent still authorizes an explicit rebuild")
+        self.assertEqual(json.loads(consent_path.read_text(encoding="utf-8")), consent_a,
+                         "a same-scope content edit never rewrites the stored consent")
+        # Case 2: a NEW eligible file → new path set and counts.
+        (self.root / "src" / "gamma.py").write_text("def gamma():\n    return 3\n", encoding="utf-8")
+        git_in(self.root, "add", "-A")
+        git_in(self.root, "commit", "-q", "-m", "add gamma")
+        snapshot_g = semantic.inventory(self.root, config)
+        self.assertEqual(len(snapshot_g["files"]), len(snapshot_e["files"]) + 1, "one more eligible file")
+        digest_g = semantic.scope_digest(config, snapshot_g)
+        self.assertNotEqual(digest_g, digest_a, "a new eligible file must start a new consent scope")
+        fake_eof = FakeTransport()
+        with mock.patch("builtins.input", side_effect=EOFError):
+            refused = semantic.build_index(self.root, transport=fake_eof)
+        self.assertTrue(any("no consent" in line for line in refused), f"expected no-consent refusal, got: {refused}")
+        self.assertEqual(fake_eof.calls, [], "zero outbound on refused rebuild after a new file")
+        self.assertEqual(json.loads(consent_path.read_text(encoding="utf-8")), consent_a,
+                         "stored consent A is untouched until the new scope is approved")
+        fake_explicit = FakeTransport()
+        rebuilt = semantic.build_index(self.root, transport=fake_explicit, consent=True)
+        self.assertIn("index built", "\n".join(rebuilt))
+        self.assertGreater(len(fake_explicit.calls), 0, "explicit re-confirmation re-indexes")
+        consent_g = json.loads(consent_path.read_text(encoding="utf-8"))
+        self.assertEqual(consent_g["scope_digest"], digest_g, "the approved record is bound to the new scope")
+        # Case 3: same path set, HIGHER chunk count → new scope, fresh confirmation.
+        paths_g = [item.split(":", 1)[0] for item in snapshot_g["files"]]
+        lines = "".join(f"value_{index} = {index}\n" for index in range(210))
+        (self.root / "src" / "alpha.py").write_text(lines, encoding="utf-8")
+        git_in(self.root, "add", "-A")
+        git_in(self.root, "commit", "-q", "-m", "grow alpha")
+        snapshot_h = semantic.inventory(self.root, config)
+        self.assertGreater(snapshot_h["chunks"], snapshot_g["chunks"], "more chunks in the same files")
+        self.assertEqual([item.split(":", 1)[0] for item in snapshot_h["files"]], paths_g,
+                         "the eligible path set is unchanged by the growth")
+        digest_h = semantic.scope_digest(config, snapshot_h)
+        self.assertNotEqual(digest_h, digest_g, "a chunk-count change must start a new consent scope")
+        fake_h = FakeTransport()
+        with mock.patch("builtins.input", side_effect=EOFError):
+            refused_h = semantic.build_index(self.root, transport=fake_h)
+        self.assertTrue(any("no consent" in line for line in refused_h), f"expected no-consent refusal, got: {refused_h}")
+        self.assertEqual(fake_h.calls, [], "zero outbound on refused rebuild after a chunk-count change")
+        self.assertEqual(json.loads(consent_path.read_text(encoding="utf-8")), consent_g,
+                         "stored consent G is untouched until the grown scope is approved")
+        fake_final = FakeTransport()
+        rebuilt_h = semantic.build_index(self.root, transport=fake_final, consent=True)
+        self.assertIn("index built", "\n".join(rebuilt_h))
+        self.assertGreater(len(fake_final.calls), 0, "explicit re-confirmation re-indexes the grown scope")

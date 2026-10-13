@@ -368,16 +368,28 @@ def chunk_text(text: str, config: dict) -> list[dict]:
 
 
 def scope_digest(config: dict, inventory: dict) -> str:
-    """Bind provider, model, ignores, and budgets: any policy change invalidates stored consent.
+    """Bind provider, model, ignores, budgets, and the eligible inventory.
 
-    Content is deliberately absent: a code edit must not re-prompt for consent, it
-    only makes the cached vectors stale (index_state detects that by hash). Consent
-    is about the policy (where code may go and under which bounds), not each edit.
+    The digest carries the sorted eligible PATHS (each `path:sha256` inventory
+    entry split on the last colon, so paths containing colons survive intact),
+    the eligible file count, and the chunk count — never content hashes, byte
+    counts, or code text. Any inventory change — a file added, removed,
+    renamed, or a chunk-count change — starts a new consent scope and requires
+    a fresh confirmation, because the set of files that may leave the machine
+    changed. A code edit that preserves the eligible path set and the chunk
+    count does NOT re-prompt: it only makes the cached vectors stale
+    (index_state detects that by content hash). Consent is about which files
+    may go and under which bounds, not each edit.
     """
     canonical = json.dumps({
         "endpoint": config["endpoint"], "model": config["model"],
         "ignores": {"skip_prefixes": config["skip_prefixes"], "code_extensions": config["code_extensions"]},
         "budgets": {key: config[key] for key in BUDGET_KEYS},
+        "scope": {
+            "paths": sorted(item.rsplit(":", 1)[0] for item in inventory["files"]),
+            "files": len(inventory["files"]),
+            "chunks": inventory["chunks"],
+        },
     }, sort_keys=True)
     return "sha256:" + _sha256(canonical)
 
