@@ -128,3 +128,5 @@ anti-pattern detector).
 You ran the real build and looked at it, every state exists, contrast and
 accessibility checks pass, screenshots were reviewed with no blocker, and
 deviations are recorded in `docs/design.md`.
+
+Upstream depth: `make upstream ID=impeccable-frontend-polish` lists pinned files (e.g. typography → typeset.md); fetch only the one your step needs.

@@ -133,3 +133,5 @@ every path is a guess.
 | "One more round" | After the cap the failure is structural; rule it. |
 | "Plan is wrong here" | Rule against the design, record it, continue. |
 | "Tests passed earlier" | Run them on the tree you integrate. |
+
+Upstream depth: `make upstream ID=superpowers-workflow` lists pinned files (e.g. reviewer brief → code-reviewer.md); fetch only the one your step needs.

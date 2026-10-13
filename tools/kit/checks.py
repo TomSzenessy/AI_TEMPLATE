@@ -294,6 +294,19 @@ def skill_review_age(context) -> list[str]:
     return findings
 
 
+@check("upstream-review-age", "Pinned upstream records reviewed longer ago than the skill review window (offline); re-review them", blocks=False)
+def upstream_review_age(context) -> list[str]:
+    from . import upstream
+    return upstream.review_age_findings(context.root, int(setting(context.root, "skill_review_days")))
+
+
+@check("upstream-notices", "Every adapted source in THIRD_PARTY_NOTICES.md has a pinned upstream record in resources.toml",
+       blocks=True, reason="A notice without a pinned record cannot be drift-checked or re-reviewed; the fix is to add the record.")
+def upstream_notices(context) -> list[str]:
+    from . import upstream
+    return upstream.notice_findings(context.root)
+
+
 @check("github-metadata", "GitHub description and topics match project.toml; run make github-sync", blocks=False)
 def github_metadata(context) -> list[str]:
     try:

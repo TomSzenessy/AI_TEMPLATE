@@ -164,6 +164,7 @@
 "tools/kit/surfaces.py",
 "tools/kit/trial.py",
 "tools/kit/uireview.py",
+"tools/kit/upstream.py",
 "tools/repoctl",
 "tools/repoctl.py",
 "tools/tests/clockshift/sitecustomize.py",
@@ -213,5 +214,6 @@
 "tools/tests/test_technical_recon.py",
 "tools/tests/test_trial_friction.py",
 "tools/tests/test_trial_report.py",
-"tools/tests/test_uireview_digest.py"
+"tools/tests/test_uireview_digest.py",
+"tools/tests/test_upstream.py"
 ]

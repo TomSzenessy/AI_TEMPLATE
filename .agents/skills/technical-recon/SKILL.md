@@ -89,3 +89,5 @@ control. It is neither a REA installation/trial nor evidence about another app.
 First-party workflow, independently written for this template. The reviewed
 [REA source](references/rea.md) informs the shipped-artifact and evidence paths;
 no upstream skill, tool code or automatic approval policy is vendored.
+
+Upstream depth: `make upstream ID=rea-authorized-analysis` lists pinned files (e.g. Android → android-analysis.md); fetch only the one your step needs.

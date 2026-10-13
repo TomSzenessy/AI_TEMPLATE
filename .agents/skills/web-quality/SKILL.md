@@ -133,3 +133,5 @@ verification status (re-run done, manual checks done, field pending). Cite
 `path:line`. Run `make ui-review` for the visual pass; `make done` before
 claiming complete. Refuse "fast on my machine" (throttle to mobile) and "obviously
 faster" (unmeasured means unknown).
+
+Upstream depth: `make upstream ID=addyosmani-web-quality-skills` lists pinned files (e.g. LCP → LCP.md); fetch only the one your step needs.

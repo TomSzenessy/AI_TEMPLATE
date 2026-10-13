@@ -12,6 +12,7 @@ project-specific (`REASON="..."`). In the template itself there is no lock, so n
 from __future__ import annotations
 
 import json
+import shlex
 from pathlib import Path
 
 from .core import RepoctlError, ensure_inside_root, load_project
@@ -19,6 +20,7 @@ from .kitlock import digest, project_path, read_lock
 
 RECORD = ".agent/kit-reports.json"  # ignored: which kit file versions this checkout drafted, reported or explained
 DRAFTS = ".agent/kit-reports"
+UPSTREAM_DRAFTS = ".agent/upstream-reports"  # ignored (.agent/)
 
 
 def _recorded(root: Path) -> dict[str, str]:
@@ -89,6 +91,9 @@ def template_repository(root: Path) -> str:
 
 def report(root: Path, args) -> str:
     """Draft the kit report for the template (nothing is sent), or record a project-specific reason."""
+    upstream = getattr(args, "upstream", None)
+    if isinstance(upstream, str) and upstream:
+        return upstream_draft(root, args)
     paths = _owed(root)
     if args.reason:
         _record(root, paths, f"project-specific: {args.reason}")
@@ -115,6 +120,24 @@ def report(root: Path, args) -> str:
     return (f"Drafted {relative} for {template_repository(root)} (nothing was sent). The owner reviews it and files it "
             f"with: make kit-publish TITLE=\"{args.title}\" BODY={relative} TYPE={args.type} PRIORITY={args.priority} "
             f"TOPIC={args.topic}")
+
+
+def upstream_draft(root: Path, args) -> str:
+    """Local draft for an upstream repository (#131). No network, no gh; the owner files it by hand."""
+    from .upstream import _pick
+    entry = _pick(root, args.upstream)[0]
+    if not args.title or not args.body_file:
+        raise RepoctlError("kit-report UPSTREAM=<id> needs TITLE=\"...\" and BODY=path")
+    body_path = ensure_inside_root(root, root / args.body_file, "upstream report body")
+    slug = "".join(ch if ch.isalnum() else "-" for ch in args.title.lower()).strip("-")[:40] or "report"
+    draft = ensure_inside_root(root, root / UPSTREAM_DRAFTS / f"{entry['id']}-{slug}.md", "upstream report draft")
+    draft.parent.mkdir(parents=True, exist_ok=True)
+    relative = draft.relative_to(root)
+    draft.write_text(
+        f"# {args.title}\n\nRepository: {entry['repo']}\nPinned revision: {entry['revision']}\n\n"
+        f"{body_path.read_text(encoding='utf-8')}\n\n---\nDraft only; nothing was sent. The owner files it with:\n"
+        f"gh issue create -R {entry['repo']} --title {shlex.quote(args.title)} --body-file {shlex.quote(str(relative))}\n", encoding="utf-8")
+    return f"Drafted {relative} for {entry['repo']}@{entry['revision'][:7]} (nothing was sent; the owner files it)."
 
 
 def publish(root: Path, args) -> str:
