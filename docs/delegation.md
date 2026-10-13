@@ -102,7 +102,12 @@ deep=opus). `web` roles get `Read, Grep, Glob, WebSearch, WebFetch` plus one
 needs `git`, `make where`, and test runs, so their read-only promise is a role
 rule, not a sandbox; `full` is unrestricted.
 Spend deep tiers on judgment (critique, architecture), fast tiers
-on lookup and upkeep.
+on lookup and upkeep. When token cost or report length is the measured
+problem (returns over their word cap, context filling with prose), pull
+Caveman (`make upstream ID=caveman-token-economy`): terse-output and
+context-compression patterns. Its `HONEST-NUMBERS` file says what savings
+are real. Keep every `path:line` and fact; never compress a critic's
+evidence. Skip it when reports already fit their caps.
 
 ## Parallelism
 

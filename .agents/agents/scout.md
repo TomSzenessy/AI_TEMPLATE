@@ -22,7 +22,9 @@ to tour the repository; when the answer lives outside `Scope`, say so in
 1. Start with `make where Q="<terms>"` and `make map`; follow doc ownership
    (`<!-- covers: -->` bindings) before reading code.
 2. Read excerpts, not whole files. Stop when the question is answered.
-3. Check `docs/ERROR_LOG.md` and closed issues for the same signature when the
+3. A cross-cutting question in a huge unmapped repo: name the graph tools in
+   `docs/architecture/README.md` in `Unknowns`; never run them yourself.
+4. Check `docs/ERROR_LOG.md` and closed issues for the same signature when the
    brief is about a failure.
 
 ## Never

@@ -27,8 +27,10 @@ needs normal code navigation, not a disassembler.
    [resource intake](../../../docs/resources.md#resource-intake-triage-what-you-are-handed).
    Record the actual trial outcome or specific non-trial reason. Reading this
    skill supplies no tool, installs nothing and changes no host configuration.
-   **Authorized request learning/replay** (for example the registry's pinned
-   api-anything reference, link-only provenance) uses this same path as a usage
+   **Authorized request learning/replay** (API Anything,
+   `make upstream ID=api-anything-authorized-replay`: learns an app's HTTP
+   calls from recorded traffic and replays them; pull its README only when you
+   must call an authorized service that has no documented API) uses this same path as a usage
    trigger, not an admission: separate learned user inputs from auth, session
    and nonce values before reuse; browser credential or profile imports need
    their own explicit scope recorded in step 1 even at tier 1 — tier 1 neither
@@ -90,4 +92,4 @@ First-party workflow, independently written for this template. The reviewed
 [REA source](references/rea.md) informs the shipped-artifact and evidence paths;
 no upstream skill, tool code or automatic approval policy is vendored.
 
-Upstream depth: `make upstream ID=rea-authorized-analysis` lists pinned files (e.g. Android → android-analysis.md); fetch only the one your step needs.
+REA (`make upstream ID=rea-authorized-analysis`): platform guides for authorized artifact analysis (Android, browser, JavaScript). Pull the one for the artifact in scope after step 1 authorizes it.

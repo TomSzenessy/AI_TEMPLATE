@@ -50,6 +50,10 @@ claim a verified license from the manifest alone.
 - Delete dead code only after tracing callers, generated artifacts, deployment
   paths, and documentation. File residual cleanup as an issue when it is
   independent.
+- Shortcuts taken on purpose are debt: record each in the issue. For a
+  ranked minimal-diff audit or a debt-ledger format, pull Ponytail
+  (`make upstream ID=ponytail-lazy-senior`) when a change keeps growing past
+  its task; it is instruction text only, nothing to install.
 
 ## Interfaces, deprecation, and migration
 

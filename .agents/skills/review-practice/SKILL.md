@@ -140,4 +140,9 @@ response.
 | "I will review my own diff, it is small" | Same blind spots as the author; use the critic at high risk. |
 | "Add the proper version it suggests" | Check use first; unused code stays unbuilt. |
 
-Upstream depth: `make upstream ID=addyosmani-agent-skills` lists pinned files (e.g. security → security-checklist.md); fetch only the one your step needs.
+Ponytail (`make upstream ID=ponytail-lazy-senior`): a smallest-change
+discipline plus a ranked audit and a shortcut-debt ledger. Pull its
+`ponytail-audit` file when a review keeps finding over-built code. Skip it
+when the diff is already minimal.
+
+Addy agent-skills (`make upstream ID=addyosmani-agent-skills`): long checklists (security, performance, accessibility, testing). Pull one when a review touches that axis deeply.

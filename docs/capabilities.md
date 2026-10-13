@@ -87,6 +87,19 @@ A skill nobody finds or follows is dead weight. Before `make new KIND=skill`:
   in a linked `references/` file the body says when to open (bytes are budgeted
   in `project.toml`). Do not write a skill for what a check can enforce.
 
+## Where to look for an outside capability
+
+After `make similar` finds nothing local, and only through `skill-scout`:
+
+- **skills.sh** (`make upstream ID=skills-sh-find-skills`): the open skill
+  ecosystem's search (`npx skills find <query>`). Use it to list candidates
+  for a named gap; never `npx skills add` without review.
+- **Awesome Claude Skills** (`make upstream ID=composio-awesome-claude-skills`):
+  a catalog with `mcp-builder` (pull before `make new KIND=mcp` to design an
+  MCP server), `webapp-testing` (Playwright patterns) and about 830
+  Composio app-API wrappers. A wrapper needs a Composio account and sends
+  data to it: only for a task that already integrates that app.
+
 ## Configuration
 
 Policy a project may change lives in `project.toml`, with built-in defaults

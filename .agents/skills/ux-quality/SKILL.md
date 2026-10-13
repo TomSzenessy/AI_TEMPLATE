@@ -117,11 +117,12 @@ Steps 1-2 below are audit and critique, step 3 is polish.
 4. For key flows, walk through as a first-time user: count steps and time to
    the first moment of value.
 
-Optional external catalogs (not installed; vet with `skill-scout` first):
-[UI UX Pro Max](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill)
-(searchable styles, palettes, font pairings) and
-[Impeccable](https://github.com/pbakaus/impeccable) (design commands with an
-anti-pattern detector).
+**UI UX Pro Max** (`make upstream ID=ui-ux-pro-max-design-intel`): CSV data
+of visual styles, palettes, font pairings, chart types, motion timings and
+do/don't UX rules per product category. Pull the one CSV for the decision in
+front of you when the brief in `docs/design.md` leaves a style, palette,
+pairing or chart choice open and you would otherwise guess; skip it when the
+brief or tokens already decide. Read the CSV as data; never run its script.
 
 ## Done when
 
@@ -129,4 +130,4 @@ You ran the real build and looked at it, every state exists, contrast and
 accessibility checks pass, screenshots were reviewed with no blocker, and
 deviations are recorded in `docs/design.md`.
 
-Upstream depth: `make upstream ID=impeccable-frontend-polish` lists pinned files (e.g. typography → typeset.md); fetch only the one your step needs.
+Impeccable (`make upstream ID=impeccable-frontend-polish`): one reference per design dimension (typeset, layout, colorize, animate, harden, polish). Pull the file for the dimension a screen failed in review; skip when it passed.

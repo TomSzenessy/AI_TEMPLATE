@@ -123,12 +123,26 @@ class UpstreamTests(unittest.TestCase):
         self.assertEqual(len(findings), 1)
         self.assertIn("p/q@1234567", findings[0])
 
+    def test_discoverability_needs_a_pointer_outside_registry_and_generated(self) -> None:
+        self.registry()
+        (self.root / "resources.toml").write_text((self.root / "resources.toml").read_text() + "# ref\n")
+        (self.root / ".claude").mkdir()
+        (self.root / ".claude" / "x.md").write_text("ref")
+        findings = upstream.discoverability_findings(self.root)
+        self.assertEqual(len(findings), 1)
+        self.assertIn("ref has no pointer", findings[0])
+        self.assertIn("make upstream ID=ref", findings[0])
+        skill = self.root / ".agents" / "skills" / "s"
+        skill.mkdir(parents=True)
+        (skill / "SKILL.md").write_text("pull ref when testing")
+        self.assertEqual(upstream.discoverability_findings(self.root), [])
+
     def test_command_and_check_are_registered(self) -> None:
         from kit.registry import Registry
         registry = Registry(Path(__file__).resolve().parents[2])
         self.assertTrue(any(c.name == "upstream" for c in registry.of("command")))
         names = {c.name for c in registry.of("check")}
-        self.assertLessEqual({"upstream-notices", "upstream-review-age"}, names)
+        self.assertLessEqual({"upstream-notices", "upstream-review-age", "upstream-discoverability"}, names)
 
 
 if __name__ == "__main__":

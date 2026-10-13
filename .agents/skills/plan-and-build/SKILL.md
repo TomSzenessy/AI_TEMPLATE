@@ -134,4 +134,4 @@ every path is a guess.
 | "Plan is wrong here" | Rule against the design, record it, continue. |
 | "Tests passed earlier" | Run them on the tree you integrate. |
 
-Upstream depth: `make upstream ID=superpowers-workflow` lists pinned files (e.g. reviewer brief → code-reviewer.md); fetch only the one your step needs.
+Superpowers (`make upstream ID=superpowers-workflow`): the original planning and review templates. Pull `code-reviewer.md` when a reviewer brief needs a fuller checklist.

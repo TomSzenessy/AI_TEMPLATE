@@ -383,6 +383,8 @@ reviewed_on = "2026-10-13"
 adapted_into = [".agents/skills/web-quality/SKILL.md"]
 files = [
   { path = "README.md", when = "browsing the catalog of skills and app wrappers" },
+  { path = "mcp-builder/SKILL.md", when = "designing an MCP server before make new KIND=mcp" },
+  { path = "webapp-testing/SKILL.md", when = "writing Playwright tests against a local web app" },
 ]
 
 [[resources]]

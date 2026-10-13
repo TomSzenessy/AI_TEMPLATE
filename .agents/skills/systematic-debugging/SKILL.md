@@ -125,4 +125,4 @@ Any of these: stop, return to Phase 1.
 Cause confirmed with evidence, red-then-green test in the suite, one root-cause
 change, `make done` fresh, real path observed, ledger and issue updated.
 
-Upstream depth: `make upstream ID=superpowers-workflow` lists pinned files (e.g. deep stack → root-cause-tracing.md); fetch only the one your step needs.
+Superpowers (`make upstream ID=superpowers-workflow`): the long-form debugging guides this skill condenses. Pull `root-cause-tracing` for a deep call chain or `find-polluter.sh` for test pollution, only when the phase above stalls.

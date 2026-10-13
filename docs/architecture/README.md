@@ -96,6 +96,27 @@ files as owned, so neither re-derives the rule.
   invariants, owner, performance budget) bound with `<!-- covers: -->`, so
   agents load the card instead of the implementation.
 
+## Large or unfamiliar codebases and diagrams
+
+Start with `make where`, `make map` and a `scout`. Pull a graph tool only
+when they cannot answer a cross-cutting question (who calls this across
+packages, what a diff touches) in a large repository this kit did not map:
+
+- **Graphify** (`make upstream ID=graphify-code-graph`): builds a queryable
+  knowledge graph of code and docs. Pull for "how is X connected to Y"
+  across many modules; read `docs/how-it-works.md` for what it cannot answer.
+- **Understand Anything** (`make upstream ID=understand-anything-graph`):
+  graph dashboard plus diff blast-radius, file-explain and onboarding
+  guides. Pull for reviewing a large PR's impact or onboarding to a repo.
+- **Archify** (`make upstream ID=archify-diagrams`): writes explorable
+  HTML/SVG architecture, sequence and data-flow diagrams. Pull when a
+  diagram must be shared or explored; a short Mermaid block suffices otherwise.
+
+Graphify and Understand Anything are tools: running them installs code and may
+send source to a model, so vet with `skill-scout`, get owner approval, and
+follow the consent rules in [`../privacy.md`](../privacy.md) first. Reading
+their files is always fine.
+
 ## Architecture review prompts
 
 Use these only when the trigger applies:

@@ -31,6 +31,10 @@ of work.
 6. **Recount last.** Re-read every live number (scores, counts, dates) from its
    source right before presenting; numbers drift while work continues.
 
+An explorable architecture or flow diagram for the deck: Archify
+(`make upstream ID=archify-diagrams`), pulled only when a static image is
+not enough.
+
 ## Done when
 
 - Every number in the deliverable appears in the claim table with a source
