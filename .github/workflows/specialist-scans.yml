@@ -76,4 +76,10 @@ jobs:
             --exclude 'https://openai\.com/index/harness-engineering/?'
             --exclude 'https://www\.iso\.org/standard/(74393|78176|81291)\.html'
             ${{ steps.markdown.outputs.files }}
+          # A PR's changed Markdown may legitimately contain no links, and
+          # lychee exits 0 there, so the action's failIfEmpty default would
+          # fail the job on its 'Total | 0' summary. Scheduled and manual
+          # full scans keep failIfEmpty. fail: true still fails broken
+          # links, malformed URLs, and read errors.
+          failIfEmpty: ${{ github.event_name != 'pull_request' }}
           fail: true
