@@ -62,15 +62,18 @@ done: python-check
 
 export KIT_IN_ACCESS = $(if $(filter command line,$(origin ACCESS)),$(value ACCESS))
 export KIT_IN_AGENT = $(if $(filter command line,$(origin AGENT)),$(value AGENT))
+export KIT_IN_ANSWERS = $(if $(filter command line,$(origin ANSWERS)),$(value ANSWERS))
 export KIT_IN_AREA = $(if $(filter command line,$(origin AREA)),$(value AREA))
 export KIT_IN_BODY = $(if $(filter command line,$(origin BODY)),$(value BODY))
 export KIT_IN_BUDGET = $(if $(filter command line,$(origin BUDGET)),$(value BUDGET))
 export KIT_IN_CHECK_ONLY = $(if $(filter command line,$(origin CHECK_ONLY)),$(value CHECK_ONLY))
+export KIT_IN_CONSENT = $(if $(filter command line,$(origin CONSENT)),$(value CONSENT))
 export KIT_IN_COVERS = $(if $(filter command line,$(origin COVERS)),$(value COVERS))
 export KIT_IN_DESC = $(if $(filter command line,$(origin DESC)),$(value DESC))
 export KIT_IN_FORCE = $(if $(filter command line,$(origin FORCE)),$(value FORCE))
 export KIT_IN_GATE = $(if $(filter command line,$(origin GATE)),$(value GATE))
 export KIT_IN_GROUP = $(if $(filter command line,$(origin GROUP)),$(value GROUP))
+export KIT_IN_GUIDED = $(if $(filter command line,$(origin GUIDED)),$(value GUIDED))
 export KIT_IN_ISSUE_FILE = $(if $(filter command line,$(origin ISSUE_FILE)),$(value ISSUE_FILE))
 export KIT_IN_KIND = $(if $(filter command line,$(origin KIND)),$(value KIND))
 export KIT_IN_KIT = $(if $(filter command line,$(origin KIT)),$(value KIT))
@@ -84,6 +87,7 @@ export KIT_IN_PUBLIC_REVIEWED = $(if $(filter command line,$(origin PUBLIC_REVIE
 export KIT_IN_PUBLIC_SAFE = $(if $(filter command line,$(origin PUBLIC_SAFE)),$(value PUBLIC_SAFE))
 export KIT_IN_Q = $(if $(filter command line,$(origin Q)),$(value Q))
 export KIT_IN_REASON = $(if $(filter command line,$(origin REASON)),$(value REASON))
+export KIT_IN_RESHAPE = $(if $(filter command line,$(origin RESHAPE)),$(value RESHAPE))
 export KIT_IN_REVIEW_EVIDENCE = $(if $(filter command line,$(origin REVIEW_EVIDENCE)),$(value REVIEW_EVIDENCE))
 export KIT_IN_SKILL_PATH = $(if $(filter command line,$(origin SKILL_PATH)),$(value SKILL_PATH))
 export KIT_IN_STATUS = $(if $(filter command line,$(origin STATUS)),$(value STATUS))
@@ -164,7 +168,7 @@ incident: python-check
 init: python-check
 	$(if $(KIT_IN_NAME),,$(error Name the project: make init NAME=my-project KIND=web))
 	$(if $(KIT_IN_KIND),,$(error Give its kind: make init NAME=my-project KIND=web))
-	@$(REPOCTL) init $(if $(KIT_IN_NAME),--name "$${KIT_IN_NAME}",) $(if $(KIT_IN_KIND),--kind "$${KIT_IN_KIND}",) $(if $(KIT_IN_OWNER),--owner "$${KIT_IN_OWNER}",)
+	@$(REPOCTL) init $(if $(KIT_IN_NAME),--name "$${KIT_IN_NAME}",) $(if $(KIT_IN_KIND),--kind "$${KIT_IN_KIND}",) $(if $(KIT_IN_OWNER),--owner "$${KIT_IN_OWNER}",) $(if $(KIT_IN_ANSWERS),--answers "$${KIT_IN_ANSWERS}",) $(if $(filter 1 yes true,$(KIT_IN_GUIDED)),--guided,) $(if $(filter 1 yes true,$(KIT_IN_CONSENT)),--consent,) $(if $(filter 1 yes true,$(KIT_IN_RESHAPE)),--reshape,)
 
 adopt: python-check
 	$(if $(KIT_IN_NAME),,$(error Name the project: make -f <kit>/Makefile adopt NAME=my-app KIND=web OWNER=you; if the kit path is not found add KIT_DIR=<kit>))

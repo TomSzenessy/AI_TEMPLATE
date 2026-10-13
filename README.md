@@ -155,7 +155,7 @@ WHEN NEEDED
                                      Create a private incident regression record
 
 PROJECT SETUP AND MAINTENANCE
-  make init NAME=my-project KIND=web [OWNER=you]
+  make init NAME=my-project KIND=web [OWNER=you] [--answers file] [--guided] [--consent] [--reshape]
                                      Turn the template into your project
   make -f <kit>/Makefile adopt NAME=x KIND=web OWNER=you
                                      Bring this kit into an existing repository (--root) without overwriting it

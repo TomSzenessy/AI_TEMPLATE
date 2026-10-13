@@ -1,7 +1,7 @@
 # Project adaptation
 
 <!-- index: operate | Lean core, artifact lifecycle, packs, and capability patterns | Turning the template into a project without generating unnecessary structure. -->
-<!-- covers: tools/kit/bootstrap.py tools/kit/ci.py tools/repoctl -->
+<!-- covers: tools/kit/bootstrap.py tools/kit/guided.py tools/kit/commands.py tools/repoctl -->
 
 The template is a small kernel plus switchable packs (`.agents/packs/`;
 [`[packs]` switching rules](./capabilities.md)), not a universal application scaffold. `make init`
@@ -30,6 +30,7 @@ a project small:
 | `docs/research/` | Keep as provenance while its guidance matters. | Archive/remove after the knowledge has been internalized and no decision cites it. |
 | `tools/kit-lock.json` | Written by `make init`, `make adopt`, and `make kit-update`: what the project got from the kit. | Never edit by hand; `make kit-update` maintains it; `KIT_REF=<sha>` pins an update to one template commit instead of its HEAD ([`kit-update.md`](./kit-update.md)). |
 | `project.mk` | Your own make targets; the kit Makefile includes it. | Keep project targets here, not in the kit's Makefile. |
+| `[guided]` | Placeholder env names, pending record drafts. See [Guided intake below](#guided-intake-after-identity-init-110) for canonical route/hash/lock/default rules. | Env: names only, create absent, append missing, never overwrite values; target preflight refuses a link/non-regular target before any write (no env-follow-alias); accepted records preserved except explicit `--reshape`; table generated, never hand-edit. |
 | `.agents/trials/` | Template maintenance: build-trial requests and seeds. | Pruned by `make init` and skipped by `make adopt`, together with any doc binding that only pointed at them; add your own requests to run `make trial`. |
 | `docs/ERROR_LOG.md` | Keep as an append-only solved-failure ledger. | Do not use it for open work; link open work to Issues. |
 | `.agents/skills/` | Keep the small first-party workflows and verified reusable capabilities. | Retain a reviewed skill while it remains trusted and useful; remove it only with a documented trust, permission, maintenance, or owner decision. |
@@ -39,6 +40,41 @@ a project small:
 
 A project should be able to remove unused optional material without removing
 its operating contract, history, or evidence.
+
+## Guided intake after identity init (#110)
+
+- **Status:** shipped in `tools/kit/guided.py`; identity init stays first
+  writer, guided intake applies only with explicit consent. `consent` and
+  `reshape` are validated as real JSON booleans in `answers_from_json`
+  before any write (a typed string like `"false"` is rejected, never coerced).
+  Answers must be strings; the four capability answers must be valid choices.
+- **Risk:** decision intake must never confirm a product or re-bootstrap.
+  Cancellation, missing/mistyped consent, unknown choice, stale plan, or
+  changed owners write nothing; apply is locked (cooperating callers serialize),
+  and the VISION/STACK owner-hash check repeats under that lock before any
+  write — an owner edit while apply waits is refused, never overwritten.
+- **Owner apply (vetted routes only):** explicit `request` sets `enabled = true`,
+  explicit `off` sets `enabled = false` in the two vetted canonical route owners
+  (Playwright browser, Exa search); `preserve` writes nothing. Only the
+  top-level `enabled` boolean is rewritten (a real TOML boolean, never a truthy
+  string); url/command/env_headers stay opaque. A missing, malformed,
+  symlinked, misnamed, or outside-root route is refused before any write; the
+  plan binds every vetted route's full raw hash, so post-plan URL/args drift
+  refuses as stale. Defaults follow the route's current state (enabled
+  preserves, disabled recommends off), so a blank answer never switches an
+  enabled route off; explicit `off` still disables. After an edit the
+  `[guided].mcp` mirror and host projection are re-derived from `.agents/mcp`
+  owners only: no connection, startup, or embedding activation.
+- **Preview vs applied:** no-consent reports `planned configuration only, no
+  connection`; applied names the enabled route from the owner projection.
+- **Golden path:** `make init NAME=x KIND=web` (unattended, unchanged), then
+  `make init ... --answers file.json` (or `--guided` for the terminal round);
+  both surfaces produce identical owner files. Drafts stay pending for
+  `product-kickoff`; embeddings stay requested-not-ready.
+- **Four shared choices:** browser and Exa take `off`/`request`/`preserve`;
+  logging takes `off`/`local-redacted`/`plan-external` (default `local-redacted`);
+  embeddings takes `off`/`request` (default `off`). Intent is persisted in the
+  `[guided]` receipt and pending STACK section, as config only.
 
 ## Adopting an existing repository
 
