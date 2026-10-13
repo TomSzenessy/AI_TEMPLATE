@@ -555,7 +555,10 @@ def build_index(root: Path, *, transport=None, consent: bool = False) -> list[st
     if not config["endpoint"] or not config["model"]:
         return ["semantic endpoint/model not configured ([kit].semantic_endpoint, [kit].semantic_model); index not built"]
     if transport is None:
-        transport = configured_transport(root, config)
+        try:
+            transport = configured_transport(root, config)
+        except SemanticError as error:
+            return [f"{error}; index not built"]
     if transport is None:
         return [f"{config['api_key_env']} is not set; index not built (a key is never consent by itself)"]
     confirmed, reason = confirm_scope(root, config, snapshot, explicit=consent)
@@ -640,7 +643,10 @@ def code_matches(root: Path, query: str, *, transport=None, consent: bool = Fals
     if not config["endpoint"] or not config["model"]:
         return _lexical(root, query, config), ["semantic endpoint/model not configured ([kit].semantic_endpoint, [kit].semantic_model)"]
     if transport is None:
-        transport = configured_transport(root, config)
+        try:
+            transport = configured_transport(root, config)
+        except SemanticError as error:
+            return _lexical(root, query, config), [f"{error} (lexical fallback)"]
     if transport is None:
         return _lexical(root, query, config), [f"{config['api_key_env']} is not set; a missing key means no outbound"]
     if secret_matches(query):
@@ -669,11 +675,22 @@ def status_lines(root: Path) -> list[str]:
     config = _config(root)
     if not config["enabled"]:
         return ["semantic code search: disabled ([kit].semantic_enabled is true to enable)"]
-    key = os.environ.get(config["api_key_env"], "")
+    key_env = config["api_key_env"]
+    try:
+        _env_name(key_env)
+        key = os.environ.get(key_env, "") or _read_dotenv(root, frozenset({key_env})).get(key_env, "")
+    except SemanticError:
+        key = ""
+    endpoint = config["endpoint"] or "(not configured)"
+    if config["endpoint"] and not _is_not_ready(config["endpoint"]):
+        try:
+            _valid_endpoint(config["endpoint"])
+        except SemanticError as error:
+            endpoint = f"(invalid: {error})"  # never echo a URL that may carry credentials
     snapshot = inventory(root, config)
     index, state, reason = index_state(root, config, snapshot)
     lines = ["semantic code search: enabled",
-             f"  endpoint: {config['endpoint'] or '(not configured)'}",
+             f"  endpoint: {endpoint}",
              f"  model: {config['model'] or '(not configured)'}",
              f"  key: {config['api_key_env']} {'set' if key else 'not set'}"]
     if snapshot["files"]:

@@ -605,6 +605,26 @@ class SimilarCodeTests(KitRepository):
         self.assertEqual(fake.calls, [], "a blank query must not reach the transport")
 
 
+class SemanticInvalidEndpointTests(KitRepository):
+    """An unsafe configured endpoint degrades honestly instead of raising (#115 critic)."""
+
+    def test_non_https_endpoint_falls_back_to_lexical_with_a_reason(self) -> None:
+        for endpoint in ("http://plain.example.test/v1", "https://user:pw@creds.example.test/v1",
+                         "https://query.example.test/v1?k=v"):
+            with self.subTest(endpoint=endpoint):
+                enable(self.root, semantic_endpoint=endpoint)
+                with mock.patch.dict(os.environ, {KEY_ENV: KEY_VALUE}):
+                    matches, reasons = semantic.code_matches(self.root, "render invoice")
+                    summary = semantic.build_index(self.root, consent=True)
+                self.assertTrue(reasons, "the fallback must say why")
+                self.assertNotIn("pw", " ".join(reasons + summary), "credentials are never echoed")
+                self.assertTrue(any("index not built" in line for line in summary), summary)
+                self.assertFalse((self.root / ".agent" / "semantic-code-cache.json").exists())
+                status = "\n".join(semantic.status_lines(self.root))
+                self.assertIn("(invalid:", status)
+                self.assertNotIn("pw@", status, "status never echoes a credentialed endpoint")
+
+
 class SemanticSnapshotTests(unittest.TestCase):
     """Approved-snapshot invariant (#115): a supplied cfg is used exactly; _config is never re-read."""
 
