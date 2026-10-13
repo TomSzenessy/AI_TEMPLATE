@@ -1,25 +1,35 @@
 ---
 name: review-mining
 description: >-
-  Reads what a product's real users say in public reviews (App Store, Google
-  Play, G2, Capterra, Trustpilot, Reddit, Hacker News, its own feature-request
-  board), ranks what they hate, what is missing and what is unsolved, and turns
-  it into a fix plan and a positioning angle. Every quote is real, verbatim
-  and linked. Use when the user says "what do users hate about X", "read the
-  reviews", "positioning", or "what should we fix".
+  Reads what a product's real users say in public reviews — your own
+  product's feedback when there is no reference, or a reference product's
+  reviews when you clone one — and ranks what they hate, what is missing and
+  what is unsolved, in their own words. Every quote is real, verbatim and
+  linked; nothing is invented. Original mode scopes the goal from VISION.md
+  or the accepted design, asking the owner one blocking question when the
+  product or its sources are missing. Turns the evidence into a fix plan and
+  a positioning angle. Use when the user says "what do users hate about X",
+  "read the reviews", "positioning", or "what should we fix".
 ---
 
 # review-mining
 
-A straight copy of a product has no reason to exist. This skill finds the
-reason: what the reference product's users hate, in their own words, and what
-your build does instead. Reads the scope in `reference/recon.md`
-(product-recon), so the mining stays inside the slice being built.
+Two modes, one goal: know what real users hate, in their own words, before
+you build. **Reference mode** (cloning a product you studied) reads the scope
+in `reference/recon.md` (product-recon), so the mining stays inside the slice
+being built. **Original mode** (your own product, no reference) has no
+`reference/recon.md`: scope the mining from the owner's goal instead —
+VISION.md or the accepted design brief, the category, the comparable
+products — and work under `docs/research/`. Never invent a competitor. If the
+product or its sources are missing, ask the owner the one blocking question
+that unblocks them. Never require product-recon, and never force a full
+product-kickoff when the user already brought a feedback task.
 
-Tool in this folder (command runs from the project root):
+One variable picks the mode's folder, so the command keeps the same shape:
 
 ```bash
-python3 .agents/skills/review-mining/reviews.py reference/reviews.csv --out reference/feedback.md
+RESEARCH_DIR=reference   # reference mode; docs/research in original mode
+python3 .agents/skills/review-mining/reviews.py "$RESEARCH_DIR/reviews.csv" --out "$RESEARCH_DIR/feedback.md"
 ```
 
 ## The rules, which are not negotiable
@@ -55,14 +65,14 @@ Aim for 100+ reviews across at least three sources, recent first:
 | its own board | its public roadmap or feature-request board (Canny and similar) and the vote counts |
 | its changelog | what it shipped, so you do not "fix" what is already fixed |
 
-Each row in `reference/reviews.csv`: `source,url,date,rating,text`, text
+Each row in `$RESEARCH_DIR/reviews.csv`: `source,url,date,rating,text`, text
 copied exactly. Read the 3 and 4 star reviews too. "Love it, but..." is where
 the best fixes hide.
 
 ## Step 2: rank
 
 ```bash
-python3 .agents/skills/review-mining/reviews.py reference/reviews.csv --out reference/feedback.md
+python3 .agents/skills/review-mining/reviews.py "$RESEARCH_DIR/reviews.csv" --out "$RESEARCH_DIR/feedback.md"
 ```
 
 A quote cut for length is marked `[excerpt]`, a rating outside 1 to 5 is
@@ -75,8 +85,10 @@ theme. Read that last list by hand. It is often the best part.
 
 ## Step 3: three lists
 
-From `reference/feedback.md`, write three ranked lists. Each item: the problem
-in one line, how many reviews, how many sources, one or two linked quotes.
+From `$RESEARCH_DIR/feedback.md`, write three ranked lists. Each item: the
+problem in one line, how many reviews, how many sources, one or two linked
+quotes. In original mode the lists are your own product's users, and they
+become its plan.
 
 1. **What they hate.** Complaints about things the product does.
 2. **What is missing.** Features people ask for by name.
@@ -91,18 +103,20 @@ a trend.
 Pick the top 5 to 8 by evidence times how cheaply you can fix them. For each:
 what to build or change, size (S, M, L), which step of the build loop takes
 it, and the evidence. Append each one to `docs/product/features.csv` with
-`status` `no` and `source` `review-mining` (evidence in `acceptance`);
-parity-check lists these as improvements, not parity, and `make next` queues
-them. Pricing and billing complaints feed the angle as much
-as the fix plan.
+`status` `no` and `source` `review-mining` (evidence in `acceptance`) only
+when that product matrix exists and the fix plan is approved; parity-check
+lists these as improvements, not parity, and `make next` queues them. With no
+appropriate matrix or no approval, propose the issues to the owner for the
+WAL instead of a tracked live backlog. Pricing and billing complaints feed
+the angle as much as the fix plan.
 
 ## Step 5: the angle
 
 Three positioning options, each grounded in a top theme:
 
 ```
-For {{who}} who {{hate this about the reference product, in plain words}},
-{{your app}} {{does this instead}}.
+For {{who}} who {{hate this about the product, in plain words}},
+{{your build}} {{does this instead}}.
 Evidence: {{theme}}, {{n}} reviews across {{n}} sources.
 ```
 
@@ -112,6 +126,8 @@ comparison page is a legal question for a lawyer in your country.
 
 ## Output
 
-`reference/reviews.csv`, `reference/feedback.md`, `reference/fixes.md` (three
-lists, fix plan, angle), new rows in `docs/product/features.csv`, and a summary
-that states the sample size. Then brand-sweep.
+`$RESEARCH_DIR/reviews.csv`, `$RESEARCH_DIR/feedback.md`,
+`$RESEARCH_DIR/fixes.md` (three lists, fix plan, angle), rows in
+`docs/product/features.csv` when the matrix exists and the plan is approved,
+and a summary that states the sample size. brand-sweep only when the angle
+is used or the product is being rebranded — not every review request.

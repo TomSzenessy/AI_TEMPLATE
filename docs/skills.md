@@ -162,7 +162,8 @@ for competitive analysis and "build our own version of X":
   original-product mode builds tokens from the confirmed design brief when no
   reference exists.
 - [`review-mining`](../.agents/skills/review-mining/SKILL.md) ranks what real
-  users complain about from linked, verbatim quotes — never invented ones.
+  users hate and ask for — a reference product's or your own product's public
+  reviews — from linked, verbatim quotes, never invented ones.
 - [`brand-sweep`](../.agents/skills/brand-sweep/SKILL.md) names and vets your
   own identity, then sweeps the codebase until nothing of the reference
   product's name, domain, or colors remains; an original-product mode names
