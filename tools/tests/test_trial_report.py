@@ -74,6 +74,18 @@ class ReportTests(unittest.TestCase):
         failing = {**PASSING, "check_passed": False}
         self.assertIn("- Verdict: fail (make check did not pass)", trial.render(SPEC, "haiku", analysis, failing, Path("p")))
 
+    def test_a_failing_surface_build_or_uncommitted_work_is_not_a_pass(self) -> None:
+        """make check and finish stay green for a project whose real build fails (#12 streak trial)."""
+        analysis = analyse(tool("a", "make done"), FINISHED)
+        broken = {**PASSING, "verify_passed": False, "verify": ["app: verification command exited 66"]}
+        self.assertIn("- Verdict: fail (surface verification did not pass)",
+                      trial.render(SPEC, "haiku", analysis, broken, Path("p")))
+        dirty = {**PASSING, "verify_passed": True, "uncommitted": 9}
+        self.assertIn("- Verdict: fail (9 uncommitted path(s) left behind)",
+                      trial.render(SPEC, "haiku", analysis, dirty, Path("p")))
+        clean = {**PASSING, "verify_passed": True, "uncommitted": 0}
+        self.assertIn("- Verdict: pass", trial.render(SPEC, "haiku", analysis, clean, Path("p")))
+
     def test_turns_and_tokens_are_counted_per_phase(self) -> None:
         analysis = analyse(turn(1, 1), tool("a", "make next"), result("a", "Next (intake): ask"),
                            turn(10, 5), turn(20, 5), tool("b", "make next"), result("b", "Next (build): code"),

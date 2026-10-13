@@ -1,0 +1,31 @@
+# Native iOS app on the simulator (#12): the smallest product that still needs
+# real platform conventions, every screen state, persistence and a simulator
+# screenshot judged under ux-quality. Kept to one screen so a cheap model fits
+# the budget.
+id = "streak"
+kind = "ios"
+mode = "new"
+budget_usd = 12
+prompt = '''
+I want "Streak", a tiny native iPhone app (SwiftUI, no third-party packages)
+for keeping up to five daily habits.
+
+I won't be available during this run. Answer my kickoff questions with your own
+recommendations and write down what you chose; for anything else, use your best
+judgement and record the decision.
+
+- One screen: a list of habits, each with a name, today's check-off, and the
+  current streak in days. Add (name only), rename, delete with swipe, and
+  reorder. An empty state that explains the app and offers "Add a habit".
+- Data stays on the device (SwiftData or a JSON file); nothing leaves the
+  phone, no accounts, no analytics, no network.
+- Follow Apple's Human Interface Guidelines: Dynamic Type, Dark Mode,
+  VoiceOver labels, 44 pt touch targets, system colors and SF Symbols.
+- Done means: unit tests for the streak calculation (including a missed day
+  and a month boundary) pass; the app builds with xcodebuild for the iOS
+  Simulator; it is installed and launched on a booted iPhone simulator
+  (`xcrun simctl`), and you capture screenshots of the empty state and of a
+  list with three habits, in light and dark mode, into `docs/screenshots/`,
+  then review them against the ux-quality skill and fix what fails.
+  `make done` must be green at the end.
+'''

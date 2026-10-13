@@ -237,6 +237,8 @@ def project_state(project: Path) -> dict[str, object]:
     trailers = git(project, "log", "--format=%(trailers:key=Docs-Unaffected,valueonly)") or ""
     finish = repoctl("finish")
     check = repoctl("check")  # finish is the fast change-set gate; the repository checks are separate
+    verify = repoctl("verify")  # each surface's own build and tests: check and finish stay green when the app does not build
+    uncommitted = [line for line in (git(project, "status", "--porcelain") or "").splitlines() if line.strip()]
     summary = [line for line in finish.stdout.splitlines() if line.startswith(("Product ", "UI review"))]
     return {
         "commits": len((git(project, "rev-list", "HEAD") or "").split()),
@@ -244,6 +246,9 @@ def project_state(project: Path) -> dict[str, object]:
         "finish_passed": finish.returncode == 0,
         "check_passed": check.returncode == 0,
         "check": [line for line in check.stderr.splitlines() if line.startswith("- ")][:5],
+        "verify_passed": verify.returncode == 0,
+        "verify": [line for line in (verify.stdout + verify.stderr).splitlines() if "verification" in line][-3:],
+        "uncommitted": len(uncommitted),
         "finish": summary or (finish.stdout.strip().splitlines() or [""])[-3:],
         "trailers": [line for line in trailers.splitlines() if line.strip()],
     }
@@ -271,6 +276,10 @@ def verdict(analysis: dict[str, object], state: dict[str, object]) -> str:
         reasons.append("make check did not pass")
     if state.get("finish_passed") is not True:
         reasons.append("change-set gate did not pass")
+    if state.get("verify_passed") is False:
+        reasons.append("surface verification did not pass")
+    if state.get("uncommitted"):
+        reasons.append(f"{state['uncommitted']} uncommitted path(s) left behind")
     return "pass" if not reasons else f"fail ({', '.join(reasons)})"
 
 
@@ -282,8 +291,11 @@ def render(spec: dict[str, object], model: str, analysis: dict[str, object], sta
         f"completed: {analysis['completed']}",
         f"- Verdict: {verdict(analysis, state)}",
         f"- Commits: {state['commits']}; change-set gate (`finish`) passed: {state['finish_passed']}; "
-        f"`make check` passed: {state.get('check_passed', 'not measured')}",
+        f"`make check` passed: {state.get('check_passed', 'not measured')}; "
+        f"surface verification passed: {state.get('verify_passed', 'not measured')}; "
+        f"uncommitted paths: {state.get('uncommitted', 'not measured')}",
         *(f"  - {line[2:]}" for line in state.get("check", [])),
+        *(f"  - {line}" for line in state.get("verify", []) if state.get("verify_passed") is False),
         f"- Final `make next`: {state['next']}",
         *(f"- {line}" for line in state["finish"]),
         f"- Kit commands: {', '.join(f'{k}×{v}' for k, v in analysis['make_targets'].items()) or 'none'}",
