@@ -123,7 +123,3 @@ system check.
 primitives built, and a contrast report with zero AA failures. Then the
 project's issue-backed build loop (AGENTS.md) builds screens against the
 primitives.
-
-## Source
-
-Adapted from the upstream skill in https://github.com/Jakeschincariol/replica-skill (MIT, © 2026 Jake Schincariol); revision: see `project.toml` `[[skills]]`.

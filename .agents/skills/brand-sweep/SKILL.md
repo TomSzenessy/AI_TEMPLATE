@@ -154,7 +154,3 @@ under `reference/` (reference mode) or `docs/design/` (original mode),
 updated tokens, rewritten strings, and a clean sweep (reference mode) or the
 manual artifact-check record (original mode). That clean sweep is the
 pre-launch gate: nothing ships while it exits 1.
-
-## Source
-
-Adapted from the upstream skill in https://github.com/Jakeschincariol/replica-skill (MIT, © 2026 Jake Schincariol); revision: see `project.toml` `[[skills]]`.

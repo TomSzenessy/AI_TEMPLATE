@@ -115,7 +115,3 @@ comparison page is a legal question for a lawyer in your country.
 `reference/reviews.csv`, `reference/feedback.md`, `reference/fixes.md` (three
 lists, fix plan, angle), new rows in `docs/product/features.csv`, and a summary
 that states the sample size. Then brand-sweep.
-
-## Source
-
-Adapted from the upstream skill in https://github.com/Jakeschincariol/replica-skill (MIT, © 2026 Jake Schincariol); revision: see `project.toml` `[[skills]]`.
