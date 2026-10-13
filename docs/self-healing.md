@@ -173,5 +173,3 @@ findings, one root cause per change (see [`delegation.md`](./delegation.md)).
   newest Python 3.11+ on `PATH` even when `python3` is an older system
   interpreter (override with `REPOCTL_PYTHON` or `make PYTHON=...`). Windows
   hosts run it from Git Bash or WSL.
-
-Advisory `upstream-review-age` (garden, offline) flags pinned upstream records older than `skill_review_days`; the blocking `upstream-notices` check ties `THIRD_PARTY_NOTICES.md` sources to those records ([resources](./resources.md#upstream-records)).

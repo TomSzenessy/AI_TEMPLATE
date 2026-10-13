@@ -9,7 +9,6 @@ from datetime import timedelta
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from . import upstream
 from .config import project_setting
 from .core import (
     KEBAB, RepoctlError, check_failed, date_is_future, ensure_inside_root, is_link_like, is_placeholder,
@@ -78,10 +77,59 @@ def load_resource_registry(root: Path, project: dict[str, object] | None = None)
             errors.append(f"resource #{position} summary is required")
         if mcp and (not isinstance(mcp, str) or not KEBAB.fullmatch(mcp)):
             errors.append(f"resource #{position} mcp must be a kebab-case adapter name")
-        errors.extend(upstream.validate(entry, position, root))
+        errors.extend(upstream_errors(entry, position, root))
     if errors:
         raise check_failed("resource registry", errors)
     return entries
+
+
+UPSTREAM_REPO = re.compile(r"[A-Za-z0-9_-][A-Za-z0-9_.-]*/[A-Za-z0-9_-][A-Za-z0-9_.-]*")
+UPSTREAM_SHA = re.compile(r"[0-9a-f]{40}")
+UPSTREAM_PATH = re.compile(r"[A-Za-z0-9_.@+-]+(?:/[A-Za-z0-9_.@+-]+)*")  # no ?, #, %, spaces: safe inside a raw URL
+
+
+def upstream_errors(entry: dict, position: int, root: Path) -> list[str]:
+    """Errors for the optional upstream keys of one registry entry (none when the entry carries none)."""
+    keys = ("repo", "revision", "license", "reviewed_on", "adapted_into", "files")
+    if not any(key in entry for key in keys):
+        return []
+    tag, errors = f"resource #{position}", []
+    repo, revision = entry.get("repo"), entry.get("revision")
+    if not (isinstance(repo, str) and UPSTREAM_REPO.fullmatch(repo)):
+        errors.append(f"{tag} repo is required with an upstream record and must be GitHub owner/name")
+    if not (isinstance(revision, str) and UPSTREAM_SHA.fullmatch(revision)):
+        errors.append(f"{tag} revision must be a full 40-hex commit SHA")
+    if is_placeholder(entry.get("license")):
+        errors.append(f"{tag} license is required with an upstream record")
+    reviewed = entry.get("reviewed_on")
+    date = parse_iso_date(reviewed) if isinstance(reviewed, str) else None
+    if date is None:
+        errors.append(f"{tag} reviewed_on must be YYYY-MM-DD")
+    elif date_is_future(date):
+        errors.append(f"{tag} reviewed_on is in the future")
+    adapted = entry.get("adapted_into", [])
+    if not isinstance(adapted, list) or not all(isinstance(p, str) for p in adapted):
+        errors.append(f"{tag} adapted_into must be a list of repository-relative paths")
+    else:
+        for path in adapted:
+            if _unsafe(path) or not (root / path).exists():
+                errors.append(f"{tag} adapted_into path must be a relative path that exists: {path}")
+    files = entry.get("files", [])
+    if not isinstance(files, list) or not all(isinstance(f, dict) for f in files):
+        errors.append(f"{tag} files must be a list of {{path, when}} tables")
+        return errors
+    for item in files:
+        path, when = item.get("path"), item.get("when")
+        if not isinstance(path, str) or _unsafe(path):
+            errors.append(f"{tag} files path must be relative with no '..' or backslash: {path!r}")
+        if not isinstance(when, str) or is_placeholder(when):
+            errors.append(f"{tag} files entry {path!r} needs a non-empty when trigger")
+    return errors
+
+
+def _unsafe(path: str) -> bool:
+    return not UPSTREAM_PATH.fullmatch(path) or ".." in path.split("/")
+
 
 
 def check_skill_provenance(project: dict[str, object], release_gate: bool = False) -> None:

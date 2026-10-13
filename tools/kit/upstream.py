@@ -14,58 +14,13 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Callable
 
-from .core import RepoctlError, date_is_future, is_placeholder, parse_iso_date, today
+from .core import RepoctlError, parse_iso_date, today
 
-REPO = re.compile(r"[A-Za-z0-9_-][A-Za-z0-9_.-]*/[A-Za-z0-9_-][A-Za-z0-9_.-]*")
-SAFE_PATH = re.compile(r"[A-Za-z0-9_.@+-]+(?:/[A-Za-z0-9_.@+-]+)*")  # no ?, #, %, spaces: safe inside a raw URL
 SHA = re.compile(r"[0-9a-f]{40}")
 NOTICES = "THIRD_PARTY_NOTICES.md"
 NOTICE_SECTION = "## Workflow material distilled"
 NOTICE_ROW = re.compile(r"\[[^\]]+\]\(https://github\.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)\)\s*`([0-9a-f]{7})`")
 Runner = Callable[[str], "str | None"]  # repo -> remote HEAD sha, or None when unreachable
-
-
-def validate(entry: dict, position: int, root: Path) -> list[str]:
-    """Errors for the optional upstream keys of one registry entry (none when the entry carries none)."""
-    keys = ("repo", "revision", "license", "reviewed_on", "adapted_into", "files")
-    if not any(key in entry for key in keys):
-        return []
-    tag, errors = f"resource #{position}", []
-    repo, revision = entry.get("repo"), entry.get("revision")
-    if not (isinstance(repo, str) and REPO.fullmatch(repo)):
-        errors.append(f"{tag} repo is required with an upstream record and must be GitHub owner/name")
-    if not (isinstance(revision, str) and SHA.fullmatch(revision)):
-        errors.append(f"{tag} revision must be a full 40-hex commit SHA")
-    if is_placeholder(entry.get("license")):
-        errors.append(f"{tag} license is required with an upstream record")
-    reviewed = entry.get("reviewed_on")
-    date = parse_iso_date(reviewed) if isinstance(reviewed, str) else None
-    if date is None:
-        errors.append(f"{tag} reviewed_on must be YYYY-MM-DD")
-    elif date_is_future(date):
-        errors.append(f"{tag} reviewed_on is in the future")
-    adapted = entry.get("adapted_into", [])
-    if not isinstance(adapted, list) or not all(isinstance(p, str) for p in adapted):
-        errors.append(f"{tag} adapted_into must be a list of repository-relative paths")
-    else:
-        for path in adapted:
-            if _unsafe(path) or not (root / path).exists():
-                errors.append(f"{tag} adapted_into path must be a relative path that exists: {path}")
-    files = entry.get("files", [])
-    if not isinstance(files, list) or not all(isinstance(f, dict) for f in files):
-        errors.append(f"{tag} files must be a list of {{path, when}} tables")
-        return errors
-    for item in files:
-        path, when = item.get("path"), item.get("when")
-        if not isinstance(path, str) or _unsafe(path):
-            errors.append(f"{tag} files path must be relative with no '..' or backslash: {path!r}")
-        if not isinstance(when, str) or is_placeholder(when):
-            errors.append(f"{tag} files entry {path!r} needs a non-empty when trigger")
-    return errors
-
-
-def _unsafe(path: str) -> bool:
-    return not SAFE_PATH.fullmatch(path) or ".." in path.split("/")
 
 
 def raw_url(entry: dict, path: str) -> str:
