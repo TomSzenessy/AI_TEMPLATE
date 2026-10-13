@@ -22,7 +22,7 @@ from pathlib import Path
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # `fixtures`, however this file is invoked (#33)
-from fixtures import KitRepository, Scratch  # noqa: E402
+from fixtures import KitRepository, Scratch, git_in  # noqa: E402
 
 from kit import semantic  # noqa: E402
 from kit.navigate import _tokens  # noqa: E402  the lexical convention the fake mirrors
@@ -610,8 +610,9 @@ class SemanticEnvResolverTests(unittest.TestCase):
     """The safe env resolver: private .env, bounded read, plain data only.
 
     Every test uses its own controlled temp Root with a fake .env; the actual
-    repository Root.env is never read. No test contacts a provider, builds a
-    transport, or sends anything outbound.
+    repository Root.env is never read. No test contacts a provider or sends
+    anything outbound: the only transport is an injected first-party fake —
+    no HTTP, no real credentials.
     """
 
     def setUp(self) -> None:
@@ -690,18 +691,74 @@ class SemanticEnvResolverTests(unittest.TestCase):
         self.assertEqual(found, {}, "an over-limit .env is rejected even when stat claims under")
         self.assertIn(semantic._ENV_MAX_BYTES + 1, read_sizes, "the bounded binary read API is used")
 
+
     def test_model_env_change_is_a_scope_mismatch_and_not_ready_is_never_sent(self) -> None:
-        self.write_env("TEST_MODEL=model-from-file\n")
-        with mock.patch.dict(os.environ, {"TEST_MODEL": "model-a"}):
-            self.assertEqual(semantic._resolve_env_value(self.root, "env:TEST_MODEL"), "model-a")
-        self.assertEqual(semantic._resolve_env_value(self.root, "env:TEST_MODEL"), "model-from-file")
-        with mock.patch.dict(os.environ, {"TEST_MODEL": "model-b"}):
-            changed = semantic._resolve_env_value(self.root, "env:TEST_MODEL")
-        self.assertEqual(changed, "model-b")
-        self.assertNotEqual(changed, "model-a", "a changed model env is a scope/cache mismatch")
-        # A missing binding resolves to "" and is never ready, never sent.
-        self.assertEqual(semantic._resolve_env_value(self.root, "env:TEST_MISSING"), "")
-        self.assertTrue(semantic._is_not_ready(""))
-        # configured_transport with a not-ready model builds no transport: zero outbound.
-        config = {"endpoint": "https://embeddings.example.test/v1", "model": "", "api_key_env": "TEST_KEY"}
-        self.assertIsNone(semantic.configured_transport(self.root, config), "a not-ready model sends nothing")
+        """ENV model/endpoint change is a scope/cache mismatch: zero outbound, lexical fallback.
+
+        In-process proof only (no CLI, no subprocess): build an index bound to
+        MODEL_A/ENDPOINT_A, mutate the ENV to B, then verify code_matches/build_index
+        refuse with lexical fallback BEFORE any outbound request (FakeTransport.calls == 0),
+        consent/cache fingerprints (endpoint+model) actually changed, and no credential
+        leaks into output/cfg/cache/consent JSON.
+        """
+        model_a = "fixture-model-a"
+        endpoint_a = "https://fixture-a.example.test/v1"
+        key_fake = _synthetic_secret()  # runtime-built; the tracked source holds no static secret
+        model_b = "fixture-model-b"
+        endpoint_b = "https://fixture-b.example.test/v1"
+        # A controlled git repo: only project.toml and src are tracked, never .env.
+        git_in(self.root, "init", "-q", "-b", "main")
+        git_in(self.root, "config", "user.email", "test@example.com")
+        git_in(self.root, "config", "user.name", "Test")
+        (self.root / "src").mkdir(parents=True, exist_ok=True)
+        (self.root / "src" / "invoice.py").write_text("def render_invoice():\n    return 1\n", encoding="utf-8")
+        (self.root / "project.toml").write_text('schema = 1\nname = "Fixture"\nkind = "web"\n', encoding="utf-8")
+        git_in(self.root, "add", "project.toml", "src")
+        git_in(self.root, "commit", "-q", "-m", "initial")
+        enable(self.root, semantic_endpoint="env:EMBEDDINGS_ENDPOINT", semantic_model="env:EMBEDDINGS_MODEL")
+        with mock.patch.dict(os.environ, {}, clear=False):
+            for name in ("EMBEDDINGS_MODEL", "EMBEDDINGS_ENDPOINT", "EMBEDDINGS_API_KEY"):
+                os.environ.pop(name, None)  # clear actual EmbVars; real Root.env never read
+            # --- Build the index bound to MODEL_A/ENDPOINT_A (injected fake, no CLI) ---
+            self.write_env(f"EMBEDDINGS_MODEL={model_a}\nEMBEDDINGS_ENDPOINT={endpoint_a}\nEMBEDDINGS_API_KEY={key_fake}\n")
+            fake_a = FakeTransport()
+            summary = semantic.build_index(self.root, transport=fake_a, consent=True)
+            self.assertIn("index built", "\n".join(summary))
+            self.assertIn(model_a, "\n".join(summary))
+            self.assertIn(endpoint_a, "\n".join(summary))
+            # Cache and consent are bound to MODEL_A/ENDPOINT_A.
+            cache = json.loads((self.root / ".agent" / "semantic-code-cache.json").read_text(encoding="utf-8"))
+            consent = json.loads((self.root / ".agent" / "semantic-code-consent.json").read_text(encoding="utf-8"))
+            self.assertEqual(cache["model"], model_a)
+            self.assertEqual(cache["endpoint"], endpoint_a)
+            self.assertEqual(consent["model"], model_a)
+            self.assertEqual(consent["endpoint"], endpoint_a)
+            config_a = semantic._config(self.root)
+            digest_a = semantic.scope_digest(config_a, semantic.inventory(self.root, config_a))
+            # --- Mutate MODEL/ENDPOINT env to B: stale cache, lexical fallback, ZERO outbound ---
+            self.write_env(f"EMBEDDINGS_MODEL={model_b}\nEMBEDDINGS_ENDPOINT={endpoint_b}\nEMBEDDINGS_API_KEY={key_fake}\n")
+            fake_b = FakeTransport()
+            matches, reasons = semantic.code_matches(self.root, "render invoice", transport=fake_b)
+            self.assertTrue(matches, "lexical matches must be available without a valid index")
+            self.assertTrue(any("model changed" in reason or "endpoint changed" in reason for reason in reasons),
+                            f"expected a model/endpoint change reason, got: {reasons}")
+            self.assertEqual(fake_b.calls, [], "zero outbound after env model/endpoint change")
+            # build_index: stored consent no longer matches → no consent (EOF on stdin), ZERO outbound.
+            fake_c = FakeTransport()
+            with mock.patch("builtins.input", side_effect=EOFError):
+                refused = semantic.build_index(self.root, transport=fake_c)
+            self.assertTrue(any("no consent" in line for line in refused), f"expected no-consent refusal, got: {refused}")
+            self.assertEqual(fake_c.calls, [], "zero outbound on rebuild after env change")
+            # No credential leakage into output or any .agent JSON; cfg stores model/endpoint only.
+            output = "\n".join(summary + reasons + refused)
+            self.assertNotIn(key_fake, output, "the key value must never appear in output")
+            for json_file in (self.root / ".agent").glob("*.json"):
+                self.assertNotIn(key_fake, json_file.read_text(encoding="utf-8"),
+                                f"API key leaked into {json_file.name}")
+            self.assertNotIn(key_fake, json.dumps(config_a), "cfg stores model/endpoint, never the key value")
+            self.assertEqual(config_a["model"], model_a)
+            self.assertEqual(config_a["endpoint"], endpoint_a)
+            # Consent/cache fingerprints (endpoint+model) actually changed — not str alone.
+            config_b = semantic._config(self.root)
+            digest_b = semantic.scope_digest(config_b, semantic.inventory(self.root, config_b))
+            self.assertNotEqual(digest_a, digest_b, "scope digest must change with model/endpoint")
