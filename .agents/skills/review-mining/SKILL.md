@@ -20,7 +20,8 @@ in `reference/recon.md` (product-recon), so the mining stays inside the slice
 being built. **Original mode** (your own product, no reference) has no
 `reference/recon.md`: scope the mining from the owner's goal instead —
 VISION.md or the accepted design brief, the category, the comparable
-products — and work under `docs/research/`. Never invent a competitor. If the
+products — and work under `docs/research/`. Before launch your product has
+no reviews yet: the comparables carry the run. Never invent a competitor. If the
 product or its sources are missing, ask the owner the one blocking question
 that unblocks them. When run, write the scope record (goal, category,
 comparables, sources, date) to `docs/research/review-scope.md`; create it
@@ -31,6 +32,7 @@ One variable picks the mode's folder, so the command keeps the same shape:
 
 ```bash
 RESEARCH_DIR=reference   # reference mode; docs/research in original mode
+mkdir -p "$RESEARCH_DIR"
 python3 .agents/skills/review-mining/reviews.py "$RESEARCH_DIR/reviews.csv" --out "$RESEARCH_DIR/feedback.md"
 ```
 
