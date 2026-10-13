@@ -52,12 +52,15 @@ returns `None`), without another value reader or a guessed branch:
 | Manifest, paths, worktree, text primitives, the shared Reviewer/date rule, conventional file names, hook events | `core`, `gitinfo`, `names` | this page |
 | Capability model: loader, packs, command and check declarations, the check context, `make help` | `registry`, `checkrun`, `commands`, `checks`, `gatechecks`, `helptext` | this page and [ADR 0002](../adr/0002-one-capability-model.md) |
 | Surfaces, vision, inventory, declared verification, adoption | `structure`, `surfaces`, `bootstrap`, `adopt` | [`../ADAPTATION.md`](../ADAPTATION.md) |
+| Guided intake after identity init: shared questions (four shared optional choices: browser/Exa/logging/embeddings), pure plan, strict-boolean consent/reshape gate and strict choice validation before any write; intent is a pending effect, and only the two vetted canonical owners (playwright/exa) get the applied `enabled` flag (request on / off off / preserve writes nothing), under an in-lock authoritative owner check with full-raw-hash staleness (preserved owners included) and a re-derived `[guided].mcp`/host mirror | `guided` | [`../ADAPTATION.md`](../ADAPTATION.md) |
 | Issues, review packets, incidents, GitHub CLI, CI checks, the CI result of a pushed commit, fetch/push/pull-first, kit reports upstream | `issues`, `github`, `ci`, `cistatus`, `gitsync`, `kitreport` | [`../ISSUE_TEMPLATE.md`](../ISSUE_TEMPLATE.md), [`../self-healing.md`](../self-healing.md) |
 | Skills provenance, resource registry | `skills` | [`../skills.md`](../skills.md) |
 | Links, index, file hygiene | `docs` | [`../security.md`](../security.md) |
 | Launch evidence | `launch` | [`../production.md`](../production.md) |
 | Product driver: feature list, research, `make next`, UI review | `product`, `uireview` | [`../building.md`](../building.md) |
 | Check blocking rule, hooks, failure output, ceremony by risk, garden report, navigation | `checks`, `session`, `garden`, `navigate`, `risk` | [`../self-healing.md`](../self-healing.md) |
+| Consent-gated semantic code similarity | `semantic` | [`../capabilities.md`](../capabilities.md) |
+| OpenAI-compatible embeddings transport (standard library only, behind `.embed`) | `semantic_transport` | [`../capabilities.md`](../capabilities.md) |
 | Doc-code bindings and staleness | `docmeta`, `docsync` | [`../bindings.md`](../bindings.md) |
 | Markers, orphan files, change coupling | `hygiene`, `reachability`, `coupling` | [`../hygiene.md`](../hygiene.md) |
 | Derived files and host adapters | `derive`, `adapters` | [`../generated-files.md`](../generated-files.md) |

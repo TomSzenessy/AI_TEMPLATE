@@ -104,7 +104,3 @@ Give honest numbers. A build at 62% is at 62%.
 `reference/parity.md`, the diff images in `reference/diffs/`, and the top five
 things to build next. Then the project's issue-backed build loop (AGENTS.md)
 for the gaps, or review-mining when parity is there.
-
-## Source
-
-Adapted from the upstream skill in https://github.com/Jakeschincariol/replica-skill (MIT, © 2026 Jake Schincariol); revision: see `project.toml` `[[skills]]`.

@@ -13,9 +13,11 @@ local):
 - governance: github, docs, skills, structure, issues, ci, cistatus, gitsync, kitreport, launch
 - project setup: kitlock (what the kit ships and the lock that records it),
   bootstrap, adopt, kitupdate
+- guided intake: guided (shared questions, pure plan, consent-gated apply;
+  docs/ADAPTATION.md)
 - self-healing: docmeta, docsync, hygiene, reachability, coupling, signatures,
   adapters, derive, scaffold, navigate, risk, session, garden, capabilities,
-  evals, trial
+  evals, trial, semantic, semantic_transport
 - product driver: product, uireview (docs/building.md)
 
 Each module owns one concern; tools/repoctl.py only builds its parser from the

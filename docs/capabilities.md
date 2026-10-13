@@ -1,7 +1,7 @@
 # Adding a capability
 
 <!-- index: extend | How to add, find, or switch off a capability or pack, and the configuration policy | You add, find, or switch off a skill, role, doc, rule, check, command, MCP route, or pack. -->
-<!-- covers: tools/kit/capabilities.py tools/kit/scaffold.py tools/kit/config.py -->
+<!-- covers: tools/kit/capabilities.py tools/kit/scaffold.py tools/kit/config.py tools/kit/semantic.py tools/kit/semantic_transport.py -->
 
 Skills, agent roles, docs, rules, checks, commands, MCP routes, and packs are
 all capabilities: one file each, read by one loader
@@ -12,6 +12,26 @@ how the kit works with them.
 
 `make similar Q="<need>"` answers first, across every kind and pack; the
 reuse-or-create thresholds are owned by [`skills.md`](./skills.md).
+An optional `CODE=1` (issue #115) ranks eligible source-code chunks against the
+query. Off by default (`[kit].semantic_enabled`; standard library only) and
+consent-gated: outbound code transfer needs explicit per-scope confirmation;
+enablement, a present key, or a request is never itself consent. Every disabled,
+unconsented, stale, or failing path falls back to honest lexical matching with a
+printed reason; a missing or stale index is never embedded. Similarity never
+authorizes deleting or rewriting code. Guided init (#110) is distinct and
+unmodified. See [`security.md`](./security.md#semantic-code-search-115),
+[`privacy.md`](./privacy.md#semantic-code-search-cache-and-consent), and
+[`model-integration.md`](./model-integration.md#embedding-responses-are-untrusted).
+
+**Module card — `tools/kit/semantic.py` + `tools/kit/semantic_transport.py`.**
+- **Purpose:** consent-gated semantic code similarity for `make similar --code`.
+- **PublicInterface:** `build_index`, `code_matches`, `status_lines`; transport `.embed`.
+- **Invariants:** bounds root; eligible scope digest (paths + chunk count, never content
+  hashes/bytes/code); approved endpoint/model tuple cached, no re-read; cache holds no
+  code or keys; lexical fallback on every failure.
+- **Owner:** `[kit]` semantic_* policy (`config.py`); `semantic.py` owns inventory,
+  cache, consent, ranking, and private key resolution.
+- **Performance:** finite existing config budgets (files/chunks/bytes/requests/response).
 `make new KIND=skill|agent|doc|rule|check|command|mcp|pack NAME=<kebab> DESC="<what>; <when>" [PACK=<pack>]`
 is the one way to add one. It refuses a near-duplicate of the same kind
 (`FORCE=1` overrides), writes valid metadata, registers a first-party skill in
@@ -43,6 +63,29 @@ it on; it still appears in `make capabilities`, `make where`, and
 [`building.md`](./building.md)) and `measure` (off: `make eval`, `make trial`;
 the template switches it on). A third-party skill, whose files are pinned by
 digest, records its pack in its `[[skills]]` provenance entry.
+
+## Writing a skill agents actually use
+
+A skill nobody finds or follows is dead weight. Before `make new KIND=skill`:
+
+- **Description:** one clause on what it does, then `Use when` with concrete
+  triggers, user phrasings, error text, and the symptoms of being about to
+  break the rule. Never summarize its steps there: an agent that can follow the
+  description will skip the body. Third person, under about 500 characters.
+- **Baseline first:** for a skill that enforces discipline, run a fresh
+  subagent on a pressure scenario (time, sunk cost, authority, exhaustion; two
+  or more at once, forced A/B/C choice, real paths) without the skill. Record
+  its excuses verbatim, write only what answers them, rerun with the skill.
+  Wording meant to shape output gets a no-guidance control and five or more
+  runs; if the control never fails, write no skill.
+- **Close loopholes:** state the rule, forbid each workaround by name, add an
+  excuse-and-reality table and a red-flags list drawn from those runs. Match
+  the form to the failure: prohibition for rules skipped under pressure, a
+  positive recipe for wrongly shaped output, a required template slot for
+  omitted elements, and no "unless it matters" clauses.
+- **Keep it lean:** one excellent example, tables for reference, heavy detail
+  in a linked `references/` file the body says when to open (bytes are budgeted
+  in `project.toml`). Do not write a skill for what a check can enforce.
 
 ## Configuration
 

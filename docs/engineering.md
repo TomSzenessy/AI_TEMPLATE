@@ -1,6 +1,6 @@
 # Engineering standard
 
-<!-- index: design | Modular design, single source of truth, dependency, and cleanup rules | Code is being changed, refactored, or reviewed. -->
+<!-- index: design | Modular design, single source of truth, dependency, cleanup rules | Code changed, refactored, or reviewed; deep modules. -->
 
 The goal is compact, legible software with high leverage: a small interface
 over a meaningful implementation, one owner for each changing fact, and tests
@@ -36,7 +36,11 @@ claim a verified license from the manifest alone.
 ## Change discipline
 
 - Make the smallest change that satisfies the issue; avoid opportunistic
-  refactors, speculative abstractions, and broad formatting churn.
+  refactors, speculative abstractions, and broad formatting churn. Aim for
+  about 100 changed lines, split before 1000, and never mix a refactor with a
+  behavior change.
+- Refactor under proof: verify before and after, one ownership boundary at a
+  time, every intermediate state buildable.
 - Preserve public contracts unless the issue and ADR explicitly change them.
 - Validate at boundaries; make invalid states fail early and clearly.
 - Prefer structured logs/metrics with stable context; redact secrets and
@@ -46,6 +50,25 @@ claim a verified license from the manifest alone.
 - Delete dead code only after tracing callers, generated artifacts, deployment
   paths, and documentation. File residual cleanup as an issue when it is
   independent.
+
+## Interfaces, deprecation, and migration
+
+- Anything observable becomes a contract (Hyrum's law: timing, ordering, error
+  text). Expose deliberately, add optional fields rather than change or remove
+  them, keep one version live, and use one error shape everywhere.
+- Treat a third-party response like user input: validate its shape at the edge.
+- An idempotency key derives from the intent, never the attempt (no random
+  UUID or timestamp); claim it with a unique constraint, not check-then-act;
+  reject a reused key with a different payload; keep it longer than the longest
+  retry or dead-letter path. A timeout is an unknown outcome.
+- Deprecate only with a proven replacement. Default to advisory; a deadline
+  needs migration tooling, and the owner migrates the users (or stays
+  compatible). Add nothing to the deprecated path; remove only after logs show
+  zero use, then delete code, tests, docs, and notices together.
+- A migration has a forward path, a tested rollback, and idempotent retries.
+  Never rename or drop in place: expand, backfill in throttled batches, switch
+  reads, then contract in a separate later deploy. Stop after the requested
+  stage; destructive steps are explicitly authorized.
 
 ## Time budgets
 

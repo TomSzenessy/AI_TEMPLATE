@@ -179,3 +179,93 @@ trust = "discovery"
 access = "read-only"
 scope = "reverse-engineering"
 summary = "Source-reviewed candidate for authorized shipped-artifact and behavior investigation; project-local runtime/package approval and trial remain separate."
+
+[[resources]]
+id = "api-anything-authorized-replay"
+kind = "skills"
+source = "https://github.com/goodnight000/api-anything/blob/4a785e8d9e72a00e2dddc0dc56569a86826df07b/README.md"
+trust = "discovery"
+access = "read-only"
+scope = "reverse-engineering"
+summary = "Pinned reference for authorized HTTP request learning/replay; inspect source, license, permissions, revision and data destinations before any use; link-only, not a default dependency."
+
+[[resources]]
+id = "ponytail-lazy-senior"
+kind = "skills"
+source = "https://github.com/DietrichGebert/ponytail/tree/9b58c1ffb790c075ca32e70a89cf1d80588f4abf"
+trust = "discovery"
+access = "read-only"
+scope = "agent"
+summary = "Use when you want minimal-diff discipline or a quick repo audit/review. Provides a smallest-change coding mode, ranked audit/review prompts and a shortcut-debt ledger."
+
+[[resources]]
+id = "archify-diagrams"
+kind = "skills"
+source = "https://github.com/tt-a1i/archify/tree/58ab0b98d2d0def8e49dced705c7b566936723ec"
+trust = "discovery"
+access = "read-only"
+scope = "web"
+summary = "Use when an architecture, sequence, data-flow or state diagram must be explorable. Provides a standalone HTML+inline-SVG diagram generator with themes and PNG/SVG/WebM export."
+
+[[resources]]
+id = "graphify-code-graph"
+kind = "skills"
+source = "https://github.com/Graphify-Labs/graphify/tree/a5ba60ddf6293d9f380321965ecf1084391dcc2b"
+trust = "discovery"
+access = "read-only"
+scope = "agent"
+summary = "Use when orienting in a large unfamiliar codebase or corpus beyond make where. Provides a queryable knowledge graph of code, docs and relationships (graphify-out/)."
+
+[[resources]]
+id = "understand-anything-graph"
+kind = "skills"
+source = "https://github.com/Egonex-AI/Understand-Anything/tree/000fbf3f36b5e534a0a8d3461cf24f5dc9ae43fe"
+trust = "discovery"
+access = "read-only"
+scope = "agent"
+summary = "Use when onboarding to a codebase or reviewing a PR's blast radius. Provides a knowledge-graph dashboard, file explainer, diff-impact, domain-flow and onboarding-guide skills."
+
+[[resources]]
+id = "caveman-token-economy"
+kind = "skills"
+source = "https://github.com/JuliusBrussee/caveman/tree/2e08b9177c07bb7249a8a2d1a6758e5db281d002"
+trust = "discovery"
+access = "read-only"
+scope = "agent"
+summary = "Use when cutting agent token cost or output verbosity. Provides terse-output modes, compressed review/commit, a session token-stats view and a cost-lowering learn pass."
+
+[[resources]]
+id = "skills-sh-find-skills"
+kind = "skills"
+source = "https://github.com/vercel-labs/skills/tree/13e4063a1cf913f5606d57d42ab83a86f5001e04"
+trust = "discovery"
+access = "read-only"
+scope = "agent"
+summary = "Use when looking for candidate skills for a named capability gap. Provides the skills.sh ecosystem search (npx skills find <query>); search only, never auto-install."
+
+[[resources]]
+id = "ui-ux-pro-max-design-intel"
+kind = "skills"
+source = "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill/tree/026b6e172c47fa09246b89b6e1d414b8e15f1057"
+trust = "discovery"
+access = "read-only"
+scope = "ux"
+summary = "Use when seeking style, palette, type-pairing or stack-specific UI ideas beyond ux-quality. Provides searchable design-intelligence data plus brand, slide and banner skills."
+
+[[resources]]
+id = "impeccable-frontend-polish"
+kind = "skills"
+source = "https://github.com/pbakaus/impeccable/tree/c63b8dd7dd5a5f3c32eaabe1af76d0694f863ed2"
+trust = "discovery"
+access = "read-only"
+scope = "ux"
+summary = "Use when a frontend needs critique or polish passes (audit, harden, animate, clarify, colorize, adapt). Provides one design skill with command-style refinement steps."
+
+[[resources]]
+id = "composio-awesome-claude-skills"
+kind = "skills"
+source = "https://github.com/ComposioHQ/awesome-claude-skills/tree/be2a406907dbc61b73e6827ded415c96139d13a2"
+trust = "discovery"
+access = "read-only"
+scope = "agent"
+summary = "Use when a task needs a MCP-server guide, webapp-testing, internal-comms or file-organizer pattern, or an app-API wrapper (composio-skills/*-automation catalog, ~830, one route)."

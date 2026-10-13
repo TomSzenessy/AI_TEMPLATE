@@ -54,6 +54,11 @@ and scoped owners:
 3. Run builders in parallel only when their seams do not conflict.
 4. Give a fresh, demanding critic the original acceptance criteria and the real
    artifact. The critic should try to falsify the claim, not rationalize it.
+   Hand over the artifact and its contract, not your claim or reasoning, with a
+   "find what is wrong" prompt. Classify each finding against the artifact text
+   (misread contract, actionable, trade-off, noise) and quantify real problems.
+   Two cycles of substantive findings with none actionable is theater: stop and
+   escalate to the owner.
 5. Fix confirmed blockers, rerun the oracle, and record the new evidence.
 6. Stop after three focused iterations or when the marginal change no longer
    improves the declared bar. File the remaining disagreement as an issue.
@@ -63,6 +68,18 @@ independent coverage, harsh review, observable comparison, and iteration. It
 does **not** accept an unbounded “perfect” promise. Quality is relative to a
 declared target, resolution, accessibility level, frame rate, privacy boundary,
 or other measurable oracle.
+
+## Guard the bar
+
+Agents under a red check take the cheapest road to green. Review the diff for a
+moved threshold, a removed check, a new `.skip` or deleted test, a new
+suppression (`@ts-ignore`, `eslint-disable`, `noqa`, `istanbul ignore`,
+`nosemgrep`), a stub or empty `catch` standing in for work, and an exception
+nobody discussed. Tightening a bar is silent; loosening one is a named, dated
+exception with an owner. Where no target number exists, record today's value
+and refuse to fall below it (a ratchet). At least one oracle should be external
+(an accessibility scanner, an advisory database, a real browser), because a
+suite the agent wrote is the one circular check.
 
 ## Domain oracles
 

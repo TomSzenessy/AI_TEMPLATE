@@ -304,6 +304,31 @@ class NavigationTests(KitRepository):
         hits = navigate.where(self.root, "ECONNRESET")
         self.assertTrue(any("[seen-before]" in hit for hit in hits), hits)
 
+    def test_where_finds_indexed_doc_trigger(self) -> None:
+        self.write("docs/design.md", "# Design\n\n"
+                   "<!-- index: design | Modular design and cleanup rules | Code is being changed; deep modules and interface clarity. -->\n\n"
+                   "Body.\n")
+        hits = navigate.where(self.root, "deep modules")
+        self.assertTrue(any(hit.startswith("docs/design.md") and "[doc" in hit for hit in hits), hits)
+
+    def test_where_finds_resource_registry_entry(self) -> None:
+        self.write("resources.toml", (self.root / "resources.toml").read_text(encoding="utf-8") + """
+[[resources]]
+id = "ffmpeg"
+kind = "media"
+source = "https://ffmpeg.org/documentation.html"
+trust = "official"
+access = "read-only"
+scope = "media"
+summary = "Official FFmpeg codec, filter, format, and pipeline documentation."
+""")
+        row = next(number for number, line in enumerate((self.root / "resources.toml").read_text(encoding="utf-8").splitlines(), 1)
+                   if line.strip() == 'id = "ffmpeg"')
+        hits = navigate.where(self.root, "ffmpeg")
+        joined = "\n".join(hits)
+        self.assertIn(f"resources.toml:{row}  [resource] ffmpeg", joined, hits)
+        self.assertIn("https://ffmpeg.org/documentation.html", joined, hits)
+
     def test_skill_overlap_ranks_existing_capability(self) -> None:
         best = navigate.skill_overlap(self.root, "render invoices for customers")[0]
         self.assertEqual(best[1], "skill:demo-skill")

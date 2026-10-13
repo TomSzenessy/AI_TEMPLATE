@@ -8,6 +8,7 @@ A project adds its own command as a new file in `.agents/commands/`
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 from . import ci, derive, scaffold, session
@@ -51,7 +52,7 @@ def next_step(root: Path, args) -> None:
     print_next(root)
 
 
-@command("where", "Find files, symbols, owning docs, rules, capabilities, and past failures", group="session",
+@command("where", "Find files, symbols, owning docs, indexed doc triggers, rules, capabilities, read-only resources, and past failures", group="session",
          usage='make where Q="login form"',
          args=(arg("query", nargs="+", var="Q", hint='Add what to look for: make where Q="login form"'),))
 def where(root: Path, args) -> None:
@@ -101,12 +102,34 @@ def new(root: Path, args) -> None:
         print(line)
 
 
-@command("similar", "Does a similar capability (any kind, any pack) already exist?", group="extend",
-         usage='make similar Q="release notes"',
-         args=(arg("description", nargs="+", var="Q", hint='Describe the capability: make similar Q="draft release notes"'),))
+@command("similar", "Does a similar capability (any kind, any pack) already exist? Optional CODE=1 adds consent-gated semantic code results (#115)",
+         group="extend", usage='make similar Q="release notes"',
+         make=('$(if $(KIT_IN_CODE_INDEX)$(KIT_IN_CODE_STATUS),,$(if $(KIT_IN_Q),,$(error Describe the capability: make similar Q="draft release notes")))\n'
+               '\t@$(REPOCTL) similar $(if $(filter 1 yes true,$(KIT_IN_CODE)),--code,) $(if $(filter 1 yes true,$(KIT_IN_CODE_INDEX)),--code-index,) '
+               '$(if $(filter 1 yes true,$(KIT_IN_CODE_STATUS)),--code-status,) $(if $(filter 1 yes true,$(KIT_IN_CONSENT)),--consent,)'
+               '$(if $(KIT_IN_Q), -- "$${KIT_IN_Q}",)'),
+         args=(arg("description", nargs="*", var="Q", hint='Describe the capability: make similar Q="draft release notes"'),
+               arg("--code", action="store_true", var="CODE",
+                   hint='Also rank eligible source code (consent-gated, #115): make similar Q="..." CODE=1'),
+               arg("--code-index", action="store_true", var="CODE_INDEX",
+                   hint="Build the local code index (consent-gated): make similar CODE_INDEX=1"),
+               arg("--code-status", action="store_true", var="CODE_STATUS",
+                   hint="Show local index/consent status (no outbound): make similar CODE_STATUS=1"),
+               arg("--consent", action="store_true", var="CONSENT",
+                   hint="Confirm the code scope without a prompt (explicit owner consent): CONSENT=1"),))
 def similar(root: Path, args) -> None:
     from .config import setting
     from .navigate import skill_overlap
+    if args.code_index:
+        from . import semantic
+        for line in semantic.build_index(root, consent=args.consent):
+            print(line)
+        return
+    if args.code_status:
+        from . import semantic
+        for line in semantic.status_lines(root):
+            print(line)
+        return
     matches = skill_overlap(root, " ".join(args.description))
     limit = float(setting(root, "overlap_limit"))
     for score, name, text in matches:
@@ -118,6 +141,18 @@ def similar(root: Path, args) -> None:
     else:
         print("Verdict: nothing similar here. Outside capabilities: ask the skill-scout role (docs/skills.md); "
               'then make new KIND=<kind> NAME=... DESC="...; ..."')
+    if args.code:
+        from . import semantic
+        query = " ".join(args.description)
+        if query.startswith("Q="):
+            query = query[2:]
+        code_matches, reasons = semantic.code_matches(root, query, consent=args.consent)
+        if reasons:
+            print(f"lexical code matches (semantic unavailable: {'; '.join(reasons)}):")
+        else:
+            print("semantic code matches:")
+        for score, label, snippet in code_matches:
+            print(f"{score:.2f}  {label}: {snippet}")
 
 
 @command("capabilities", "Every capability by kind and pack, plus tools, agent hosts, and MCP routes", group="extend",
@@ -270,16 +305,44 @@ def incident(root: Path, args) -> None:
 
 # --- Project setup and maintenance --------------------------------------------------
 
-@command("init", "Turn the template into your project", group="setup", usage="make init NAME=my-project KIND=web [OWNER=you]",
-         args=(
+@command("init", "Turn the template into your project", group="setup",
+          usage="make init NAME=my-project KIND=web [OWNER=you] [--answers file] [--guided] [--consent] [--reshape]",
+          args=(
     arg("--name", required=True, var="NAME", hint="Name the project: make init NAME=my-project KIND=web"),
     arg("--kind", required=True, var="KIND", help="lowercase kebab-case project kind",
         hint="Give its kind: make init NAME=my-project KIND=web"),
     arg("--owner", var="OWNER", help="accountable owner handle or team (replaces the project-owner placeholder)"),
+    arg("--answers", var="ANSWERS", help="guided intake: JSON answers file (- reads stdin)"),
+    arg("--guided", action="store_true", var="GUIDED", help="ask the intake questions in the terminal"),
+    arg("--consent", action="store_true", var="CONSENT", help="explicitly consent to applying the plan now"),
+    arg("--reshape", action="store_true", var="RESHAPE", help="explicitly reshape accepted records too"),
 ))
 def init(root: Path, args) -> None:
     from .bootstrap import initialize_project
+    from .guided import answers_from_json, ask_terminal, guided_init
+    # Identity init is always first and unattended; guided intake (#110) collects
+    # answers only after it and applies nothing without explicit consent.
     initialize_project(root, args.name, args.kind, args.owner)
+    answers, consent, reshape = None, args.consent, args.reshape
+    if args.guided:
+        result = ask_terminal(root)
+        if result is None:
+            print("Cancelled: identity init stands; no intake was applied.")
+            return
+        if result is False:
+            print("Declined: identity init stands; no intake was applied.")
+            return
+        answers, consent = result, True
+    if args.answers:
+        text = sys.stdin.read() if args.answers == "-" else Path(args.answers).read_text(encoding="utf-8")
+        payload = answers_from_json(text)
+        answers = payload["answers"]
+        # answers_from_json already validated consent/reshape as real booleans, so
+        # there is no truthiness coercion here: a typed string would have raised above.
+        consent = consent or payload.get("consent", False)
+        reshape = reshape or payload.get("reshape", False)
+    if answers is not None:
+        print(guided_init(root, answers, consent=consent, reshape=reshape))
 
 
 @command("adopt", "Bring this kit into an existing repository (--root) without overwriting it", group="setup",

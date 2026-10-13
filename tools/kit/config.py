@@ -41,6 +41,40 @@ DEFAULTS: dict[str, object] = {
     "playwright_version": "1.63.0",
     # Model for headless eval runs on hosts that accept one; cheap by default.
     "eval_model": "haiku",
+    # Optional consent-gated semantic code similarity for `make similar --code` (#115).
+    # Off by default; standard library only; every disabled/unconsented/stale/failing
+    # path falls back to honest lexical matching. Similarity never deletes code.
+    # endpoint/model accept a literal or an explicit `env:NAME` reference; the
+    # convenient disabled defaults reference EMBEDDINGS_ENDPOINT/EMBEDDINGS_MODEL.
+    "semantic_enabled": False,
+    "semantic_endpoint": "env:EMBEDDINGS_ENDPOINT",
+    "semantic_model": "env:EMBEDDINGS_MODEL",
+    "semantic_api_key_env": "EMBEDDINGS_API_KEY",
+    "semantic_timeout_seconds": 10.0,
+    "semantic_retries": 1,
+    "semantic_max_requests": 8,
+    "semantic_batch_chunks": 64,
+    "semantic_chunk_bytes": 4096,
+    "semantic_chunk_lines": 200,
+    "semantic_max_files": 200,
+    "semantic_max_chunks": 2000,
+    "semantic_max_file_bytes": 262144,
+    "semantic_cache_max_bytes": 8388608,
+    "semantic_max_response_bytes": 8388608,
+    "semantic_top_k": 5,
+    "semantic_code_extensions": [
+        ".py", ".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs", ".css", ".scss", ".html", ".htm",
+        ".sh", ".bash", ".zsh", ".rb", ".go", ".rs", ".java", ".kt", ".swift", ".c", ".h",
+        ".cpp", ".cc", ".cxx", ".hpp", ".cs", ".php", ".sql", ".yaml", ".yml", ".toml", ".xml",
+        ".vue", ".svelte", ".lua", ".pl", ".pm", ".r", ".scala", ".clj", ".ex", ".exs", ".erl",
+        ".hrl", ".ml", ".mli", ".fs", ".fsx", ".dart", ".jl", ".nim", ".zig", ".v", ".sv", ".vhd",
+        ".proto", ".graphql", ".gql", ".tf", ".hcl", ".mk", ".cmake", ".gradle",
+    ],
+    "semantic_skip_prefixes": [
+        ".claude/", ".agent/", ".agents/", ".codex/", ".cursor/", ".gemini/", ".github/", ".githooks/",
+        ".security/", ".review/",
+    ],
+    "semantic_schema_version": "semantic-cache-v1",
 }
 
 

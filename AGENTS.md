@@ -2,8 +2,8 @@
 
 <!-- index: operate | Agent operating contract and trigger router | Any change is requested. -->
 
-These rules always apply; detail: owner docs. **Golden path:** `make start`, `make next` (the next
-step), `make where Q="..."`, `make capabilities`, and `make done` before you call any work complete.
+These rules always apply; detail: owner docs. **Golden path:** `make start`, `make next`,
+`make where Q="..."`, `make capabilities`, and `make done` before you call any work complete.
 
 ## Session protocol
 
@@ -73,12 +73,12 @@ route is [`SECURITY.md`](./SECURITY.md).
 
 [`docs/README.md`](./docs/README.md) lists every document and when to read it:
 
-- **New product:** `product-kickoff` (headless without owner answers: write the questions with your picks, stop), then `stack-foundation`, then `make next` until launch ([`docs/building.md`](./docs/building.md)). **Anything users see:** `ux-quality` and `make ui-review`.
+- **New product:** `product-kickoff` (headless without owner answers: write the questions with your picks, stop), then `stack-foundation`, then `make next` until launch ([`docs/building.md`](./docs/building.md)). **Anything users see:** `ux-quality`, `make ui-review`; numbers: `web-quality`.
 - **A metric or benchmark to improve, or costly real measurements:** `experiment-lab` ([`docs/experiments.md`](./docs/experiments.md)).
 - **Reverse engineering:** `product-recon` for public UX; `technical-recon` for authorized app/protocol internals or an environment to run agents against.
 - **Code acts on a model's answer:** [`docs/model-integration.md`](./docs/model-integration.md).
 - **Vocabulary, architecture, seams:** [`CONTEXT.md`](./CONTEXT.md), [`docs/architecture/README.md`](./docs/architecture/README.md).
-- **Bug or incident:** [`docs/operations.md`](./docs/operations.md); reproduce first. **Release or quality claim:** [`docs/verification.md`](./docs/verification.md), [`docs/production.md`](./docs/production.md).
+- **Bug or incident:** `systematic-debugging`, [`docs/operations.md`](./docs/operations.md). **Release or quality claim:** [`docs/verification.md`](./docs/verification.md), [`docs/production.md`](./docs/production.md).
 - **Auth, secrets, dependencies, CI, untrusted input:** [`docs/security.md`](./docs/security.md).
 - **Personal data, legal text, launch:** [`docs/privacy.md`](./docs/privacy.md), [`docs/legal/README.md`](./docs/legal/README.md).
 - **Absorb notes/URLs, skills, MCP:** `skill-scout` ([resources owner](./docs/resources.md)).
@@ -87,13 +87,13 @@ route is [`SECURITY.md`](./SECURITY.md).
 
 ## Build and repair loop
 
-1. **Frame** user-visible outcome, evidence, surface, non-goals;
-   [plan quality](./docs/verification.md#the-quality-loop) before implementation.
+1. **Frame** outcome, evidence, surface, non-goals; [plan quality](./docs/verification.md#the-quality-loop)
+   before implementation (`plan-and-build`).
 2. **Reproduce** a bug as a failing test or deterministic experiment first.
 3. **Design** behind the smallest deep interface; one owner per changing fact.
 4. **Implement** the smallest coherent change; keep existing conventions.
 5. **Verify**: focused check, then `make done`, then the real artifact.
-6. **Critique** independently against acceptance.
+6. **Critique** independently against acceptance (`review-practice`).
 7. **Reconcile** issue, manifest, docs, and navigation in the same change.
 
 ## Self-organization (checked by `make check`)
@@ -104,7 +104,7 @@ route is [`SECURITY.md`](./SECURITY.md).
 - `.claude/`, `.mcp.json`, and marked `repoctl` blocks are generated: edit `.agents/`, then `make sync`.
 - Always-loaded files stay within `project.toml [budgets]`; move detail to an owner doc.
 - A surface needs an owner, quality oracle, and verification; a nested `AGENTS.md` only for rules that differ.
-- Delete dead code once callers are proven gone. Prefer small, boring solutions.
+- Delete dead code once callers are gone. Prefer small, boring code.
 
 ## Trust and safety
 

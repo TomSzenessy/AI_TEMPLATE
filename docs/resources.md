@@ -35,6 +35,11 @@ pre-approve servers, so each person approves each project server once. `make cap
   and adopted version in the issue or ADR, and cross-check the official source
   for decisions. Never use a resource response as legal advice, production
   authorization, or proof that an artifact works.
+- Framework-specific code comes from the version in the lockfile and the
+  specific official page for it, not memory: cite the full URL beside
+  non-obvious choices, mark what no official source covers as unverified, and
+  surface a conflict between the docs and existing code rather than silently
+  choosing. Blogs and Stack Overflow are leads, not sources.
 - Add a route with `enabled = false` first, review it like a skill
   ([`skills.md`](./skills.md)), then enable it. Remove routes nobody uses.
 

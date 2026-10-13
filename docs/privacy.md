@@ -26,6 +26,28 @@ erasure. Track the actual stores, replicas, backups, providers, and delayed jobs
 a database row deletion or HTTP success is not physical deletion evidence.
 Record exceptions, owner, trigger, maximum period, and release condition.
 
+### Semantic code search cache and consent
+
+`make similar ... CODE=1` writes its local vector index under the ignored
+`.agent/` cache: vectors, paths, line/byte ranges, source hashes, model,
+endpoint, scope, and schema — never code or keys. That cache is private to the
+resolved root: a physical root change — even a clone of the same origin and
+branch at a different path — requires a fresh confirmation. The cache is
+sent nowhere except the consent-gated embeddings call; a query export
+confirms the same consent. A stored consent is withdrawn automatically
+when the endpoint, model, eligible-file inventory, or any budget changes.
+The confirmation record stores the canonical scope fields — the sorted
+eligible paths, the file and chunk counts, and the policy — never code,
+keys, or HMACs. A code edit that preserves the eligible path set and the
+chunk count does not re-prompt; it only makes cached vectors stale by
+content hash, so future eligible code is indexed under the stated policy
+while changed chunks are re-embedded on the next explicit index build. Any
+other inventory change — a file added, removed, renamed, or a chunk-count
+change — requires a fresh confirmation. Similarity never authorizes
+deleting or rewriting code, and nothing here is legal advice.
+See [`security.md`](./security.md#semantic-code-search-115) and
+[`capabilities.md`](./capabilities.md).
+
 ## Cookies and browser storage
 
 Inventory every cookie, local/session storage key, pixel, SDK, and third-party
