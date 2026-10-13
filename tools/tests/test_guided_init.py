@@ -131,6 +131,28 @@ class GuidedInitTests(Scratch):
         self.assertIn("Cancelled", result.stdout)
         self.assert_same_owner_files(root, plain)
 
+    def test_terminal_decline_writes_nothing(self) -> None:
+        """A terminal decline (11 answers, then 'n') applies nothing: exit 0, no TypeError.
+
+        Byte-for-byte, every guided-owned file matches the plain identity-init tree, so the
+        decline wrote no intake effect; identity init (always the first writer) stands.
+        Semantic match with the JSON decline (exit 0, writes nothing), not identical text.
+        """
+        root = self.copy_working_tree()
+        plain = self.copy_working_tree()
+        self.assertEqual(run_cli(plain, "init", "--name", "x", "--kind", "web").returncode, 0)
+        before = {relative: (plain / relative).read_bytes() if (plain / relative).is_file() else None
+                   for relative in OWNER_FILES}
+        lines = [ANSWERS[question["id"]] for question in guided.QUESTIONS] + ["n"]
+        result = run_cli(root, "init", "--name", "x", "--kind", "web", "--guided",
+                         stdin="\n".join(lines) + "\n")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("TypeError", result.stderr)
+        self.assertIn("Declined", result.stdout)
+        for relative, expected in before.items():
+            actual = (root / relative).read_bytes() if (root / relative).is_file() else None
+            self.assertEqual(actual, expected, relative)
+
     def test_missing_consent_writes_nothing(self) -> None:
         root = self.copy_working_tree()
         plain = self.copy_working_tree()

@@ -295,6 +295,9 @@ def init(root: Path, args) -> None:
         if result is None:
             print("Cancelled: identity init stands; no intake was applied.")
             return
+        if result is False:
+            print("Declined: identity init stands; no intake was applied.")
+            return
         answers, consent = result, True
     if args.answers:
         text = sys.stdin.read() if args.answers == "-" else Path(args.answers).read_text(encoding="utf-8")
