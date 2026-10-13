@@ -62,7 +62,7 @@ class UpstreamTests(unittest.TestCase):
         with self.assertRaises(RepoctlError) as caught:
             self.load()
         self.assertIn("repo is required", str(caught.exception.findings))
-        for path in ("/abs.md", "../x.md", "a/../x.md"):
+        for path in ("/abs.md", "../x.md", "a/../x.md", "a.md?x=1", "a.md#frag", "a%2e.md", "a b.md"):
             self.rejects(f'files = [{{ path = "{path}", when = "x y" }}]\n', "files path")
         self.rejects('files = [{ path = "a.md", when = "" }]\n', "when")
         self.rejects('adapted_into = ["missing.md"]\n', "adapted_into")
@@ -99,7 +99,7 @@ class UpstreamTests(unittest.TestCase):
     def test_report_is_a_local_draft_only(self) -> None:
         self.registry()
         (self.root / "body.md").write_text("It breaks.")
-        args = SimpleNamespace(upstream="ref", title="Bug in typeset", body_file=Path("body.md"))
+        args = SimpleNamespace(upstream="ref", title='Bug "in" $(typeset)', body_file=Path("body.md"))
         with mock.patch("subprocess.run", side_effect=AssertionError("no gh/network")):
             message = kitreport.upstream_draft(self.root, args)
         drafts = list((self.root / ".agent/upstream-reports").glob("ref-*.md"))
@@ -108,6 +108,7 @@ class UpstreamTests(unittest.TestCase):
         self.assertIn("o/r", text)
         self.assertIn(SHA, text)
         self.assertIn("gh issue create -R o/r", text)
+        self.assertIn("--title 'Bug \"in\" $(typeset)'", text, "the filing line quotes the title for the shell")
         self.assertIn("nothing was sent", message)
         self.assertIn(".agent/", (Path(__file__).resolve().parents[2] / ".gitignore").read_text())
 

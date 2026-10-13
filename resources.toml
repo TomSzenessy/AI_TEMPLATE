@@ -255,7 +255,7 @@ scope = "agent"
 summary = "Use when orienting in a large unfamiliar codebase or corpus beyond make where. Provides a queryable knowledge graph of code, docs and relationships (graphify-out/)."
 repo = "Graphify-Labs/graphify"
 revision = "a5ba60ddf6293d9f380321965ecf1084391dcc2b"
-license = "Apache-2.0"
+license = "Apache-2.0 AND MIT"
 reviewed_on = "2026-10-13"
 files = [
   { path = "graphify/skill.md", when = "using graphify to build and query a code knowledge graph" },
@@ -293,8 +293,9 @@ scope = "agent"
 summary = "Use when cutting agent token cost or output verbosity. Provides terse-output modes, compressed review/commit, a session token-stats view and a cost-lowering learn pass."
 repo = "JuliusBrussee/caveman"
 revision = "2e08b9177c07bb7249a8a2d1a6758e5db281d002"
-license = "Apache-2.0"
+license = "Apache-2.0 AND MIT"
 reviewed_on = "2026-10-13"
+adapted_into = [".agents/skills/review-practice/SKILL.md", "docs/engineering.md"]
 files = [
   { path = "docs/HONEST-NUMBERS.md", when = "quoting token-savings claims honestly" },
   { path = "skills/caveman-compress/SKILL.md", when = "compressing memory or context files to cut tokens" },

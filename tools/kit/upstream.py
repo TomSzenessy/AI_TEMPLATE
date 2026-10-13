@@ -16,7 +16,8 @@ from typing import Callable
 
 from .core import RepoctlError, date_is_future, is_placeholder, parse_iso_date, today
 
-REPO = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
+REPO = re.compile(r"[A-Za-z0-9_-][A-Za-z0-9_.-]*/[A-Za-z0-9_-][A-Za-z0-9_.-]*")
+SAFE_PATH = re.compile(r"[A-Za-z0-9_.@+-]+(?:/[A-Za-z0-9_.@+-]+)*")  # no ?, #, %, spaces: safe inside a raw URL
 SHA = re.compile(r"[0-9a-f]{40}")
 NOTICES = "THIRD_PARTY_NOTICES.md"
 NOTICE_SECTION = "## Workflow material distilled"
@@ -64,8 +65,7 @@ def validate(entry: dict, position: int, root: Path) -> list[str]:
 
 
 def _unsafe(path: str) -> bool:
-    return (not path.strip() or path.startswith("/") or "\\" in path or ".." in path.split("/")
-            or bool(re.match(r"^[A-Za-z]:", path)))
+    return not SAFE_PATH.fullmatch(path) or ".." in path.split("/")
 
 
 def raw_url(entry: dict, path: str) -> str:

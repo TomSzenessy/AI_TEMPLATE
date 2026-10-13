@@ -12,6 +12,7 @@ project-specific (`REASON="..."`). In the template itself there is no lock, so n
 from __future__ import annotations
 
 import json
+import shlex
 from pathlib import Path
 
 from .core import RepoctlError, ensure_inside_root, load_project
@@ -134,7 +135,7 @@ def upstream_draft(root: Path, args) -> str:
     draft.write_text(
         f"# {args.title}\n\nRepository: {entry['repo']}\nPinned revision: {entry['revision']}\n\n"
         f"{body_path.read_text(encoding='utf-8')}\n\n---\nDraft only; nothing was sent. The owner files it with:\n"
-        f"gh issue create -R {entry['repo']} --title \"{args.title}\" --body-file {relative}\n", encoding="utf-8")
+        f"gh issue create -R {entry['repo']} --title {shlex.quote(args.title)} --body-file {shlex.quote(str(relative))}\n", encoding="utf-8")
     return f"Drafted {relative} for {entry['repo']}@{entry['revision'][:7]} (nothing was sent; the owner files it)."
 
 
