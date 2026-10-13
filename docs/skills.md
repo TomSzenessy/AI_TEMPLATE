@@ -48,8 +48,7 @@ video surface may need a renderer/export skill. Those are decisions recorded in
 the issue and `[[skills]]` provenance, not permanent template dependencies.
 
 A useful capability request names the trigger, input/output interface, least
-privilege, real artifact oracle, and rollback. If a host already offers a
-reviewed skill such as `find-skills`, use that discovery route.
+privilege, real artifact oracle, and rollback.
 
 
 - Popularity, install counts, and stars are discovery signals, not trust.
@@ -98,10 +97,9 @@ rather than a large prompt collection:
   [`systematic-debugging`](../.agents/skills/systematic-debugging/SKILL.md),
   [`review-practice`](../.agents/skills/review-practice/SKILL.md) and
   [`web-quality`](../.agents/skills/web-quality/SKILL.md) carry the everyday
-  engineering loop: idea to merged branch, root cause before fix, requesting
-  and answering review, and measured web speed, accessibility and SEO. They
-  merge the useful parts of several public collections
-  ([notices](../THIRD_PARTY_NOTICES.md)); the rest are routes in `resources.toml`.
+  engineering loop, merged from public collections
+  ([notices](../THIRD_PARTY_NOTICES.md)); other collections are routes in
+  `resources.toml`.
 
 First-party skills are source-controlled, declared in
 `project.toml [capabilities].local_skills`, not third-party `[[skills]]`.
@@ -117,29 +115,6 @@ generates its host adapters. Third-party skills never use that path; they need
 `[[skills]]` provenance. A `reviewed_on` older than `[kit].skill_review_days`
 (default one year) is reported by `make garden` and fails `make readiness`
 only from `private-preview` on.
-
-## Writing a skill agents actually use
-
-A skill nobody finds or follows is dead weight. Before `make new KIND=skill`:
-
-- **Description:** one clause on what it does, then `Use when` with concrete
-  triggers, user phrasings, error text, and the symptoms of being about to
-  break the rule. Never summarize its steps there: an agent that can follow the
-  description will skip the body. Third person, under about 500 characters.
-- **Baseline first:** for a skill that enforces discipline, run a fresh
-  subagent on a pressure scenario (time, sunk cost, authority, exhaustion; two
-  or more at once, forced A/B/C choice, real paths) without the skill. Record
-  its excuses verbatim, write only what answers them, rerun with the skill.
-  Wording meant to shape output gets a no-guidance control and five or more
-  runs; if the control never fails, write no skill.
-- **Close loopholes:** state the rule, forbid each workaround by name, add an
-  excuse-and-reality table and a red-flags list drawn from those runs. Match
-  the form to the failure: prohibition for rules skipped under pressure, a
-  positive recipe for wrongly shaped output, a required template slot for
-  omitted elements, and no "unless it matters" clauses.
-- **Keep it lean:** one excellent example, tables for reference, heavy detail
-  in a linked `references/` file the body says when to open (bytes are budgeted
-  in `project.toml`). Do not write a skill for what a check can enforce.
 
 ## One canonical copy, any host
 
@@ -220,11 +195,3 @@ loop in `AGENTS.md` and `tdd`), `replica-backend` (see
 store-listing linter `listing.py`, which only pays off once a project has an
 App Store or Google Play surface — then discover it from the pinned upstream
 revision.
-
-## Useful capability branches
-
-Use the installed/global skill only when its source is reviewed and the task
-matches its trigger: bug diagnosis, TDD, architecture/deep modules, frontend
-design, security review, research, domain modeling, or pre-commit setup. For
-React/Next, Supabase, Blender, video, or other specialized work, discover a
-reputable current skill rather than copying an unverified prompt collection.

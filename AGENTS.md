@@ -2,8 +2,8 @@
 
 <!-- index: operate | Agent operating contract and trigger router | Any change is requested. -->
 
-These rules always apply; detail: owner docs. **Golden path:** `make start`, `make next` (the next
-step), `make where Q="..."`, `make capabilities`, and `make done` before you call any work complete.
+These rules always apply; detail: owner docs. **Golden path:** `make start`, `make next`,
+`make where Q="..."`, `make capabilities`, and `make done` before you call any work complete.
 
 ## Session protocol
 
@@ -73,7 +73,7 @@ route is [`SECURITY.md`](./SECURITY.md).
 
 [`docs/README.md`](./docs/README.md) lists every document and when to read it:
 
-- **New product:** `product-kickoff` (headless without owner answers: write the questions with your picks, stop), then `stack-foundation`, then `make next` until launch ([`docs/building.md`](./docs/building.md)). **Anything users see:** `ux-quality`, `make ui-review`; speed/SEO/a11y numbers: `web-quality`.
+- **New product:** `product-kickoff` (headless without owner answers: write the questions with your picks, stop), then `stack-foundation`, then `make next` until launch ([`docs/building.md`](./docs/building.md)). **Anything users see:** `ux-quality`, `make ui-review`; numbers: `web-quality`.
 - **A metric or benchmark to improve, or costly real measurements:** `experiment-lab` ([`docs/experiments.md`](./docs/experiments.md)).
 - **Reverse engineering:** `product-recon` for public UX; `technical-recon` for authorized app/protocol internals or an environment to run agents against.
 - **Code acts on a model's answer:** [`docs/model-integration.md`](./docs/model-integration.md).
@@ -87,8 +87,8 @@ route is [`SECURITY.md`](./SECURITY.md).
 
 ## Build and repair loop
 
-1. **Frame** user-visible outcome, evidence, surface, non-goals;
-   multi-file work: `plan-and-build`.
+1. **Frame** outcome, evidence, surface, non-goals; [plan quality](./docs/verification.md#the-quality-loop)
+   before implementation (`plan-and-build`).
 2. **Reproduce** a bug as a failing test or deterministic experiment first.
 3. **Design** behind the smallest deep interface; one owner per changing fact.
 4. **Implement** the smallest coherent change; keep existing conventions.
@@ -104,7 +104,7 @@ route is [`SECURITY.md`](./SECURITY.md).
 - `.claude/`, `.mcp.json`, and marked `repoctl` blocks are generated: edit `.agents/`, then `make sync`.
 - Always-loaded files stay within `project.toml [budgets]`; move detail to an owner doc.
 - A surface needs an owner, quality oracle, and verification; a nested `AGENTS.md` only for rules that differ.
-- Delete dead code once callers are proven gone. Prefer small, boring solutions.
+- Delete dead code once callers are gone. Prefer small, boring code.
 
 ## Trust and safety
 
