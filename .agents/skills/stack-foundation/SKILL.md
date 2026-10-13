@@ -38,9 +38,20 @@ Scale the setup to the kickoff tier: a `prototype` needs steps 1 to 5; a
    use simulator or emulator screenshots instead.
 6. **Configuration and secrets:** commit `.env.example` with every variable and
    a comment, never real values; validate configuration at startup and fail fast.
-7. **Observability:** structured logs with request IDs, error tracking (for
-   example Sentry or the platform's crash reporting), and a health endpoint for
-   services. Record any personal data they touch in `docs/legal/data-inventory.md`.
+7. **Observability:** write 2 to 4 questions on-call will ask first (is it
+   succeeding, why does it fail, is a dependency slow); every signal answers one.
+   Structured JSON logs with stable event names, a request ID on every line, and
+   an `entryPoint` field when a scheduler, webhook, or CLI share a sink; never
+   log secrets or whole bodies. Rate, errors, and duration histograms (read
+   p95/p99, never averages) per endpoint and external call, with labels from
+   small fixed sets (route template, status class), never user ids or URLs.
+   Error tracking (Sentry or platform crash reporting), a health endpoint, and
+   OpenTelemetry traces once more than one service exists. Alert only on user
+   symptoms (error rate, p99, queue age), each with a three-line runbook
+   (means, first check, escalate to) in `docs/runbooks/`; at most two severities,
+   page and ticket. Prove it: force one error, find it by request ID, and
+   test-fire each alert once. Record any personal data they touch in
+   `docs/legal/data-inventory.md`.
 8. **Delivery:** CI runs `make verify` (the test half of `make done`; agents
    run `make done` locally); every pull request gets a preview
    deployment or build when the platform supports it; document rollback in

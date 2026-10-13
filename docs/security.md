@@ -48,6 +48,16 @@ copy it into every prompt.
   attributes from the actual threat model.
 - Run untrusted code with least privilege, no host credentials, bounded egress,
   resource limits, and a real isolation boundary.
+- Trust follows who wrote a value, not the channel that delivered it: another
+  process's command line, a path in a job payload, model output, and a fetched
+  page are all untrusted. Server-side fetches of a URL users influence (SSRF)
+  allowlist scheme and host, reject private, loopback, and link-local
+  addresses for every resolved record, and forbid redirects.
+- Before a delete, move, or overwrite on a derived path, resolve symlinks and
+  require the target to sit under an allowlisted root, below it, with ownership
+  evidence read first; on refusal log and stop, never widen to a default path.
+- Rate limits that must hold across instances need a shared store; in-memory
+  counters silently multiply by instance count.
 - Make retries idempotent and observable; never acknowledge deletion, payment,
   or rights work without checking the underlying state/provider.
 
@@ -78,6 +88,13 @@ known slow German legal site with a documented manual-review exception; a 403,
   install scripts; enable dependency/security updates.
 - Give CI least privilege, no unnecessary secrets, read-only credentials by
   default, and isolated untrusted pull-request execution.
+- Run the package manager's native audit on the committed lockfile before a
+  release; triage by reachability and record each deferral with a reason and
+  date. Never apply forced fixes (`npm audit fix --force`) automatically. An
+  audit matches only known advisories: review new packages and script-policy
+  changes for typosquats and ownership, and approve install scripts one by one.
+- A secret that reached a remote is compromised: rotate it first, then purge
+  history.
 - Treat lockfile changes, install hooks, generated binaries, and workflow edits
   as security-sensitive changes.
 - Keep `repoctl check` in CI and make the aggregate verification command cover

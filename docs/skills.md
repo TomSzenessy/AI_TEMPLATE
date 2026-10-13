@@ -110,6 +110,29 @@ generates its host adapters. Third-party skills never use that path; they need
 (default one year) is reported by `make garden` and fails `make readiness`
 only from `private-preview` on.
 
+## Writing a skill agents actually use
+
+A skill nobody finds or follows is dead weight. Before `make new KIND=skill`:
+
+- **Description:** one clause on what it does, then `Use when` with concrete
+  triggers, user phrasings, error text, and the symptoms of being about to
+  break the rule. Never summarize its steps there: an agent that can follow the
+  description will skip the body. Third person, under about 500 characters.
+- **Baseline first:** for a skill that enforces discipline, run a fresh
+  subagent on a pressure scenario (time, sunk cost, authority, exhaustion; two
+  or more at once, forced A/B/C choice, real paths) without the skill. Record
+  its excuses verbatim, write only what answers them, rerun with the skill.
+  Wording meant to shape output gets a no-guidance control and five or more
+  runs; if the control never fails, write no skill.
+- **Close loopholes:** state the rule, forbid each workaround by name, add an
+  excuse-and-reality table and a red-flags list drawn from those runs. Match
+  the form to the failure: prohibition for rules skipped under pressure, a
+  positive recipe for wrongly shaped output, a required template slot for
+  omitted elements, and no "unless it matters" clauses.
+- **Keep it lean:** one excellent example, tables for reference, heavy detail
+  in a linked `references/` file the body says when to open (bytes are budgeted
+  in `project.toml`). Do not write a skill for what a check can enforce.
+
 ## One canonical copy, any host
 
 Skills live only in `.agents/skills/<name>/SKILL.md`. Codex, Copilot, and

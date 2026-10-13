@@ -28,7 +28,7 @@ the project already tried or owns; if absent, locate the closest owners first.
    maintenance cost. Prefer a bounded owner update over another file/catalog.
 3. For supplied information, decide from accessible material and existing
    owners first. Search host skills/catalogs, GitHub or MCP registries only
-   for a remaining named capability gap. Host/global availability is not proof
+   for a remaining named capability gap (read-only `npx skills find <query>`/skills.sh; never auto-install). Host/global availability is not proof
    of reviewed, portable project ownership.
 4. Propose the smallest useful application with an observable artifact oracle,
    or a specific non-trial reason and next action. Intake outcomes, conditional
