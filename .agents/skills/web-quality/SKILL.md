@@ -21,7 +21,7 @@ Also: TTFB < 800 ms; contrast 4.5:1 text, 3:1 large text and controls; touch
 or click targets >= 24 px (WCAG 2.2 minimum), 44 pt/48 dp on touch. Starting
 budget for a content page, unless the project sets one: page < 1.5 MB,
 JS < 300 KB, CSS < 100 KB, above-fold images < 500 KB, fonts < 100 KB,
-third-party < 200 KB (compressed). Record any project budget in `docs/design.md`.
+third-party < 200 KB (compressed). Record any project budget in `docs/design.md` (created by `product-kickoff`; without it, in the issue).
 
 ## Audit order
 

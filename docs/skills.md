@@ -94,6 +94,14 @@ rather than a large prompt collection:
 - [`../.agents/skills/pitch-from-evidence/SKILL.md`](../.agents/skills/pitch-from-evidence/SKILL.md)
   builds a pitch or results report from a claim table in which every number
   has a source.
+- [`plan-and-build`](../.agents/skills/plan-and-build/SKILL.md),
+  [`systematic-debugging`](../.agents/skills/systematic-debugging/SKILL.md),
+  [`review-practice`](../.agents/skills/review-practice/SKILL.md) and
+  [`web-quality`](../.agents/skills/web-quality/SKILL.md) carry the everyday
+  engineering loop: idea to merged branch, root cause before fix, requesting
+  and answering review, and measured web speed, accessibility and SEO. They
+  merge the useful parts of several public collections
+  ([notices](../THIRD_PARTY_NOTICES.md)); the rest are routes in `resources.toml`.
 
 First-party skills are source-controlled, declared in
 `project.toml [capabilities].local_skills`, not third-party `[[skills]]`.

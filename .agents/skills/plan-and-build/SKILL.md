@@ -1,6 +1,6 @@
 ---
 name: plan-and-build
-description: Takes a non-trivial feature or change from idea to merged branch - refine, owner-approved design, bite-sized plan, task-by-task build with fresh implementers and reviews, finish; Use when asked to build or change something spanning several files or with unclear requirements, "plan this", "let's build X", "brainstorm", "write a spec", "execute the plan".
+description: Takes a feature or change that spans several files from a vague idea to an approved design, a plan, and a reviewed, merged branch; Use when asked to build or change something non-trivial, requirements are unclear, or the user says "plan this", "let's build X", "brainstorm", "write a spec", or "execute the plan".
 ---
 
 # Plan and build
@@ -80,8 +80,10 @@ branch), `make start`, tests green. Tasks in plan order; **per task**:
    Goal, one Deliverable, Scope, Out of scope, Context (issue link, task text,
    interfaces earlier tasks produced), Done when (the verification command).
    Pointers, not pasted history. It spawns no subagents; it commits per slice.
-3. On concerns, fix correctness or scope ones before review; on NEEDS_CONTEXT
-   answer and redispatch; on BLOCKED change something (context, deeper tier,
+3. Read its return block (`Done`/`Verified`/`Residuals`, see
+   [`implementer.md`](../../agents/implementer.md)). Residuals touching
+   correctness or scope: fix before review. It stopped for missing context:
+   answer and redispatch. It could not finish: change something (context, deeper tier,
    smaller task, plan fix), never retry unchanged.
 4. **Review in two passes on `git diff BASE..HEAD`**: (a) spec compliance
    against the task text, nothing missing or extra; (b) quality, incl.

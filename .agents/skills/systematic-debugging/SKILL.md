@@ -1,6 +1,6 @@
 ---
 name: systematic-debugging
-description: Finds the root cause of a bug, failing test, flaky test, or build break before any fix, then fixes it test-first with fresh evidence; Use when something fails or behaves unexpectedly, "it's flaky", "tests are red", "why does this happen", a fix did not work, or you are about to guess.
+description: Finds and proves the root cause of a failure before any fix; Use when a test, build, or flaky check fails, behavior is unexpected, a fix did not work, the user asks "why does this happen", or you are about to guess at a change.
 ---
 
 # Systematic debugging
