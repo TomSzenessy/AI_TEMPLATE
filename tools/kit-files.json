@@ -51,6 +51,7 @@
 ".agents/skills/technical-recon/references/rea.md",
 ".agents/skills/ux-quality/SKILL.md",
 ".editorconfig",
+".env.example",
 ".gitattributes",
 ".githooks/commit-msg",
 ".github/ISSUE_TEMPLATE/bug.yml",

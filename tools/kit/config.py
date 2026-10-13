@@ -44,10 +44,12 @@ DEFAULTS: dict[str, object] = {
     # Optional consent-gated semantic code similarity for `make similar --code` (#115).
     # Off by default; standard library only; every disabled/unconsented/stale/failing
     # path falls back to honest lexical matching. Similarity never deletes code.
+    # endpoint/model accept a literal or an explicit `env:NAME` reference; the
+    # convenient disabled defaults reference EMBEDDINGS_ENDPOINT/EMBEDDINGS_MODEL.
     "semantic_enabled": False,
-    "semantic_endpoint": "",
-    "semantic_model": "",
-    "semantic_api_key_env": "SEMANTIC_API_KEY",
+    "semantic_endpoint": "env:EMBEDDINGS_ENDPOINT",
+    "semantic_model": "env:EMBEDDINGS_MODEL",
+    "semantic_api_key_env": "EMBEDDINGS_API_KEY",
     "semantic_timeout_seconds": 10.0,
     "semantic_retries": 1,
     "semantic_max_requests": 8,

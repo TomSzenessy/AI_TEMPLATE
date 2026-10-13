@@ -11,7 +11,10 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
+import stat
 import sys
+import tempfile
 import threading
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -601,3 +604,104 @@ class SemanticSnapshotTests(unittest.TestCase):
         self.assertEqual(transport.config["model"], "approved-snapshot-model")
         self.assertEqual(transport.url, "https://approved-snapshot.example.test/v1/embeddings")
         self.assertEqual(transport.key, KEY_VALUE, "only the known safe TEST-marker key is used")
+
+
+class SemanticEnvResolverTests(unittest.TestCase):
+    """The safe env resolver: private .env, bounded read, plain data only.
+
+    Every test uses its own controlled temp Root with a fake .env; the actual
+    repository Root.env is never read. No test contacts a provider, builds a
+    transport, or sends anything outbound.
+    """
+
+    def setUp(self) -> None:
+        self.root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.root, True)
+
+    def write_env(self, text: str) -> None:
+        (self.root / ".env").write_text(text, encoding="utf-8")
+
+    def test_private_dotenv_parses_quotes_comments_export_blank_alias_and_duplicate(self) -> None:
+        secret = _synthetic_secret()  # runtime-built; the tracked source holds no static secret
+        self.write_env(
+            "# a comment line\n"
+            "export TEST_EXPORT=exported-value\n"
+            'TEST_QUOTED="quoted # not comment"\n'
+            "TEST_INLINE=inline-value # trailing comment\n"
+            "TEST_BLANK=\n"
+            f"TEST_SECRET={secret}\n"
+            "TEST_DUP=first\n"
+            "TEST_DUP=second\n"
+            "UNRELATED=ignored\n"
+        )
+        names = frozenset({"TEST_EXPORT", "TEST_QUOTED", "TEST_INLINE", "TEST_BLANK", "TEST_SECRET", "TEST_DUP"})
+        found = semantic._read_dotenv(self.root, names)
+        self.assertEqual(found["TEST_EXPORT"], "exported-value")
+        self.assertEqual(found["TEST_QUOTED"], "quoted # not comment", "# inside quotes is literal")
+        self.assertEqual(found["TEST_INLINE"], "inline-value", "an inline # comment outside quotes is stripped")
+        self.assertEqual(found["TEST_BLANK"], "")
+        self.assertEqual(found["TEST_SECRET"], secret)
+        self.assertNotIn("TEST_DUP", found, "a duplicate binding is dropped as ambiguous")
+        self.assertNotIn("UNRELATED", found, "only requested names are read")
+        # A symlink alias for .env is rejected before any read.
+        (self.root / ".env").unlink()
+        outside = self.root.parent / "semantic-env-alias-fixture"
+        outside.write_text("TEST_EXPORT=alias\n", encoding="utf-8")
+        self.addCleanup(outside.unlink)
+        (self.root / ".env").symlink_to(outside)
+        self.assertEqual(semantic._read_dotenv(self.root, frozenset({"TEST_EXPORT"})), {}, "a symlink alias is rejected")
+
+    def test_dotenv_over_64kib_is_rejected_with_a_bounded_read(self) -> None:
+        # A valid binding, then padding that pushes the REAL file over the 64 KiB bound.
+        self.write_env("TEST_A=alpha\n" + "#" + "x" * semantic._ENV_MAX_BYTES + "\n")
+        read_sizes: list[int] = []
+        real_open = Path.open
+
+        def recording_open(self, mode="r", *args, **kwargs):
+            handle = real_open(self, mode, *args, **kwargs)
+            if "b" not in mode:
+                return handle
+
+            class _Recorder:
+                def __init__(self, inner):
+                    self._inner = inner
+
+                def read(self, size=-1):
+                    read_sizes.append(size)
+                    return self._inner.read(size)
+
+                def __enter__(self):
+                    return self
+
+                def __exit__(self, *exc):
+                    return self._inner.__exit__(*exc)
+
+            return _Recorder(handle)
+
+        # stat claims the file is small; the real content is over the bound. The bounded
+        # binary read (_ENV_MAX_BYTES + 1) is what catches it — not the stat check.
+        fake_stat = mock.Mock()
+        fake_stat.st_mode = stat.S_IFREG | 0o644
+        fake_stat.st_size = 100
+        with mock.patch.object(Path, "open", recording_open):
+            with mock.patch.object(Path, "read_text", side_effect=AssertionError("unbounded read_text must not be used")):
+                with mock.patch.object(Path, "stat", return_value=fake_stat):
+                    found = semantic._read_dotenv(self.root, frozenset({"TEST_A"}))
+        self.assertEqual(found, {}, "an over-limit .env is rejected even when stat claims under")
+        self.assertIn(semantic._ENV_MAX_BYTES + 1, read_sizes, "the bounded binary read API is used")
+
+    def test_model_env_change_is_a_scope_mismatch_and_not_ready_is_never_sent(self) -> None:
+        self.write_env("TEST_MODEL=model-from-file\n")
+        with mock.patch.dict(os.environ, {"TEST_MODEL": "model-a"}):
+            self.assertEqual(semantic._resolve_env_value(self.root, "env:TEST_MODEL"), "model-a")
+        self.assertEqual(semantic._resolve_env_value(self.root, "env:TEST_MODEL"), "model-from-file")
+        with mock.patch.dict(os.environ, {"TEST_MODEL": "model-b"}):
+            changed = semantic._resolve_env_value(self.root, "env:TEST_MODEL")
+        self.assertEqual(changed, "model-b")
+        self.assertNotEqual(changed, "model-a", "a changed model env is a scope/cache mismatch")
+        # A missing binding resolves to "" and is never ready, never sent.
+        self.assertEqual(semantic._resolve_env_value(self.root, "env:TEST_MISSING"), "")
+        self.assertTrue(semantic._is_not_ready(""))
+        # configured_transport with a not-ready model builds no transport: zero outbound.
+        config = {"endpoint": "https://embeddings.example.test/v1", "model": "", "api_key_env": "TEST_KEY"}
+        self.assertIsNone(semantic.configured_transport(self.root, config), "a not-ready model sends nothing")

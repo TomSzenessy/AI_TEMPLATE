@@ -14,14 +14,18 @@ import hashlib
 import json
 import math
 import os
+import re
+import stat
 import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from .core import (
-    DIRECTORY_ROLES, RepoctlError, code_secret_matches, has_link_component, is_link_like, read_utf8, secret_matches,
+    DIRECTORY_ROLES, RepoctlError, code_secret_matches, ensure_inside_root, has_link_component, is_link_like,
+    read_utf8, secret_matches,
 )
 from .docs import BINARY_SUFFIXES
 from .gitinfo import git, is_repository
@@ -60,13 +64,159 @@ class SemanticError(Exception):
     """A refused or failed semantic operation; the message is safe to print (never a key or code)."""
 
 
+# --- Safe environment value resolver -------------------------------------------
+# Internal SEM env-value resolver: no global dotenv framework, no dependency.
+# Values are plain data — never sourced, executed, evaluated, interpolated, or
+# command-substituted. Process environment by presence (including blank)
+# overrides the private root .env. Credentials (the API key) are never written
+# to logs, caches, consent records, argv, or error messages; endpoint/model
+# values are bound and stored exactly as approved.
+
+# Strict NAME ASCII env grammar: letter or underscore, then letters/digits/underscores.
+_ENV_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+# Config values may reference an environment variable with the explicit env: prefix.
+_ENV_REF_PREFIX = "env:"
+# The root .env file is read at most this many bytes (finite bound).
+_ENV_MAX_BYTES = 64 * 1024
+# Placeholder-looking values are not ready (never executed, never sent).
+_PLACEHOLDER_RE = re.compile(
+    r"^[<\[(].*[>\])]$"  # <...>, [...], (...)
+    r"|^(?:your|my|the)[-_ ]"  # your-*, my-*, the-*
+    r"|^(?:changeme|change[-_ ]?me|todo|fixme|xxx+|example|placeholder|replace)",
+    re.IGNORECASE,
+)
+# Dynamic-shell-looking values are never executed.
+_DYNAMIC_SHELL_RE = re.compile(r"\$\(|\$\{|`|\$[A-Za-z_]")
+
+
+def _env_name(name: str) -> str:
+    """Validate a strict ASCII env name; the error never includes the value."""
+    if not _ENV_NAME_RE.fullmatch(name):
+        raise SemanticError("invalid environment variable name in [kit] semantic configuration")
+    return name
+
+
+def _parse_env_value(value: str) -> str:
+    """Parse a .env value: strip whitespace; matching quotes; inline # comments.
+
+    A # inside matching quotes is literal; a # outside quotes starts an inline
+    comment. An unmatched quote is left as-is so `_is_not_ready` refuses it.
+    No eval, source, interpolation, or command substitution — plain data only.
+    """
+    value = value.strip()
+    if value[:1] in ("'", '"'):
+        quote = value[0]
+        end = value.find(quote, 1)
+        if end == -1:
+            return value  # unmatched quote: not ready
+        return value[1:end]
+    hash_pos = value.find("#")
+    if hash_pos != -1:
+        value = value[:hash_pos].rstrip()
+    return value
+
+
+def _read_dotenv(root: Path, names: frozenset[str]) -> dict[str, str]:
+    """Read only the requested names from the root's private .env file.
+
+    The file is validated BEFORE reading: it must be a regular file inside the
+    root (no alias, no broken link, no directory), and at most 64 KiB. Values
+    are plain data — never sourced, executed, evaluated, interpolated, or
+    command-substituted. Unrelated names are ignored; a requested name bound
+    twice is rejected as ambiguous. No raw value appears in any error.
+    """
+    try:
+        path = ensure_inside_root(root, root / ".env", ".env file")
+    except RepoctlError:
+        return {}  # alias/brokenlink: rejected before read
+    try:
+        info = path.stat()
+    except FileNotFoundError:
+        return {}
+    if not stat.S_ISREG(info.st_mode) or info.st_size > _ENV_MAX_BYTES:
+        return {}  # nonregular or too large: rejected before read
+    try:
+        with path.open("rb") as handle:
+            raw = handle.read(_ENV_MAX_BYTES + 1)
+    except OSError:
+        return {}
+    if len(raw) > _ENV_MAX_BYTES:
+        return {}  # grew past the bound: rejected after the bounded read
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        return {}
+    found: dict[str, str] = {}
+    ambiguous: set[str] = set()
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[len("export "):].strip()
+        key, sep, value = line.partition("=")
+        if not sep:
+            continue
+        key = key.strip()
+        if key not in names:
+            continue  # ignore unrelated names; never parse all secrets
+        if key in ambiguous:
+            continue
+        if key in found:
+            ambiguous.add(key)
+            del found[key]
+            continue
+        found[key] = _parse_env_value(value)
+    return found
+
+
+def _resolve_env_value(root: Path, value: str) -> str:
+    """Resolve a [kit] semantic value: a literal, or an explicit env:NAME reference.
+
+    Process environment by presence (including blank) overrides the private
+    root .env. Values are plain data — never executed. A missing binding
+    resolves to "" (not ready).
+    """
+    if not value.startswith(_ENV_REF_PREFIX):
+        return value
+    name = _env_name(value[len(_ENV_REF_PREFIX):])
+    if name in os.environ:
+        return os.environ[name]
+    return _read_dotenv(root, frozenset({name})).get(name, "")
+
+
+def _is_not_ready(value: str) -> bool:
+    """A missing, placeholder, dynamic-shell, or unmatched-quote binding is not ready."""
+    if not value:
+        return True
+    if value[:1] in ("'", '"') and value.find(value[0], 1) == -1:
+        return True  # unmatched quote: refuse rather than send a malformed value
+    return bool(_PLACEHOLDER_RE.search(value) or _DYNAMIC_SHELL_RE.search(value))
+
+
+def _valid_endpoint(endpoint: str) -> str:
+    """The endpoint must be HTTPS with no credentials, query, or fragment."""
+    parsed = urlsplit(endpoint)
+    if parsed.scheme != "https" or not parsed.hostname:
+        raise SemanticError("semantic endpoint must be an HTTPS URL")
+    if parsed.username or parsed.password:
+        raise SemanticError("semantic endpoint must not contain credentials")
+    if parsed.query or parsed.fragment:
+        raise SemanticError("semantic endpoint must not contain a query or fragment")
+    return endpoint
+
+
 def _config(root: Path) -> dict[str, object]:
-    """Every [kit] semantic tunable with its built-in default (config.py is the one owner)."""
+    """Every [kit] semantic tunable with its built-in default (config.py is the one owner).
+
+    endpoint/model accept a literal or an explicit env:NAME reference; the
+    convenient disabled defaults reference EMBEDDINGS_ENDPOINT/EMBEDDINGS_MODEL.
+    """
     from .config import setting
     return {
         "enabled": bool(setting(root, "semantic_enabled")),
-        "endpoint": str(setting(root, "semantic_endpoint")),
-        "model": str(setting(root, "semantic_model")),
+        "endpoint": _resolve_env_value(root, str(setting(root, "semantic_endpoint"))),
+        "model": _resolve_env_value(root, str(setting(root, "semantic_model"))),
         "api_key_env": str(setting(root, "semantic_api_key_env")),
         "timeout": float(setting(root, "semantic_timeout_seconds")),
         "retries": int(setting(root, "semantic_retries")),
@@ -476,13 +626,30 @@ def configured_transport(root: Path, config: dict | None = None) -> OpenAITransp
     `config` is the already-resolved [kit] snapshot; when omitted it is read once
     here. Callers that resolved a config pass it so the transport uses exactly the
     approved model/endpoint — no re-read, no tuple A→B.
+
+    The key is looked up from the safe env resolver when no process key is set;
+    credentials are never added to cfg, consent records, or caches. Reading the
+    key from a file may separately look it up, but the approved endpoint/model
+    tuple is never re-resolved here.
     """
     if config is None:
         config = _config(root)
-    key = os.environ.get(config["api_key_env"], "")
-    if not key:
+    endpoint = config["endpoint"]
+    model = config["model"]
+    if not endpoint or not model or _is_not_ready(endpoint) or _is_not_ready(model):
         return None
-    return OpenAITransport(config["endpoint"], key, config)
+    _valid_endpoint(endpoint)
+    key_env = config["api_key_env"]
+    try:
+        _env_name(key_env)
+    except SemanticError:
+        return None  # an unsafe key-env name is never looked up, never sent
+    key = os.environ.get(key_env, "")
+    if not key:
+        key = _read_dotenv(root, frozenset({key_env})).get(key_env, "")
+    if not key or _is_not_ready(key):
+        return None
+    return OpenAITransport(endpoint, key, config)
 
 
 # --- Index build and search -------------------------------------------------------
