@@ -175,7 +175,9 @@ content digests, upstream source and revision, review date, project-local
 permissions, and a concrete rollback. The ledger `purpose` names the upstream
 skill each local skill adapts, because adapted skills may be renamed. Any
 change inside one of these directories must update its digest in the same
-change.
+change. For an isolated skill copy, include the full
+[`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md) in that bundle; a
+link alone is insufficient.
 
 Upstream skills reviewed and declined for this template, because the template's
 own documents and reviewed global skills already own those procedures:

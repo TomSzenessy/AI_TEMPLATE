@@ -123,7 +123,3 @@ few weeks), L (a quarter), XL (rescope it). No promises of a perfect clone.
 the core loop, screen and flow counts, the three hardest parts, what is out
 of scope, and the next step: design-tokens, then the project's issue-backed
 build loop (AGENTS.md).
-
-## Source
-
-Adapted from the upstream skill in https://github.com/Jakeschincariol/replica-skill (MIT, © 2026 Jake Schincariol); revision: see `project.toml` `[[skills]]`.
