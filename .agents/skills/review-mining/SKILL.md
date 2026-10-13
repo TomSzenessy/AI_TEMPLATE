@@ -22,7 +22,9 @@ being built. **Original mode** (your own product, no reference) has no
 VISION.md or the accepted design brief, the category, the comparable
 products — and work under `docs/research/`. Never invent a competitor. If the
 product or its sources are missing, ask the owner the one blocking question
-that unblocks them. Never require product-recon, and never force a full
+that unblocks them. When run, write the scope record (goal, category,
+comparables, sources, date) to `docs/research/review-scope.md`; create it
+only then, never as a placeholder. Never require product-recon, and never force a full
 product-kickoff when the user already brought a feedback task.
 
 One variable picks the mode's folder, so the command keeps the same shape:

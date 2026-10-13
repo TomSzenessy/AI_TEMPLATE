@@ -169,7 +169,8 @@ for competitive analysis and "build our own version of X":
   reference exists.
 - [`review-mining`](../.agents/skills/review-mining/SKILL.md) ranks what real
   users hate and ask for — a reference product's or your own product's public
-  reviews — from linked, verbatim quotes, never invented ones.
+  reviews — from linked, verbatim quotes, never invented ones; original mode
+  scopes from the goal and records it under `docs/research/`.
 - [`brand-sweep`](../.agents/skills/brand-sweep/SKILL.md) names and vets your
   own identity, then sweeps the codebase until nothing of the reference
   product's name, domain, or colors remains; an original-product mode names
