@@ -145,4 +145,4 @@ discipline plus a ranked audit and a shortcut-debt ledger. Pull its
 `ponytail-audit` file when a review keeps finding over-built code. Skip it
 when the diff is already minimal.
 
-Addy agent-skills (`make upstream ID=addyosmani-agent-skills`): long checklists (security, performance, accessibility, testing). Pull one when a review touches that axis deeply.
+Addy agent-skills (`make upstream ID=addyosmani-agent-skills`): long security, performance, accessibility and testing checklists. Pull the one whose axis the diff changes (auth, a hot path, UI, test strategy); skip axes the diff does not touch.

@@ -155,7 +155,7 @@ An entry may pin its reviewed upstream: `repo`, 40-hex `revision`, `license`,
   `make check` requires a record for every source in the notices' distilled
   table (replica-skill: `[[skills]]` provenance).
 - `make check` requires each id in AGENTS.md, `.agents/**/*.md` or `docs/**/*.md`
-  (what, when to pull).
+  (say what and when).
 - `make kit-report UPSTREAM=<id> TITLE=... BODY=path` drafts an upstream issue
   in ignored `.agent/upstream-reports/`; never filed by it.
 

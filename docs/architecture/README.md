@@ -112,8 +112,8 @@ packages, what a diff touches) in a large repository this kit did not map:
   HTML/SVG architecture, sequence and data-flow diagrams. Pull when a
   diagram must be shared or explored; a short Mermaid block suffices otherwise.
 
-Graphify and Understand Anything are tools: running them installs code and may
-send source to a model, so vet with `skill-scout`, get owner approval, and
+Graphify and Understand Anything are tools, and Archify ships export scripts:
+running them installs code or may send source to a model, so vet with `skill-scout`, get owner approval, and
 follow the consent rules in [`../privacy.md`](../privacy.md) first. Reading
 their files is always fine.
 

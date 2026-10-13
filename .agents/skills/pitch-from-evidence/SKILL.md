@@ -32,8 +32,9 @@ of work.
    source right before presenting; numbers drift while work continues.
 
 An explorable architecture or flow diagram for the deck: Archify
-(`make upstream ID=archify-diagrams`), pulled only when a static image is
-not enough.
+(`make upstream ID=archify-diagrams`, an agent skill that writes
+interactive HTML/SVG diagrams), pulled only when a static image is not
+enough; vet any of its scripts with `skill-scout` before running them.
 
 ## Done when
 

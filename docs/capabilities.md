@@ -92,8 +92,9 @@ A skill nobody finds or follows is dead weight. Before `make new KIND=skill`:
 After `make similar` finds nothing local, and only through `skill-scout`:
 
 - **skills.sh** (`make upstream ID=skills-sh-find-skills`): the open skill
-  ecosystem's search (`npx skills find <query>`). Use it to list candidates
-  for a named gap; never `npx skills add` without review.
+  ecosystem's search (`npx skills find <query>`, a read-only listing). Use
+  it to name candidates for a gap, then hand them to `skill-scout`;
+  installing (`npx skills add`) needs its review and the owner's approval.
 - **Awesome Claude Skills** (`make upstream ID=composio-awesome-claude-skills`):
   a catalog with `mcp-builder` (pull before `make new KIND=mcp` to design an
   MCP server), `webapp-testing` (Playwright patterns) and about 830
