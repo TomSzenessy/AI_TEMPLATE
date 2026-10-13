@@ -91,7 +91,8 @@ def template_repository(root: Path) -> str:
 
 def report(root: Path, args) -> str:
     """Draft the kit report for the template (nothing is sent), or record a project-specific reason."""
-    if getattr(args, "upstream", None):
+    upstream = getattr(args, "upstream", None)
+    if isinstance(upstream, str) and upstream:
         return upstream_draft(root, args)
     paths = _owed(root)
     if args.reason:
