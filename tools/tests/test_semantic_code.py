@@ -944,3 +944,29 @@ class SemanticEnvResolverTests(unittest.TestCase):
         rebuilt_h = semantic.build_index(self.root, transport=fake_final, consent=True)
         self.assertIn("index built", "\n".join(rebuilt_h))
         self.assertGreater(len(fake_final.calls), 0, "explicit re-confirmation re-indexes the grown scope")
+
+
+class SemanticSingleReadTests(KitRepository):
+    """The embedded text and the hash recorded for it come from one read (#130)."""
+
+    def test_file_edited_between_inventory_and_indexing_is_never_recorded_under_a_stale_hash(self) -> None:
+        git_in(self.root, "init", "-q", "-b", "main")
+        git_in(self.root, "config", "user.email", "test@example.com")
+        git_in(self.root, "config", "user.name", "Test")
+        (self.root / "src").mkdir(parents=True, exist_ok=True)
+        target = self.root / "src" / "alpha.py"
+        target.write_text("def alpha():\n    return 1\n", encoding="utf-8")
+        (self.root / "src" / "beta.py").write_text("def beta():\n    return 2\n", encoding="utf-8")
+        git_in(self.root, "add", "src")
+        git_in(self.root, "commit", "-q", "-m", "initial")
+        enable(self.root)
+        config = semantic._config(self.root)
+        snapshot = semantic.inventory(self.root, config)
+        target.write_text("def alpha():\n    return 'edited after the inventory'\n", encoding="utf-8")
+        fake = FakeTransport()
+        index = semantic._index_inventory(self.root, config, snapshot, fake)
+        sent = "".join("".join(call) for call in fake.calls)
+        self.assertNotIn("src/alpha.py", [entry["path"] for entry in index["files"]],
+                         "a file changed since the inventory is skipped as stale, not recorded")
+        self.assertNotIn("edited after the inventory", sent, "unconfirmed edited text must not be sent")
+        self.assertEqual(index["counts"]["files"], len(index["files"]))
