@@ -126,7 +126,7 @@ Three words are used throughout the tools, so here they are first:
 EVERY SESSION (this is all most tasks need)
   make start                         Print the session brief: branch, handover, map, next step, what needs attention
   make next                          The single next step toward a complete product
-  make where Q="login form"          Find files, symbols, owning docs, rules, capabilities, and past failures
+  make where Q="login form"          Find files, symbols, owning docs, indexed doc triggers, rules, capabilities, read-only resources, and past failures
   make ui-review                     Screenshot the UI (phone/desktop, light/dark) for a judged review
   make done                          Before saying "done": heal derived files, gates, all tests
 
@@ -155,7 +155,7 @@ WHEN NEEDED
                                      Create a private incident regression record
 
 PROJECT SETUP AND MAINTENANCE
-  make init NAME=my-project KIND=web [OWNER=you]
+  make init NAME=my-project KIND=web [OWNER=you] [--answers file] [--guided] [--consent] [--reshape]
                                      Turn the template into your project
   make -f <kit>/Makefile adopt NAME=x KIND=web OWNER=you
                                      Bring this kit into an existing repository (--root) without overwriting it

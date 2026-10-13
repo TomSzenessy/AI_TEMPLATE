@@ -1,6 +1,6 @@
 # Engineering standard
 
-<!-- index: design | Modular design, single source of truth, dependency, and cleanup rules | Code is being changed, refactored, or reviewed. -->
+<!-- index: design | Modular design, single source of truth, dependency, cleanup rules | Code changed, refactored, or reviewed; deep modules. -->
 
 The goal is compact, legible software with high leverage: a small interface
 over a meaningful implementation, one owner for each changing fact, and tests
