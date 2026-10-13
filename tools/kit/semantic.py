@@ -332,7 +332,9 @@ def scope_digest(config: dict, inventory: dict) -> str:
     Carries sorted eligible PATHS, file count, and chunk count — never content
     hashes, byte counts, or code text. Any path-set or chunk-count change requires
     fresh consent; a code edit preserving both does NOT re-prompt (index_state
-    detects staleness by content hash instead).
+    detects staleness by content hash instead). This is deliberate (#130): consent
+    means "these files may be indexed", not "this exact content"; every send is an
+    explicit `make similar CODE_INDEX=1` run that prints the scope first.
     """
     canonical = json.dumps({
         "endpoint": config["endpoint"], "model": config["model"],
@@ -503,15 +505,18 @@ def _index_inventory(root: Path, config: dict, inventory: dict, transport) -> di
     Batching is global across files to minimize outbound requests.
     """
     all_chunks: list[tuple[str, dict]] = []
+    per_file: list[tuple[str, str, list[dict]]] = []
     for item in inventory["files"]:
         relative, digest = item.split(":", 1)
         try:
-            text = read_utf8(root / relative)
+            text = read_utf8(root / relative)  # the one read: chunked, embedded, and hashed from this text
         except (OSError, RepoctlError):
             continue
+        if _sha256(text) != digest:
+            continue  # edited since the inventory was confirmed: skip as stale, never record a mismatched hash
         chunks = chunk_text(text, config)[: config["max_chunks"]]
-        for chunk in chunks:
-            all_chunks.append((relative, chunk))
+        per_file.append((relative, digest, chunks))
+        all_chunks.extend((relative, chunk) for chunk in chunks)
     batches = math.ceil(len(all_chunks) / config["batch"]) if all_chunks else 0
     if batches > config["max_requests"]:
         raise SemanticError(
@@ -524,13 +529,7 @@ def _index_inventory(root: Path, config: dict, inventory: dict, transport) -> di
         all_vectors += transport.embed([chunk["text"] for _, chunk in batch])
     files: list[dict] = []
     vector_index = 0
-    for item in inventory["files"]:
-        relative, digest = item.split(":", 1)
-        try:
-            text = read_utf8(root / relative)
-        except (OSError, RepoctlError):
-            continue
-        chunks = chunk_text(text, config)[: config["max_chunks"]]
+    for relative, digest, chunks in per_file:
         vectors = all_vectors[vector_index : vector_index + len(chunks)]
         vector_index += len(chunks)
         files.append({
@@ -541,7 +540,7 @@ def _index_inventory(root: Path, config: dict, inventory: dict, transport) -> di
     return {"schema_version": config["schema"], "root_id": _root_id(root), "model": config["model"],
             "endpoint": config["endpoint"], "scope_digest": scope_digest(config, inventory), "created_at": _now(),
             "files": files,
-            "counts": {"files": len(files), "chunks": inventory["chunks"], "bytes": inventory["bytes"]}}
+            "counts": {"files": len(files), "chunks": len(all_chunks), "bytes": inventory["bytes"]}}
 
 
 def build_index(root: Path, *, transport=None, consent: bool = False) -> list[str]:
