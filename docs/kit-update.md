@@ -28,12 +28,13 @@ also remembers the version the project had from the kit before its edit
 update applies the kit's version again instead of treating it as an edit. The
 staged version stays in `.agent/kit-update/` and `make garden` lists it on every
 run until you merge it and delete the staged file, so an ignored kit fix is never
-silently lost. A
-project made before the lock existed gets every differing kit file listed once
-on its first update (nothing is overwritten); after that, updates apply
-automatically. A kit checkout without git history keeps the recorded
-`kit_version`, and an update from a lock that never recorded one says so
-instead of printing a placeholder.
+silently lost. On a first update without a lock, differing kit files are
+compared with the offered kit commit's history, as described below: historical
+matches update automatically; unmatched files are kept and listed once to merge.
+Without that history, every differing file is kept and listed once instead.
+Subsequent updates use the recorded lock. A kit checkout without git history
+keeps the recorded `kit_version`, and an update from a lock that never recorded
+one says so instead of printing a placeholder.
 
 Project-owned files are never kit files: `project.toml`, `VISION.md`,
 `README.md`, `LICENSE`, `CONTEXT.md`, the stack decision, design, architecture,
