@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -119,7 +120,10 @@ class RoutingTests(unittest.TestCase):
     def test_rea_is_pinned_read_only_candidate_not_enabled_mcp(self):
         entries = skills.load_resource_registry(ROOT)
         rea = next(entry for entry in entries if entry["id"] == "rea-authorized-analysis")
-        self.assertIn("79156e5bed1d72b83ade0483246f457b337b7e59", rea["source"])
+        self.assertIn(rea["revision"], rea["source"], "the route is pinned to the reviewed revision")
+        reference = (SKILL / "references" / "rea.md").read_text()
+        pins = set(re.findall(r"morluto/rea/(?:tree/|blob/)?([0-9a-f]{40})", reference))
+        self.assertEqual(pins, {rea["revision"]}, "rea.md links follow the registry pin (one source of truth)")
         self.assertEqual(rea["access"], "read-only")
         self.assertEqual(rea["trust"], "discovery")
         self.assertNotIn("mcp", rea)

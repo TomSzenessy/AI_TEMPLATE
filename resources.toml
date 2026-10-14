@@ -174,15 +174,15 @@ summary = "Catalogue of deceptive (dark) patterns to avoid in onboarding, pricin
 [[resources]]
 id = "rea-authorized-analysis"
 kind = "skills"
-source = "https://github.com/morluto/rea/tree/79156e5bed1d72b83ade0483246f457b337b7e59"
+source = "https://github.com/morluto/rea/tree/307af044bc0bdc15bc836c549e774220af8f459e"
 trust = "discovery"
 access = "read-only"
 scope = "reverse-engineering"
 summary = "Source-reviewed candidate for authorized shipped-artifact and behavior investigation; project-local runtime/package approval and trial remain separate."
 repo = "morluto/rea"
-revision = "79156e5bed1d72b83ade0483246f457b337b7e59"
+revision = "307af044bc0bdc15bc836c549e774220af8f459e"
 license = "MIT"
-reviewed_on = "2026-10-13"
+reviewed_on = "2026-10-14"
 adapted_into = [".agents/skills/technical-recon/SKILL.md"]
 files = [
   { path = "docs/android-analysis.md", when = "analyzing an authorized Android artifact" },
@@ -194,15 +194,15 @@ files = [
 [[resources]]
 id = "api-anything-authorized-replay"
 kind = "skills"
-source = "https://github.com/goodnight000/api-anything/blob/4a785e8d9e72a00e2dddc0dc56569a86826df07b/README.md"
+source = "https://github.com/goodnight000/api-anything/blob/1788526eb54ff1f0d8bd7373bd5fdcac143ad7ad/README.md"
 trust = "discovery"
 access = "read-only"
 scope = "reverse-engineering"
 summary = "Pinned reference for authorized HTTP request learning/replay; inspect source, license, permissions, revision and data destinations before any use; link-only, not a default dependency."
 repo = "goodnight000/api-anything"
-revision = "4a785e8d9e72a00e2dddc0dc56569a86826df07b"
+revision = "1788526eb54ff1f0d8bd7373bd5fdcac143ad7ad"
 license = "MIT"
-reviewed_on = "2026-10-13"
+reviewed_on = "2026-10-14"
 adapted_into = [".agents/skills/technical-recon/SKILL.md"]
 files = [
   { path = "README.md", when = "learning and replaying authorized HTTP requests" },
@@ -211,15 +211,15 @@ files = [
 [[resources]]
 id = "ponytail-lazy-senior"
 kind = "skills"
-source = "https://github.com/DietrichGebert/ponytail/tree/9b58c1ffb790c075ca32e70a89cf1d80588f4abf"
+source = "https://github.com/DietrichGebert/ponytail/tree/2961b52fc1fe6a5a87c7a959a79512e5c2f3ffe5"
 trust = "discovery"
 access = "read-only"
 scope = "agent"
 summary = "Use when you want minimal-diff discipline or a quick repo audit/review. Provides a smallest-change coding mode, ranked audit/review prompts and a shortcut-debt ledger."
 repo = "DietrichGebert/ponytail"
-revision = "9b58c1ffb790c075ca32e70a89cf1d80588f4abf"
+revision = "2961b52fc1fe6a5a87c7a959a79512e5c2f3ffe5"
 license = "MIT"
-reviewed_on = "2026-10-13"
+reviewed_on = "2026-10-14"
 files = [
   { path = "skills/ponytail/SKILL.md", when = "applying the smallest-change coding mode" },
   { path = "skills/ponytail-audit/SKILL.md", when = "running a ranked repo audit with minimal-diff lens" },
@@ -230,15 +230,15 @@ files = [
 [[resources]]
 id = "archify-diagrams"
 kind = "skills"
-source = "https://github.com/tt-a1i/archify/tree/58ab0b98d2d0def8e49dced705c7b566936723ec"
+source = "https://github.com/tt-a1i/archify/tree/c21c31ffb879668900c5487ea24993bf45d89b15"
 trust = "discovery"
 access = "read-only"
 scope = "web"
 summary = "Use when an architecture, sequence, data-flow or state diagram must be explorable. Provides a standalone HTML+inline-SVG diagram generator with themes and PNG/SVG/WebM export."
 repo = "tt-a1i/archify"
-revision = "58ab0b98d2d0def8e49dced705c7b566936723ec"
+revision = "c21c31ffb879668900c5487ea24993bf45d89b15"
 license = "MIT"
-reviewed_on = "2026-10-13"
+reviewed_on = "2026-10-14"
 files = [
   { path = "archify/SKILL.md", when = "generating an explorable architecture or sequence diagram" },
   { path = "docs/authoring-cookbook.md", when = "authoring diagram specs, themes and exports" },
@@ -248,15 +248,15 @@ files = [
 [[resources]]
 id = "graphify-code-graph"
 kind = "skills"
-source = "https://github.com/Graphify-Labs/graphify/tree/a5ba60ddf6293d9f380321965ecf1084391dcc2b"
+source = "https://github.com/Graphify-Labs/graphify/tree/041771be72229bb2c8d8205b9cc6871c6be52b91"
 trust = "discovery"
 access = "read-only"
 scope = "agent"
 summary = "Use when orienting in a large unfamiliar codebase or corpus beyond make where. Provides a queryable knowledge graph of code, docs and relationships (graphify-out/)."
 repo = "Graphify-Labs/graphify"
-revision = "a5ba60ddf6293d9f380321965ecf1084391dcc2b"
+revision = "041771be72229bb2c8d8205b9cc6871c6be52b91"
 license = "Apache-2.0 AND MIT"
-reviewed_on = "2026-10-13"
+reviewed_on = "2026-10-14"
 files = [
   { path = "graphify/skill.md", when = "using graphify to build and query a code knowledge graph" },
   { path = "ARCHITECTURE.md", when = "understanding how the graph is extracted and stored" },
@@ -266,15 +266,15 @@ files = [
 [[resources]]
 id = "understand-anything-graph"
 kind = "skills"
-source = "https://github.com/Egonex-AI/Understand-Anything/tree/000fbf3f36b5e534a0a8d3461cf24f5dc9ae43fe"
+source = "https://github.com/Egonex-AI/Understand-Anything/tree/f2d0164f72fe678805c34245a6df36acededfebd"
 trust = "discovery"
 access = "read-only"
 scope = "agent"
 summary = "Use when onboarding to a codebase or reviewing a PR's blast radius. Provides a knowledge-graph dashboard, file explainer, diff-impact, domain-flow and onboarding-guide skills."
 repo = "Egonex-AI/Understand-Anything"
-revision = "000fbf3f36b5e534a0a8d3461cf24f5dc9ae43fe"
+revision = "f2d0164f72fe678805c34245a6df36acededfebd"
 license = "MIT"
-reviewed_on = "2026-10-13"
+reviewed_on = "2026-10-14"
 files = [
   { path = "understand-anything-plugin/skills/understand/SKILL.md", when = "building the codebase knowledge graph" },
   { path = "understand-anything-plugin/skills/understand-diff/SKILL.md", when = "assessing a diff's blast radius" },
@@ -286,15 +286,15 @@ files = [
 [[resources]]
 id = "caveman-token-economy"
 kind = "skills"
-source = "https://github.com/JuliusBrussee/caveman/tree/2e08b9177c07bb7249a8a2d1a6758e5db281d002"
+source = "https://github.com/JuliusBrussee/caveman/tree/d262ab3882952a59312ff3537cd86d894523c5ab"
 trust = "discovery"
 access = "read-only"
 scope = "agent"
 summary = "Use when cutting agent token cost or output verbosity. Provides terse-output modes, compressed review/commit, a session token-stats view and a cost-lowering learn pass."
 repo = "JuliusBrussee/caveman"
-revision = "2e08b9177c07bb7249a8a2d1a6758e5db281d002"
+revision = "d262ab3882952a59312ff3537cd86d894523c5ab"
 license = "Apache-2.0 AND MIT"
-reviewed_on = "2026-10-13"
+reviewed_on = "2026-10-14"
 adapted_into = [".agents/skills/review-practice/SKILL.md", "docs/engineering.md"]
 files = [
   { path = "docs/HONEST-NUMBERS.md", when = "quoting token-savings claims honestly" },
@@ -321,15 +321,15 @@ files = [
 [[resources]]
 id = "ui-ux-pro-max-design-intel"
 kind = "skills"
-source = "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill/tree/026b6e172c47fa09246b89b6e1d414b8e15f1057"
+source = "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill/tree/7246805992a42b7bba37d4cac83b01416f0c6c44"
 trust = "discovery"
 access = "read-only"
 scope = "ux"
 summary = "Use when seeking style, palette, type-pairing or stack-specific UI ideas beyond ux-quality. Provides searchable design-intelligence data plus brand, slide and banner skills."
 repo = "nextlevelbuilder/ui-ux-pro-max-skill"
-revision = "026b6e172c47fa09246b89b6e1d414b8e15f1057"
+revision = "7246805992a42b7bba37d4cac83b01416f0c6c44"
 license = "MIT"
-reviewed_on = "2026-10-13"
+reviewed_on = "2026-10-14"
 adapted_into = [".agents/skills/ux-quality/SKILL.md"]
 files = [
   { path = "src/ui-ux-pro-max/data/styles.csv", when = "picking a visual style direction with concrete attributes" },
@@ -345,15 +345,15 @@ files = [
 [[resources]]
 id = "impeccable-frontend-polish"
 kind = "skills"
-source = "https://github.com/pbakaus/impeccable/tree/c63b8dd7dd5a5f3c32eaabe1af76d0694f863ed2"
+source = "https://github.com/pbakaus/impeccable/tree/2f98774f86bc05563876643db37e6c37c322850f"
 trust = "discovery"
 access = "read-only"
 scope = "ux"
 summary = "Use when a frontend needs critique or polish passes (audit, harden, animate, clarify, colorize, adapt). Provides one design skill with command-style refinement steps."
 repo = "pbakaus/impeccable"
-revision = "c63b8dd7dd5a5f3c32eaabe1af76d0694f863ed2"
+revision = "2f98774f86bc05563876643db37e6c37c322850f"
 license = "Apache-2.0"
-reviewed_on = "2026-10-13"
+reviewed_on = "2026-10-14"
 adapted_into = [".agents/skills/ux-quality/SKILL.md"]
 files = [
   { path = "skill/reference/typeset.md", when = "choosing, pairing or fixing typography and type scale" },
@@ -414,15 +414,15 @@ files = [
 [[resources]]
 id = "addyosmani-agent-skills"
 kind = "skills"
-source = "https://github.com/addyosmani/agent-skills/tree/1be8e34187e34647bb83adc3a1323b26ae6f6abe"
+source = "https://github.com/addyosmani/agent-skills/tree/aeac41d4d005999432bb7312f7ff06383a91d59d"
 trust = "discovery"
 access = "read-only"
 scope = "agent"
 summary = "Use when a task needs an engineering checklist deeper than our compact skills. Provides security, performance, accessibility, testing, observability and definition-of-done checklists plus orchestration patterns."
 repo = "addyosmani/agent-skills"
-revision = "1be8e34187e34647bb83adc3a1323b26ae6f6abe"
+revision = "aeac41d4d005999432bb7312f7ff06383a91d59d"
 license = "MIT"
-reviewed_on = "2026-10-13"
+reviewed_on = "2026-10-14"
 adapted_into = [".agents/skills/plan-and-build/SKILL.md", ".agents/skills/systematic-debugging/SKILL.md", ".agents/skills/review-practice/SKILL.md", ".agents/skills/stack-foundation/SKILL.md", "docs/engineering.md", "docs/security.md", "docs/verification.md", "docs/resources.md", "docs/adr/README.md"]
 files = [
   { path = "references/security-checklist.md", when = "reviewing a change for security before merge" },
