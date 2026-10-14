@@ -74,6 +74,9 @@ permission denied. A screen with only the happy path is not done.
 WCAG 2.2 AA contrast; touch targets of at least 44 pt (iOS) or 48 dp
 (Android); screen-reader labels; logical focus and keyboard order; respect
 reduced motion; layouts survive 200% text size; never use colour alone.
+Prove large text with a capture taken at that size, never a default-size one:
+`xcrun simctl ui booted content_size accessibility-extra-large` (reset with
+`large`), `adb shell settings put system font_scale 2.0`, or browser zoom 200%.
 
 ## Onboarding and user psychology, used ethically
 

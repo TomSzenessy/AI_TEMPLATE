@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -85,6 +87,17 @@ class ReportTests(unittest.TestCase):
                       trial.render(SPEC, "haiku", analysis, dirty, Path("p")))
         clean = {**PASSING, "verify_passed": True, "uncommitted": 0}
         self.assertIn("- Verdict: pass", trial.render(SPEC, "haiku", analysis, clean, Path("p")))
+
+    def test_a_stale_claude_cli_is_refused_before_any_spend(self) -> None:
+        """A v1 CLI on PATH maps model aliases to retired models and runs zero turns (#139)."""
+        self.assertIn("1.0.2", trial.cli_problem("/old/bin/claude", "1.0.2 (Claude Code)") or "")
+        self.assertIn("/old/bin/claude", trial.cli_problem("/old/bin/claude", "1.0.2 (Claude Code)") or "")
+        self.assertIsNone(trial.cli_problem("/new/bin/claude", "2.1.153 (Claude Code)"))
+        self.assertIn("version", trial.cli_problem("/x/claude", "") or "")
+        with mock.patch("subprocess.run", side_effect=subprocess.TimeoutExpired("claude", 60)):
+            self.assertEqual(trial.cli_version("/x/claude"), "")
+        with mock.patch("subprocess.run", side_effect=OSError("not executable")):
+            self.assertEqual(trial.cli_version("/x/claude"), "")
 
     def test_turns_and_tokens_are_counted_per_phase(self) -> None:
         analysis = analyse(turn(1, 1), tool("a", "make next"), result("a", "Next (intake): ask"),

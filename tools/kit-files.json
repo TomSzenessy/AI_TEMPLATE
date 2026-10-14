@@ -156,6 +156,7 @@
 "tools/kit/risk.py",
 "tools/kit/scaffold.py",
 "tools/kit/semantic.py",
+"tools/kit/semantic_inventory.py",
 "tools/kit/semantic_transport.py",
 "tools/kit/session.py",
 "tools/kit/signatures.py",

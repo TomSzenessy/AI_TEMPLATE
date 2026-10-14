@@ -60,6 +60,7 @@ returns `None`), without another value reader or a guessed branch:
 | Product driver: feature list, research, `make next`, UI review | `product`, `uireview` | [`../building.md`](../building.md) |
 | Check blocking rule, hooks, failure output, ceremony by risk, garden report, navigation | `checks`, `session`, `garden`, `navigate`, `risk` | [`../self-healing.md`](../self-healing.md) |
 | Consent-gated semantic code similarity | `semantic` | [`../capabilities.md`](../capabilities.md) |
+| Eligible-code inventory and chunking for semantic search | `semantic_inventory` | [`../capabilities.md`](../capabilities.md) |
 | OpenAI-compatible embeddings transport (standard library only, behind `.embed`) | `semantic_transport` | [`../capabilities.md`](../capabilities.md) |
 | Pinned upstream records: file index, drift check, notice coverage | `upstream` | [`../resources.md`](../resources.md#upstream-records) |
 | Doc-code bindings and staleness | `docmeta`, `docsync` | [`../bindings.md`](../bindings.md) |

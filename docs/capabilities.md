@@ -1,7 +1,7 @@
 # Adding a capability
 
 <!-- index: extend | How to add, find, or switch off a capability or pack, and the configuration policy | You add, find, or switch off a skill, role, doc, rule, check, command, MCP route, or pack. -->
-<!-- covers: tools/kit/capabilities.py tools/kit/scaffold.py tools/kit/config.py tools/kit/semantic.py tools/kit/semantic_transport.py -->
+<!-- covers: tools/kit/capabilities.py tools/kit/scaffold.py tools/kit/config.py tools/kit/semantic.py tools/kit/semantic_inventory.py tools/kit/semantic_transport.py -->
 
 Skills, agent roles, docs, rules, checks, commands, MCP routes, and packs are
 all capabilities: one file each, read by one loader
@@ -29,7 +29,7 @@ unmodified. See [`security.md`](./security.md#semantic-code-search-115),
 - **Invariants:** bounds root; eligible scope digest (paths + chunk count, never content
   hashes/bytes/code); approved endpoint/model tuple cached, no re-read; cache holds no
   code or keys; lexical fallback on every failure.
-- **Owner:** `[kit]` semantic_* policy (`config.py`); `semantic.py` owns inventory,
+- **Owner:** `[kit]` semantic_* policy (`config.py`); `semantic_inventory.py` owns the code inventory; `semantic.py` owns
   cache, consent, ranking, and private key resolution.
 - **Performance:** finite existing config budgets (files/chunks/bytes/requests/response).
 `make new KIND=skill|agent|doc|rule|check|command|mcp|pack NAME=<kebab> DESC="<what>; <when>" [PACK=<pack>]`
