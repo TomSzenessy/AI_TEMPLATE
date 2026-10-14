@@ -17,7 +17,7 @@ local):
   docs/ADAPTATION.md)
 - self-healing: docmeta, docsync, hygiene, reachability, coupling, signatures,
   adapters, derive, scaffold, navigate, risk, session, garden, capabilities,
-  evals, trial, semantic, semantic_transport, upstream
+  evals, trial, semantic, semantic_inventory, semantic_transport, upstream
 - product driver: product, uireview (docs/building.md)
 
 Each module owns one concern; tools/repoctl.py only builds its parser from the

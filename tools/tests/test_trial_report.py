@@ -86,6 +86,13 @@ class ReportTests(unittest.TestCase):
         clean = {**PASSING, "verify_passed": True, "uncommitted": 0}
         self.assertIn("- Verdict: pass", trial.render(SPEC, "haiku", analysis, clean, Path("p")))
 
+    def test_a_stale_claude_cli_is_refused_before_any_spend(self) -> None:
+        """A v1 CLI on PATH maps model aliases to retired models and runs zero turns (#139)."""
+        self.assertIn("1.0.2", trial.cli_problem("/old/bin/claude", "1.0.2 (Claude Code)") or "")
+        self.assertIn("/old/bin/claude", trial.cli_problem("/old/bin/claude", "1.0.2 (Claude Code)") or "")
+        self.assertIsNone(trial.cli_problem("/new/bin/claude", "2.1.153 (Claude Code)"))
+        self.assertIn("version", trial.cli_problem("/x/claude", "") or "")
+
     def test_turns_and_tokens_are_counted_per_phase(self) -> None:
         analysis = analyse(turn(1, 1), tool("a", "make next"), result("a", "Next (intake): ask"),
                            turn(10, 5), turn(20, 5), tool("b", "make next"), result("b", "Next (build): code"),

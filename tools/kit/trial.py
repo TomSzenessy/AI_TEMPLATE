@@ -318,11 +318,31 @@ def render(spec: dict[str, object], model: str, analysis: dict[str, object], sta
     return "\n".join(lines)
 
 
+MIN_CLI_MAJOR = 2  # v1 CLIs map model aliases to retired models: the run spends nothing and does nothing
+
+
+def cli_problem(path: str, version_text: str) -> str | None:
+    """Why the claude CLI at `path` cannot run a trial, or None. Checked before any spend (#139)."""
+    match = re.match(r"\s*(\d+)\.", version_text or "")
+    if not match:
+        return f"cannot read the claude CLI version at {path} (`claude --version` printed {version_text!r})"
+    if int(match.group(1)) < MIN_CLI_MAJOR:
+        return (f"the claude CLI at {path} is {version_text.split()[0]}, older than {MIN_CLI_MAJOR}.x; "
+                "an older install earlier on PATH shadows the current one (`which -a claude`): "
+                "update or remove it, or put the current one first on PATH")
+    return None
+
+
 def run_trial(root: Path, identifier: str, model: str = "sonnet", budget: float | None = None,
               directory: str | None = None, timeout: int = 7200) -> int:
     spec = load_trial(root, identifier)
-    if shutil.which("claude") is None:
+    cli = shutil.which("claude")
+    if cli is None:
         raise RepoctlError("build trials need the claude CLI (other hosts: run the prompt by hand, then --analyze)")
+    version = subprocess.run([cli, "--version"], capture_output=True, text=True, check=False, timeout=60).stdout
+    problem = cli_problem(cli, version.strip())
+    if problem:
+        raise RepoctlError(problem)
     budget = float(budget if budget is not None else spec.get("budget_usd", 25))
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     report_dir = root / REPORTS / f"{stamp}-{identifier}"
