@@ -39,10 +39,10 @@ Local skills carry no per-file notices; this section is the single record.
 | Upstream (pinned revision) | License | Local owners it shaped |
 | --- | --- | --- |
 | [obra/superpowers](https://github.com/obra/superpowers) `bb92a77` | MIT, (c) 2025 Jesse Vincent | `plan-and-build`, `systematic-debugging`, `review-practice`, `docs/skills.md` |
-| [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) `1be8e34` | MIT, (c) 2025 Addy Osmani | `plan-and-build`, `systematic-debugging`, `review-practice`, `stack-foundation`, `docs/engineering.md`, `docs/security.md`, `docs/verification.md`, `docs/resources.md`, `docs/adr/README.md` |
+| [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) `aeac41d` | MIT, (c) 2025 Addy Osmani | `plan-and-build`, `systematic-debugging`, `review-practice`, `stack-foundation`, `docs/engineering.md`, `docs/security.md`, `docs/verification.md`, `docs/resources.md`, `docs/adr/README.md` |
 | [addyosmani/web-quality-skills](https://github.com/addyosmani/web-quality-skills) `afa8da9` | MIT, (c) 2026 Addy Osmani | `web-quality` |
-| [JuliusBrussee/caveman](https://github.com/JuliusBrussee/caveman) `2e08b91` | Apache-2.0, Copyright 2026 Julius Brussee (upstream `NOTICE`: "Caveman / Copyright 2026 Julius Brussee") | `review-practice` (finding format), `docs/engineering.md` |
-| [pbakaus/impeccable](https://github.com/pbakaus/impeccable) `c63b8dd` | Apache-2.0 | `ux-quality` (anti-pattern list, audit/critique/polish vocabulary) |
+| [JuliusBrussee/caveman](https://github.com/JuliusBrussee/caveman) `d262ab3` | Apache-2.0, Copyright 2026 Julius Brussee (upstream `NOTICE`: "Caveman / Copyright 2026 Julius Brussee") | `review-practice` (finding format), `docs/engineering.md` |
+| [pbakaus/impeccable](https://github.com/pbakaus/impeccable) `2f98774` | Apache-2.0 | `ux-quality` (anti-pattern list, audit/critique/polish vocabulary) |
 | [ComposioHQ/awesome-claude-skills](https://github.com/ComposioHQ/awesome-claude-skills) `be2a406`, `webapp-testing` | Apache-2.0 | `web-quality` (one testing line) |
 
 Change statement for the Apache-2.0 sources (Caveman, Impeccable, webapp-testing): guidance was condensed and
