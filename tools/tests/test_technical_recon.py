@@ -122,7 +122,7 @@ class RoutingTests(unittest.TestCase):
         rea = next(entry for entry in entries if entry["id"] == "rea-authorized-analysis")
         self.assertIn(rea["revision"], rea["source"], "the route is pinned to the reviewed revision")
         reference = (SKILL / "references" / "rea.md").read_text()
-        pins = set(re.findall(r"morluto/rea/(?:tree|blob)/([0-9a-f]{40})", reference))
+        pins = set(re.findall(r"morluto/rea/(?:tree/|blob/)?([0-9a-f]{40})", reference))
         self.assertEqual(pins, {rea["revision"]}, "rea.md links follow the registry pin (one source of truth)")
         self.assertEqual(rea["access"], "read-only")
         self.assertEqual(rea["trust"], "discovery")
