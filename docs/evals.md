@@ -21,8 +21,10 @@ default, `BUDGET=` caps spend) the owner's request from
 `.agents/trials/<request>.toml`, and writes `.agent/trials/<run>/report.md`:
 spend, turns, kit commands, every gate block, failed kit command, bypass, and
 `Docs-Unaffected` trailer, and the product's final `make next` phase, the change-set gate (`finish`) and
-`make check` results, each reported under its own name. The report's verdict is `pass` only
-when both are green and no gate was bypassed (any `--no-verify` fails the run); it
+`make check` results, each surface's own verification (`make verify`: the real
+build and tests) and the uncommitted paths left behind, each reported under its own
+name. The report's verdict is `pass` only when all are green, nothing is left
+uncommitted, and no gate was bypassed (any `--no-verify` fails the run); it
 also shows turns and tokens per `make next` phase and the golden-path commands the
 agent never ran. Stop-hook blocks count as gate blocks; gate phrases printed by
 the kit's own test suite inside `make done` do not. Judge each friction item with the blocking rule in

@@ -522,7 +522,8 @@ def run_verification(root: Path) -> None:
                 raise RepoctlError(f"{identifier}: verification command failed to run: {error}") from error
             if result.returncode != 0:
                 raise RepoctlError(
-                    f"{identifier}: verification command exited {result.returncode}: {' '.join(command)}"
+                    f"{identifier}: verification command exited {result.returncode}: {' '.join(command)} "
+                    f"(commands run from the surface path {surface['path']!r}; write paths relative to it)"
                 )
         print(f"{identifier}: verification passed")
 

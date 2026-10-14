@@ -1,0 +1,29 @@
+# Launch trial (#12): the smallest static web product taken to private-preview
+# and deployed for real on GitHub Pages by the owner. Measures the release path
+# (fresh UI review, in-date records, readiness) rather than feature breadth.
+id = "tipjar"
+kind = "web"
+mode = "new"
+budget_usd = 12
+prompt = '''
+I want "Tipjar", a one-page tip and bill-split calculator for a phone browser.
+
+I won't be available during this run. Answer my kickoff questions with your own
+recommendations and write down what you chose; for anything else, use your best
+judgement and record the decision.
+
+- Inputs: bill amount, tip percentage (presets 10/15/20 and custom), number of
+  people, optional rounding up. Shows tip, total, and per-person amounts as you
+  type; handles empty, zero, and invalid input with clear inline messages.
+- Static site only: plain HTML, CSS and a little JavaScript or a minimal Vite
+  build. No server, accounts, analytics, cookies, or network calls. Local
+  currency formatting from the browser locale.
+- It will be hosted on GitHub Pages under a sub-path (/<repo>/), so every asset
+  path must be relative. The deployable site must end up in `dist/`.
+- Accessible (labels, keyboard, contrast, 44 px targets), light and dark mode.
+- Done means: unit tests for the calculation (rounding, split, invalid input)
+  pass; `make ui-review` has a fresh passing review of the built page at phone
+  and desktop widths; the project phase is set to "private-preview" in
+  project.toml with the vision, stack decision and records in date; and
+  `make done` is green at the end.
+'''
