@@ -1,18 +1,18 @@
 # REA: source-aware, optional adoption
 
 The resource registry route `rea-authorized-analysis` points to
-[morluto/rea @ 79156e5bed1d72b83ade0483246f457b337b7e59](https://github.com/morluto/rea/tree/79156e5bed1d72b83ade0483246f457b337b7e59).
+[morluto/rea @ 307af044bc0bdc15bc836c549e774220af8f459e](https://github.com/morluto/rea/tree/307af044bc0bdc15bc836c549e774220af8f459e).
 It is a **reviewed candidate**, not an installed dependency or enabled MCP.
 Use it when a named gap requires evidence from authorized shipped artifacts or
 runtime behavior that normal source/docs inspection cannot establish.
 
 ## What to consult
 
-- [README and target routing](https://github.com/morluto/rea/blob/79156e5bed1d72b83ade0483246f457b337b7e59/README.md): native, managed, JavaScript/Electron, browser, package and other provider paths.
-- [Investigation skill](https://github.com/morluto/rea/blob/79156e5bed1d72b83ade0483246f457b337b7e59/.agents/skills/reverse-engineer-anything/SKILL.md): question-first inventories and focused follow-ups. Its acquisition/approval defaults do not override this project's contract.
-- [Evidence workflows](https://github.com/morluto/rea/blob/79156e5bed1d72b83ade0483246f457b337b7e59/.agents/skills/reverse-engineer-anything/references/evidence-workflows.md): source/trace identities, static/runtime correlation, finite comparisons and explicit unknowns.
-- [Installation and release boundaries](https://github.com/morluto/rea/blob/79156e5bed1d72b83ade0483246f457b337b7e59/docs/installation.md): supported clients/providers and source vs released package.
-- [Process capture](https://github.com/morluto/rea/blob/79156e5bed1d72b83ade0483246f457b337b7e59/docs/process-capture.md): target execution, environment, filesystem observations, timeout and cleanup limitations.
+- [README and target routing](https://github.com/morluto/rea/blob/307af044bc0bdc15bc836c549e774220af8f459e/README.md): native, managed, JavaScript/Electron, browser, package and other provider paths.
+- [Investigation skill](https://github.com/morluto/rea/blob/307af044bc0bdc15bc836c549e774220af8f459e/.agents/skills/reverse-engineer-anything/SKILL.md): question-first inventories and focused follow-ups. Its acquisition/approval defaults do not override this project's contract.
+- [Evidence workflows](https://github.com/morluto/rea/blob/307af044bc0bdc15bc836c549e774220af8f459e/.agents/skills/reverse-engineer-anything/references/evidence-workflows.md): source/trace identities, static/runtime correlation, finite comparisons and explicit unknowns.
+- [Installation and release boundaries](https://github.com/morluto/rea/blob/307af044bc0bdc15bc836c549e774220af8f459e/docs/installation.md): supported clients/providers and source vs released package.
+- [Process capture](https://github.com/morluto/rea/blob/307af044bc0bdc15bc836c549e774220af8f459e/docs/process-capture.md): target execution, environment, filesystem observations, timeout and cleanup limitations.
 
 REA can produce investigation evidence; it does not supply a validated game or
 agent-environment simulator. The local reconstruction and experiment lab own
@@ -59,7 +59,7 @@ inspection; the owner chose optional project-local tooling. Runtime/package
 trial remains a per-project decision when that concrete gap appears. This is
 not a claim that REA works in this host or that an external app was analyzed.
 
-[REA's MIT license](https://github.com/morluto/rea/blob/79156e5bed1d72b83ade0483246f457b337b7e59/LICENSE)
+[REA's MIT license](https://github.com/morluto/rea/blob/307af044bc0bdc15bc836c549e774220af8f459e/LICENSE)
 is Copyright (c) 2026 morluto. Preserve its full copyright and permission notice
 if copying substantial upstream material; third-party engines and dependencies
 retain their own licenses. No REA code or skill files are distributed here.
