@@ -183,7 +183,6 @@ def _config(root: Path) -> dict[str, object]:
     }
 
 
-
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
@@ -197,8 +196,6 @@ def _root_id(root: Path) -> str:
     branch = git(root, "rev-parse", "--abbrev-ref", "HEAD")
     provenance = f"{remote.strip()}:{branch.strip()}" if remote and branch else "local"
     return "root:" + _sha256(f"{resolved}\n{provenance}")
-
-
 
 
 # --- Consent --------------------------------------------------------------------

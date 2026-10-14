@@ -333,14 +333,21 @@ def cli_problem(path: str, version_text: str) -> str | None:
     return None
 
 
+def cli_version(cli: str) -> str:
+    """`claude --version` output, or "" when the CLI hangs or cannot start (cli_problem then explains)."""
+    try:
+        return subprocess.run([cli, "--version"], capture_output=True, text=True, check=False, timeout=60).stdout.strip()
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+
+
 def run_trial(root: Path, identifier: str, model: str = "sonnet", budget: float | None = None,
               directory: str | None = None, timeout: int = 7200) -> int:
     spec = load_trial(root, identifier)
     cli = shutil.which("claude")
     if cli is None:
         raise RepoctlError("build trials need the claude CLI (other hosts: run the prompt by hand, then --analyze)")
-    version = subprocess.run([cli, "--version"], capture_output=True, text=True, check=False, timeout=60).stdout
-    problem = cli_problem(cli, version.strip())
+    problem = cli_problem(cli, cli_version(cli))
     if problem:
         raise RepoctlError(problem)
     budget = float(budget if budget is not None else spec.get("budget_usd", 25))
