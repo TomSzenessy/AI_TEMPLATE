@@ -209,6 +209,25 @@ files = [
 ]
 
 [[resources]]
+id = "agent-reach"
+kind = "skills"
+source = "https://github.com/Panniantong/Agent-Reach/tree/94f06c1969dfc1834001269d79d3ad0972d9dee6"
+trust = "discovery"
+access = "read-only"
+scope = "research"
+summary = "Per-platform read-only fetch routes (web, GitHub, YouTube, Bilibili, Reddit, X, Facebook, Instagram, LinkedIn, V2EX, XiaoHongShu, Xueqiu) with fallback chains; distilled in English into platform-reach. Its installer, doctor and cookie importer are not adopted."
+repo = "Panniantong/Agent-Reach"
+revision = "94f06c1969dfc1834001269d79d3ad0972d9dee6"
+license = "MIT"
+reviewed_on = "2026-10-20"
+adapted_into = [".agents/skills/platform-reach/SKILL.md"]
+files = [
+  { path = "agent_reach/skill/references/career.md", when = "searching Boss Zhipin jobs through its dedicated CDP Chrome runbook (Chinese)" },
+  { path = "agent_reach/skill/references/video.md", when = "transcribing a Xiaoyuzhou podcast episode (Chinese)" },
+  { path = "docs/install.md", when = "the owner approved installing a platform backend and wants upstream's setup steps" },
+]
+
+[[resources]]
 id = "ponytail-lazy-senior"
 kind = "skills"
 source = "https://github.com/DietrichGebert/ponytail/tree/2961b52fc1fe6a5a87c7a959a79512e5c2f3ffe5"

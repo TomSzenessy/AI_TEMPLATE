@@ -43,6 +43,7 @@ Local skills carry no per-file notices; this section is the single record.
 | [addyosmani/web-quality-skills](https://github.com/addyosmani/web-quality-skills) `afa8da9` | MIT, (c) 2026 Addy Osmani | `web-quality` |
 | [JuliusBrussee/caveman](https://github.com/JuliusBrussee/caveman) `d262ab3` | Apache-2.0, Copyright 2026 Julius Brussee (upstream `NOTICE`: "Caveman / Copyright 2026 Julius Brussee") | `review-practice` (finding format), `docs/engineering.md` |
 | [pbakaus/impeccable](https://github.com/pbakaus/impeccable) `2f98774` | Apache-2.0 | `ux-quality` (anti-pattern list, audit/critique/polish vocabulary) |
+| [Panniantong/Agent-Reach](https://github.com/Panniantong/Agent-Reach) `94f06c1` | MIT, (c) 2025 Agent Eyes | `platform-reach` (English SKILL and the Chinese references translated, condensed and rewritten; per-platform commands and fallback chains kept; installer, doctor and cookie importer dropped; reviewed 2026-10-20) |
 | [ComposioHQ/awesome-claude-skills](https://github.com/ComposioHQ/awesome-claude-skills) `be2a406`, `webapp-testing` | Apache-2.0 | `web-quality` (one testing line) |
 
 Change statement for the Apache-2.0 sources (Caveman, Impeccable, webapp-testing): guidance was condensed and
@@ -53,8 +54,8 @@ The other reviewed collections (Ponytail, Archify, Graphify, Understand
 Anything, UI UX Pro Max, vercel-labs/skills, REA, API Anything) are linked as
 routes in [`resources.toml`](./resources.toml), not copied.
 
-The MIT License text below applies to each MIT source above (Superpowers and
-both Addy Osmani repositories), with its own copyright line from the table.
+The MIT License text below applies to each MIT source above (Superpowers, both Addy Osmani repositories and
+Agent-Reach), with its own copyright line from the table.
 
 ## License (replica-skill; same MIT text for the sources above)
 

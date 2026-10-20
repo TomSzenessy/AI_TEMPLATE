@@ -21,7 +21,8 @@ assumption you researched under in your return.
 1. Check `resources.toml` and `docs/resources.md` for an approved starting
    point, then use the available routes: docs MCP (Context7), web search (Exa
    or the host's built-in search), and a browser (Playwright) for pages that
-   need rendering.
+   need rendering. For a platform (GitHub, YouTube, Reddit, X, LinkedIn and
+   more) or a URL to read, follow the `platform-reach` skill's routes.
 2. Prefer official docs, specifications, changelogs, and source code over
    blogs. Record versions and dates; flag anything older than the project's
    pinned versions.

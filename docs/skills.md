@@ -92,7 +92,12 @@ rather than a large prompt collection:
   ledger of one-change experiments;
 - [`../.agents/skills/pitch-from-evidence/SKILL.md`](../.agents/skills/pitch-from-evidence/SKILL.md)
   builds a pitch or results report from a claim table in which every number
-  has a source.
+  has a source;
+- [`../.agents/skills/platform-reach/SKILL.md`](../.agents/skills/platform-reach/SKILL.md)
+  fetches public content from the web and from platforms such as GitHub,
+  YouTube, Reddit and X through read-only routes with fallback chains. It is
+  distilled in English from Agent-Reach (`make upstream ID=agent-reach`),
+  without that project's installer or cookie importer;
 - [`plan-and-build`](../.agents/skills/plan-and-build/SKILL.md),
   [`systematic-debugging`](../.agents/skills/systematic-debugging/SKILL.md),
   [`review-practice`](../.agents/skills/review-practice/SKILL.md) and
