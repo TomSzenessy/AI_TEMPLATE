@@ -72,7 +72,7 @@ yt-dlp -x --audio-format mp3 -o "/tmp/%(id)s.%(ext)s" "URL"
 #    Files over the provider's size limit must be split first (ffmpeg -f segment).
 curl -s https://api.groq.com/openai/v1/audio/transcriptions \
   -H "Authorization: Bearer $GROQ_API_KEY" \
-  -F model=whisper-large-v3 -F file=@/tmp/VIDEO_ID.mp3
+  -F model=whisper-large-v3 -F file=@/tmp/VIDEO_ID.mp3   # or the WAV `bili audio` wrote
 ```
 
 The key comes from the user's environment and is never echoed.

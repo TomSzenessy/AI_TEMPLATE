@@ -93,11 +93,8 @@ rather than a large prompt collection:
 - [`../.agents/skills/pitch-from-evidence/SKILL.md`](../.agents/skills/pitch-from-evidence/SKILL.md)
   builds a pitch or results report from a claim table in which every number
   has a source;
-- [`../.agents/skills/platform-reach/SKILL.md`](../.agents/skills/platform-reach/SKILL.md)
-  fetches public content from the web and from platforms such as GitHub,
-  YouTube, Reddit and X through read-only routes with fallback chains. It is
-  distilled in English from Agent-Reach (`make upstream ID=agent-reach`),
-  without that project's installer or cookie importer;
+- [`platform-reach`](../.agents/skills/platform-reach/SKILL.md) reads the web
+  and platforms read-only;
 - [`plan-and-build`](../.agents/skills/plan-and-build/SKILL.md),
   [`systematic-debugging`](../.agents/skills/systematic-debugging/SKILL.md),
   [`review-practice`](../.agents/skills/review-practice/SKILL.md) and
@@ -192,8 +189,8 @@ change. For an isolated skill copy, include the full
 [`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md) in that bundle; a
 link alone is insufficient.
 
-Upstream skills reviewed and declined for this template, because the template's
-own documents and reviewed global skills already own those procedures:
+Upstream skills declined because the template's own documents and reviewed
+global skills already own those procedures:
 `replica-architect` (see [`STACK-DECISION.md`](./STACK-DECISION.md) and
 `codebase-design`), `replica-build` and `replica-test` (see the build/repair
 loop in `AGENTS.md` and `tdd`), `replica-backend` (see
