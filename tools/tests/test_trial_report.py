@@ -115,6 +115,31 @@ class ReportTests(unittest.TestCase):
         self.assertIn("next", line)
         self.assertNotIn("done", line)
 
+    def test_both_doc_review_trailer_keys_are_counted(self) -> None:
+        raw = "\x1e\x1fdocs/a.md reviewed\x1d\x1e\x1f\x1fdocs/b.md unaffected\x1d"
+        self.assertEqual(trial.doc_review_trailers(raw),
+                         ["docs/a.md reviewed", "docs/b.md unaffected"])
+
+    def test_project_state_keeps_the_trailer_list(self) -> None:
+        """A list/string mismatch here crashed every trial before its report was written."""
+        def fake_git(root: Path, *arguments: str, **_: object) -> str:
+            if arguments[0] == "log":
+                return "\x1e\x1fdocs/a.md reviewed\n\x1d\x1e\x1f\x1fdocs/b.md also\n\x1d"
+            if arguments[0] == "rev-list":
+                return "a\nb\n"
+            return ""
+
+        def fake_run(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+            action = command[-1]
+            stdout = {"finish": "Product 100% complete\n", "next": "Next (launch): ship\n",
+                      "verify": "app: verification passed\n"}.get(action, "")
+            return subprocess.CompletedProcess(command, 0, stdout, "")
+
+        with mock.patch.object(trial, "git", side_effect=fake_git), \
+             mock.patch.object(trial.subprocess, "run", side_effect=fake_run):
+            state = trial.project_state(Path("."))
+        self.assertEqual(state["trailers"], ["docs/a.md reviewed", "docs/b.md also"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -20,7 +20,9 @@ from `seed` that then runs `make adopt`), gives `claude -p` (Sonnet by
 default, `BUDGET=` caps spend) the owner's request from
 `.agents/trials/<request>.toml`, and writes `.agent/trials/<run>/report.md`:
 spend, turns, kit commands, every gate block, failed kit command, bypass, and
-`Docs-Unaffected` trailer, and the product's final `make next` phase, the change-set gate (`finish`) and
+every doc-review trailer (`Docs-Reviewed` or `Docs-Unaffected`; the list is
+stored as values, one per commit), and the
+product's final `make next` phase, the change-set gate (`finish`) and
 `make check` results, each surface's own verification (`make verify`: the real
 build and tests) and the uncommitted paths left behind, each reported under its own
 name. The report's verdict is `pass` only when all are green, nothing is left

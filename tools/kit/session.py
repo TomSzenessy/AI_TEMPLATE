@@ -96,6 +96,14 @@ def _heal_derived(root: Path) -> list[str]:
         return [f"adapter regeneration failed: {error}"]
 
 
+def _generated_paths(root: Path) -> set[str]:
+    """Files `make sync` writes whole, from the same owner the drift report uses."""
+    try:
+        return derive.generated_paths(root)
+    except (RepoctlError, OSError):
+        return set()
+
+
 def _digest(root: Path, path: str) -> str:
     try:
         return hashlib.sha256((root / path).read_bytes()).hexdigest()
@@ -335,12 +343,15 @@ def after_edit(root: Path, event: dict[str, object]) -> None:
     if not relative:
         return
     notes = []
-    if relative.startswith(".claude/") or relative == ".mcp.json":
+    # Only a file `make sync` writes whole is "generated". A hand-written source,
+    # test, or document that contains a generated block is a source, not output.
+    if relative in _generated_paths(root):
         notes.append(f"{relative} is generated. Put the change in .agents/; `make sync` regenerates it.")
     elif relative.startswith(CANONICAL_INPUTS) or relative.endswith(".md"):
         healed = _heal_derived(root)
         if healed:
-            notes.append("Derived files regenerated from their sources: " + ", ".join(healed))
+            notes.append("Derived files regenerated from their sources (the edited file is a source): "
+                         + ", ".join(healed))
     session = str(event.get("session_id", "local"))
     state = _load_state(root, session)
     owned = [doc for doc in docmeta.owners(docmeta.bindings(root, repository_files(root)), relative) if doc not in state["noted"]]
@@ -363,8 +374,8 @@ def finish_findings(root: Path, session_paths: list[str] | None = None, since: s
 
     `session_paths` narrows it to the paths one session changed (the stop hook), and
     `since` is the commit that session started at: its commits are judged with their
-    Docs-Unaffected trailers, as `make done` judges them. None judges the whole change
-    set (`finish`, `make done`).
+    `Docs-Reviewed`/`Docs-Unaffected` trailers, as `make done` judges them. None judges
+    the whole change set (`finish`, `make done`).
     """
     project = load_project(root)
     base = default_branch(project)
@@ -413,7 +424,7 @@ def commit_findings(root: Path, message_file: str | None) -> list[str]:
     exempt = docsync.exemption_scope(docsync.message_trailers(root, message)) or set()
     file_set = set(repository_files(root))
     # A merge commit brings in commits that already passed this gate or recorded a
-    # Docs-Unaffected decision; re-asking would re-litigate it. make done and CI's
+    # doc-review decision; re-asking would re-litigate it. make done and CI's
     # stale-document check still read those commits' trailers.
     merged_in: set[str] = set()
     if git(root, "rev-parse", "-q", "--verify", "MERGE_HEAD") is not None:
@@ -434,9 +445,11 @@ def commit_gate(root: Path, message_file: str | None) -> int:
     print(f"{GATE_COMMIT_BLOCKED} by the self-healing gate (docs/self-healing.md):", file=sys.stderr)
     print("\n".join(f"- {item}" for item in findings[:15]), file=sys.stderr)
     print(
-        "Owed doc: update and stage it, or add the trailer 'Docs-Unaffected: <doc.md> <reason>'\n"
-        "  (name the doc itself; a code path or glob such as 'tools/** untouched' exempts nothing)\n"
-        "  in the message's LAST paragraph (with any Co-Authored-By lines), as git requires.\n"
+        "Owed doc: update and stage it, or record a per-commit review with\n"
+        "  'Docs-Reviewed: <doc.md> <reason>' (the doc already describes the change)\n"
+        "  or 'Docs-Unaffected: <doc.md> <reason>' (the change does not affect it).\n"
+        "  Name the doc itself; a code path or glob such as 'tools/** untouched' exempts nothing.\n"
+        "  Put the trailer in the message's LAST paragraph (with any Co-Authored-By lines), as git requires.\n"
         "Derived file: run make sync and stage the result.",
         file=sys.stderr,
     )

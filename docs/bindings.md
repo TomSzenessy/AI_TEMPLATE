@@ -13,9 +13,13 @@ A document declares what it describes with one comment near its top, such as
 - **Stale document**: a commit newer than the document's last commit touched
   covered paths. `make check` fails. A commit authored by `dependabot[bot]` whose diff changes only
   `uses:` lines is ignored (a bot cannot add a trailer); any other change is not. If a change truly does not affect the doc,
-  record that in the commit with a trailer, `Docs-Unaffected: docs/x.md <reason>`
-  (a reason with no path exempts all documents; a value that starts with a
-  non-document path or glob, such as `tools/** untouched`, exempts nothing). Git's own trailer parsing is
+  record that in the commit with a trailer, `Docs-Unaffected: docs/x.md <reason>`;
+  when the doc already describes the change, record the review with
+  `Docs-Reviewed: docs/x.md <reason>`. Both are per commit: two commits touching
+  different modules under one broad binding can each carry their own record, so
+  unrelated work need not be squashed. The commit gate, the history check, and
+  trial evidence all read both keys. (A reason with no path exempts all documents; a value that starts with a
+  non-document path or glob, such as `tools/** untouched`, exempts nothing.) Git's own trailer parsing is
   used everywhere: trailers belong in the message's last paragraph, and a
   trailer without a reason exempts nothing.
 - **Owed document**: covered paths changed on this branch while the doc did not;

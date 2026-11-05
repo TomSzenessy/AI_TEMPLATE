@@ -114,7 +114,9 @@ evidence. Skip it when reports already fit their caps.
 Run subagents in parallel only when their write scopes are disjoint;
 implementers that might touch the same files work sequentially or in separate
 git worktrees. Merge results through the orchestrator, then run `make done`
-once on the combined change.
+once on the combined change. A same-name add/add (two branches independently
+created the obvious test file) keeps both tests under distinct topic names;
+never resolve it by dropping one side's coverage.
 
 The same holds for separate top-level sessions (two terminals, two hosts, a
 human and an agent): give each its own worktree (`git worktree add`). In a

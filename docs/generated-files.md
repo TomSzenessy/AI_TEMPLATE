@@ -20,7 +20,10 @@ Nothing that can be generated is maintained by hand. `make sync` (also run by
 | GitHub description, topics, template flag (`make github-sync`) | `project.toml [repository]`; `make garden` reports drift |
 
 Generated host stubs cover only capabilities of enabled packs.
-`make check` fails on any drift and on hand-written files in a generated host
+`derive.generated_paths` is the single definition of "a file `make sync` writes
+whole" (host adapters plus `tools/kit-files.json`); the after-edit hook warns
+about one of those, and it never calls a hand-written file with a generated
+block generated. `drift()` still reports every rendered file, blocks included. `make check` fails on any drift and on hand-written files in a generated host
 directory. Add a host by adding a renderer in `tools/kit/adapters.py` and
 listing it in `project.toml [adapters].hosts`. Codex, Copilot, and Cursor read
 `AGENTS.md` and `.agents/skills/` directly.
