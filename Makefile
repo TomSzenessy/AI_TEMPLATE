@@ -3,6 +3,13 @@
 # may come first); tools/repoctl applies the same rule for hooks. Override with PYTHON=...
 PYTHON ?= $(shell ok='import sys; sys.exit(sys.version_info < (3, 11))'; for p in python3 python3.14 python3.13 python3.12 python3.11 python; do command -v $$p >/dev/null 2>&1 && $$p -c "$$ok" 2>/dev/null && { echo $$p; break; }; done)
 REPOCTL := $(PYTHON) tools/repoctl.py
+# Surface verification commands that call bare `python`/`python3` use the project
+# virtualenv when one exists, so `make verify` sees the project's dependencies.
+# CI has no .venv, so the same declared commands run on the interpreter CI set up.
+ifeq ($(origin REPOCTL_SURFACE_PYTHON),undefined)
+REPOCTL_SURFACE_PYTHON := $(abspath $(firstword $(wildcard .venv/bin/python .venv/Scripts/python.exe)))
+endif
+export REPOCTL_SURFACE_PYTHON
 # This kit's directory, also when run from another repository with make -f (make adopt).
 # Read from the single MAKEFILE_LIST entry through the shell so a path with spaces survives;
 # override with KIT_DIR=<kit> on the command line (adopt fails fast, naming KIT_DIR, when this is not a kit).

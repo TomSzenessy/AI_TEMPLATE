@@ -14,8 +14,11 @@ steps happen.
 ## The path: `make next`
 
 `make next` reads repository state and prints one step, the skill or role to
-use, and how to verify it. The session brief shows the same step. Phases, in
-order:
+use, and how to verify it. A project that recorded `license = "none-yet"` also
+gets a reminder line on each call to choose a license before public launch;
+`make next` never selects one for the owner
+([`engineering.md`](./engineering.md)). The session brief shows the same step.
+Phases, in order:
 
 | Phase | Done when |
 |---|---|

@@ -154,6 +154,15 @@ class ProductDriverTests(KitRepository):
         self.adopt()
         self.assertEqual(config.setting(self.root, "project_mode"), "adopt")
 
+    def test_next_reminds_a_deferred_license_without_choosing_one(self) -> None:
+        """#150: a deferred decision is the owner's; the product driver only reminds."""
+        manifest = (self.root / "project.toml").read_text()
+        self.write("project.toml", manifest.replace('kind = "web"\n', 'kind = "web"\nlicense = "none-yet"\n'))
+        output = self.cli("next").stdout
+        self.assertIn('License: deliberately deferred (license = "none-yet")', output)
+        self.assertIn("before public launch", output)
+        self.assertNotIn("MIT", output, "the reminder never picks a license for the owner")
+
 
 class UiReviewTests(KitRepository):
     def setUp(self) -> None:

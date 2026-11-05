@@ -16,7 +16,7 @@ from unittest import mock
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # `fixtures`, however this file is invoked (#33)
 from fixtures import Scratch  # noqa: E402
 
-from kit import bootstrap, cistatus, product, structure  # noqa: E402
+from kit import bootstrap, cistatus, launch, product, structure  # noqa: E402
 from kit.core import RepoctlError  # noqa: E402
 
 MANIFEST = """\
@@ -1125,6 +1125,31 @@ class GitSyncTests(Scratch):
         lines = (root / ".gitattributes").read_text(encoding="utf-8").splitlines()
         self.assertIn("docs/ERROR_LOG.md merge=union", lines)
         self.assertFalse(any("AGENTS.md" in line and "union" in line for line in lines), "never an edited file")
+
+
+class DeferredLicenseTests(Scratch):
+    """#150: a conscious deferral passes development verification; an undecided default does not."""
+
+    def test_an_explicit_deferral_passes_development(self) -> None:
+        project = {"license": "none-yet", "phase": "development"}
+        self.assertEqual(launch.license_errors(self.root, project), [])
+
+    def test_a_deferral_never_launches_or_hides_an_existing_license(self) -> None:
+        self.write("LICENSE", "MIT License\n")
+        project = {"license": "none-yet", "phase": "development"}
+        self.assertIn("LICENSE exists", launch.license_errors(self.root, project)[0])
+        self.write("LICENSE", "")
+        (self.root / "LICENSE").unlink()
+        project = {"license": "none-yet", "phase": "public-launch"}
+        self.assertIn("public launch", launch.license_errors(self.root, project)[0])
+
+    def test_undecided_and_selected_states_stay_distinct(self) -> None:
+        undecided = launch.license_errors(self.root, {"license": "UNSELECTED", "phase": "development"})
+        self.assertIn('license = "none-yet"', undecided[0], "the fix is named")
+        self.assertIn("no root LICENSE file", launch.license_errors(
+            self.root, {"license": "MIT", "phase": "development"})[0])
+        self.write("LICENSE", "MIT License\n")
+        self.assertEqual(launch.license_errors(self.root, {"license": "MIT", "phase": "development"}), [])
 
 
 if __name__ == "__main__":
