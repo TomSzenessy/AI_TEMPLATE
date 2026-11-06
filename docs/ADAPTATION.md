@@ -3,17 +3,14 @@
 <!-- index: operate | Lean core, artifact lifecycle, packs, and capability patterns | Turning the template into a project without generating unnecessary structure. -->
 <!-- covers: tools/kit/bootstrap.py tools/kit/guided.py tools/kit/commands.py tools/repoctl -->
 
-The template is a small kernel plus switchable packs (`.agents/packs/`;
-[`[packs]` switching rules](./capabilities.md)), not a universal application scaffold. `make init`
-starts a project from each pack's declared default. The kernel stays responsible for navigation, the project
-manifest, issue-backed intent, path safety, declared verification, and bounded
-review. Project-specific policy and code are added only after the vision intake
-identifies a real need.
+The template is a kernel plus switchable packs (`.agents/packs/`;
+[`[packs]` switching rules](./capabilities.md)), not a universal scaffold. `make init` starts from each pack's declared default.
+The kernel owns navigation, the manifest, issue-backed intent, path safety,
+declared verification, and bounded review. Policy and code are added only after the vision intake identifies a real need.
 
 ## Artifact lifecycle
 
-The template contains deliberate scaffolds. Their lifecycle is part of keeping
-a project small:
+The template contains deliberate scaffolds; their lifecycle keeps a project small:
 
 | Artifact | Keep/update | Replace or remove when |
 |---|---|---|
@@ -108,6 +105,7 @@ its operating contract, history, or evidence.
    surfaces remain the default.
 7. Re-run inventory and the declared checks; remove or deprecate anything with
    no owner, oracle, or caller.
+8. Batch with `make ready` / `make integrate` ([collaboration](./collaboration.md)).
 
 ## Capability patterns by product type
 

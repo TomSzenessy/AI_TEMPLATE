@@ -32,9 +32,10 @@ assumed. A new or changed check **blocks** only when all three hold:
 3. **Deterministic and hard to game:** it checks the artifact itself (a file,
    a binding, a digest), not a ticked box or a keyword in prose.
 
-Otherwise it is **advisory** (`make garden`, the brief) or an
-**automatic fix** (`make sync`). Since #9 `markdown-links`, `command-references`,
-`markers`, `budgets` are advisory, as is `readme-template-sections`. `file-hygiene` stays blocking; `[checks.file-hygiene] allow_paths` exempts one path with a reason ([`capabilities.md`](./capabilities.md#exempting-one-path-from-file-hygiene)) and advisory `file-hygiene-allowed` lists it too. Further rules:
+Otherwise **advisory** (`make garden`, the brief) or **automatic fix**
+(`make sync`). `markdown-links`, `command-references`, `markers`, `budgets`,
+`readme-template-sections`, and `leak-scan-fingerprints` are advisory.
+`file-hygiene` blocks; `[checks.file-hygiene] allow_paths` exempts one path with a reason ([`capabilities.md`](./capabilities.md#exempting-one-path-from-file-hygiene)) and `file-hygiene-allowed` lists it too. Further rules:
 
 - **One blocking point per concern.** Each later gate fires only on what the
   earlier one let through (`--no-verify`, uncommitted work), never on a

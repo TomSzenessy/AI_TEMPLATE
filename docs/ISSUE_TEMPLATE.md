@@ -62,6 +62,8 @@ template's repository (`[template].source`) instead of this one
 What changed in the covered code last: `issues.py`, `github.py`, and `ci.py`
 now run every git call through one wrapper (`gitinfo.run_git`) and date records
 with `core.today()` (one UTC day); the contract above is unchanged.
+`ci tree-reuse` only decides whether a default-branch tree already passed a
+successful run; it does not change the issue contract.
 
 ## Classification
 
