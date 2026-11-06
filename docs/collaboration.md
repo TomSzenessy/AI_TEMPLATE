@@ -1,7 +1,7 @@
 # Collaboration
 
 <!-- index: operate | Sharing work: fetch, push, pull-first, CI after push, claims, issue comment types | several people or agents work on one repository -->
-<!-- covers: tools/kit/gitsync.py tools/kit/cistatus.py .gitattributes -->
+<!-- covers: tools/kit/gitsync.py tools/kit/cistatus.py tools/kit/prflow.py .gitattributes -->
 
 Several people or agents on one repository (a team, a pair, or one person
 running parallel agent sessions) lose work in three ways: one runs
@@ -16,7 +16,7 @@ the commands that prevent each. The session protocol in
 |---|---|---|
 | Session start | The brief fetches the upstream (at most 10 s, never in CI), fast-forwards a clean tree that is only behind, and otherwise says how far behind or ahead the branch is. A resumed or compacted session fast-forwards only while it has committed nothing, and its stop-gate baseline moves with the pull. | `make start` |
 | Stop | The stop gate names this session's uncommitted paths and its commits that are not pushed, once per turn; say why something stays local and stop. Commits the brief pulled are never counted as the session's. Without a remote, or inside CI, it says nothing. | hook |
-| After a push | `make ci-status` reads the CI of the pushed commit: green, red, pending, inconclusive, none, unpushed, or unknown (no `gh`, offline, inside CI). A red run on this session's pushed HEAD blocks `make done` and the stop gate; a green answer is cached for a day, anything else for five minutes. | `make ci-status` |
+| After a push | `make ci-status` reads the CI of the pushed commit: green, red, pending, inconclusive, none, unpushed, unavailable (every failed job ran zero steps, so billing/credits rather than code), or unknown (no `gh`, offline, inside CI). A red run on this session's pushed HEAD blocks `make done` and the stop gate; unavailable does not, and names the billing cause instead of pointing at logs that do not exist; an all-skipped success is unavailable too, because it verified nothing, and unreadable job details are `unknown`, never green. A green answer is cached for a day, anything else for five minutes. | `make ci-status` |
 | Before a run others will rely on (a release build, a deploy, a benchmark, an official submission) | Refuses a dirty tree, unpushed commits, a diverged branch, or an unreadable upstream (exit 1); pulls new commits and exits 3 so the caller restarts on the new code; exit 0 means run as is. `CHECK_ONLY=1` never pulls (a frozen release); inside CI it exits 0. | `make pull-first` |
 
 Commit verification excludes `issues` and `issue_comment` runs: GitHub attaches
@@ -49,6 +49,38 @@ Push each working step, at least every 30 minutes and always before stopping.
 On a rebase conflict keep both sides' intent and rerun the tests; never
 resolve by dropping the other side. Shared documents change on the default
 branch; merge it into long-lived variant branches regularly.
+
+## Batch finished work
+
+One CI run per finished change set, on the exact tree that merges. The rules:
+
+- **One branch per coherent change set.** Several small fixes that share an
+  issue, an owner, or a review belong on one branch, not four.
+- **Draft while iterating.** A draft PR is skipped by the heavy jobs (the leak scan still
+  runs on every non-draft PR and every push), so a half-finished push does not
+  pay for verification.
+- **Local gate before ready.** Run `make done` yourself; `make ready` repeats
+  it on the tree it will push and refuses a dirty tree or a failing gate.
+- **One push when done.** `make ready` merges the default branch locally, runs
+  `make done` once, pushes once, then `gh pr ready`. Do not re-run green CI to
+  "be sure"; a re-run buys no assurance.
+- **Batch several finished branches.** `make integrate BRANCHES="feature/a
+  feature/b"` merges them into one integration branch, runs `make done` once,
+  and opens one PR whose body carries every `Fixes`/`Closes`/`Resolves #N`;
+  a conflict aborts the merge instead of guessing. Both commands re-check the tree
+  after `make done`, because `repoctl sync` may rewrite a derived file.
+- **Merge queue.** `ci.yml` and the specialist scans also run on
+  `merge_group`, so the queue tests the combined tree once.
+- **Tree-hash reuse.** A default-branch push whose tree is byte-identical to a
+  head that already passed a `ci` run skips the heavy jobs; a tree that differs
+  by any file runs them. The cheap gates and leak scan always run.
+- **Leak-scan fixtures.** Prefer fixtures built at runtime. A `.gitleaksignore`
+  fingerprint keyed to a commit is orphaned by a squash merge, so
+  `make check` warns about one; use a path-scoped allowlist in
+  `.gitleaks.toml` when a fixture must be tracked.
+- **No required check is dropped.** Drafts, reuse, and batching change when a
+  job runs, never whether a required check exists; never merge with a failed,
+  pending, or skipped required check.
 
 ## Claims
 

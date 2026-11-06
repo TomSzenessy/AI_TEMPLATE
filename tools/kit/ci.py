@@ -23,6 +23,7 @@ from .github import _gh, load_label_registry
 from .config import project_setting
 from .core import RepoctlError, load_project, markdown_without_fenced_code, reject_secret_text
 from .core import today as core_today
+from .gitinfo import git
 from .issues import contract, issue_problems, parse_sections
 
 CANONICAL = contract.HEADINGS  # the contract owns the headings; the name stays for callers
@@ -239,6 +240,50 @@ def gate_command(root: Path, python: str) -> list[str]:
     if project_setting(load_project(root), "project_mode") == "adopt":
         return [python, str(Path(__file__).resolve().parents[1] / "repoctl.py"), "--root", str(root), "check"]
     return ["make", "--no-print-directory", f"PYTHON={python}", "verify"]
+
+
+def tree_reuse(root: Path, repository: str, runner: Callable[[list[str]], str] | None = None) -> str:
+    """`true` when the current tree is byte-identical to a head a successful `ci` run verified.
+
+    A default-branch push whose tree already passed as a PR head needs no second
+    heavy run. Any unreadable run, missing tree, or different tree returns
+    `false`, so a changed file can never inherit another head's green result.
+    """
+    current = (git(root, "rev-parse", "HEAD^{tree}") or "").strip()
+    if not current or not repository:
+        return "false"
+    ask = runner or (lambda arguments: _gh(root, arguments))
+    try:
+        runs = json.loads(ask(
+            ["run", "list", "--workflow", "ci", "--limit", "20",
+             "--json", "headSha,workflowName,status,conclusion,event,databaseId"]) or "[]")
+    except (RuntimeError, OSError, subprocess.TimeoutExpired, json.JSONDecodeError):
+        return "false"
+    if not isinstance(runs, list):
+        return "false"
+    for run in runs:
+        if not isinstance(run, dict) or run.get("conclusion") != "success":
+            continue
+        head = run.get("headSha")
+        identifier = run.get("databaseId")
+        if not isinstance(head, str) or not head or not isinstance(identifier, (int, str)) or not str(identifier).strip():
+            continue
+        try:
+            jobs_payload = json.loads(ask(["run", "view", str(identifier), "--json", "jobs"]) or "{}")
+            jobs = jobs_payload.get("jobs") if isinstance(jobs_payload, dict) else None
+        except (RuntimeError, OSError, subprocess.TimeoutExpired, json.JSONDecodeError):
+            continue
+        if not isinstance(jobs, list) or not any(
+                isinstance(job, dict) and job.get("steps") for job in jobs):
+            continue  # an all-skipped run verified nothing
+        try:
+            payload = json.loads(ask(["api", f"repos/{repository}/commits/{head}"]) or "{}")
+        except (RuntimeError, OSError, subprocess.TimeoutExpired, json.JSONDecodeError):
+            continue
+        tree = payload.get("commit", {}).get("tree", {}).get("sha") if isinstance(payload, dict) else None
+        if tree == current:
+            return "true"
+    return "false"
 
 
 def run_gate(root: Path) -> str:

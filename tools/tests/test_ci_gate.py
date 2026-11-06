@@ -1,5 +1,6 @@
 """kit-ci runs the interpreter the matrix configured (#66) and only toolchain-free gates in adopted projects (#67)."""
 import ast
+import json
 import os
 import shutil
 import stat
@@ -83,6 +84,17 @@ class PythonSelectionTests(unittest.TestCase):
         workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
         self.assertIn("python3 tools/repoctl.py --root . ci gate", workflow)
         self.assertIn('python: ["3.11", "3.x"]', workflow)
+        self.assertIn("merge_group:", workflow)
+        self.assertIn("ready_for_review", workflow, "gh pr ready must start the first non-draft run")
+        self.assertIn("actions: read", workflow, "tree-hash reuse queries run jobs")
+        self.assertIn("ci tree-reuse", workflow)
+        self.assertIn("steps.reuse.outputs.reuse != 'true'", workflow)
+        scans = (ROOT / ".github/workflows/specialist-scans.yml").read_text(encoding="utf-8")
+        self.assertIn("merge_group:", scans, "the leak scan and link scan run in the merge queue")
+        self.assertIn("ready_for_review", scans)
+        self.assertIn("head.repo.full_name == github.repository", scans, "same-repo PRs get the leak scan")
+        self.assertIn("pull-requests: read", scans, "gitleaks lists PR commits")
+        self.assertIn("pull_request.draft == false", scans, "drafts do not spend scan minutes")
 
 
 class FloorTests(unittest.TestCase):
@@ -213,6 +225,55 @@ class SurfaceInterpreterTests(Scratch):
             self.assertEqual(done.returncode, 0, done.stderr)
             self.assertEqual(os.path.realpath(done.stdout.strip()),
                              os.path.realpath(str(project / ".venv" / "bin" / "python")))
+
+
+class TreeReuseTests(Scratch):
+    """#152: a default-branch tree may reuse a successful run only when it is byte-identical."""
+
+    TREE = "a" * 40
+
+    def runner(self, tree: str):
+        def run(arguments: list[str]) -> str:
+            if arguments[:2] == ["run", "list"]:
+                return json.dumps([{"workflowName": "ci", "status": "completed", "conclusion": "success",
+                                    "event": "pull_request", "headSha": "b" * 40, "databaseId": 7}])
+            if arguments[:2] == ["run", "view"]:
+                return json.dumps({"jobs": [{"steps": [{"name": "Run the gate"}]}]})
+            if arguments[0] == "api":
+                return json.dumps({"commit": {"tree": {"sha": tree}}})
+            raise AssertionError(arguments)
+        return run
+
+    def test_a_successful_identical_tree_is_reused(self) -> None:
+        with mock.patch.object(ci, "git", return_value=self.TREE + "\n"):
+            self.assertEqual(ci.tree_reuse(self.root, "example/project", self.runner(self.TREE)), "true")
+
+    def test_a_different_tree_is_never_reused(self) -> None:
+        with mock.patch.object(ci, "git", return_value=self.TREE + "\n"):
+            self.assertEqual(ci.tree_reuse(self.root, "example/project", self.runner("c" * 40)), "false")
+
+    def test_an_all_skipped_success_is_never_reused(self) -> None:
+        def skipped(arguments: list[str]) -> str:
+            if arguments[:2] == ["run", "list"]:
+                return json.dumps([{"workflowName": "ci", "status": "completed", "conclusion": "success",
+                                    "headSha": "b" * 40, "databaseId": 9}])
+            if arguments[:2] == ["run", "view"]:
+                return json.dumps({"jobs": [{"steps": []}]})
+            raise AssertionError(arguments)
+        with mock.patch.object(ci, "git", return_value=self.TREE + "\n"):
+            self.assertEqual(ci.tree_reuse(self.root, "example/project", skipped), "false")
+
+    def test_a_failed_or_unreadable_run_is_never_reused(self) -> None:
+        def failing(arguments: list[str]) -> str:
+            if arguments[:2] == ["run", "list"]:
+                return json.dumps([{"workflowName": "ci", "status": "completed", "conclusion": "failure",
+                                    "headSha": "b" * 40, "databaseId": 8}])
+            if arguments[:2] == ["run", "view"]:
+                return json.dumps({"jobs": [{"steps": [{"name": "Run the gate"}]}]})
+            raise AssertionError(arguments)
+        with mock.patch.object(ci, "git", return_value=self.TREE + "\n"):
+            self.assertEqual(ci.tree_reuse(self.root, "example/project", failing), "false")
+            self.assertEqual(ci.tree_reuse(self.root, "", self.runner(self.TREE)), "false")
 
 
 if __name__ == "__main__":

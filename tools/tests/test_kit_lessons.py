@@ -143,6 +143,69 @@ class CiStatusTests(unittest.TestCase):
         self.assertEqual(state, "red")
         self.assertIn("ci (failure)", detail)
 
+    def test_zero_step_jobs_are_unavailable_and_do_not_block(self) -> None:
+        """#149: a billing/credits run has no code failure to fix."""
+        def runner(arguments: list[str]) -> str:
+            if arguments[:2] == ["run", "list"]:
+                return json.dumps([{"workflowName": "ci", "status": "completed", "conclusion": "failure",
+                                    "url": "https://x/1", "databaseId": 42}])
+            if arguments[:2] == ["run", "view"]:
+                return json.dumps({"jobs": [{"steps": []}, {"steps": []}]})
+            raise AssertionError(arguments)
+        state, detail = self.status(runner)
+        self.assertEqual(state, "unavailable")
+        self.assertIn("zero steps", detail)
+        self.assertIn("not a code failure", detail)
+        with mock.patch.dict(os.environ, {"GITHUB_ACTIONS": "", "CI": ""}), \
+             mock.patch.object(cistatus, "_gh_runner", return_value=runner), \
+             mock.patch.object(cistatus, "pushed_head", return_value=self.SHA):
+            self.assertEqual(cistatus.red_findings(Path(".")), [])
+
+    def test_an_all_skipped_success_is_unavailable_not_green(self) -> None:
+        """A skipped required check must not read as a verified tree."""
+        def runner(arguments: list[str]) -> str:
+            if arguments[:2] == ["run", "list"]:
+                return json.dumps([{"workflowName": "ci", "status": "completed", "conclusion": "success",
+                                    "url": "https://x/1", "databaseId": 45}])
+            if arguments[:2] == ["run", "view"]:
+                return json.dumps({"jobs": [{"steps": []}]})
+            raise AssertionError(arguments)
+        state, detail = self.status(runner)
+        self.assertEqual(state, "unavailable")
+        self.assertIn("nothing verified", detail)
+
+    def test_a_failed_step_keeps_the_red_verdict(self) -> None:
+        def runner(arguments: list[str]) -> str:
+            if arguments[:2] == ["run", "list"]:
+                return json.dumps([{"workflowName": "ci", "status": "completed", "conclusion": "failure",
+                                    "url": "https://x/1", "databaseId": 43}])
+            if arguments[:2] == ["run", "view"]:
+                return json.dumps({"jobs": [{"steps": [{"name": "Run tests", "conclusion": "failure"}]}]})
+            raise AssertionError(arguments)
+        state, detail = self.status(runner)
+        self.assertEqual(state, "red")
+        self.assertIn("CI failed", detail)
+
+    def test_unreadable_job_steps_do_not_claim_green(self) -> None:
+        def runner(arguments: list[str]) -> str:
+            if arguments[:2] == ["run", "list"]:
+                return json.dumps([{"workflowName": "ci", "status": "completed", "conclusion": "success",
+                                    "databaseId": 46}])
+            raise RuntimeError("rate limited")
+        state, detail = self.status(runner)
+        self.assertEqual(state, "unknown")
+        self.assertIn("refusing to call it green", detail)
+
+    def test_a_missing_run_id_or_unreadable_jobs_stays_red(self) -> None:
+        for payload in ({"workflowName": "ci", "status": "completed", "conclusion": "failure"},
+                        {"workflowName": "ci", "status": "completed", "conclusion": "failure", "databaseId": 44}):
+            with self.subTest(payload=payload):
+                def runner(arguments: list[str], item: dict = payload) -> str:
+                    if arguments[:2] == ["run", "list"]:
+                        return json.dumps([item])
+                    raise RuntimeError("cannot read jobs")
+                self.assertEqual(self.status(runner)[0], "red")
+
     def test_issue_events_do_not_turn_successful_push_verification_red(self) -> None:
         """#97: issue validation shares a SHA, not the commit verification contract."""
         for event in ("issues", "issue_comment"):
@@ -263,6 +326,23 @@ class CiCacheTests(Scratch):
             self.assertTrue(any("default branch trunk" in line and "pending" in line for line in first), first)
             self.assertEqual(session._attention(self.root, "real-hook-session"), first)
         self.assertEqual(len(calls), 1)
+
+    def test_brief_all_skipped_success_is_unavailable(self) -> None:
+        head = "a" * 40
+        self.write("project.toml", 'schema = 1\nname = "x"\nkind = "template"\n[repository]\ndefault_branch = "main"\n')
+        def runner(args: list[str]) -> str:
+            if args[:2] == ["run", "list"]:
+                return json.dumps([{"headSha": head, "event": "push", "workflowName": "ci",
+                                    "status": "completed", "conclusion": "success", "databaseId": 1}])
+            if args[:2] == ["run", "view"]:
+                return json.dumps({"jobs": [{"steps": []}]})
+            raise AssertionError(args)
+        with mock.patch.dict(os.environ, {"GITHUB_ACTIONS": "", "CI": ""}), \
+             mock.patch.object(cistatus, "pushed_head", return_value=head), \
+             mock.patch.object(cistatus, "git", return_value=head):
+            lines = cistatus.brief_ci_lines(self.root, "brief-skipped", runner)
+        self.assertIn("HEAD: unavailable", lines[0])
+        self.assertIn("zero steps", lines[0])
 
     def test_new_session_with_unwritable_snapshot_does_not_replay_previous_session_green(self) -> None:
         """#83: the current lifecycle invocation owns cache identity even when persistence fails."""

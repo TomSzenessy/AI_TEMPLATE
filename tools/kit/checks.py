@@ -413,3 +413,20 @@ def ci_red(context) -> list[str]:
         return []
     from .cistatus import red_findings
     return red_findings(context.root, change.since if change.scoped else None)
+
+
+@check("leak-scan-fingerprints", "A .gitleaksignore entry keyed to a commit will be orphaned by a squash merge; prefer a runtime fixture",
+       blocks=False)
+def leak_scan_fingerprints(context) -> list[str]:
+    """Warn about commit-keyed leak-scan fingerprints that a squash merge invalidates (#152)."""
+    path = context.root / ".gitleaksignore"
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return []
+    return [
+        f".gitleaksignore: '{line.split(':', 1)[0][:12]}…' is keyed to a commit, so a squash merge orphans it; "
+        "build the fixture at runtime or use a path-scoped allowlist instead"
+        for line in lines
+        if line.strip() and not line.startswith("#") and re.match(r"^[0-9a-f]{40}:", line.strip())
+    ]

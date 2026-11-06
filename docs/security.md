@@ -94,12 +94,23 @@ organization-approved equivalent) for external Markdown links. Use a pinned
 `pre-commit` configuration for fast local feedback when it fits the team. Keep
 these tools additive: their output and failures are evidence, while
 `repoctl` remains the zero-dependency contract and path-safety check. The
-bundled specialist workflow runs Gitleaks on trusted pushes/manual runs (its
+bundled specialist workflow runs Gitleaks on trusted pushes/manual runs and in
+the merge queue (its
 organization license is not exposed to fork PRs) and credential-free Lychee for
 Markdown links: pull requests scan only the Markdown they add or change (file
 names filtered to a safe character set, since they are untrusted input), and a
 weekly schedule or manual run scans everything, so third-party outages and link
-rot surface as a failed scheduled run instead of failing unrelated changes; the
+rot surface as a failed scheduled run instead of failing unrelated changes.
+A `.gitleaksignore` fingerprint keyed to a commit is orphaned by a squash
+merge: the advisory `leak-scan-fingerprints` check reports it, and a runtime
+fixture or a `.gitleaks.toml` allowlist is the durable fix. A default-branch
+tree byte-identical to an already verified head may reuse that verification;
+the secret scan and the cheap gates still run. The reuse step reads workflow
+runs, so the job grants `actions: read`; a draft PR is skipped and the
+`ready_for_review` event starts its first non-draft run. The secret scan runs
+for same-repository non-draft PRs and default-branch pushes (the job grants
+`pull-requests: read` so Gitleaks can list PR commits); fork PRs stay
+credential-free by design.  the
 Lychee step sets `failIfEmpty: ${{ github.event_name != 'pull_request' }}`
 because a changed file may legitimately contain no links (the pinned action's
 default fails such pull requests on its `Total | 0` summary), while scheduled

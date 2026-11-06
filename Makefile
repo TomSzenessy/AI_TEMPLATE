@@ -65,13 +65,14 @@ done: python-check
 # (tools/kit/commands.py and .agents/commands/). Make variables reach repoctl as
 # quoted data, never as shell source. Edit the declaration, not this block.
 # <repoctl:commands>
-.PHONY: start next where ui-review new similar capabilities risk kit-report upstream kit-publish ci-status pull-first handover map garden sync issue review-packet incident init adopt kit-update check doctor readiness inventory resources skill-digest validate labels github-sync eval trial help
+.PHONY: start next where ui-review new similar capabilities risk kit-report upstream kit-publish ci-status pull-first ready integrate handover map garden sync issue review-packet incident init adopt kit-update check doctor readiness inventory resources skill-digest validate labels github-sync eval trial help
 
 export KIT_IN_ACCESS = $(if $(filter command line,$(origin ACCESS)),$(value ACCESS))
 export KIT_IN_AGENT = $(if $(filter command line,$(origin AGENT)),$(value AGENT))
 export KIT_IN_ANSWERS = $(if $(filter command line,$(origin ANSWERS)),$(value ANSWERS))
 export KIT_IN_AREA = $(if $(filter command line,$(origin AREA)),$(value AREA))
 export KIT_IN_BODY = $(if $(filter command line,$(origin BODY)),$(value BODY))
+export KIT_IN_BRANCHES = $(if $(filter command line,$(origin BRANCHES)),$(value BRANCHES))
 export KIT_IN_BUDGET = $(if $(filter command line,$(origin BUDGET)),$(value BUDGET))
 export KIT_IN_CHECK = $(if $(filter command line,$(origin CHECK)),$(value CHECK))
 export KIT_IN_CHECK_ONLY = $(if $(filter command line,$(origin CHECK_ONLY)),$(value CHECK_ONLY))
@@ -156,6 +157,13 @@ ci-status: python-check
 
 pull-first: python-check
 	@$(REPOCTL) pull-first $(if $(filter 1 yes true,$(KIT_IN_CHECK_ONLY)),--check-only,)
+
+ready: python-check
+	@$(REPOCTL) ready
+
+integrate: python-check
+	$(if $(KIT_IN_BRANCHES),,$(error Name the branches: make integrate BRANCHES="feature/a feature/b"))
+	@$(REPOCTL) integrate $(if $(KIT_IN_BRANCHES),--branches "$${KIT_IN_BRANCHES}",)
 
 handover: python-check
 	@$(REPOCTL) handover

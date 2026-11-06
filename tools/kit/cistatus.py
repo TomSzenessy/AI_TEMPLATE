@@ -46,7 +46,7 @@ def pushed_head(root: Path) -> str | None:
 
 
 CACHE = ".agent/ci-status.json"  # ignored; one gh call per commit, not per start, done and stop (#83)
-CACHE_SCOPE = "commit-verification-v1"  # pre-#97 answers included unrelated issue events; never reuse them
+CACHE_SCOPE = "commit-verification-v2"  # pre-#97 answers included unrelated issue events; never reuse them
 FINAL = {"green"}  # red is asked again: a re-run on the same commit can turn it green
 GREEN_S = 86400  # a green answer is asked again after a day: a later re-run or new workflow can turn it red (#85)
 RETRY_S = 300  # pending, none, or unknown (offline) is asked again after this long, not on every gate
@@ -83,7 +83,7 @@ def _store(root: Path, sha: str, result: tuple[str, str]) -> None:
 
 def ci_status(root: Path, sha: str | None = None, runner: Runner | None = None,
               fresh: bool = False) -> tuple[str, str]:
-    """(state, detail) for one commit's CI runs: green, red, pending, inconclusive, none, unpushed, or unknown.
+    """(state, detail) for one commit's CI runs: green, red, pending, inconclusive, none, unpushed, unavailable, or unknown.
     With the real `gh` (no `runner`) the answer is cached per commit in CACHE."""
     if os.environ.get("GITHUB_ACTIONS") == "true" or os.environ.get("CI") == "true":
         return "unknown", "running inside CI"
@@ -99,15 +99,64 @@ def ci_status(root: Path, sha: str | None = None, runner: Runner | None = None,
 
 
 def _ask(root: Path, sha: str, runner: Runner | None) -> tuple[str, str]:
+    ask = runner or _gh_runner(root)
     try:
-        raw = (runner or _gh_runner(root))(
-            ["run", "list", "--commit", sha, "--limit", "100", "--json", "workflowName,status,conclusion,url,event"])
+        raw = ask(
+            ["run", "list", "--commit", sha, "--limit", "100",
+             "--json", "workflowName,status,conclusion,url,event,databaseId"])
         runs = json.loads(raw or "[]")
     except FileNotFoundError:
         return "unknown", "GitHub CLI (gh) is not installed"
     except (RuntimeError, OSError, subprocess.TimeoutExpired, json.JSONDecodeError) as error:
         return "unknown", f"cannot read CI: {error}"
-    return _classify(sha, runs)
+    state, detail = _classify(sha, runs)
+    if state == "red":
+        zero = _no_steps_ran(runs, ask, RED)
+        if zero is True:
+            return "unavailable", (
+                f"CI unavailable on {sha[:7]}: every job ran zero steps (billing/credits or spending limit); "
+                "this is not a code failure"
+            )
+        return state, detail
+    if state == "green":
+        zero = _no_steps_ran(runs, ask, {"success"})
+        if zero is True:
+            return "unavailable", (
+                f"CI unavailable on {sha[:7]}: the successful run executed zero steps (all jobs skipped); "
+                "nothing verified this tree"
+            )
+        if zero is None:
+            return "unknown", f"cannot read CI job steps on {sha[:7]}; refusing to call it green"
+    return state, detail
+
+
+def _no_steps_ran(runs: object, ask: Runner, conclusions: set[str]) -> bool | None:
+    """True when every run with one of `conclusions` ran no step; None when that cannot be read.
+
+    False means a real step ran (or the run metadata predates job ids, kept for
+    compatibility). A real failure must never be hidden behind a billing
+    explanation, and an all-skipped success must never be called green (#149).
+    """
+    candidates = [run for run in runs if isinstance(run, dict) and run.get("status") == "completed"
+                  and run.get("conclusion") in conclusions] if isinstance(runs, list) else []
+    if not candidates:
+        return False
+    for run in candidates:
+        identifier = run.get("databaseId")
+        if not isinstance(identifier, (int, str)) or not str(identifier).strip():
+            return False
+        try:
+            payload = json.loads(ask(["run", "view", str(identifier), "--json", "jobs"]) or "{}")
+        except (RuntimeError, OSError, subprocess.TimeoutExpired, json.JSONDecodeError):
+            return None
+        jobs = payload.get("jobs") if isinstance(payload, dict) else None
+        if not isinstance(jobs, list) or not jobs:
+            return None
+        if not all(isinstance(job, dict) and isinstance(job.get("steps"), list) for job in jobs):
+            return None
+        if any(job["steps"] for job in jobs):
+            return False
+    return True
 
 
 def _classify(sha: str, runs: object) -> tuple[str, str]:
@@ -165,14 +214,25 @@ def brief_ci_lines(root: Path, session_id: str | None = None, runner: Runner | N
     results = {}
     targets = {sha for sha in (pushed, default_sha) if sha}
     if targets:
+        ask = runner or _gh_runner(root, timeout_s=BRIEF_TIMEOUT_S)
         try:
-            raw = (runner or _gh_runner(root, timeout_s=BRIEF_TIMEOUT_S))(
-                ["run", "list", "--limit", "100", "--json", "workflowName,status,conclusion,url,event,headSha"])
+            raw = ask(
+                ["run", "list", "--limit", "100",
+                 "--json", "workflowName,status,conclusion,url,event,headSha,databaseId"])
             runs = json.loads(raw or "[]")
             if not isinstance(runs, list):
                 raise ValueError("run list is not an array")
-            results = {sha: _classify(sha, [r for r in runs if isinstance(r, dict) and r.get("headSha") == sha])
-                       for sha in targets}
+            for sha in targets:
+                applicable = [r for r in runs if isinstance(r, dict) and r.get("headSha") == sha]
+                state, detail = _classify(sha, applicable)
+                if state == "green":
+                    zero = _no_steps_ran(applicable, ask, {"success"})
+                    if zero is True:
+                        state, detail = "unavailable", (
+                            f"every job on {sha[:7]} executed zero steps; nothing verified this tree")
+                    elif zero is None:
+                        state, detail = "unknown", f"cannot read CI job steps on {sha[:7]}"
+                results[sha] = (state, detail)
         except (FileNotFoundError, RuntimeError, OSError, subprocess.TimeoutExpired, ValueError, TypeError) as error:
             results = {sha: ("unknown", f"cannot read CI: {error}") for sha in targets}
     head_result = results.get(pushed, ("unpushed", "HEAD is not on its upstream yet")) if head else ("unknown", "cannot resolve HEAD")

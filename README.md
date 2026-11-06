@@ -145,6 +145,9 @@ WHEN NEEDED
                                      File a reviewed kit-report draft on the template repository (the owner's step)
   make ci-status                     The CI result of what you pushed: green, red, pending, or why it cannot tell
   make pull-first [CHECK_ONLY=1]     Before a run others rely on: refuse a dirty or unpushed tree, pull new commits (exit 3: restart)
+  make ready                         Merge the default branch, run make done once, push once, then mark the PR ready
+  make integrate BRANCHES="feature/a feature/b"
+                                     Merge finished branches into one gated branch and open one PR carrying every Fixes #N
   make handover                      Write HANDOVER.md before pausing (git facts pre-filled)
   make map                           One-screen repository map
   make garden                        Full rot report: every check, advisory ones included
