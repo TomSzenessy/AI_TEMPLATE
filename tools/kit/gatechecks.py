@@ -44,7 +44,8 @@ def owed_docs(context) -> list[str]:
         owed.setdefault(doc, paths)
     return [
         f"{doc} covers changed {', '.join(paths[:4])}{' …' if len(paths) > 4 else ''} but was not updated"
-        " (update it, or record why in the commit with a 'Docs-Unaffected: <doc> <reason>' trailer)"
+        " (update it, or record the per-commit review with 'Docs-Reviewed: <doc> <reason>',"
+        " or why it is unaffected with 'Docs-Unaffected: <doc> <reason>')"
         for doc, paths in owed.items()
     ]
 

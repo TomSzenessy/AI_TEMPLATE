@@ -67,18 +67,17 @@ Otherwise it is **advisory** (`make garden`, the brief) or an
 |---|---|---|---|
 | Session start or resume | `repoctl hook session-start` | `make start` | Brief: branch, recent commits, `HANDOVER.md`, map, the `make next` step, open findings, red CI, a template clone used as a project. Derived files are regenerated and the git commit gate is installed (adopted projects: [`adopt.md`](./adopt.md)). |
 | Before context compaction | `repoctl hook pre-compact` | — | Writes `.agent/checkpoint.md` (uncommitted paths, docs still owed). |
-| After a file edit | `repoctl hook after-edit` | — | Names the docs covering the edited path (once per session); regenerates derived files when a source changed; warns on edits to generated files. |
-| Before declaring done | `repoctl hook stop` | `make done` | Gate over this branch's change set: owed docs, derived-file drift, dead bindings, red pushed CI (`ci-red`), an unreported kit change (`kit-upstream`), the stop hook also this session's unpushed work ([collaboration](./collaboration.md)), plus critic evidence for committed `high`-risk paths ([ceremony](#ceremony-by-risk)); `make done` also prints product completeness and advises on a stale UI review. It blocks again in a turn only on changed findings (five at most); it holds a session on new `make check` findings, and one that changed product-surface code while must features are open or `features.csv` is invalid ([`building.md`](./building.md)); `make done` also runs every test and predicts the commit gate. |
-| Every commit | `.githooks/commit-msg` (any agent or human) | same | Refuses a commit whose staged covered code skips its doc (unless the message carries a `Docs-Unaffected:` trailer), and derived-file drift when the commit touches a source. In a merge commit, paths the merged branch brought in skip the owed-doc check (already judged); the rest is checked. Exit 3 means blocked; a broken plugin or kit also blocks (see [A broken check](#a-broken-check-is-a-finding-not-a-traceback)). Bypass with `--no-verify`. |
+| After a file edit | `repoctl hook after-edit` | — | Names the docs covering the edited path (once per session); regenerates derived files; warns only on files `make sync` writes whole, never on hand-written sources/tests/docs/host-local files. |
+| Before declaring done | `repoctl hook stop` | `make done` | Gate over this branch's change set: owed docs, derived-file drift, dead bindings, red pushed CI (`ci-red`), an unreported kit change (`kit-upstream`), the stop hook also this session's unpushed work ([collaboration](./collaboration.md)), plus critic evidence for committed `high`-risk paths ([ceremony](#ceremony-by-risk)); `make done` also prints product completeness and advises on a stale UI review. It blocks again in a turn only on changed findings (five at most); it holds a session on new `make check` findings, and one that changed product-surface code while must features are open or `features.csv` is invalid ([`building.md`](./building.md)); `make done` also runs every test. |
+| Every commit | `.githooks/commit-msg` (any agent or human) | same | Refuses a commit whose staged covered code skips its doc (unless the message carries a `Docs-Reviewed:` or `Docs-Unaffected:` trailer), and derived-file drift when the commit touches a source. In a merge commit, paths the merged branch brought in skip the owed-doc check (already judged); the rest is checked. Exit 3 means blocked; a broken plugin or kit also blocks (see [A broken check](#a-broken-check-is-a-finding-not-a-traceback)). Bypass: `--no-verify`. |
 
 Owed docs (`doc-coupling`), critic evidence and `surface-docs` are registry
 checks, so `[checks]` downgrades apply; `surface-docs` counts a surface's
 `extra_paths` as owned.
 
-The commit gate is installed (`core.hooksPath=.githooks`) only when the
-repository has no hooks path and no active hooks in `.git/hooks`; otherwise the
-brief says so and you call `.githooks/commit-msg "$1"` from your existing hook
-or hook manager, so nothing already in use is switched off.
+The commit gate is installed (`core.hooksPath=.githooks`) only when no
+hooks path is set and no active hooks in `.git/hooks`; otherwise the brief says so; call `.githooks/commit-msg "$1"` from your existing hook
+or hook manager, so nothing in use is switched off.
 
 Claude Code receives the hooks through the generated `.claude/settings.json`.
 Other hosts read [`AGENTS.md`](../AGENTS.md), which tells them to run the make

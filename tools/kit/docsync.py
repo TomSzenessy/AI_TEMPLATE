@@ -22,6 +22,11 @@ from .gitinfo import git, has_history, path_matches
 from .registry import Registry, doc_name
 
 UNAFFECTED_TRAILER = "Docs-Unaffected"
+# The same per-commit decision under a name that says what the author did: they
+# reviewed the bound document and it already describes the change (#147). Both
+# keys share one parser, so an existing trailer keeps working.
+REVIEWED_TRAILER = "Docs-Reviewed"
+EXEMPTION_TRAILERS = (UNAFFECTED_TRAILER, REVIEWED_TRAILER)
 HISTORY_LIMIT = 2000
 
 
@@ -92,7 +97,7 @@ NON_DOC_SCOPE = re.compile(r"\*|/$|/.*/|/[^/]*[._]")
 
 
 def exemption_scope(values: list[str]) -> set[str] | None:
-    """Docs exempted by Docs-Unaffected trailer values; None when nothing valid.
+    """Docs exempted by `Docs-Unaffected` or `Docs-Reviewed` trailer values; None when nothing valid.
 
     Each value is `<doc.md ...> <reason>` (named docs only) or `<reason>` (all
     docs). A value without a reason, or one that starts with a non-document path
@@ -114,11 +119,11 @@ def exemption_scope(values: list[str]) -> set[str] | None:
 
 
 def message_trailers(root: Path, message: str) -> list[str]:
-    """Docs-Unaffected values exactly as git parses commit trailers."""
+    """Doc-review values exactly as git parses commit trailers (`Docs-Unaffected` or `Docs-Reviewed`)."""
     values = []
     for line in (git(root, "interpret-trailers", "--parse", input=message) or "").splitlines():
         key, _, value = line.partition(":")
-        if key.strip().lower() == UNAFFECTED_TRAILER.lower():
+        if key.strip().lower() in {name.lower() for name in EXEMPTION_TRAILERS}:
             values.append(value.strip())
     return values
 
@@ -152,10 +157,12 @@ def _is_pin_bump(root: Path, commit: str, email: str, name: str) -> bool:
 def history_read(
     root: Path, revisions: str | None = None
 ) -> list[tuple[str, set[str] | None, set[str]]] | None:
-    """Newest-first (commit, Docs-Unaffected scope, paths); scope None = no trailer.
+    """Newest-first (commit, doc-review scope, paths); scope None = no trailer.
 
     None means the read failed or timed out; an empty list is a genuinely empty
-    history. A pin-only Dependabot commit gets the all-docs scope (not stale).
+    history. Both per-commit keys are read so `Docs-Unaffected` and the clearer
+    `Docs-Reviewed` are one decision. A pin-only Dependabot commit gets the
+    all-docs scope (not stale).
     """
     output = git(
         root,
@@ -164,7 +171,8 @@ def history_read(
         f"-n{HISTORY_LIMIT}",
         "--no-merges",
         "--name-only",
-        f"--format=%x1e%h%x1f%(trailers:key={UNAFFECTED_TRAILER},valueonly,separator=%x1d)%x1f%ae%x1f%an%x1f",
+        f"--format=%x1e%h%x1f%(trailers:key={UNAFFECTED_TRAILER},valueonly,separator=%x1d)"
+        f"%x1f%(trailers:key={REVIEWED_TRAILER},valueonly,separator=%x1d)%x1f%ae%x1f%an%x1f",
         timeout=60,
     )
     if output is None:
@@ -173,8 +181,9 @@ def history_read(
     for record in output.split("\x1e"):
         if not record.strip():
             continue
-        commit, trailer, email, name, names = (record.split("\x1f") + ["", "", "", ""])[:5]
-        scope = exemption_scope([value for value in trailer.split("\x1d") if value.strip()])
+        commit, unaffected, reviewed, email, name, names = (record.split("\x1f") + [""] * 5)[:6]
+        values = [value for value in (*unaffected.split("\x1d"), *reviewed.split("\x1d")) if value.strip()]
+        scope = exemption_scope(values)
         if scope is None and _is_pin_bump(root, commit.strip(), email, name):
             scope = {"*"}
         commits.append((commit.strip(), scope, {line for line in names.splitlines() if line}))
@@ -213,7 +222,8 @@ def stale_documents(
                 findings.append(
                     f"{doc}: stale since {commit} changed {', '.join(touched[:3])}"
                     + (" …" if len(touched) > 3 else "")
-                    + f" (update the doc, or add a '{UNAFFECTED_TRAILER}: {doc} <reason>' commit trailer)"
+                    + f" (update the doc, or record the review with a '{REVIEWED_TRAILER}: {doc} <reason>' "
+                    f"or '{UNAFFECTED_TRAILER}: {doc} <reason>' commit trailer)"
                 )
                 break
     return findings
@@ -228,7 +238,8 @@ def owed_documents(
 ) -> dict[str, list[str]]:
     """Covered paths changed on this branch (since base) or uncommitted, per untouched doc.
 
-    Branch commits carrying a matching Docs-Unaffected trailer do not create debt.
+    Branch commits carrying a matching `Docs-Reviewed` or `Docs-Unaffected`
+    trailer do not create debt.
     """
     merge_base = (git(root, "merge-base", "HEAD", base) or "").strip()
     return owed_since(root, doc_bindings, f"{merge_base}..HEAD" if merge_base else None, uncommitted)

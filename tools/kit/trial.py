@@ -3,7 +3,7 @@
 A navigation eval (`make eval`) asks a cold agent where things are. A build
 trial asks it to build a product from an owner request and measures what the
 kit did to that run: cost, turns, which commands it used, every gate block,
-bypass, and Docs-Unaffected trailer, and where the product stood at the end
+bypass, and doc-review trailer, and where the product stood at the end
 (`make next` phase, `make done`, completeness). Friction found here is fixed in
 the kit under the blocking rule in docs/self-healing.md.
 
@@ -229,12 +229,20 @@ def _has_result(transcript: Path) -> bool:
         return False
 
 
+def doc_review_trailers(raw: str) -> list[str]:
+    """Doc-review values from a `git log` format that emits both trailer keys."""
+    return [value.strip() for record in raw.split("\x1e")
+            for value in record.replace("\x1f", "\x1d").split("\x1d") if value.strip()]
+
+
 def project_state(project: Path) -> dict[str, object]:
     """Where the product stands, read with the project's own kit."""
     def repoctl(*arguments: str) -> subprocess.CompletedProcess[str]:
         return subprocess.run([sys.executable, "tools/repoctl.py", *arguments], cwd=project,
                               capture_output=True, text=True, check=False, timeout=1800)
-    trailers = git(project, "log", "--format=%(trailers:key=Docs-Unaffected,valueonly)") or ""
+    trailers = doc_review_trailers(
+        git(project, "log", "--format=%x1e%(trailers:key=Docs-Unaffected,valueonly,separator=%x1d)"
+                           "%x1f%(trailers:key=Docs-Reviewed,valueonly,separator=%x1d)") or "")
     finish = repoctl("finish")
     check = repoctl("check")  # finish is the fast change-set gate; the repository checks are separate
     verify = repoctl("verify")  # each surface's own build and tests: check and finish stay green when the app does not build
@@ -250,7 +258,7 @@ def project_state(project: Path) -> dict[str, object]:
         "verify": [line for line in (verify.stdout + verify.stderr).splitlines() if "verification" in line][-3:],
         "uncommitted": len(uncommitted),
         "finish": summary or (finish.stdout.strip().splitlines() or [""])[-3:],
-        "trailers": [line for line in trailers.splitlines() if line.strip()],
+        "trailers": trailers,
     }
 
 
@@ -309,7 +317,7 @@ def render(spec: dict[str, object], model: str, analysis: dict[str, object], sta
         *(f"  - `{f['command']}`: {f['message']}" for f in analysis["failed_make"]),
         f"- `--no-verify` bypasses: {len(analysis['bypasses'])}",
         *(f"  - `{b}`" for b in analysis["bypasses"]),
-        f"- Docs-Unaffected trailers: {len(state['trailers'])}",
+        f"- Doc-review trailers (Docs-Reviewed/Docs-Unaffected): {len(state['trailers'])}",
         *(f"  - {t}" for t in state["trailers"]),
         "", "Judge each item with docs/self-healing.md#when-a-check-may-block: fix the kit, "
         "make it advisory, or justify the block.", "",

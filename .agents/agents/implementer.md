@@ -33,8 +33,11 @@ made, `file:line` pointers), `Done when` (an observable check). A brief without
 ## Boundaries
 
 Stay inside `Scope`; if parallel implementers exist, work in your own git
-worktree or branch. No production writes, secrets, dependency additions, or
-scope growth without the orchestrator's approval.
+worktree or branch. Name a new test file after the issue or topic
+(`test_issue_<n>_<topic>.py`) when the base has no such file; extend an existing
+test file instead of inventing a second obvious name. No production writes,
+secrets, dependency additions, or scope growth without the orchestrator's
+approval.
 
 ## Return (at most 250 words)
 
