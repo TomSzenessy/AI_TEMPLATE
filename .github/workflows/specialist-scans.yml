@@ -3,6 +3,8 @@ name: specialist scans
 on:
   push:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  merge_group:
   workflow_dispatch:
   # Weekly full link scan: external link rot shows up as a failed scheduled
   # run; pull requests only scan the Markdown they change.
@@ -17,11 +19,12 @@ concurrency:
 
 jobs:
   secrets:
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' || (github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name == github.repository)
     name: maintained secret scan
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      pull-requests: read  # gitleaks-action lists PR commits on same-repo PRs
     timeout-minutes: 10
     steps:
       - name: Checkout
@@ -35,7 +38,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
   links:
-    if: github.event_name != 'push'
+    if: github.event_name != 'push' && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
     name: maintained Markdown link scan
     runs-on: ubuntu-latest
     permissions:

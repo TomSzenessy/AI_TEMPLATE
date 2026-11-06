@@ -1,11 +1,14 @@
 name: ci
 
 on:
-  # Pull requests run the full path; pushes only on the default branch, so a
-  # pull request's commits are not verified twice.
+  # Pull requests and the merge queue run the full path; pushes only on the
+  # default branch, so a pull request's commits are not verified twice.
   push:
     branches: [main]
   pull_request:
+    # `gh pr ready` must start the first non-draft run (#152).
+    types: [opened, synchronize, reopened, ready_for_review]
+  merge_group:
 
 permissions: {}
 
@@ -16,10 +19,13 @@ concurrency:
 
 jobs:
   verify:
+    # A draft PR is still being edited: it must not spend CI minutes.
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     name: repository verification (python ${{ matrix.python }})
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      actions: read  # gh run list/view for tree-hash reuse
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -37,16 +43,30 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ matrix.python }}
+      - name: Decide tree-hash reuse
+        id: reuse
+        if: github.event_name == 'push'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          reuse=$(python3 tools/repoctl.py --root . ci tree-reuse)
+          echo "reuse=$reuse" >> "$GITHUB_OUTPUT"
       - name: Run the verification gate on the matrix interpreter
         # The adopted copy (kit-ci.yml) runs only `repoctl check`; docs/adopt.md says why.
+        if: steps.reuse.outputs.reuse != 'true'
         env:
           REPOCTL_SETUP: "1"  # runs each surface's declared setup (toolchain install) before its verification
         run: python3 tools/repoctl.py --root . ci gate
+      - name: Reuse a verified tree
+        if: steps.reuse.outputs.reuse == 'true'
+        run: echo "Tree already verified by a successful ci run; heavy verification skipped."
   test-future:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     name: tests 800 days ahead (no calendar rot)
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      actions: read  # gh run list/view for tree-hash reuse
     timeout-minutes: 30
     steps:
       - name: Check out pinned revision
@@ -58,5 +78,17 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11"
+      - name: Decide tree-hash reuse
+        id: reuse
+        if: github.event_name == 'push'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          reuse=$(python3 tools/repoctl.py --root . ci tree-reuse)
+          echo "reuse=$reuse" >> "$GITHUB_OUTPUT"
       - name: Run the tests 800 days ahead
+        if: steps.reuse.outputs.reuse != 'true'
         run: KIT_SLOW=1 make test-future
+      - name: Reuse a verified tree
+        if: steps.reuse.outputs.reuse == 'true'
+        run: echo "Tree already verified by a successful ci run; calendar test skipped."

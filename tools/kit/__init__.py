@@ -19,6 +19,7 @@ local):
   adapters, derive, scaffold, navigate, risk, session, garden, capabilities,
   evals, trial, semantic, semantic_inventory, semantic_transport, upstream
 - product driver: product, uireview (docs/building.md)
+- change sets: prflow (docs/collaboration.md)
 
 Each module owns one concern; tools/repoctl.py only builds its parser from the
 @command declarations and dispatches.

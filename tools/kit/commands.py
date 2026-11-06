@@ -8,6 +8,7 @@ A project adds its own command as a new file in `.agents/commands/`
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -226,6 +227,26 @@ def ci_status(root: Path, args) -> int:
 def pull_first(root: Path, args) -> int:
     from .gitsync import pull_first as pull
     code, message = pull(root, check_only=args.check_only)
+    print(message)
+    return code
+
+
+@command("ready", "Merge the default branch, run make done once, push once, then mark the PR ready",
+         group="when-needed", usage="make ready")
+def ready(root: Path, args) -> int:
+    from .prflow import ready as finish_branch
+    code, message = finish_branch(root)
+    print(message)
+    return code
+
+
+@command("integrate", "Merge finished branches into one gated branch and open one PR carrying every Fixes #N",
+         group="when-needed", usage='make integrate BRANCHES="feature/a feature/b"',
+         args=(arg("--branches", required=True, var="BRANCHES",
+                   hint='Name the branches: make integrate BRANCHES="feature/a feature/b"'),))
+def integrate(root: Path, args) -> int:
+    from .prflow import integrate as integrate_branches
+    code, message = integrate_branches(root, args.branches.replace(",", " ").split())
     print(message)
     return code
 
@@ -466,8 +487,14 @@ def github_sync(root: Path, args) -> None:
 
 
 @command("ci", "Run a CI check (the same tested code GitHub Actions runs)", make=None,
-         args=(arg("check", choices=["pr-reference", "issue-contract", "gate"]),))
+         args=(arg("check", choices=["pr-reference", "issue-contract", "gate", "tree-reuse"]),))
 def run_ci(root: Path, args) -> None:
+    if args.check == "tree-reuse":
+        from .ci import tree_reuse
+        project = load_project(root)
+        repository = project.get("repository", {}).get("github", "") if isinstance(project.get("repository"), dict) else ""
+        print(tree_reuse(root, str(repository or os.environ.get("GITHUB_REPOSITORY", ""))))
+        return
     runner = {"pr-reference": ci.run_pr_reference, "issue-contract": ci.run_issue_contract, "gate": ci.run_gate}[args.check]
     print(runner(root))
 
