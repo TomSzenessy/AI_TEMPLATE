@@ -289,6 +289,27 @@ def check_public_launch_evidence(root: Path, project: dict[str, object]) -> list
 RELEASE_PHASES = {"private-preview", "public-launch"}
 
 
+def license_errors(root: Path, project: dict[str, object]) -> list[str]:
+    """The license state: selected with its text, deliberately deferred, or undecided (#150)."""
+    license_name = project.get("license")
+    if license_name == "none-yet":
+        # An explicit deferral is the project owner's decision; it still cannot
+        # launch and it must not hide a LICENSE someone already added.
+        if (root / "LICENSE").is_file():
+            return ["license is none-yet but a root LICENSE exists: select its label"]
+        if project.get("phase") == "public-launch":
+            return ["public launch requires a selected license, not none-yet"]
+        return []
+    if not isinstance(license_name, str) or license_name in {"", "UNSELECTED"}:
+        return [
+            'license is not selected: add a LICENSE and its label, or record a deliberate deferral '
+            'with license = "none-yet" (docs/engineering.md)'
+        ]
+    if not (root / "LICENSE").is_file():
+        return [f"selected license has no root LICENSE file: {license_name}"]
+    return []
+
+
 def check_readiness(root: Path, *, checks_done: bool = False) -> None:
     """Doctor: the registry's blocking checks plus what only readiness knows.
 
@@ -323,11 +344,7 @@ def check_readiness(root: Path, *, checks_done: bool = False) -> None:
     if project.get("phase") not in {"bootstrap", "development", "private-preview", "public-launch"}:
         errors.append(f"project phase is invalid: {project.get('phase')}")
 
-    license_name = project.get("license")
-    if not isinstance(license_name, str) or license_name in {"", "UNSELECTED"}:
-        errors.append("license is not selected")
-    elif not (root / "LICENSE").is_file():
-        errors.append(f"selected license has no root LICENSE file: {license_name}")
+    errors += license_errors(root, project)
 
     owners = project.get("owners", [])
     if (

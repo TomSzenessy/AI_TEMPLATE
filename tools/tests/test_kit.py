@@ -95,6 +95,19 @@ class HookTests(KitRepository):
         result = self.cli("hook", "after-edit", stdin="not json")
         self.assertEqual(result.returncode, 0)
 
+    def test_after_edit_calls_only_real_generated_files_generated(self) -> None:
+        """#146: a hand-written source, test, doc, or host-local file is not generated."""
+        for number, path in enumerate(("src/billing/invoice.py", "tests/test_billing.py", "docs/security.md",
+                                       ".claude/settings.local.json")):
+            with self.subTest(path=path):
+                event = {"session_id": f"generated-{number}", "tool_input": {"file_path": str(self.root / path)}}
+                output = self.cli("hook", "after-edit", stdin=json.dumps(event)).stdout
+                self.assertNotIn("is generated", output)
+        generated = self.root / ".claude" / "skills" / "demo-skill" / "SKILL.md"
+        event = {"session_id": "generated-real", "tool_input": {"file_path": str(generated)}}
+        output = self.cli("hook", "after-edit", stdin=json.dumps(event)).stdout
+        self.assertIn("is generated", output)
+
 
 class CommitGateTests(KitRepository):
     def message(self, text: str) -> str:
@@ -123,6 +136,26 @@ class CommitGateTests(KitRepository):
         self.git("add", "src/billing/invoice.py")
         commented = self.message("change\n# Docs-Unaffected: docs/billing.md\n")
         self.assertEqual(self.cli("hook", "commit-msg", commented).returncode, 3)
+
+    def test_two_commits_each_record_their_own_doc_review(self) -> None:
+        """#147: different modules under one broad binding need no squash."""
+        first = "module a\n\nDocs-Reviewed: docs/billing.md module A keeps the documented contract\n"
+        self.write("src/billing/a.py", "A = 1\n")
+        self.git("add", "src/billing/a.py")
+        self.assertEqual(self.cli("hook", "commit-msg", self.message(first)).returncode, 0)
+        self.git("commit", "-q", "-m", first)
+        second = "module b\n\nDocs-Reviewed: docs/billing.md module B keeps the documented contract\n"
+        self.write("src/billing/b.py", "B = 2\n")
+        self.git("add", "src/billing/b.py")
+        self.assertEqual(self.cli("hook", "commit-msg", self.message(second)).returncode, 0)
+        self.git("commit", "-q", "-m", second)
+        self.assertEqual(self.self_heal(), "")
+
+    def test_docs_reviewed_still_requires_a_document_not_a_path(self) -> None:
+        self.write("src/billing/a.py", "A = 1\n")
+        self.git("add", "src/billing/a.py")
+        self.assertEqual(self.cli("hook", "commit-msg", self.message(
+            "change\n\nDocs-Reviewed: src/billing/a.py no behavior change\n")).returncode, 3)
 
     def test_merge_commit_defers_to_merged_commits(self) -> None:
         # The branch commit recorded its decision; merging it must not ask again.

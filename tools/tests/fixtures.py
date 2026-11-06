@@ -74,6 +74,8 @@ GIT_ISOLATION = {
     "GIT_CONFIG_VALUE_0": "0",
     "GIT_CONFIG_KEY_1": "maintenance.auto",
     "GIT_CONFIG_VALUE_1": "false",
+    # An ambient interpreter override must not change what a surface test executes.
+    "REPOCTL_SURFACE_PYTHON": "",
 }
 
 

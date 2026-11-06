@@ -251,6 +251,9 @@ def print_next(root: Path) -> None:
     print(f"Next ({step['phase']}): {step['action']}")
     print(f"How: {step['guide']}")
     print(f"Done when: {step['verify']}")
+    if load_project(root).get("license") == "none-yet":
+        print('License: deliberately deferred (license = "none-yet"); choose and record one before '
+              "public launch (docs/engineering.md).")
 
 
 def product_summary(root: Path) -> str | None:

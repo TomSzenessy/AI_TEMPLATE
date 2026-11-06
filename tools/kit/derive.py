@@ -172,6 +172,17 @@ def render_kit_files(root: Path) -> dict[str, str]:
     return {KIT_FILES: json.dumps(paths, indent=0) + "\n"}
 
 
+def generated_paths(root: Path) -> set[str]:
+    """Files `make sync` writes whole (host adapters and the generated kit list).
+
+    A hand-written file that merely contains a `repoctl` block is a source, not
+    a generated file; `render_blocks` owns those and this set never includes
+    them. The after-edit hook uses this whole-file definition; `drift()` reports
+    every rendered file, including those blocks.
+    """
+    return {*adapters.render(root), *render_kit_files(root)}
+
+
 def render_all(root: Path) -> dict[str, str]:
     return {**adapters.render(root), **render_blocks(root), **render_kit_files(root)}
 

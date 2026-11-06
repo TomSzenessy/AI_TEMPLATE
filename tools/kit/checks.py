@@ -127,7 +127,7 @@ def dead_bindings(context) -> list[str]:
     return docsync.dead_bindings(context.bindings, context.files)
 
 
-@check("stale-docs", "A doc is updated after the code it covers changes (or a Docs-Unaffected trailer says why)",
+@check("stale-docs", "A doc is updated after the code it covers changes (or a Docs-Reviewed/Docs-Unaffected trailer says why)",
        blocks=True, reason="Trials showed agents skip doc updates at the end of a session; this is the one point that catches it.")
 def stale_docs(context) -> list[str]:
     return docsync.stale_documents(context.root, context.bindings, changed_paths(context.root))
