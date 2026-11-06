@@ -59,7 +59,10 @@ another.
 1. Create or update the release issue before mutation; include acceptance and
    disclosure classification.
 2. Build the smallest release candidate from pinned inputs.
-3. Run `make verify` plus every active surface's real oracle.
+3. Run `make verify` plus every active surface's real oracle. A
+   `license = "none-yet"` deferral passes development verification but fails
+   `make readiness` at public launch: select and record the license first
+   ([`engineering.md`](./engineering.md)).
 4. Inspect the artifact and deployment state; do not stop at exit code zero.
 5. Obtain an independent review and attach the exact head/artifact evidence.
 6. Deploy through a protected, least-privilege environment; verify health,

@@ -13,7 +13,7 @@ from unittest import mock
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from fixtures import Scratch, template_only  # noqa: E402
 
-from kit import ci  # noqa: E402
+from kit import ci, structure  # noqa: E402
 from kit.core import RepoctlError  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -133,6 +133,86 @@ class GateTests(Scratch):
         with mock.patch.object(ci.subprocess, "run", return_value=subprocess.CompletedProcess([], 0)) as run:
             ci.run_gate(self.root)
         self.assertNotIn("npm", " ".join(run.call_args.args[0]))
+
+
+class SurfaceInterpreterTests(Scratch):
+    """#145: a bare python3 surface command follows the project virtualenv, not PATH."""
+
+    def project(self, path: str = ".") -> None:
+        self.write("project.toml", 'schema = 1\nname = "demo"\nkind = "web"\n'
+                   '[[surfaces]]\nid = "app"\n'
+                   f'path = "{path}"\nkind = "code"\nstatus = "active"\n'
+                   'verification = [["python3", "-m", "pytest"]]\n')
+
+    def run_surface(self, path: str = ".", **env: str) -> mock.Mock:
+        self.project(path)
+        with mock.patch.dict(os.environ, env, clear=False), \
+             mock.patch.object(structure.subprocess, "run", return_value=subprocess.CompletedProcess([], 0)) as run:
+            structure.run_verification(self.root)
+        return run
+
+    def test_a_project_interpreter_overrides_a_bare_python3(self) -> None:
+        run = self.run_surface(REPOCTL_SURFACE_PYTHON="/venv/bin/python")
+        command = run.call_args.args[0]
+        self.assertEqual(command[:2], ["/venv/bin/python", "-m"])
+        self.assertEqual(run.call_args.kwargs["env"]["REPOCTL_SURFACE_PYTHON"], "/venv/bin/python")
+
+    def test_without_a_virtualenv_the_declared_command_is_unchanged(self) -> None:
+        with mock.patch.dict(os.environ, {"REPOCTL_SURFACE_PYTHON": ""}, clear=False):
+            run = self.run_surface()
+        self.assertEqual(run.call_args.args[0][0], "python3")
+
+    def venv_interpreter(self) -> Path:
+        """A real venv-shaped interpreter: bin/python is a symlink to the base interpreter."""
+        target = self.root / ".venv" / "bin" / "python"
+        target.parent.mkdir(parents=True)
+        try:
+            target.symlink_to(sys.executable)
+        except OSError as error:  # Windows without symlink privilege
+            self.skipTest(f"cannot create a symlinked interpreter: {error}")
+        return target
+
+    def test_a_discovered_dot_venv_is_absolute_for_a_nested_surface(self) -> None:
+        venv = self.venv_interpreter()
+        (self.root / "app").mkdir()
+        with mock.patch.dict(os.environ, {"REPOCTL_SURFACE_PYTHON": ""}, clear=False):
+            run = self.run_surface("app")
+        interpreter = run.call_args.args[0][0]
+        self.assertTrue(os.path.isabs(interpreter), interpreter)
+        self.assertTrue(os.path.islink(interpreter), "the venv path itself must be kept, not dereferenced")
+        self.assertEqual(interpreter, os.path.abspath(venv))
+        self.assertNotEqual(os.path.realpath(interpreter), interpreter)
+
+    def test_a_relative_override_keeps_the_venv_symlink(self) -> None:
+        venv = self.venv_interpreter()
+        with mock.patch.dict(os.environ, {"REPOCTL_SURFACE_PYTHON": ".venv/bin/python"}, clear=False):
+            run = self.run_surface("app")
+        interpreter = run.call_args.args[0][0]
+        self.assertEqual(interpreter, os.path.abspath(venv))
+        self.assertTrue(os.path.islink(interpreter))
+
+    def test_an_explicit_python_path_is_never_rewritten(self) -> None:
+        self.assertEqual(structure.surface_command(["./python3", "-m", "pytest"], "/venv/bin/python"),
+                         ["./python3", "-m", "pytest"])
+        self.assertEqual(structure.surface_command(["python3.12", "-m", "pytest"], "/venv/bin/python"),
+                         ["python3.12", "-m", "pytest"])
+
+    @template_only  # an adopted project includes kit.mk, which this focused copy does not need
+    def test_the_makefile_exports_an_absolute_interpreter(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            project = Path(temporary)
+            shutil.copy(ROOT / "Makefile", project / "Makefile")
+            (project / ".venv" / "bin").mkdir(parents=True)
+            (project / ".venv" / "bin" / "python").write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            done = subprocess.run(
+                ["make", "--no-print-directory", "-f", "Makefile",
+                 "--eval", "show-python: ; @echo $(REPOCTL_SURFACE_PYTHON)", "show-python"],
+                cwd=project, capture_output=True, text=True, timeout=30,
+                env={key: value for key, value in os.environ.items() if key != "REPOCTL_SURFACE_PYTHON"},
+            )
+            self.assertEqual(done.returncode, 0, done.stderr)
+            self.assertEqual(os.path.realpath(done.stdout.strip()),
+                             os.path.realpath(str(project / ".venv" / "bin" / "python")))
 
 
 if __name__ == "__main__":

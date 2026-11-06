@@ -31,7 +31,10 @@ The root [`LICENSE`](../LICENSE) file is the authoritative license text.
 `project.toml.license` is a human/tooling label for the selected SPDX-style
 identifier; `repoctl` checks that both exist but does not infer that arbitrary
 license text matches the label. Replace and review both files together; do not
-claim a verified license from the manifest alone.
+claim a verified license from the manifest alone. Three states are distinct:
+a selected label with its LICENSE, `UNSELECTED` (no decision yet, which fails
+`make doctor`), and `none-yet` (a deliberate deferral that passes development
+verification, prints a `make next` reminder, and fails at public launch).
 
 ## Change discipline
 

@@ -134,6 +134,36 @@ def validation_commands(surface: dict[str, object], field: str = "verification")
     return normalized
 
 
+def surface_python(root: Path) -> str:
+    """The absolute interpreter a surface's bare `python`/`python3` command should use, or "".
+
+    An explicit `REPOCTL_SURFACE_PYTHON` wins (the Makefile exports an absolute
+    one when a project virtualenv exists); a relative override is resolved
+    against the repository root, never against the surface's working directory.
+    Otherwise the conventional `.venv` in the repository is discovered here, so
+    `repoctl verify` works even when called directly. CI has no `.venv`, so its
+    declared commands stay unchanged.
+    """
+    override = os.environ.get("REPOCTL_SURFACE_PYTHON", "").strip()
+    if override:
+        path = Path(override)
+        # absolute(), never resolve(): a venv's bin/python is a symlink to the
+        # base interpreter, and dereferencing it loses the venv's site-packages.
+        return str(path) if path.is_absolute() else os.path.abspath(root / path)
+    for candidate in (".venv/bin/python", ".venv/Scripts/python.exe"):
+        path = root / candidate
+        if path.is_file():
+            return os.path.abspath(path)
+    return ""
+
+
+def surface_command(command: list[str], python: str) -> list[str]:
+    """Map a bare `python`/`python3` executable to the project interpreter, leaving paths alone."""
+    if not python or command[0] not in {"python", "python3"} or "/" in command[0] or "\\" in command[0]:
+        return command
+    return [python, *command[1:]]
+
+
 def critic_evidence_paths(surface: dict[str, object]) -> list[str]:
     value = surface.get("critic_evidence", [])
     if isinstance(value, str):
@@ -485,6 +515,7 @@ def run_verification(root: Path) -> None:
         raise RepoctlError("surface verification recursion depth exceeded")
     project = load_project(root)
     profile = governance_profile(project)
+    project_python = surface_python(root)
     # The registry's blocking checks (structure, docs, hygiene, provenance) already ran in
     # `repoctl verify` before this; running them again here made each run twice.
     for surface in declared_surfaces(project):
@@ -506,11 +537,16 @@ def run_verification(root: Path) -> None:
             else:
                 print(f"{identifier}: no automated command; minimal profile leaves review to the host")
             continue
-        for command in commands:
+        for declared in commands:
+            command = surface_command(declared, project_python)
             print(f"{identifier}: running {' '.join(command)}")
             try:
                 command_environment = verification_environment()
                 command_environment["REPOCTL_VERIFY_DEPTH"] = str(depth + 1)
+                if project_python:
+                    # Exposed for a surface command that chooses to read it; argv[0]
+                    # is what this function rewrites, not PATH.
+                    command_environment["REPOCTL_SURFACE_PYTHON"] = project_python
                 result = subprocess.run(
                     command,
                     cwd=surface_root,

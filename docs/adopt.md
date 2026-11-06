@@ -17,7 +17,7 @@ owns:
 | `README.md` | Your README stays; the project identity block is appended. |
 | `docs/README.md` | Your page stays; the generated documentation index is appended. |
 | `.github/workflows/<name>` | The kit's workflow is written beside yours as `kit-<name>`. |
-| `LICENSE` | Yours is kept and the manifest's `license` label follows it. With none, the kit's is **not** copied (a license is your legal choice): no LICENSE file, `license = "UNSELECTED"`, and adopt says so. |
+| `LICENSE` | Yours is kept and the manifest's `license` label follows it. With none, the kit's is **not** copied (a license is your legal choice): no LICENSE file, `license = "UNSELECTED"`, and adopt says so. A project that consciously defers licensing records `license = "none-yet"` once; `make verify` then passes with a `make next` reminder, while `UNSELECTED` stays an actionable failure. |
 | anything else | Yours is kept. Kept files are recorded in `tools/kit-lock.json` as yours, so `make kit-update` never touches them and mentions one only when the kit's version of it changes. |
 
 ## Kit CI and your toolchains
