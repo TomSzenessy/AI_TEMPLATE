@@ -140,9 +140,6 @@ source's current version, accessibility, licenses, and dependencies; compare
 against the already-reviewed local skills first; and verify the exact interaction 
 path and quality oracle rather than relying on popularity or descriptions.
 
-Provenance boundary:
-[`research/primary-source-hardening-2026-09-25.md`](./research/primary-source-hardening-2026-09-25.md).
-
 ### Upstream records
 
 An entry may pin its reviewed upstream: `repo`, 40-hex `revision`, `license`,
@@ -158,6 +155,9 @@ An entry may pin its reviewed upstream: `repo`, 40-hex `revision`, `license`,
   (say what and when).
 - `make kit-report UPSTREAM=<id> TITLE=... BODY=path` drafts an upstream issue
   in ignored `.agent/upstream-reports/`; never filed by it.
+
+Records added 2026-11-05: `agent-reach` and `security-audit-skill`
+(`make upstream ID=<id>`; see [skills.md](./skills.md)).
 
 ## Skill and example acceptance gate
 

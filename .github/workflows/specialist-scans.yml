@@ -65,14 +65,17 @@ jobs:
         if: steps.markdown.outputs.files != ''
         uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
         with:
-          # Exact-path exclusions are manually reviewed primary sources that
-          # reject automated clients; do not broaden these to whole domains.
+          # Reviewed exclusions cover primary sources that reject automated
+          # clients; keep each as narrow as the reviewed source allows.
           args: >-
             --no-progress
             --max-retries 4
             --retry-wait-time 5
             --accept 200,202,206
             --exclude 'https://www\.gesetze-im-internet\.de/.*'
+            --exclude 'https://ico\.org\.uk/for-organisations/uk-gdpr-guidance-and-resources/'
+            --exclude 'https://ico\.org\.uk/for-organisations/direct-marketing-and-privacy-and-electronic-communications/.*'
+            --exclude 'https://ico\.org\.uk/media2/.*'
             --exclude 'https://openai\.com/index/harness-engineering/?'
             --exclude 'https://www\.iso\.org/standard/(74393|78176|81291)\.html'
             ${{ steps.markdown.outputs.files }}

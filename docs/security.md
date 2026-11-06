@@ -104,7 +104,11 @@ Lychee step sets `failIfEmpty: ${{ github.event_name != 'pull_request' }}`
 because a changed file may legitimately contain no links (the pinned action's
 default fails such pull requests on its `Total | 0` summary), while scheduled
 and manual full scans keep failing when they find none, and `fail: true` still
-fails broken links, malformed URLs, and unreadable files;
+fails broken links, malformed URLs, and unreadable files. Reviewed exclusions
+cover primary sources that reject automated clients (German statutes,
+OpenAI's harness page, ISO previews, and the UK ICO guidance, PECR
+marketing pages, and cookie-template PDF); keep each as narrow as the
+reviewed source allows.
 organization-owned repositories must provide the trusted `GITLEAKS_LICENSE`
 secret for the pinned action. Enable the provider's fork-PR secret scanning as
 well. The link job accepts only successful response classes and excludes the
