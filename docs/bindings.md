@@ -18,7 +18,7 @@ A document declares what it describes with one comment near its top, such as
   `Docs-Reviewed: docs/x.md <reason>`. Both are per commit: two commits touching
   different modules under one broad binding can each carry their own record, so
   unrelated work need not be squashed. The commit gate, the history check, and
-  trial evidence all read both keys. (A reason with no path exempts all documents; a value that starts with a
+  trial evidence all read both keys (a reason with no path exempts all documents; a value that starts with a
   non-document path or glob, such as `tools/** untouched`, exempts nothing.) Git's own trailer parsing is
   used everywhere: trailers belong in the message's last paragraph, and a
   trailer without a reason exempts nothing.
