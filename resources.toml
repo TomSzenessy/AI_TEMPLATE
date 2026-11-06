@@ -459,3 +459,52 @@ files = [
   { path = "skills/seo/references/STRUCTURED-DATA.md", when = "adding or validating structured data" },
   { path = "skills/best-practices/references/SECURITY.md", when = "auditing web security headers and practices" },
 ]
+
+[[resources]]
+id = "agent-reach"
+kind = "skills"
+source = "https://github.com/Panniantong/Agent-Reach/tree/94f06c1969dfc1834001269d79d3ad0972d9dee6"
+trust = "discovery"
+access = "read-only"
+scope = "research"
+summary = "Pinned source for the read-only platform routes distilled into platform-reach: web search, pages, RSS, GitHub, YouTube, Bilibili, X/Twitter, Reddit, Facebook, Instagram, LinkedIn, V2EX, XiaoHongShu and Xueqiu. Installer, doctor, cookie importer, Boss CDP runbook and Xiaoyuzhou transcription are not adopted."
+repo = "Panniantong/Agent-Reach"
+revision = "94f06c1969dfc1834001269d79d3ad0972d9dee6"
+license = "MIT"
+reviewed_on = "2026-11-05"
+adapted_into = [".agents/skills/platform-reach/SKILL.md"]
+files = [
+  { path = "agent_reach/skill/SKILL_en.md", when = "comparing the distilled English route list with upstream" },
+  { path = "agent_reach/skill/references/search.md", when = "checking the Exa web-search route" },
+  { path = "agent_reach/skill/references/web.md", when = "checking a page or RSS read command" },
+  { path = "agent_reach/skill/references/dev.md", when = "checking a GitHub read command" },
+  { path = "agent_reach/skill/references/video.md", when = "checking a YouTube or Bilibili subtitle command" },
+  { path = "agent_reach/skill/references/social.md", when = "checking a social-platform read command" },
+  { path = "agent_reach/skill/references/career.md", when = "reviewing the linked Boss Zhipin runbook that platform-reach deliberately does not adopt" },
+  { path = "agent_reach/skill/references/finance.md", when = "checking a Xueqiu quote command" },
+  { path = "agent_reach/scripts/transcribe_xiaoyuzhou.sh", when = "reviewing the linked transcription route that platform-reach does not adopt" },
+  { path = "docs/cookie-export.md", when = "reviewing the manual Cookie-Editor export boundary" },
+]
+
+[[resources]]
+id = "security-audit-skill"
+kind = "skills"
+source = "https://github.com/cloudflare/security-audit-skill/tree/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8"
+trust = "discovery"
+access = "read-only"
+scope = "security"
+summary = "Pinned source for the reviewed security-audit workflow: six phases, coverage ledger, fresh-verifier validation, schema-validated findings, and target-neutral reporting. SKILL.md is condensed; companions, schema and Node validators are vendored unchanged."
+repo = "cloudflare/security-audit-skill"
+revision = "c1c8a8c1471069fb0e188eeaff69b8e8db6564a8"
+license = "MIT"
+reviewed_on = "2026-11-05"
+adapted_into = [".agents/skills/security-audit/SKILL.md"]
+files = [
+  { path = "skills/security-audit/SKILL.md", when = "comparing the condensed workflow with upstream" },
+  { path = "skills/security-audit/RECONNAISSANCE.md", when = "planning Phase 1 coverage units" },
+  { path = "skills/security-audit/HUNTING.md", when = "running a coverage-led hunter wave" },
+  { path = "skills/security-audit/VALIDATION-AND-REPORTING.md", when = "validating candidates and writing the report" },
+  { path = "skills/security-audit/AI-AND-LLM.md", when = "auditing an LLM-backed target" },
+  { path = "skills/security-audit/WEB-PROTOCOL-AND-AUTH.md", when = "auditing HTTP framing or authentication" },
+  { path = "skills/security-audit/report-schema.json", when = "checking the findings record shape" },
+]

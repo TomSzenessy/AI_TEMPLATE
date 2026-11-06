@@ -78,7 +78,7 @@ measure = true
 [capabilities]
 # First-party skills written in this repository (`make new KIND=skill` adds
 # them here). Third-party skills instead need [[skills]] provenance below.
-local_skills = ["product-kickoff", "stack-foundation", "ux-quality", "experiment-lab", "pitch-from-evidence", "technical-recon", "plan-and-build", "systematic-debugging", "review-practice", "web-quality"]
+local_skills = ["product-kickoff", "stack-foundation", "ux-quality", "experiment-lab", "pitch-from-evidence", "technical-recon", "plan-and-build", "systematic-debugging", "review-practice", "web-quality", "platform-reach"]
 
 # [checks.<name>]  A project may downgrade one blocking check it disagrees with; it still runs.
 # severity = "advisory"  (the only value) and reason = "..." (required). Deleting the entry restores blocking.
@@ -217,3 +217,17 @@ purpose = "Adapted from upstream replica-brand: name and vet your own identity, 
 reviewed_on = "2026-10-12"
 permissions = "project-local"
 rollback = "remove the .agents/skills/brand-sweep directory and its [[skills]] entry"
+
+# Reviewed security-audit capability, condensed from Cloudflare's MIT tree.
+# The phase companions, schema, and validators are vendored unchanged; the local
+# SKILL.md fits the 8000-byte skill budget; setup and planning detail is
+# in PLANNING.md. See .agents/skills/security-audit/ATTRIBUTION.md.
+[[skills]]
+package = "cloudflare/security-audit-skill@security-audit"
+source = "https://github.com/cloudflare/security-audit-skill"
+revision = "c1c8a8c1471069fb0e188eeaff69b8e8db6564a8"
+content_digest = "sha256:89d131db93c508e77053d645e85055eb84ee19b727e2239efbb87780629735bb"
+purpose = "Adapted from upstream security-audit: source-first reconnaissance, coverage-led hunting, fresh-verifier validation, schema-validated findings, independent record verification, and a target-neutral report under sandbox-only execution"
+reviewed_on = "2026-11-05"
+permissions = "read-only / project-local"
+rollback = "remove the .agents/skills/security-audit directory and its [[skills]] entry"

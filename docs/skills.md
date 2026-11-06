@@ -64,8 +64,7 @@ privilege, real artifact oracle, and rollback.
 
 ## Bundled project-local workflows
 
-The template intentionally ships a few small, composable first-party skills
-rather than a large prompt collection:
+The template ships small, composable first-party skills:
 
 - [`../.agents/skills/agent-handover/SKILL.md`](../.agents/skills/agent-handover/SKILL.md)
   keeps substantial work resumable;
@@ -74,32 +73,30 @@ rather than a large prompt collection:
 - [`../.agents/skills/repository-audit/SKILL.md`](../.agents/skills/repository-audit/SKILL.md)
   turns broad reviews into evidence-backed issues;
 - [`../.agents/skills/product-kickoff/SKILL.md`](../.agents/skills/product-kickoff/SKILL.md)
-  turns "build me an app" into researched, confirmed decisions before code,
-  then hands over to `make next`;
+  turns "build me an app" into confirmed decisions before code, then `make next`;
 - [`../.agents/skills/ux-quality/SKILL.md`](../.agents/skills/ux-quality/SKILL.md)
-  sets the UI/UX bar (visual polish against references, platform conventions,
-  states, accessibility, ethical onboarding) and the `make ui-review` loop;
+  sets the UI/UX bar (states, accessibility, conventions, ethical onboarding)
+  and the `make ui-review` loop;
 - [`../.agents/skills/stack-foundation/SKILL.md`](../.agents/skills/stack-foundation/SKILL.md)
-  sets up a walking skeleton with strict types, lint, tests, CI, preview
-  deploys, configuration, and error tracking before feature work. Its step 4
-  declares the surface, including `extra_paths` for the entry files a generator
-  writes outside the app directory (Vite keeps `index.html` at the root);
+  sets up a walking skeleton with strict types, lint, tests, CI, previews,
+  configuration, and error tracking before feature work;
 - [`../.agents/skills/technical-recon/SKILL.md`](../.agents/skills/technical-recon/SKILL.md)
-  recovers authorized app/protocol/environment behavior contracts and compares a
-  bounded reconstruction;
+  recovers authorized app/protocol behavior contracts and compares a bounded
+  reconstruction;
 - [`../.agents/skills/experiment-lab/SKILL.md`](../.agents/skills/experiment-lab/SKILL.md)
   reaches a measured score through a deterministic core, a local lab, and a
   ledger of one-change experiments;
 - [`../.agents/skills/pitch-from-evidence/SKILL.md`](../.agents/skills/pitch-from-evidence/SKILL.md)
   builds a pitch or results report from a claim table in which every number
-  has a source.
-- [`plan-and-build`](../.agents/skills/plan-and-build/SKILL.md),
-  [`systematic-debugging`](../.agents/skills/systematic-debugging/SKILL.md),
-  [`review-practice`](../.agents/skills/review-practice/SKILL.md) and
-  [`web-quality`](../.agents/skills/web-quality/SKILL.md) carry the everyday
-  engineering loop, merged from public collections
-  ([notices](../THIRD_PARTY_NOTICES.md)); other collections are routes in
-  `resources.toml`.
+  has a source;
+- [`../.agents/skills/platform-reach/SKILL.md`](../.agents/skills/platform-reach/SKILL.md)
+  gives one read-only route per public platform (web/RSS, GitHub, YouTube,
+  Bilibili, X/Twitter, Reddit, Facebook, Instagram, LinkedIn, V2EX,
+  XiaoHongShu, Xueqiu) with fallbacks, and refuses login automation,
+  cookie-store reads, CAPTCHA bypass, and unpinned installs.
+- `plan-and-build`, `systematic-debugging`, `review-practice`, and
+  `web-quality` carry the everyday engineering loop
+  ([notices](../THIRD_PARTY_NOTICES.md)).
 
 First-party skills are source-controlled, declared in
 `project.toml [capabilities].local_skills`, not third-party `[[skills]]`.
@@ -186,6 +183,11 @@ change inside one of these directories must update its digest in the same
 change. For an isolated skill copy, include the full
 [`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md) in that bundle; a
 link alone is insufficient.
+
+## Reviewed security-audit tree
+
+[`security-audit`](./security-audit.md) is a vendored Cloudflare tree; its
+provenance, boundaries, and rollback live in that owner page.
 
 Upstream skills reviewed and declined for this template, because the template's
 own documents and reviewed global skills already own those procedures:

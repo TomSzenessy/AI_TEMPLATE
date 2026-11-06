@@ -1,17 +1,15 @@
 # Documentation index
 
 The navigation layer for humans and agents. Durable knowledge lives beside its
-owner; live work, status, and acceptance tracking live in GitHub Issues, not in
-a second Markdown backlog. For a code question, `make where Q="..."` is
-usually faster than this page.
+owner; live work and acceptance live in GitHub Issues, not a Markdown backlog.
 
 ## Machine-readable sources
 
 - [`../project.toml`](../project.toml): surfaces, checks, budgets, risk tiers,
   adapters, launch state, and reviewed skill provenance.
 - [`../resources.toml`](../resources.toml): read-only resource routes.
-- [`../.agents/`](../.agents/): every capability, one file each (`make capabilities` lists them by kind and pack).
-- [`handoffs/`](./handoffs/README.md): continuation records; not indexed below, so link each from there.
+- [`../.agents/`](../.agents/): every capability, one file each.
+- [`handoffs/`](./handoffs/README.md): continuation records, linked from there.
 - Dated research notes beside the baseline:
   [MCP boundaries](./research/mcp-production-boundaries-2026-09-25.md),
   [hardening](./research/primary-source-hardening-2026-09-25.md).
@@ -81,6 +79,7 @@ itself and this table cannot drift. Edit the line in the document, not here.
 | [`capabilities.md`](./capabilities.md) | How to add, find, or switch off a capability or pack, and the configuration policy | You add, find, or switch off a skill, role, doc, rule, check, command, MCP route, or pack. |
 | [`evals.md`](./evals.md) | Fresh-agent navigation evals and scored build trials | AGENTS.md, the docs, a skill, or a gate changed and needs fresh-agent evidence. |
 | [`resources.md`](./resources.md) | Sources and intake | Absorb notes/URLs; capability, example, docs, gate. |
+| [`security-audit.md`](./security-audit.md) | Reviewed Cloudflare security-audit tree: provenance, boundaries, and rollback | A full security audit or pen test is requested. |
 | [`skills.md`](./skills.md) | Skill discovery, provenance, and overlap rules | A task needs a capability the repository does not provide. |
 | [`adr/0001-issue-backed-write-ahead.md`](./adr/0001-issue-backed-write-ahead.md) | Accepted write-ahead and documentation-boundary decision | You need the rationale for issue-backed continuity. |
 | [`adr/0002-one-capability-model.md`](./adr/0002-one-capability-model.md) | The capability model: kinds, declaration fields, discovery, packs, and what is out of scope | You add, find, or switch off a skill, role, doc, rule, check, command, MCP route, or pack. |

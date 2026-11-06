@@ -44,17 +44,32 @@ Local skills carry no per-file notices; this section is the single record.
 | [JuliusBrussee/caveman](https://github.com/JuliusBrussee/caveman) `d262ab3` | Apache-2.0, Copyright 2026 Julius Brussee (upstream `NOTICE`: "Caveman / Copyright 2026 Julius Brussee") | `review-practice` (finding format), `docs/engineering.md` |
 | [pbakaus/impeccable](https://github.com/pbakaus/impeccable) `2f98774` | Apache-2.0 | `ux-quality` (anti-pattern list, audit/critique/polish vocabulary) |
 | [ComposioHQ/awesome-claude-skills](https://github.com/ComposioHQ/awesome-claude-skills) `be2a406`, `webapp-testing` | Apache-2.0 | `web-quality` (one testing line) |
+| [Panniantong/Agent-Reach](https://github.com/Panniantong/Agent-Reach) `94f06c1` | MIT, (c) 2025 Agent Eyes | `platform-reach` (the English skill and Chinese references were translated, condensed, and rewritten; the installer, doctor, cookie importer, Boss CDP runbook, and Xiaoyuzhou transcription were not adopted) |
 
 Change statement for the Apache-2.0 sources (Caveman, Impeccable, webapp-testing): guidance was condensed and
 rewritten; no file, code, or asset was copied. License text:
 <https://www.apache.org/licenses/LICENSE-2.0>.
 
+### Vendored skill tree: security-audit
+
+This tree is different from the distilled material above: its phase companions,
+ten domain companions, `report-schema.json`, both Node validators, their tests,
+and the upstream license are vendored unchanged; the local `SKILL.md` is
+condensed and `PLANNING.md` was added for setup, coverage, severity, and budget
+detail. Attribution and the exact change record are in
+[`.agents/skills/security-audit/ATTRIBUTION.md`](./.agents/skills/security-audit/ATTRIBUTION.md).
+
+| Upstream (pinned revision) | License | Local owner |
+| --- | --- | --- |
+| [cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill) `c1c8a8c` | MIT, (c) 2025-2026 Cloudflare, Inc. | `security-audit` (vendored tree; `SKILL.md` condensed) |
+
 The other reviewed collections (Ponytail, Archify, Graphify, Understand
 Anything, UI UX Pro Max, vercel-labs/skills, REA, API Anything) are linked as
 routes in [`resources.toml`](./resources.toml), not copied.
 
-The MIT License text below applies to each MIT source above (Superpowers and
-both Addy Osmani repositories), with its own copyright line from the table.
+The MIT License text below applies to each MIT source above (Superpowers, both
+Addy Osmani repositories, Agent-Reach, and the security-audit skill), with its
+own copyright line from the table.
 
 ## License (replica-skill; same MIT text for the sources above)
 
