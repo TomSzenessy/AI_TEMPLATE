@@ -19,9 +19,11 @@ import re
 from pathlib import Path
 
 WORKFLOW_DIR = ".github/workflows"
-JOBS_START = re.compile(r"""^(?:"jobs"|'jobs'|jobs)\s*:\s*(?:#.*)?$""")  # block-style jobs mapping
+JOBS_START = re.compile(r"""^(?:"jobs"|'jobs'|jobs)\s*:\s*(?:[&!]\S+\s*)?(?:#.*)?$""")
 JOB_KEY = re.compile(r"""^(?:"([A-Za-z0-9_-]+)"|'([A-Za-z0-9_-]+)'|([A-Za-z0-9_-]+))\s*:(?:\s|$)""")
 TOP_KEY = re.compile(r"""^(?:"([A-Za-z_][A-Za-z0-9_-]*)"|'([A-Za-z_][A-Za-z0-9_-]*)'|([A-Za-z_][A-Za-z0-9_-]*))\s*:(.*)$""")
+DOCUMENT_MARKER = re.compile(r"^(?:---|\.\.\.)\s*(?:#.*)?$")
+BLOCK_LEAD = re.compile(r"^[&!]\S+$")  # an anchor or tag on the jobs value, with the block beneath
 WORKFLOW_KEY = re.compile(r"^[A-Za-z0-9_.@/-]+\.ya?ml$")
 # GitHub's documented top-level keys. Anything else is not a workflow the kit can
 # claim to mirror; unknown keys are GitHub errors too, so reporting is honest.
@@ -81,16 +83,17 @@ def workflow_problem(text: str) -> str | None:
     """Why this workflow cannot be mirrored, or None when its jobs are readable.
 
     Reads the conventional block form of GitHub's documented top-level keys.
-    An explicit key (`? jobs`), a flow mapping, an unknown top-level key, or a
-    `jobs:` body with no readable job is a named problem, never an empty job
-    list. An empty `jobs:` mapping is not a problem: there is nothing to miss.
+    An explicit key (`? jobs`), a flow mapping, an unknown top-level key, a
+    `jobs:` body with no readable job, or a workflow with no `jobs:` at all is a
+    named problem, never an empty job list. An empty `jobs:` mapping is not a
+    problem: there is nothing to miss.
     """
     lines = text.replace("\r\n", "\n").split("\n")
     jobs_index: int | None = None
     for index, line in enumerate(lines):
         if not line.strip() or line.lstrip().startswith("#") or line.startswith((" ", "\t")):
             continue
-        if line.strip() in {"---", "..."}:
+        if DOCUMENT_MARKER.match(line):
             continue
         match = TOP_KEY.match(line)
         if not match:
@@ -100,11 +103,11 @@ def workflow_problem(text: str) -> str | None:
             return f"line {index + 1} has unsupported top-level key {name!r}"
         if name == "jobs":
             jobs_index = index
-            value = match.group(4).strip()
-            if value and not value.startswith("#"):
+            value = match.group(4).split("#", 1)[0].strip()
+            if value and not BLOCK_LEAD.match(value):
                 return "its 'jobs:' value is not a block mapping"
     if jobs_index is None:
-        return None
+        return "it has no 'jobs:' mapping"
     body: list[str] = []
     for line in lines[jobs_index + 1:]:
         if line.strip() and not line.lstrip().startswith("#") and not line.startswith((" ", "\t")):

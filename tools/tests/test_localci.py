@@ -82,6 +82,28 @@ jobs :
     runs-on: ubuntu-latest
 """
 
+NO_JOBS = """\
+name: no-jobs
+on: push
+"""
+
+DOCUMENT_START_COMMENT = """\
+--- # document start
+name: marked
+on: push
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+"""
+
+ANCHORED_JOBS = """\
+name: anchored
+on: push
+jobs: &jobs
+  verify:
+    runs-on: ubuntu-latest
+"""
+
 EMPTY_JOBS_THEN_KEY = """\
 name: empty
 on: push
@@ -194,6 +216,13 @@ class WorkflowParsingTests(unittest.TestCase):
 
     def test_a_workflow_without_jobs_yields_none(self) -> None:
         self.assertEqual(wfmap.workflow_jobs("name: x\non: push\n"), {})
+        self.assertIn("no 'jobs:' mapping", wfmap.workflow_problem(NO_JOBS))
+
+    def test_a_document_marker_comment_and_a_jobs_anchor_are_read(self) -> None:
+        self.assertEqual(set(wfmap.workflow_jobs(DOCUMENT_START_COMMENT)), {"verify"})
+        self.assertIsNone(wfmap.workflow_problem(DOCUMENT_START_COMMENT))
+        self.assertEqual(set(wfmap.workflow_jobs(ANCHORED_JOBS)), {"verify"})
+        self.assertIsNone(wfmap.workflow_problem(ANCHORED_JOBS))
 
     def test_any_consistent_job_indentation_is_read(self) -> None:
         self.assertEqual(set(wfmap.workflow_jobs(FOUR_SPACE)), {"verify", "publish"})
@@ -274,6 +303,10 @@ class ManifestTests(LocalCIBase):
     def test_a_spaced_jobs_key_is_visible_to_the_drift_check(self) -> None:
         self.write(".github/workflows/spaced.yml", SPACED_KEYS)
         self.assertIn("spaced.yml:extra is neither mapped", "\n".join(localci.findings(self.root)))
+
+    def test_a_workflow_without_jobs_is_a_named_finding(self) -> None:
+        self.write(".github/workflows/nojobs.yml", NO_JOBS)
+        self.assertIn("nojobs.yml: it has no 'jobs:' mapping", "\n".join(localci.findings(self.root)))
 
     def test_flow_style_jobs_are_a_named_finding_not_silence(self) -> None:
         self.write(".github/workflows/flow.yml", FLOW_JOBS)
