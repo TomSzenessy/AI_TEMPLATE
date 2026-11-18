@@ -10,7 +10,7 @@ local):
 - capability model: registry (the one loader), checkrun (the check context and
   the one blocking rule), commands and checks (the kit's declarations, gatechecks the gates' rules;
   docs/adr/0002-one-capability-model.md)
-- governance: github, docs, skills, structure, issues, ci, cistatus, gitsync, kitreport, launch
+- governance: github, docs, skills, structure, issues, ci, cistatus, localci, wfmap, gitsync, kitreport, launch
 - project setup: kitlock (what the kit ships and the lock that records it),
   bootstrap, adopt, kitupdate
 - guided intake: guided (shared questions, pure plan, consent-gated apply;

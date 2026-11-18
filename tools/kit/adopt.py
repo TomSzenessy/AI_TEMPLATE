@@ -106,6 +106,31 @@ def keep_project_license(target: Path, project_had_one: bool) -> str | None:
 
 MERGED_AT_COLLISION = ("Makefile", ".gitignore", "README.md", "docs/README.md", "AGENTS.md")
 
+LOCAL_CI_TABLE = re.compile(r"(?m)^\[ci\.local\]\s*$")
+
+
+def drop_local_ci_map(target: Path) -> bool:
+    """Drop the kit's `[ci.local]` map from an adopted manifest (docs/local-ci.md).
+
+    `make init` keeps it because it copies the template's workflows. Adoption
+    keeps the project's own workflows, so the entries would name jobs that do
+    not exist; the project maps its own jobs when it wants local CI.
+    """
+    manifest = target / "project.toml"
+    text = manifest.read_text(encoding="utf-8")
+    start = LOCAL_CI_TABLE.search(text)
+    if start is None:
+        return False
+    end = len(text)
+    for following in re.finditer(r"(?m)^\[([A-Za-z0-9_.-]+)\]\s*$", text[start.end():]):
+        name = following.group(1)
+        if name == "ci.local" or name.startswith("ci.local."):
+            continue
+        end = start.end() + following.start()
+        break
+    manifest.write_text((text[:start.start()] + text[end:]).strip("\n") + "\n", encoding="utf-8")
+    return True
+
 
 def free_name(parent: Path, wanted: str) -> str:
     names = set(os.listdir(parent))
@@ -212,6 +237,7 @@ def adopt(target: Path, kit: Path, name: str, kind: str, owner: str | None) -> N
             kept.append(relative)
     indexed = index_existing_docs(target, before)
     initialize_project(target, name, kind, owner, mode="adopt")
+    local_ci = drop_local_ci_map(target)
     shipped = kit_paths(kit)  # your kept files are never kit files; only the kit's version of them is remembered
     targets = renamed_targets(target)
     for relative in [*shipped, "project.toml"]:  # prose follows the renamed targets (make kit-update renders the same way)
@@ -238,6 +264,9 @@ def adopt(target: Path, kit: Path, name: str, kind: str, owner: str | None) -> N
         print(f"  {agents_note}")
     if license_note:
         print(f"  {license_note}")
+    if local_ci:
+        print("  local CI: removed the kit's [ci.local] workflow map; map your own jobs when you run "
+              "make ci-local (docs/local-ci.md)")
     if indexed:
         print(f"  index lines added to your docs (edit the wording): {', '.join(indexed[:8])}{' …' if len(indexed) > 8 else ''}")
     print("  CI: .github/workflows/kit-ci.yml runs only the toolchain-free gate (repoctl check); it installs no Node/Go/etc., "

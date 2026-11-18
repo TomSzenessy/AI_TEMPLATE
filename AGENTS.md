@@ -16,12 +16,11 @@ These rules always apply; detail: owner docs. **Golden path:** `make start`, `ma
    (low, normal, or high ceremony). With others in the repository, claim the
    issue and name overlaps ([`docs/collaboration.md`](./docs/collaboration.md)).
    Parallel sessions use separate worktrees; stage only your paths.
-4. **Finish:** update every doc covering what you changed, run `make done`,
-   and observe the real artifact. Commit and push each working step, always
-   before you stop; never break the default branch. After a push,
+4. **Finish:** update every doc covering what you changed, run `make done`
+   and `make ci-local`, and observe the real artifact. Commit and push each
+   step before you stop; never break the default branch. After the push,
    `make ci-status` until green: a red run is yours. Before a run others rely
-   on (a release build, a benchmark), `make pull-first`. When pausing,
-   `make handover`.
+   on (release, benchmark), `make pull-first`. When pausing, `make handover`.
 
 Code, tests, and runtime observations are evidence; a plausible explanation
 is not a diagnosis.

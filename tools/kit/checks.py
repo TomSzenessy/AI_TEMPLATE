@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import re
 
-from . import derive, docs, docsync, gatechecks, github, hygiene, product, signatures, skills, structure
+from . import derive, docs, docsync, gatechecks, github, hygiene, localci, product, signatures, skills, structure
 from .config import setting
 from .core import (
     FILE_SURFACE_KINDS,
@@ -157,6 +157,14 @@ def budgets(context) -> list[str]:
        blocks=True, reason="Untested workflow shell broke CI repeatedly; the repoctl ci commands are tested locally.")
 def workflow_length(context) -> list[str]:
     return hygiene.workflow_errors(context.root, context.files)
+
+
+@check("local-ci-map", "Every workflow job is mapped in [ci.local] or declared not_local, and reviewed digests are "
+                       "current; before a push",
+       blocks=True, reason="An adopting project with Actions blocked pushed to learn whether a workflow step passed "
+              "(#160); the drift check names the fix and fails locally in seconds.")
+def local_ci_map(context) -> list[str]:
+    return localci.findings(context.root)
 
 
 # --- Product guardrails (each from a step a trial agent skipped) ---------------------

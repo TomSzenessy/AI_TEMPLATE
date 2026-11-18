@@ -90,7 +90,7 @@ local_skills = ["product-kickoff", "stack-foundation", "ux-quality", "experiment
 [budgets]
 # Byte limits (~4 bytes/token) for files agents load often; make check enforces.
 "AGENTS.md" = 7500
-"docs/README.md" = 9500
+"docs/README.md" = 9800
 "tools/kit/*.py" = 32000  # keep kit modules agent-sized; add budgets for product code too
 ".agents/agents/*.md" = 3000
 ".agents/skills/*/SKILL.md" = 8000
@@ -105,6 +105,64 @@ high = [
 ]
 low = ["docs/**", "**/*.md"]
 # ceremony = { normal = "issue, focused test, make done, observed artifact" }   # optional per-tier text
+
+[ci.local]
+# Run the workflow jobs a laptop can reproduce, on this exact tree, before the one
+# push (docs/local-ci.md). Each mapped job stores the digest of its reviewed
+# workflow block: when CI changes, re-read the job diff, then `make ci-local BLESS=1`.
+# guard = true makes the pre-push hook refuse a stale, failed, or incomplete run
+# (CI_LOCAL_SKIP=1 bypasses it deliberately). Off by default: a hotfix should not
+# wait for a full local run. Enable it to make the one-push rule mechanical.
+guard = false
+
+[ci.local.tools]
+# Minimum versions the doctor checks; a job whose tool is missing or older is SKIP.
+python3 = "3.11"
+make = "3.81"
+
+[[ci.local.jobs]]
+group = "verify"
+workflow = ".github/workflows/ci.yml"
+job = "verify"
+digest = "sha256:bef7cdc1424cd14066ba5f4239d9cd1adf14218bb9c7a56cb56f910cea20af87"
+tools = ["python3", "make"]
+commands = [["make", "verify"]]
+
+[[ci.local.jobs]]
+group = "verify"
+workflow = ".github/workflows/ci.yml"
+job = "test-future"
+digest = "sha256:75b9738d34987de1c73d09f14a86468f7fca510036eb8c217be0010cb1a5f041"
+tools = ["python3", "make"]
+commands = [["make", "test-future"]]
+
+[[ci.local.jobs]]
+group = "garden"
+workflow = ".github/workflows/garden.yml"
+job = "garden"
+digest = "sha256:5f764cfee000316efa36d3529539984c55c2f8a1b3342e2750a2697305e9dd96"
+tools = ["python3", "make"]
+commands = [["make", "garden"]]
+
+[[ci.local.not_local]]
+workflow = ".github/workflows/specialist-scans.yml"
+job = "secrets"
+reason = "gitleaks-action with a GITLEAKS_LICENSE and GitHub PR commit enumeration; make check's file-hygiene covers the tracked tree locally, and a host with gitleaks can map it as a job"
+
+[[ci.local.not_local]]
+workflow = ".github/workflows/specialist-scans.yml"
+job = "links"
+reason = "lychee scans external URLs; needs network access and the workflow's reviewed exclusions, so the PR names it while markdown-links runs in make check"
+
+[[ci.local.not_local]]
+workflow = ".github/workflows/issue-contract.yml"
+job = "canonical-contract"
+reason = "validates a GitHub issue event payload and applies labels with an API token; run make issue locally to file, then let the workflow accept it"
+
+[[ci.local.not_local]]
+workflow = ".github/workflows/require-issue-reference.yml"
+job = "issue-reference"
+reason = "validates a pull request event payload and queries the linked issue over the GitHub API; the PR body carries Fixes #N and the workflow checks it once"
 
 [security]
 contact = ""
