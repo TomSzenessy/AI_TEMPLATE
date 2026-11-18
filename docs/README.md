@@ -41,6 +41,7 @@ itself and this table cannot drift. Edit the line in the document, not here.
 | [`generated-files.md`](./generated-files.md) | Derived files, host adapters, and generated blocks | A generated file looks wrong, or a new agent host is added. |
 | [`hygiene.md`](./hygiene.md) | Deprecation markers, orphan files, change coupling, and product guardrails | Code or files look stale, duplicated, or ownerless. |
 | [`kit-update.md`](./kit-update.md) | The kit lock, make kit-update, and the golden-path test | A kit fix must reach projects, or a project updates from the template. |
+| [`local-ci.md`](./local-ci.md) | Local execution of the workflow jobs: groups, skips, digests, the push protocol, and what a local pass does not prove | The next step is a push, Actions is metered or blocked, or a workflow job must be reproduced locally. |
 | [`operations.md`](./operations.md) | Failure loop and error ledger rules | A bug, outage, flaky test, or operational failure occurs. |
 | [`production.md`](./production.md) | Production evidence and release boundary | A real project is being prepared for deployment or release. |
 | [`self-healing.md`](./self-healing.md) | When a check may block, lifecycle hooks, failure output, ceremony by risk, and the gardener | A check fails, a gate blocks, or the kit itself changes. |

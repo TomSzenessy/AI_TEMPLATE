@@ -16,6 +16,7 @@ advisory data; it does not verify exploit details.
 
 - [ ] Focused check:
 - [ ] `make done`
+- [ ] `make ci-local` on the final tree (tree hash: <short>); every `not_local` gate is listed:
 - [ ] Real artifact/state observed:
 - [ ] Regression/negative case:
 

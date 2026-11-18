@@ -1,0 +1,17 @@
+#!/bin/sh
+# Local CI guard (docs/local-ci.md): with `[ci.local] guard = true`, a push whose
+# head tree has no passing local run is refused. It reads the recorded evidence
+# and never runs the suite, so the hook stays fast. Bypass deliberately with
+# CI_LOCAL_SKIP=1 and say why in the PR; `git push --no-verify` skips it entirely.
+top=$(git rev-parse --show-toplevel) || exit 0
+"$top/tools/repoctl" --root "$top" ci-local --guard
+status=$?
+[ "$status" -eq 0 ] && exit 0
+# 126/127 = the launcher or a Python 3.11+ interpreter is missing: nothing ran,
+# so the gate cannot judge. Warn loudly and let the push through (CI still checks).
+if [ "$status" -eq 126 ] || [ "$status" -eq 127 ]; then
+  echo "WARNING: local CI guard NOT RUN: repoctl could not start (exit $status); install Python 3.11+ or fix tools/repoctl" >&2
+  exit 0
+fi
+echo "Push blocked by the local CI guard: run make ci-local on this tree, or set CI_LOCAL_SKIP=1 and say why in the PR (docs/local-ci.md)" >&2
+exit 1

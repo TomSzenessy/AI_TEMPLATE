@@ -12,7 +12,7 @@ import os
 import sys
 from pathlib import Path
 
-from . import ci, derive, scaffold, session
+from . import ci, derive, localci, scaffold, session
 from .core import RepoctlError, check_failed, ensure_inside_root, load_project
 from .helptext import help_text
 from .registry import KINDS, arg, command
@@ -218,7 +218,37 @@ def ci_status(root: Path, args) -> int:
     from .cistatus import ci_status as status
     state, detail = status(root)
     print(f"{state}: {detail}")
+    note = localci.evidence_note(root)
+    if note:
+        print(note)
     return 1 if state == "red" else 0
+
+
+@command("ci-local", "Run every locally reproducible workflow job on this exact tree before a push "
+         "(PASS/FAIL/SKIP; exit 3 when incomplete)", group="when-needed",
+         usage='make ci-local [GROUP="verify"] [CHECK=1|LIST=1|PLAN=1|BLESS=1] [ALLOW_SKIP=1] [SLOW=1] [DIRTY=1]',
+         args=(
+    arg("--group", default="", var="GROUP",
+        help="only these groups (space- or comma-separated); default runs every mapped job"),
+    arg("--check", action="store_true", var="CHECK", help="validate the manifest against the workflows; run nothing"),
+    arg("--list", action="store_true", dest="list_jobs", var="LIST", help="print the plan without running"),
+    arg("--plan", action="store_true", dest="plan_only", var="PLAN", help="print the plan and each job's resolved state"),
+    arg("--bless", action="store_true", var="BLESS", help="refresh reviewed digests after re-reading the workflow diff"),
+    arg("--allow-skip", action="store_true", var="ALLOW_SKIP", help="accept skips (exit 0 instead of 3)"),
+    arg("--slow", action="store_true", var="SLOW", help="run jobs marked slow (also CI_LOCAL_SLOW=1)"),
+    arg("--dirty", action="store_true", var="DIRTY", help="allow a dirty tree (the run is recorded as unverified)"),
+    arg("--guard", action="store_true", help="pre-push policy: read the last run, never execute jobs"),
+))
+def ci_local(root: Path, args) -> int:
+    return localci.run(root, localci.Options(
+        group=args.group, check=args.check, list_jobs=args.list_jobs, plan_only=args.plan_only,
+        bless=args.bless, allow_skip=args.allow_skip, slow=args.slow, dirty=args.dirty, guard=args.guard))
+
+
+@command("ci-doctor", "Show the tools each local CI job needs, the detected versions, and the declared minimums",
+         group="when-needed", usage="make ci-doctor")
+def ci_doctor(root: Path, args) -> int:
+    return localci.doctor(root)
 
 
 @command("pull-first", "Before a run others rely on: refuse a dirty or unpushed tree, pull new commits (exit 3: restart)",

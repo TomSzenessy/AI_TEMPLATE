@@ -65,12 +65,14 @@ done: python-check
 # (tools/kit/commands.py and .agents/commands/). Make variables reach repoctl as
 # quoted data, never as shell source. Edit the declaration, not this block.
 # <repoctl:commands>
-.PHONY: start next where ui-review new similar capabilities risk kit-report upstream kit-publish ci-status pull-first ready integrate handover map garden sync issue review-packet incident init adopt kit-update check doctor readiness inventory resources skill-digest validate labels github-sync eval trial help
+.PHONY: start next where ui-review new similar capabilities risk kit-report upstream kit-publish ci-status ci-local ci-doctor pull-first ready integrate handover map garden sync issue review-packet incident init adopt kit-update check doctor readiness inventory resources skill-digest validate labels github-sync eval trial help
 
 export KIT_IN_ACCESS = $(if $(filter command line,$(origin ACCESS)),$(value ACCESS))
 export KIT_IN_AGENT = $(if $(filter command line,$(origin AGENT)),$(value AGENT))
+export KIT_IN_ALLOW_SKIP = $(if $(filter command line,$(origin ALLOW_SKIP)),$(value ALLOW_SKIP))
 export KIT_IN_ANSWERS = $(if $(filter command line,$(origin ANSWERS)),$(value ANSWERS))
 export KIT_IN_AREA = $(if $(filter command line,$(origin AREA)),$(value AREA))
+export KIT_IN_BLESS = $(if $(filter command line,$(origin BLESS)),$(value BLESS))
 export KIT_IN_BODY = $(if $(filter command line,$(origin BODY)),$(value BODY))
 export KIT_IN_BRANCHES = $(if $(filter command line,$(origin BRANCHES)),$(value BRANCHES))
 export KIT_IN_BUDGET = $(if $(filter command line,$(origin BUDGET)),$(value BUDGET))
@@ -82,6 +84,7 @@ export KIT_IN_CODE_STATUS = $(if $(filter command line,$(origin CODE_STATUS)),$(
 export KIT_IN_CONSENT = $(if $(filter command line,$(origin CONSENT)),$(value CONSENT))
 export KIT_IN_COVERS = $(if $(filter command line,$(origin COVERS)),$(value COVERS))
 export KIT_IN_DESC = $(if $(filter command line,$(origin DESC)),$(value DESC))
+export KIT_IN_DIRTY = $(if $(filter command line,$(origin DIRTY)),$(value DIRTY))
 export KIT_IN_FORCE = $(if $(filter command line,$(origin FORCE)),$(value FORCE))
 export KIT_IN_GATE = $(if $(filter command line,$(origin GATE)),$(value GATE))
 export KIT_IN_GROUP = $(if $(filter command line,$(origin GROUP)),$(value GROUP))
@@ -91,10 +94,12 @@ export KIT_IN_ISSUE_FILE = $(if $(filter command line,$(origin ISSUE_FILE)),$(va
 export KIT_IN_KIND = $(if $(filter command line,$(origin KIND)),$(value KIND))
 export KIT_IN_KIT = $(if $(filter command line,$(origin KIT)),$(value KIT))
 export KIT_IN_KIT_REF = $(if $(filter command line,$(origin KIT_REF)),$(value KIT_REF))
+export KIT_IN_LIST = $(if $(filter command line,$(origin LIST)),$(value LIST))
 export KIT_IN_MODEL = $(if $(filter command line,$(origin MODEL)),$(value MODEL))
 export KIT_IN_NAME = $(if $(filter command line,$(origin NAME)),$(value NAME))
 export KIT_IN_OWNER = $(if $(filter command line,$(origin OWNER)),$(value OWNER))
 export KIT_IN_PACK = $(if $(filter command line,$(origin PACK)),$(value PACK))
+export KIT_IN_PLAN = $(if $(filter command line,$(origin PLAN)),$(value PLAN))
 export KIT_IN_PRIORITY = $(if $(filter command line,$(origin PRIORITY)),$(value PRIORITY))
 export KIT_IN_PUBLIC_REVIEWED = $(if $(filter command line,$(origin PUBLIC_REVIEWED)),$(value PUBLIC_REVIEWED))
 export KIT_IN_PUBLIC_SAFE = $(if $(filter command line,$(origin PUBLIC_SAFE)),$(value PUBLIC_SAFE))
@@ -103,6 +108,7 @@ export KIT_IN_REASON = $(if $(filter command line,$(origin REASON)),$(value REAS
 export KIT_IN_RESHAPE = $(if $(filter command line,$(origin RESHAPE)),$(value RESHAPE))
 export KIT_IN_REVIEW_EVIDENCE = $(if $(filter command line,$(origin REVIEW_EVIDENCE)),$(value REVIEW_EVIDENCE))
 export KIT_IN_SKILL_PATH = $(if $(filter command line,$(origin SKILL_PATH)),$(value SKILL_PATH))
+export KIT_IN_SLOW = $(if $(filter command line,$(origin SLOW)),$(value SLOW))
 export KIT_IN_STATUS = $(if $(filter command line,$(origin STATUS)),$(value STATUS))
 export KIT_IN_SUMMARY = $(if $(filter command line,$(origin SUMMARY)),$(value SUMMARY))
 export KIT_IN_SURFACE = $(if $(filter command line,$(origin SURFACE)),$(value SURFACE))
@@ -154,6 +160,12 @@ kit-publish: python-check
 
 ci-status: python-check
 	@$(REPOCTL) ci-status
+
+ci-local: python-check
+	@$(REPOCTL) ci-local $(if $(KIT_IN_GROUP),--group "$${KIT_IN_GROUP}",) $(if $(filter 1 yes true,$(KIT_IN_CHECK)),--check,) $(if $(filter 1 yes true,$(KIT_IN_LIST)),--list,) $(if $(filter 1 yes true,$(KIT_IN_PLAN)),--plan,) $(if $(filter 1 yes true,$(KIT_IN_BLESS)),--bless,) $(if $(filter 1 yes true,$(KIT_IN_ALLOW_SKIP)),--allow-skip,) $(if $(filter 1 yes true,$(KIT_IN_SLOW)),--slow,) $(if $(filter 1 yes true,$(KIT_IN_DIRTY)),--dirty,)
+
+ci-doctor: python-check
+	@$(REPOCTL) ci-doctor
 
 pull-first: python-check
 	@$(REPOCTL) pull-first $(if $(filter 1 yes true,$(KIT_IN_CHECK_ONLY)),--check-only,)

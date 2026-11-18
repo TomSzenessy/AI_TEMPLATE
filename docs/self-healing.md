@@ -35,6 +35,8 @@ assumed. A new or changed check **blocks** only when all three hold:
 Otherwise **advisory** (`make garden`, the brief) or **automatic fix**
 (`make sync`). `markdown-links`, `command-references`, `markers`, `budgets`,
 `readme-template-sections`, and `leak-scan-fingerprints` are advisory.
+`local-ci-map` blocks; its fix is `make ci-local BLESS=1`
+([`local-ci.md`](./local-ci.md)).
 `file-hygiene` blocks; `[checks.file-hygiene] allow_paths` exempts one path with a reason ([`capabilities.md`](./capabilities.md#exempting-one-path-from-file-hygiene)) and `file-hygiene-allowed` lists it too. Further rules:
 
 - **One blocking point per concern.** Each later gate fires only on what the
@@ -71,6 +73,7 @@ Otherwise **advisory** (`make garden`, the brief) or **automatic fix**
 | After a file edit | `repoctl hook after-edit` | — | Names the docs covering the edited path (once per session); regenerates derived files; warns only on files `make sync` writes whole, never on hand-written sources/tests/docs/host-local files. |
 | Before declaring done | `repoctl hook stop` | `make done` | Gate over this branch's change set: owed docs, derived-file drift, dead bindings, red pushed CI (`ci-red`), an unreported kit change (`kit-upstream`), the stop hook also this session's unpushed work ([collaboration](./collaboration.md)), plus critic evidence for committed `high`-risk paths ([ceremony](#ceremony-by-risk)); `make done` also prints product completeness and advises on a stale UI review. It blocks again in a turn only on changed findings (five at most); it holds a session on new `make check` findings, and one that changed product-surface code while must features are open or `features.csv` is invalid ([`building.md`](./building.md)); `make done` also runs every test. |
 | Every commit | `.githooks/commit-msg` (any agent or human) | same | Refuses a commit whose staged covered code skips its doc (unless the message carries a `Docs-Reviewed:` or `Docs-Unaffected:` trailer), and derived-file drift when the commit touches a source. In a merge commit, paths the merged branch brought in skip the owed-doc check (already judged); the rest is checked. Exit 3 means blocked; a broken plugin or kit also blocks (see [A broken check](#a-broken-check-is-a-finding-not-a-traceback)). Bypass: `--no-verify`. |
+| Before a push | `.githooks/pre-push` (opt-in) | — | Refuses a head whose recorded local run is missing, failed, incomplete, or stale ([`local-ci.md`](./local-ci.md)). |
 
 Owed docs (`doc-coupling`), critic evidence and `surface-docs` are registry
 checks, so `[checks]` downgrades apply; `surface-docs` counts a surface's
@@ -113,20 +116,14 @@ independent critic. Tune the globs per project. Never widen `low` to dodge a gat
 ### Critic evidence the gate can read
 
 For committed `high` paths, completion gates read `.agent/critic.md`
-([contract](./delegation.md#the-critics-verdict-and-its-evidence)):
-
-- **`Verdict:`** must belong to the contract's vocabulary. `blocker` and
-  unknown verdicts (including legacy `ship`) fail, never pass softly.
-- **`Commit:`** names HEAD, or an ancestor whose subsequent committed paths
-  are **all `low`** under current risk rules. Commit high-risk work before
-  review; any later `normal` or `high` change requires a fresh review.
-  History includes every commit and merge parent, reverted changes,
-  deletions and both rename paths — not just the final net diff.
-- Missing records/fields, non-ancestor commits, and unreadable HEAD/history
-  fail with a named fix.
-
-Only committed paths are judged; a dirty tree is not yet a reviewed diff.
-`[governance].profile = "minimal"` skips this gate, handing review to the host.
+([contract](./delegation.md#the-critics-verdict-and-its-evidence)).
+`Commit:` must name HEAD, or an ancestor whose later committed paths are all
+`low`; history includes every commit and merge parent, reverted changes,
+deletions, and both rename paths. Missing fields, a non-ancestor commit, or
+unreadable HEAD/history fail with a named fix, and an unknown or legacy verdict
+never passes softly. Only committed paths are judged; a dirty tree is not yet a
+reviewed diff. `[governance].profile = "minimal"` skips this gate, handing
+review to the host.
 
 ## Write-ahead issues
 

@@ -1,7 +1,7 @@
 # Collaboration
 
 <!-- index: operate | Sharing work: fetch, push, pull-first, CI after push, claims, issue comment types | several people or agents work on one repository -->
-<!-- covers: tools/kit/gitsync.py tools/kit/cistatus.py tools/kit/prflow.py .gitattributes -->
+<!-- covers: tools/kit/gitsync.py tools/kit/cistatus.py tools/kit/localci.py tools/kit/prflow.py .gitattributes -->
 
 Several people or agents on one repository (a team, a pair, or one person
 running parallel agent sessions) lose work in three ways: one runs
@@ -59,11 +59,13 @@ One CI run per finished change set, on the exact tree that merges. The rules:
 - **Draft while iterating.** A draft PR is skipped by the heavy jobs (the leak scan still
   runs on every non-draft PR and every push), so a half-finished push does not
   pay for verification.
-- **Local gate before ready.** Run `make done` yourself; `make ready` repeats
-  it on the tree it will push and refuses a dirty tree or a failing gate.
+- **Local gate before ready.** Run `make done` and then `make ci-local`
+  yourself; `make ready` repeats `make done` on the tree it will push and
+  refuses a dirty tree or a failing gate.
 - **One push when done.** `make ready` merges the default branch locally, runs
   `make done` once, pushes once, then `gh pr ready`. Do not re-run green CI to
-  "be sure"; a re-run buys no assurance.
+  "be sure"; a re-run buys no assurance. The local run and the tree hash it
+  recorded are the evidence the push relies on.
 - **Batch several finished branches.** `make integrate BRANCHES="feature/a
   feature/b"` merges them into one integration branch, runs `make done` once,
   and opens one PR whose body carries every `Fixes`/`Closes`/`Resolves #N`;
@@ -81,6 +83,42 @@ One CI run per finished change set, on the exact tree that merges. The rules:
 - **No required check is dropped.** Drafts, reuse, and batching change when a
   job runs, never whether a required check exists; never merge with a failed,
   pending, or skipped required check.
+
+## Verify, then push once
+
+`make done` runs a project-defined subset of CI. `make ci-local` runs the
+workflow jobs themselves, from `project.toml [ci.local]`, on the committed
+tree; [`local-ci.md`](./local-ci.md) owns the manifest, the groups, the states,
+and the limits. The protocol:
+
+1. **Start clean.** `make pull-first`; work on a branch or worktree.
+2. **Iterate locally.** `make ci-local GROUP=<affected>` while editing; keep
+   the PR draft and do not push to test.
+3. **Finish on the real tree.** Merge the default branch locally, run
+   `make done`, then the full `make ci-local`. Commit first: it refuses a dirty
+   tree, and `DIRTY=1` records an unverified tree instead of evidence.
+4. **One push.** Push that tree once and open or update one draft PR. Mark it
+   ready only while the head tree equals the tree in
+   `.agent/ci-local/last-run.json`; put that short hash and the summary in the
+   PR body, together with every `[[ci.local.not_local]]` gate that remains.
+5. **CI runs once.** `make ci-status` until green; it warns when the recorded
+   local run is stale, dirty, or incomplete. If a workflow fails, reproduce the
+   command locally, fix it, rerun the affected group and then the full run, and
+   push once more.
+6. **Combine, don't multiply.** Several finished branches become one
+   integration branch (`make integrate BRANCHES="a b c"`), verified once, in one
+   PR. Never open a second PR for a fix to an unmerged PR.
+7. **Merge only a verified head.** CI green and the tree equals the locally
+   verified tree. Never push an empty commit to retrigger.
+8. **Release builds.** `make pull-first`, build locally with the release flags,
+   full `make ci-local`, then one push or tag, recording commit and tree hash.
+
+A local pass proves the mapped commands on this tree — not the runner image,
+the OS/Python matrix, network isolation, GitHub-only permissions, or any
+`not_local` gate. Those stay visible in the PR; a local pass is never a
+substitute for CI's own checks. With `[ci.local] guard = true`, the pre-push
+hook refuses a head without a passing recorded run (`CI_LOCAL_SKIP=1` bypasses
+it deliberately).
 
 ## Claims
 
