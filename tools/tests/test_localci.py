@@ -74,6 +74,21 @@ on: push
     runs-on: ubuntu-latest
 """
 
+SPACED_KEYS = """\
+name: spaced
+on: push
+jobs :
+  "extra" :
+    runs-on: ubuntu-latest
+"""
+
+EMPTY_JOBS_THEN_KEY = """\
+name: empty
+on: push
+jobs:
+permissions: {}
+"""
+
 
 def digest_of(text: str, name: str) -> str:
     return wfmap.block_digest(wfmap.workflow_jobs(text)[name])
@@ -169,6 +184,15 @@ class WorkflowParsingTests(unittest.TestCase):
         self.assertFalse(wfmap.unreadable_jobs(QUOTED_JOB))
         self.assertEqual(set(wfmap.workflow_jobs(QUOTED_JOBS)), {"verify"})
 
+    def test_yaml_whitespace_before_a_colon_is_read(self) -> None:
+        self.assertEqual(set(wfmap.workflow_jobs(SPACED_KEYS)), {"extra"})
+        self.assertFalse(wfmap.unreadable_jobs(SPACED_KEYS))
+        self.assertEqual(set(wfmap.workflow_jobs('"jobs" :\n  verify :\n    runs-on: x\n')), {"verify"})
+
+    def test_an_empty_jobs_mapping_followed_by_a_key_is_not_unreadable(self) -> None:
+        self.assertEqual(wfmap.workflow_jobs(EMPTY_JOBS_THEN_KEY), {})
+        self.assertFalse(wfmap.unreadable_jobs(EMPTY_JOBS_THEN_KEY))
+
     def test_a_block_workflow_with_no_jobs_is_not_unreadable(self) -> None:
         self.assertFalse(wfmap.unreadable_jobs("name: x\non: push\njobs:\n"))
 
@@ -209,6 +233,10 @@ class ManifestTests(LocalCIBase):
         problems = "\n".join(localci.findings(self.root))
         self.assertIn("four.yml:verify is neither mapped", problems)
         self.assertIn("four.yml:publish is neither mapped", problems)
+
+    def test_a_spaced_jobs_key_is_visible_to_the_drift_check(self) -> None:
+        self.write(".github/workflows/spaced.yml", SPACED_KEYS)
+        self.assertIn("spaced.yml:extra is neither mapped", "\n".join(localci.findings(self.root)))
 
     def test_flow_style_jobs_are_a_named_finding_not_silence(self) -> None:
         self.write(".github/workflows/flow.yml", FLOW_JOBS)

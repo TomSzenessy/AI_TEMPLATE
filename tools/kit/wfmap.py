@@ -17,9 +17,9 @@ import re
 from pathlib import Path
 
 WORKFLOW_DIR = ".github/workflows"
-JOBS_START = re.compile(r"""^(?:"jobs"|'jobs'|jobs):\s*(?:#.*)?$""")  # block-style jobs mapping
-JOBS_KEY = re.compile(r"""^(?:"jobs"|'jobs'|jobs):""")  # any `jobs:` line, for the unreadable-form finding
-JOB_KEY = re.compile(r"""^(?:"([A-Za-z0-9_-]+)"|'([A-Za-z0-9_-]+)'|([A-Za-z0-9_-]+)):(?:\s|$)""")
+JOBS_START = re.compile(r"""^(?:"jobs"|'jobs'|jobs)\s*:\s*(?:#.*)?$""")  # block-style jobs mapping
+JOBS_KEY = re.compile(r"""^(?:"jobs"|'jobs'|jobs)\s*:""")  # any `jobs:` line, for the unreadable-form finding
+JOB_KEY = re.compile(r"""^(?:"([A-Za-z0-9_-]+)"|'([A-Za-z0-9_-]+)'|([A-Za-z0-9_-]+))\s*:(?:\s|$)""")
 WORKFLOW_KEY = re.compile(r"^[A-Za-z0-9_.@/-]+\.ya?ml$")
 
 
@@ -73,17 +73,20 @@ def workflow_jobs(text: str) -> dict[str, str]:
 
 
 def unreadable_jobs(text: str) -> bool:
-    """A `jobs:` section with content but no readable block job keys.
+    """A `jobs:` section with indented content but no readable block job keys.
 
     Covers a flow-style mapping (on the `jobs:` line or the next one), quoted
-    keys we cannot read, and malformed bodies. A block `jobs:` with no jobs is
-    not flagged: there is nothing to miss.
+    keys we cannot read, and malformed bodies. An empty `jobs:` followed by
+    another top-level key is not flagged: there is nothing to miss.
     """
     lines = text.replace("\r\n", "\n").split("\n")
     start = next((index for index, line in enumerate(lines) if JOBS_START.match(line)), None)
     if start is None:
         return any(JOBS_KEY.match(line) for line in lines)
-    body = [line for line in lines[start + 1:] if line.strip() and not line.lstrip().startswith("#")]
+    base = len(lines[start]) - len(lines[start].lstrip())
+    body = [line for line in lines[start + 1:]
+            if line.strip() and not line.lstrip().startswith("#")
+            and len(line) - len(line.lstrip()) > base]
     return bool(body) and not workflow_jobs(text)
 
 
