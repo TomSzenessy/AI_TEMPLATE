@@ -41,7 +41,9 @@ STATE_DIR = ".agent/ci-local"
 LAST_RUN = "last-run.json"
 PASS, FAIL, SKIP, NOT_LOCAL = "PASS", "FAIL", "SKIP", "NOT LOCAL"
 EXIT_PASSED, EXIT_FAILED, EXIT_MISUSE, EXIT_INCOMPLETE = 0, 1, 2, 3
-JOB_HEADING = re.compile(r"^  ([A-Za-z0-9_-]+):\s*(?:#.*)?$")
+JOBS_START = re.compile(r"^jobs:\s*(?:#.*)?$")  # block-style jobs mapping only
+JOBS_KEY = re.compile(r"^jobs:")  # any `jobs:` line, for the unreadable-form finding
+JOB_KEY = re.compile(r"^([A-Za-z0-9_-]+):(?:\s|$)")  # a job key, inline value or block
 WORKFLOW_KEY = re.compile(r"^[A-Za-z0-9_.@/-]+\.ya?ml$")
 VERSION = re.compile(r"(\d+(?:\.\d+)+)")
 VERSION_MINIMUM = re.compile(r"\d+(?:\.\d+)*")
@@ -221,28 +223,44 @@ def load_plan(root: Path) -> Plan:
 def workflow_jobs(text: str) -> dict[str, str]:
     """Job id -> its YAML block, read as text so the kit needs no YAML parser.
 
-    Jobs are the two-space keys under a column-zero `jobs:` line; a block ends
-    at the next such key or at the end of the `jobs` mapping.
+    The first key under the column-zero `jobs:` line fixes the indentation, so
+    two-space and four-space (or any consistent) block-style mappings both work.
+    A job block ends at the next key at that indentation or at a dedent out of
+    the `jobs` mapping. Flow-style `jobs: {...}` is not a block we can digest;
+    `_unreadable_jobs` makes that visible instead of silently empty.
     """
     lines = text.replace("\r\n", "\n").split("\n")
-    start = next((index + 1 for index, line in enumerate(lines) if re.match(r"^jobs:\s*(?:#.*)?$", line)), None)
+    start = next((index + 1 for index, line in enumerate(lines) if JOBS_START.match(line)), None)
     if start is None:
+        return {}
+    indent = next((len(line) - len(line.lstrip()) for line in lines[start:]
+                   if line.strip() and not line.lstrip().startswith("#")), 0)
+    if indent == 0:  # a flow mapping or malformed content, never a block of job keys
         return {}
     blocks: dict[str, list[str]] = {}
     current: str | None = None
     for line in lines[start:]:
-        heading = JOB_HEADING.match(line)
+        content_indent = len(line) - len(line.lstrip())
+        heading = JOB_KEY.match(line[indent:]) if line.startswith(" " * indent) and content_indent == indent else None
         if heading:
             current = heading.group(1)
             blocks[current] = [line]
             continue
         if current is None:
             continue
-        if line and not line[0].isspace():  # dedented to the next top-level key
+        if line and content_indent < indent:  # dedented to the next top-level key
             current = None
             continue
         blocks[current].append(line)
     return {name: _normalized(body) for name, body in blocks.items()}
+
+
+def _unreadable_jobs(text: str) -> bool:
+    """A `jobs:` key whose jobs are not block-style, so no job can be mapped or declared."""
+    lines = text.replace("\r\n", "\n").split("\n")
+    if any(JOBS_START.match(line) for line in lines):
+        return False
+    return any(JOBS_KEY.match(line) for line in lines)
 
 
 def _normalized(lines: list[str]) -> str:
@@ -272,8 +290,12 @@ def _check_against_workflows(root: Path, plan: Plan) -> None:
     workflows: dict[str, dict[str, str]] = {}
     for relative in _workflow_paths(root):
         text = read_text_file(root, relative)
-        if text is not None:
-            workflows[relative] = workflow_jobs(text)
+        if text is None:
+            continue
+        workflows[relative] = workflow_jobs(text)
+        if _unreadable_jobs(text):
+            plan.problems.append(f"{relative}: its jobs are not block-style under `jobs:`, so the local CI map "
+                                 "cannot see them; use one key per line (docs/local-ci.md)")
     declared = {job.key for job in plan.jobs} | {(item.workflow, item.name) for item in plan.not_local}
     for job in plan.jobs:
         if not WORKFLOW_KEY.match(job.workflow):

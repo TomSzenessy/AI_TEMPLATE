@@ -3,6 +3,7 @@ import contextlib
 import io
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -34,6 +35,21 @@ jobs:
       - run: echo publish
 """
 WORKFLOW_PATH = ".github/workflows/ci.yml"
+
+FOUR_SPACE = """\
+name: ci
+on:
+  push:
+jobs:
+    verify:
+        runs-on: ubuntu-latest
+        steps:
+            - run: echo verify
+    publish:
+        runs-on: ubuntu-latest
+"""
+
+FLOW_JOBS = "name: flow\non: push\njobs: {verify: {runs-on: ubuntu-latest}}\n"
 
 
 def digest_of(text: str, name: str) -> str:
@@ -113,6 +129,17 @@ class WorkflowParsingTests(unittest.TestCase):
     def test_a_workflow_without_jobs_yields_none(self) -> None:
         self.assertEqual(localci.workflow_jobs("name: x\non: push\n"), {})
 
+    def test_any_consistent_job_indentation_is_read(self) -> None:
+        self.assertEqual(set(localci.workflow_jobs(FOUR_SPACE)), {"verify", "publish"})
+        self.assertIn("echo verify", localci.workflow_jobs(FOUR_SPACE)["verify"])
+
+    def test_a_flow_style_jobs_mapping_is_reported_to_the_caller(self) -> None:
+        self.assertEqual(localci.workflow_jobs(FLOW_JOBS), {})
+        self.assertTrue(localci._unreadable_jobs(FLOW_JOBS))
+
+    def test_a_block_workflow_with_no_jobs_is_not_unreadable(self) -> None:
+        self.assertFalse(localci._unreadable_jobs("name: x\non: push\njobs:\n"))
+
     def test_a_block_digest_changes_when_the_job_changes(self) -> None:
         changed = WORKFLOW.replace("echo verify", "echo verify --all")
         self.assertNotEqual(digest_of(WORKFLOW, "verify"), digest_of(changed, "verify"))
@@ -144,6 +171,16 @@ class ManifestTests(LocalCIBase):
     def test_not_local_needs_a_reason(self) -> None:
         self.write_manifest(manifest(mapped(), not_local(reason="")))
         self.assertIn("not_local needs a reason", "\n".join(localci.findings(self.root)))
+
+    def test_a_four_space_workflow_job_is_visible_to_the_drift_check(self) -> None:
+        self.write(".github/workflows/four.yml", FOUR_SPACE)
+        problems = "\n".join(localci.findings(self.root))
+        self.assertIn("four.yml:verify is neither mapped", problems)
+        self.assertIn("four.yml:publish is neither mapped", problems)
+
+    def test_flow_style_jobs_are_a_named_finding_not_silence(self) -> None:
+        self.write(".github/workflows/flow.yml", FLOW_JOBS)
+        self.assertIn("not block-style", "\n".join(localci.findings(self.root)))
 
     def test_no_manifest_is_not_a_finding(self) -> None:
         self.write_manifest('schema = 1\nname = "Demo"\nkind = "web"\n')
@@ -327,6 +364,36 @@ class GuardTests(LocalCIBase):
         code, output = self.run_guard()
         self.assertEqual(code, 3)
         self.assertIn("incomplete", output)
+
+    def test_the_guard_blocks_a_recorded_dirty_run(self) -> None:
+        self.write_manifest(manifest(mapped(), not_local(), guard=True))
+        self.write("scratch.txt", "uncommitted\n")
+        self.assertEqual(self.run_ci(dirty=True)[0], 0)
+        code, output = self.run_guard()
+        self.assertEqual(code, 3)
+        self.assertIn("unverified dirty tree", output)
+
+    def test_the_guard_blocks_a_recorded_tree_that_differs_from_head(self) -> None:
+        self.write_manifest(manifest(mapped(), not_local(), guard=True))
+        self.assertEqual(self.run_ci()[0], 0)
+        record = self.last_run()
+        record["tree"] = "0" * 40
+        (self.root / localci.STATE_DIR / localci.LAST_RUN).write_text(json.dumps(record), encoding="utf-8")
+        code, output = self.run_guard()
+        self.assertEqual(code, 3)
+        self.assertIn("tree changed since the recorded local CI run", output)
+
+    def test_the_hook_lets_a_push_through_when_repoctl_cannot_start(self) -> None:
+        hook = self.root / ".githooks" / "pre-push"
+        hook.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(ROOT / ".githooks" / "pre-push", hook)
+        launcher = self.root / "tools" / "repoctl"
+        launcher.parent.mkdir(parents=True, exist_ok=True)
+        launcher.write_text("#!/bin/sh\nexit 127\n", encoding="utf-8")
+        launcher.chmod(0o755)
+        done = subprocess.run(["sh", str(hook)], cwd=self.root, capture_output=True, text=True, check=False)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertIn("NOT RUN", done.stderr)
 
     def test_ci_local_skip_bypasses_the_guard_with_a_reason(self) -> None:
         self.write_manifest(manifest(mapped(), not_local(), guard=True))
