@@ -41,9 +41,9 @@ STATE_DIR = ".agent/ci-local"
 LAST_RUN = "last-run.json"
 PASS, FAIL, SKIP, NOT_LOCAL = "PASS", "FAIL", "SKIP", "NOT LOCAL"
 EXIT_PASSED, EXIT_FAILED, EXIT_MISUSE, EXIT_INCOMPLETE = 0, 1, 2, 3
-JOBS_START = re.compile(r"^jobs:\s*(?:#.*)?$")  # block-style jobs mapping only
-JOBS_KEY = re.compile(r"^jobs:")  # any `jobs:` line, for the unreadable-form finding
-JOB_KEY = re.compile(r"^([A-Za-z0-9_-]+):(?:\s|$)")  # a job key, inline value or block
+JOBS_START = re.compile(r"""^(?:"jobs"|'jobs'|jobs):\s*(?:#.*)?$""")  # block-style jobs mapping
+JOBS_KEY = re.compile(r"""^(?:"jobs"|'jobs'|jobs):""")  # any `jobs:` line, for the unreadable-form finding
+JOB_KEY = re.compile(r"""^(?:"([A-Za-z0-9_-]+)"|'([A-Za-z0-9_-]+)'|([A-Za-z0-9_-]+)):(?:\s|$)""")
 WORKFLOW_KEY = re.compile(r"^[A-Za-z0-9_.@/-]+\.ya?ml$")
 VERSION = re.compile(r"(\d+(?:\.\d+)+)")
 VERSION_MINIMUM = re.compile(r"\d+(?:\.\d+)*")
@@ -243,7 +243,7 @@ def workflow_jobs(text: str) -> dict[str, str]:
         content_indent = len(line) - len(line.lstrip())
         heading = JOB_KEY.match(line[indent:]) if line.startswith(" " * indent) and content_indent == indent else None
         if heading:
-            current = heading.group(1)
+            current = next(group for group in heading.groups() if group)
             blocks[current] = [line]
             continue
         if current is None:
@@ -256,11 +256,18 @@ def workflow_jobs(text: str) -> dict[str, str]:
 
 
 def _unreadable_jobs(text: str) -> bool:
-    """A `jobs:` key whose jobs are not block-style, so no job can be mapped or declared."""
+    """A `jobs:` section with content but no readable block job keys.
+
+    Covers a flow-style mapping (on the `jobs:` line or the next one), quoted
+    keys we cannot read, and malformed bodies. A block `jobs:` with no jobs is
+    not flagged: there is nothing to miss.
+    """
     lines = text.replace("\r\n", "\n").split("\n")
-    if any(JOBS_START.match(line) for line in lines):
-        return False
-    return any(JOBS_KEY.match(line) for line in lines)
+    start = next((index for index, line in enumerate(lines) if JOBS_START.match(line)), None)
+    if start is None:
+        return any(JOBS_KEY.match(line) for line in lines)
+    body = [line for line in lines[start + 1:] if line.strip() and not line.lstrip().startswith("#")]
+    return bool(body) and not workflow_jobs(text)
 
 
 def _normalized(lines: list[str]) -> str:

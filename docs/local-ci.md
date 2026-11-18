@@ -113,10 +113,11 @@ make ci-local CHECK=1   # validate only, no run
 ```
 
 The digest covers the job's YAML block, read as text, so the kit needs no YAML
-parser. Any consistent indentation under `jobs:` is read; a flow-style
-`jobs: {...}` mapping is reported as unreadable instead of being silently
-skipped. `BLESS` refuses to run while structural problems (an unmapped job, a
-missing reason) remain: a fresh digest must not bless an incomplete map.
+parser. Block-style jobs at any consistent indentation are read, quoted keys
+included; a flow-style `jobs:` mapping, or any `jobs:` section with no readable
+job, is reported instead of being silently skipped. `BLESS` refuses to run while
+structural problems (an unmapped job, a missing reason) remain: a fresh digest
+must not bless an incomplete map.
 
 ## Tools, skips, and the doctor
 

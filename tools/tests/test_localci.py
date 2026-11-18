@@ -51,6 +51,29 @@ jobs:
 
 FLOW_JOBS = "name: flow\non: push\njobs: {verify: {runs-on: ubuntu-latest}}\n"
 
+FLOW_NEXT_LINE = """\
+name: flow
+on: push
+jobs:
+  {extra: {runs-on: ubuntu-latest}}
+"""
+
+QUOTED_JOB = """\
+name: quoted
+on: push
+jobs:
+  "extra":
+    runs-on: ubuntu-latest
+"""
+
+QUOTED_JOBS = """\
+name: quoted
+on: push
+"jobs":
+  verify:
+    runs-on: ubuntu-latest
+"""
+
 
 def digest_of(text: str, name: str) -> str:
     return localci.block_digest(localci.workflow_jobs(text)[name])
@@ -137,6 +160,15 @@ class WorkflowParsingTests(unittest.TestCase):
         self.assertEqual(localci.workflow_jobs(FLOW_JOBS), {})
         self.assertTrue(localci._unreadable_jobs(FLOW_JOBS))
 
+    def test_a_flow_mapping_on_the_line_after_jobs_is_unreadable(self) -> None:
+        self.assertEqual(localci.workflow_jobs(FLOW_NEXT_LINE), {})
+        self.assertTrue(localci._unreadable_jobs(FLOW_NEXT_LINE))
+
+    def test_quoted_job_keys_and_a_quoted_jobs_key_are_read(self) -> None:
+        self.assertEqual(set(localci.workflow_jobs(QUOTED_JOB)), {"extra"})
+        self.assertFalse(localci._unreadable_jobs(QUOTED_JOB))
+        self.assertEqual(set(localci.workflow_jobs(QUOTED_JOBS)), {"verify"})
+
     def test_a_block_workflow_with_no_jobs_is_not_unreadable(self) -> None:
         self.assertFalse(localci._unreadable_jobs("name: x\non: push\njobs:\n"))
 
@@ -180,7 +212,10 @@ class ManifestTests(LocalCIBase):
 
     def test_flow_style_jobs_are_a_named_finding_not_silence(self) -> None:
         self.write(".github/workflows/flow.yml", FLOW_JOBS)
-        self.assertIn("not block-style", "\n".join(localci.findings(self.root)))
+        self.write(".github/workflows/flow-next.yml", FLOW_NEXT_LINE)
+        problems = "\n".join(localci.findings(self.root))
+        self.assertIn("flow.yml: its jobs are not block-style", problems)
+        self.assertIn("flow-next.yml: its jobs are not block-style", problems)
 
     def test_no_manifest_is_not_a_finding(self) -> None:
         self.write_manifest('schema = 1\nname = "Demo"\nkind = "web"\n')
