@@ -145,7 +145,7 @@ WHEN NEEDED
                                      File a reviewed kit-report draft on the template repository (the owner's step)
   make ci-status                     The CI result of what you pushed: green, red, pending, or why it cannot tell
   make ci-local [GROUP="verify"] [CHECK=1|LIST=1|PLAN=1|BLESS=1] [ALLOW_SKIP=1] [SLOW=1] [DIRTY=1]
-                                     Run every locally reproducible workflow job on this exact tree before a push (PASS/FAIL/SKIP; exit 3 when incomplete)
+                                     Run every locally reproducible workflow job on this exact tree before a push (PASS/FAIL/SKIP; repoctl exits 3 when incomplete)
   make ci-doctor                     Show the tools each local CI job needs, the detected versions, and the declared minimums
   make pull-first [CHECK_ONLY=1]     Before a run others rely on: refuse a dirty or unpushed tree, pull new commits (exit 3: restart)
   make ready                         Merge the default branch, run make done once, push once, then mark the PR ready

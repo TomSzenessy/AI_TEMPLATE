@@ -14,7 +14,7 @@ one run on the exact tree that merges instead.
 - Run `make done` and `make ci-local` locally, then `make ready` (default
   branch merged, one gate, one push, `gh pr ready`). It refuses a dirty tree or
   a failing gate ([`docs/local-ci.md`](../../docs/local-ci.md)).
-- A run with a skipped job is `INCOMPLETE` (exit 3), never green: install the
+- A run with a skipped job is `INCOMPLETE`, never green: install the
   tool, or say in the PR which gate you accepted; a `not_local` gate is named
   in the PR, never silently dropped.
 - Several finished branches go through `make integrate BRANCHES="a b c"`; one

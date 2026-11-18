@@ -283,6 +283,20 @@ class RunTests(LocalCIBase):
 
 
 class GuardTests(LocalCIBase):
+    def test_the_command_dispatches_the_guard_without_running_jobs(self) -> None:
+        """The pre-push hook calls `repoctl ci-local --guard`; it must read the record, never run the suite."""
+        self.write_manifest(manifest(mapped(), not_local(), guard=True))
+        done = self.cli("ci-local", "--guard")
+        self.assertEqual(done.returncode, 3, done.stdout + done.stderr)
+        self.assertIn("no local CI run is recorded", done.stderr)
+        self.assertNotIn("RUN", done.stdout)
+        self.assertFalse((self.root / localci.STATE_DIR).exists(), "the guard must not create a run directory")
+
+    def test_the_command_guard_is_inert_when_disabled(self) -> None:
+        done = self.cli("ci-local", "--guard")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertEqual(done.stdout, "")
+
     def test_the_guard_is_opt_in(self) -> None:
         code, _ = self.run_guard()
         self.assertEqual(code, 0)

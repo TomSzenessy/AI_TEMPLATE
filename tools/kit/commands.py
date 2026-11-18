@@ -225,7 +225,7 @@ def ci_status(root: Path, args) -> int:
 
 
 @command("ci-local", "Run every locally reproducible workflow job on this exact tree before a push "
-         "(PASS/FAIL/SKIP; exit 3 when incomplete)", group="when-needed",
+         "(PASS/FAIL/SKIP; repoctl exits 3 when incomplete)", group="when-needed",
          usage='make ci-local [GROUP="verify"] [CHECK=1|LIST=1|PLAN=1|BLESS=1] [ALLOW_SKIP=1] [SLOW=1] [DIRTY=1]',
          args=(
     arg("--group", default="", var="GROUP",

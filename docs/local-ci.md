@@ -61,7 +61,10 @@ by default; `DIRTY=1` records it as an **unverified tree**, which the guard and
 incomplete, and the summary then says `PASSED WITH SKIPS`, never `PASSED`.
 The `0/1/2/3` contract belongs to `repoctl ci-local`; GNU make itself exits `2`
 for any failing recipe, so scripts and the pre-push guard call `repoctl`
-directly when they must distinguish the states.
+directly when they must distinguish the states. GNU make also treats a trailing
+`--flag` as its own option: the make spelling is the variable form
+(`make ci-local CHECK=1`, `BLESS=1`, `PLAN=1`), while
+`repoctl ci-local --check` keeps the flags.
 
 ## The map: `project.toml [ci.local]`
 

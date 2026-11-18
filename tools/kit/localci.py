@@ -542,7 +542,13 @@ def _result_line(state: str, job: Job, duration: float, reason: str = "") -> str
 
 
 def run(root: Path, options: Options) -> int:
-    """Execute the selected jobs and record the evidence; 0 passed, 1 failed, 3 incomplete."""
+    """Execute the selected jobs and record the evidence; 0 passed, 1 failed, 3 incomplete.
+
+    Also the one command entry point: `--guard` is the pre-push policy and must
+    dispatch here (the hook calls `repoctl ci-local --guard`), never into a run.
+    """
+    if options.guard:
+        return guard(root)
     plan = load_plan(root)
     if options.check:
         return check(root)
@@ -732,9 +738,3 @@ def guard(root: Path) -> int:
     print("Push blocked: run make ci-local on this tree, or set CI_LOCAL_SKIP=1 and say why in the PR "
           "(docs/local-ci.md).", file=sys.stderr)
     return EXIT_INCOMPLETE
-
-
-def main(root: Path, options: Options) -> int:
-    if options.guard:
-        return guard(root)
-    return run(root, options)
