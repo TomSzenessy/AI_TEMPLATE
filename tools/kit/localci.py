@@ -44,6 +44,7 @@ EXIT_PASSED, EXIT_FAILED, EXIT_MISUSE, EXIT_INCOMPLETE = 0, 1, 2, 3
 JOB_HEADING = re.compile(r"^  ([A-Za-z0-9_-]+):\s*(?:#.*)?$")
 WORKFLOW_KEY = re.compile(r"^[A-Za-z0-9_.@/-]+\.ya?ml$")
 VERSION = re.compile(r"(\d+(?:\.\d+)+)")
+VERSION_MINIMUM = re.compile(r"\d+(?:\.\d+)*")
 TRUTHY = {"1", "true", "yes", "on"}
 
 
@@ -81,6 +82,7 @@ class Plan:
     jobs: list[Job] = field(default_factory=list)
     not_local: list[NotLocal] = field(default_factory=list)
     problems: list[str] = field(default_factory=list)
+    digest_problems: list[str] = field(default_factory=list)  # the subset BLESS=1 may repair
     tools: dict[str, str] = field(default_factory=dict)
     guard: bool = False
 
@@ -127,7 +129,14 @@ def load_plan(root: Path) -> Plan:
         plan.problems.append("project.toml [ci.local] must be a table of jobs, not_local, and tools")
         return plan
     tools = local.get("tools") or {}
-    plan = Plan(tools={str(key): str(value) for key, value in tools.items()} if isinstance(tools, dict) else {})
+    if not isinstance(tools, dict):
+        plan = Plan()
+        plan.problems.append("project.toml [ci.local.tools] must be a table of minimum version strings")
+        return plan
+    plan = Plan(tools={str(key): str(value) for key, value in tools.items()})
+    for tool, minimum in plan.tools.items():
+        if not VERSION_MINIMUM.fullmatch(minimum):
+            plan.problems.append(f"[ci.local.tools] {tool} minimum '{minimum}' must be a version like 3.11")
     if local.get("guard", False) not in (True, False):
         plan.problems.append("project.toml [ci.local] guard must be true or false")
     plan.guard = local.get("guard", False) is True
@@ -279,11 +288,15 @@ def _check_against_workflows(root: Path, plan: Plan) -> None:
             plan.problems.append(f"{job.workflow}: no job '{job.name}' (renamed or removed); update project.toml [ci.local]")
             continue
         if not job.digest:
-            plan.problems.append(f"{job.workflow}:{job.name} has no digest: re-read the workflow job, then run "
-                                 "make ci-local BLESS=1")
+            message = (f"{job.workflow}:{job.name} has no digest: re-read the workflow job, then run "
+                       "make ci-local BLESS=1")
+            plan.problems.append(message)
+            plan.digest_problems.append(message)
         elif job.digest != block_digest(jobs[job.name]):
-            plan.problems.append(f"{job.workflow}:{job.name} changed since it was reviewed (stale digest); "
-                                 "re-read the job diff, then run make ci-local BLESS=1")
+            message = (f"{job.workflow}:{job.name} changed since it was reviewed (stale digest); "
+                       "re-read the job diff, then run make ci-local BLESS=1")
+            plan.problems.append(message)
+            plan.digest_problems.append(message)
     for item in plan.not_local:
         jobs = workflows.get(item.workflow)
         if jobs is None:
@@ -298,9 +311,9 @@ def _check_against_workflows(root: Path, plan: Plan) -> None:
 
 
 def findings(root: Path) -> list[str]:
-    """The drift check behind `make check` and `ci-local --check`; empty when no map is configured."""
+    """The drift check behind `make check` and `ci-local --check`; empty only when there is nothing to judge."""
     plan = load_plan(root)
-    return plan.problems if plan.configured else []
+    return plan.problems if (plan.configured or plan.problems) else []
 
 
 # --- Tools ------------------------------------------------------------------------
@@ -383,7 +396,7 @@ def _selected(jobs: list[Job], group_spec: str) -> list[Job]:
 
 def _run_id(commit: str, dirty: bool) -> str:
     stamp = time.strftime("%Y%m%dT%H%M%S", time.gmtime())
-    return f"{stamp}-{commit[:7]}{'-dirty' if dirty else ''}-{time.time_ns() % 1000:03d}"
+    return f"{stamp}-{commit[:7]}{'-dirty' if dirty else ''}-{time.time_ns() % 1_000_000:06d}"
 
 
 def _tail(path: Path, limit: int = 20) -> str:
@@ -440,13 +453,16 @@ def doctor(root: Path) -> int:
 
 
 def check(root: Path) -> int:
-    problems = findings(root)
-    if not problems:
-        plan = load_plan(root)
+    plan = load_plan(root)
+    if not plan.configured and not plan.problems:
+        print("No local CI map is configured (project.toml [ci.local]); add jobs or leave the workflows to CI "
+              "(docs/local-ci.md).")
+        return EXIT_PASSED
+    if not plan.problems:
         print(f"Local CI mirrors every workflow job ({len(plan.jobs)} mapped, {len(plan.not_local)} not local).")
         return EXIT_PASSED
     print("Local CI drift:")
-    print("\n".join(f"- {problem}" for problem in problems))
+    print("\n".join(f"- {problem}" for problem in plan.problems))
     print("Fix the manifest, or re-read the workflow diff and run make ci-local BLESS=1.")
     return EXIT_FAILED
 
@@ -462,7 +478,7 @@ def _patch_digests(text: str, digests: dict[tuple[str, str], str]) -> str:
             index += 1
             continue
         end = index + 1
-        while end < len(lines) and not lines[end].lstrip().startswith("[["):
+        while end < len(lines) and not lines[end].startswith("["):
             end += 1
         block = lines[index:end]
         workflow = name = ""
@@ -493,7 +509,7 @@ def bless(root: Path) -> int:
     if not plan.configured:
         print("No local CI jobs are mapped; nothing to bless (docs/local-ci.md).")
         return EXIT_MISUSE
-    structural = [problem for problem in plan.problems if "stale digest" not in problem and "has no digest" not in problem]
+    structural = [problem for problem in plan.problems if problem not in plan.digest_problems]
     if structural:
         print("Cannot bless until the manifest matches the workflows:")
         print("\n".join(f"- {problem}" for problem in structural))
@@ -579,6 +595,7 @@ def run(root: Path, options: Options) -> int:
                             "reason": reason, "duration_s": 0.0, "tools": list(job.tools)})
             continue
         log = log_dir / f"{job.group}-{job.name}.log".replace("/", "-")
+        print(f"  RUN      {job.group:<10} {_label(job.workflow, job.name):<36}", flush=True)
         job_start = time.monotonic()
         ok = True
         with log.open("w", encoding="utf-8") as handle:
