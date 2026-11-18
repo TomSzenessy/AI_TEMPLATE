@@ -15,7 +15,7 @@ from unittest import mock
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from fixtures import Scratch, template_only  # noqa: E402
 
-from kit import checks, core, derive, localci, trial  # noqa: E402
+from kit import checks, core, derive, localci, trial, wfmap  # noqa: E402
 from kit.registry import Registry  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -76,7 +76,7 @@ on: push
 
 
 def digest_of(text: str, name: str) -> str:
-    return localci.block_digest(localci.workflow_jobs(text)[name])
+    return wfmap.block_digest(wfmap.workflow_jobs(text)[name])
 
 
 def mapped(group: str = "verify", name: str = "verify", commands: str = '[["sh", "-c", "exit 0"]]',
@@ -144,33 +144,33 @@ class LocalCIBase(Scratch):
 
 class WorkflowParsingTests(unittest.TestCase):
     def test_jobs_are_read_as_blocks_with_their_steps(self) -> None:
-        jobs = localci.workflow_jobs(WORKFLOW)
+        jobs = wfmap.workflow_jobs(WORKFLOW)
         self.assertEqual(set(jobs), {"verify", "publish"})
         self.assertIn("echo verify", jobs["verify"])
         self.assertNotIn("echo publish", jobs["verify"])
 
     def test_a_workflow_without_jobs_yields_none(self) -> None:
-        self.assertEqual(localci.workflow_jobs("name: x\non: push\n"), {})
+        self.assertEqual(wfmap.workflow_jobs("name: x\non: push\n"), {})
 
     def test_any_consistent_job_indentation_is_read(self) -> None:
-        self.assertEqual(set(localci.workflow_jobs(FOUR_SPACE)), {"verify", "publish"})
-        self.assertIn("echo verify", localci.workflow_jobs(FOUR_SPACE)["verify"])
+        self.assertEqual(set(wfmap.workflow_jobs(FOUR_SPACE)), {"verify", "publish"})
+        self.assertIn("echo verify", wfmap.workflow_jobs(FOUR_SPACE)["verify"])
 
     def test_a_flow_style_jobs_mapping_is_reported_to_the_caller(self) -> None:
-        self.assertEqual(localci.workflow_jobs(FLOW_JOBS), {})
-        self.assertTrue(localci._unreadable_jobs(FLOW_JOBS))
+        self.assertEqual(wfmap.workflow_jobs(FLOW_JOBS), {})
+        self.assertTrue(wfmap.unreadable_jobs(FLOW_JOBS))
 
     def test_a_flow_mapping_on_the_line_after_jobs_is_unreadable(self) -> None:
-        self.assertEqual(localci.workflow_jobs(FLOW_NEXT_LINE), {})
-        self.assertTrue(localci._unreadable_jobs(FLOW_NEXT_LINE))
+        self.assertEqual(wfmap.workflow_jobs(FLOW_NEXT_LINE), {})
+        self.assertTrue(wfmap.unreadable_jobs(FLOW_NEXT_LINE))
 
     def test_quoted_job_keys_and_a_quoted_jobs_key_are_read(self) -> None:
-        self.assertEqual(set(localci.workflow_jobs(QUOTED_JOB)), {"extra"})
-        self.assertFalse(localci._unreadable_jobs(QUOTED_JOB))
-        self.assertEqual(set(localci.workflow_jobs(QUOTED_JOBS)), {"verify"})
+        self.assertEqual(set(wfmap.workflow_jobs(QUOTED_JOB)), {"extra"})
+        self.assertFalse(wfmap.unreadable_jobs(QUOTED_JOB))
+        self.assertEqual(set(wfmap.workflow_jobs(QUOTED_JOBS)), {"verify"})
 
     def test_a_block_workflow_with_no_jobs_is_not_unreadable(self) -> None:
-        self.assertFalse(localci._unreadable_jobs("name: x\non: push\njobs:\n"))
+        self.assertFalse(wfmap.unreadable_jobs("name: x\non: push\njobs:\n"))
 
     def test_a_block_digest_changes_when_the_job_changes(self) -> None:
         changed = WORKFLOW.replace("echo verify", "echo verify --all")

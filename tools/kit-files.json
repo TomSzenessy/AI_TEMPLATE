@@ -201,6 +201,7 @@
 "tools/kit/trial.py",
 "tools/kit/uireview.py",
 "tools/kit/upstream.py",
+"tools/kit/wfmap.py",
 "tools/repoctl",
 "tools/repoctl.py",
 "tools/tests/clockshift/sitecustomize.py",

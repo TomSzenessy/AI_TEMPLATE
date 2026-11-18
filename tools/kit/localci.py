@@ -21,7 +21,6 @@ GitHub-only permissions (`docs/local-ci.md`).
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import re
@@ -35,16 +34,12 @@ from pathlib import Path
 
 from .core import RepoctlError, load_project, read_text_file
 from .gitinfo import git
+from .wfmap import WORKFLOW_DIR, block_digest, is_workflow_path, unreadable_jobs, workflow_jobs, workflow_paths
 
-WORKFLOW_DIR = ".github/workflows"
 STATE_DIR = ".agent/ci-local"
 LAST_RUN = "last-run.json"
 PASS, FAIL, SKIP, NOT_LOCAL = "PASS", "FAIL", "SKIP", "NOT LOCAL"
 EXIT_PASSED, EXIT_FAILED, EXIT_MISUSE, EXIT_INCOMPLETE = 0, 1, 2, 3
-JOBS_START = re.compile(r"""^(?:"jobs"|'jobs'|jobs):\s*(?:#.*)?$""")  # block-style jobs mapping
-JOBS_KEY = re.compile(r"""^(?:"jobs"|'jobs'|jobs):""")  # any `jobs:` line, for the unreadable-form finding
-JOB_KEY = re.compile(r"""^(?:"([A-Za-z0-9_-]+)"|'([A-Za-z0-9_-]+)'|([A-Za-z0-9_-]+)):(?:\s|$)""")
-WORKFLOW_KEY = re.compile(r"^[A-Za-z0-9_.@/-]+\.ya?ml$")
 VERSION = re.compile(r"(\d+(?:\.\d+)+)")
 VERSION_MINIMUM = re.compile(r"\d+(?:\.\d+)*")
 TRUTHY = {"1", "true", "yes", "on"}
@@ -220,92 +215,19 @@ def load_plan(root: Path) -> Plan:
     return plan
 
 
-def workflow_jobs(text: str) -> dict[str, str]:
-    """Job id -> its YAML block, read as text so the kit needs no YAML parser.
-
-    The first key under the column-zero `jobs:` line fixes the indentation, so
-    two-space and four-space (or any consistent) block-style mappings both work.
-    A job block ends at the next key at that indentation or at a dedent out of
-    the `jobs` mapping. Flow-style `jobs: {...}` is not a block we can digest;
-    `_unreadable_jobs` makes that visible instead of silently empty.
-    """
-    lines = text.replace("\r\n", "\n").split("\n")
-    start = next((index + 1 for index, line in enumerate(lines) if JOBS_START.match(line)), None)
-    if start is None:
-        return {}
-    indent = next((len(line) - len(line.lstrip()) for line in lines[start:]
-                   if line.strip() and not line.lstrip().startswith("#")), 0)
-    if indent == 0:  # a flow mapping or malformed content, never a block of job keys
-        return {}
-    blocks: dict[str, list[str]] = {}
-    current: str | None = None
-    for line in lines[start:]:
-        content_indent = len(line) - len(line.lstrip())
-        heading = JOB_KEY.match(line[indent:]) if line.startswith(" " * indent) and content_indent == indent else None
-        if heading:
-            current = next(group for group in heading.groups() if group)
-            blocks[current] = [line]
-            continue
-        if current is None:
-            continue
-        if line and content_indent < indent:  # dedented to the next top-level key
-            current = None
-            continue
-        blocks[current].append(line)
-    return {name: _normalized(body) for name, body in blocks.items()}
-
-
-def _unreadable_jobs(text: str) -> bool:
-    """A `jobs:` section with content but no readable block job keys.
-
-    Covers a flow-style mapping (on the `jobs:` line or the next one), quoted
-    keys we cannot read, and malformed bodies. A block `jobs:` with no jobs is
-    not flagged: there is nothing to miss.
-    """
-    lines = text.replace("\r\n", "\n").split("\n")
-    start = next((index for index, line in enumerate(lines) if JOBS_START.match(line)), None)
-    if start is None:
-        return any(JOBS_KEY.match(line) for line in lines)
-    body = [line for line in lines[start + 1:] if line.strip() and not line.lstrip().startswith("#")]
-    return bool(body) and not workflow_jobs(text)
-
-
-def _normalized(lines: list[str]) -> str:
-    body = [line.rstrip() for line in lines]
-    while body and not body[-1]:
-        body.pop()
-    while body and not body[0]:
-        body.pop(0)
-    return "\n".join(body)
-
-
-def block_digest(block: str) -> str:
-    return "sha256:" + hashlib.sha256(block.encode("utf-8")).hexdigest()
-
-
-def _workflow_paths(root: Path) -> list[str]:
-    directory = root / WORKFLOW_DIR
-    try:
-        names = sorted(path.relative_to(root).as_posix() for path in directory.iterdir()
-                       if path.is_file() and path.suffix in {".yml", ".yaml"})
-    except OSError:
-        return []
-    return names
-
-
 def _check_against_workflows(root: Path, plan: Plan) -> None:
     workflows: dict[str, dict[str, str]] = {}
-    for relative in _workflow_paths(root):
+    for relative in workflow_paths(root):
         text = read_text_file(root, relative)
         if text is None:
             continue
         workflows[relative] = workflow_jobs(text)
-        if _unreadable_jobs(text):
+        if unreadable_jobs(text):
             plan.problems.append(f"{relative}: its jobs are not block-style under `jobs:`, so the local CI map "
                                  "cannot see them; use one key per line (docs/local-ci.md)")
     declared = {job.key for job in plan.jobs} | {(item.workflow, item.name) for item in plan.not_local}
     for job in plan.jobs:
-        if not WORKFLOW_KEY.match(job.workflow):
+        if not is_workflow_path(job.workflow):
             plan.problems.append(f"{job.workflow}:{job.name} workflow must be a path like "
                                  f"{WORKFLOW_DIR}/ci.yml")
             continue

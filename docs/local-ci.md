@@ -1,7 +1,7 @@
 # Local CI
 
 <!-- index: operate | Local execution of the workflow jobs: groups, skips, digests, the push protocol, and what a local pass does not prove | The next step is a push, Actions is metered or blocked, or a workflow job must be reproduced locally. -->
-<!-- covers: tools/kit/localci.py tools/tests/test_localci.py .githooks/pre-push -->
+<!-- covers: tools/kit/localci.py tools/kit/wfmap.py tools/tests/test_localci.py .githooks/pre-push -->
 
 GitHub Actions is metered, and an account-level spending limit or block can
 remove the feedback loop entirely. That makes "push and see" an expensive way
