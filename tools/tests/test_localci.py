@@ -89,6 +89,34 @@ jobs:
 permissions: {}
 """
 
+EMPTY_JOBS_THEN_NESTED = """\
+name: empty
+on: push
+jobs:
+permissions:
+  contents: read
+"""
+
+EXPLICIT_JOBS_KEY = """\
+name: explicit
+on: push
+? jobs
+:
+  extra:
+    runs-on: ubuntu-latest
+"""
+
+EXPLICIT_JOB_KEY = """\
+name: explicit
+on: push
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+  ? extra
+  :
+    runs-on: ubuntu-latest
+"""
+
 
 def digest_of(text: str, name: str) -> str:
     return wfmap.block_digest(wfmap.workflow_jobs(text)[name])
@@ -173,28 +201,37 @@ class WorkflowParsingTests(unittest.TestCase):
 
     def test_a_flow_style_jobs_mapping_is_reported_to_the_caller(self) -> None:
         self.assertEqual(wfmap.workflow_jobs(FLOW_JOBS), {})
-        self.assertTrue(wfmap.unreadable_jobs(FLOW_JOBS))
+        self.assertIn("not a block mapping", wfmap.workflow_problem(FLOW_JOBS))
 
     def test_a_flow_mapping_on_the_line_after_jobs_is_unreadable(self) -> None:
         self.assertEqual(wfmap.workflow_jobs(FLOW_NEXT_LINE), {})
-        self.assertTrue(wfmap.unreadable_jobs(FLOW_NEXT_LINE))
+        self.assertIn("flow mapping", wfmap.workflow_problem(FLOW_NEXT_LINE))
 
     def test_quoted_job_keys_and_a_quoted_jobs_key_are_read(self) -> None:
         self.assertEqual(set(wfmap.workflow_jobs(QUOTED_JOB)), {"extra"})
-        self.assertFalse(wfmap.unreadable_jobs(QUOTED_JOB))
+        self.assertIsNone(wfmap.workflow_problem(QUOTED_JOB))
         self.assertEqual(set(wfmap.workflow_jobs(QUOTED_JOBS)), {"verify"})
 
     def test_yaml_whitespace_before_a_colon_is_read(self) -> None:
         self.assertEqual(set(wfmap.workflow_jobs(SPACED_KEYS)), {"extra"})
-        self.assertFalse(wfmap.unreadable_jobs(SPACED_KEYS))
+        self.assertIsNone(wfmap.workflow_problem(SPACED_KEYS))
         self.assertEqual(set(wfmap.workflow_jobs('"jobs" :\n  verify :\n    runs-on: x\n')), {"verify"})
 
     def test_an_empty_jobs_mapping_followed_by_a_key_is_not_unreadable(self) -> None:
         self.assertEqual(wfmap.workflow_jobs(EMPTY_JOBS_THEN_KEY), {})
-        self.assertFalse(wfmap.unreadable_jobs(EMPTY_JOBS_THEN_KEY))
+        self.assertIsNone(wfmap.workflow_problem(EMPTY_JOBS_THEN_KEY))
+        self.assertIsNone(wfmap.workflow_problem(EMPTY_JOBS_THEN_NESTED))
 
     def test_a_block_workflow_with_no_jobs_is_not_unreadable(self) -> None:
-        self.assertFalse(wfmap.unreadable_jobs("name: x\non: push\njobs:\n"))
+        self.assertIsNone(wfmap.workflow_problem("name: x\non: push\njobs:\n"))
+
+    def test_an_explicit_yaml_jobs_key_is_named_not_ignored(self) -> None:
+        self.assertEqual(wfmap.workflow_jobs(EXPLICIT_JOBS_KEY), {})
+        self.assertIn("not a conventional top-level key", wfmap.workflow_problem(EXPLICIT_JOBS_KEY))
+
+    def test_an_explicit_job_key_inside_a_readable_block_is_named(self) -> None:
+        self.assertEqual(set(wfmap.workflow_jobs(EXPLICIT_JOB_KEY)), {"verify"})
+        self.assertIn("job keys cannot be read", wfmap.workflow_problem(EXPLICIT_JOB_KEY))
 
     def test_a_block_digest_changes_when_the_job_changes(self) -> None:
         changed = WORKFLOW.replace("echo verify", "echo verify --all")
@@ -242,8 +279,13 @@ class ManifestTests(LocalCIBase):
         self.write(".github/workflows/flow.yml", FLOW_JOBS)
         self.write(".github/workflows/flow-next.yml", FLOW_NEXT_LINE)
         problems = "\n".join(localci.findings(self.root))
-        self.assertIn("flow.yml: its jobs are not block-style", problems)
-        self.assertIn("flow-next.yml: its jobs are not block-style", problems)
+        self.assertIn("flow.yml: its 'jobs:' value is not a block mapping", problems)
+        self.assertIn("flow-next.yml: its jobs are a flow mapping", problems)
+
+    def test_an_explicit_key_workflow_is_a_named_finding(self) -> None:
+        self.write(".github/workflows/explicit.yml", EXPLICIT_JOBS_KEY)
+        self.assertIn("explicit.yml: line 3 is not a conventional top-level key",
+                      "\n".join(localci.findings(self.root)))
 
     def test_no_manifest_is_not_a_finding(self) -> None:
         self.write_manifest('schema = 1\nname = "Demo"\nkind = "web"\n')

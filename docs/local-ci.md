@@ -113,11 +113,13 @@ make ci-local CHECK=1   # validate only, no run
 ```
 
 The digest covers the job's YAML block, read as text, so the kit needs no YAML
-parser. Block-style jobs at any consistent indentation are read, quoted keys
-included; a flow-style `jobs:` mapping, or any `jobs:` section with no readable
-job, is reported instead of being silently skipped. `BLESS` refuses to run while
-structural problems (an unmapped job, a missing reason) remain: a fresh digest
-must not bless an incomplete map.
+parser. It reads the conventional block form: GitHub's documented top-level
+keys, any consistent job indentation, quoted keys, and YAML key spacing.
+Anything it cannot read confidently — an explicit key (`? jobs`), a flow
+mapping, an unknown top-level key, or a `jobs:` body with no readable job — is
+a named finding, never an empty job list. An empty `jobs:` mapping is not a
+finding. `BLESS` refuses to run while structural problems (an unmapped job, a
+missing reason) remain: a fresh digest must not bless an incomplete map.
 
 ## Tools, skips, and the doctor
 

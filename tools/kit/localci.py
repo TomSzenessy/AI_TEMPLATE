@@ -34,7 +34,7 @@ from pathlib import Path
 
 from .core import RepoctlError, load_project, read_text_file
 from .gitinfo import git
-from .wfmap import WORKFLOW_DIR, block_digest, is_workflow_path, unreadable_jobs, workflow_jobs, workflow_paths
+from .wfmap import WORKFLOW_DIR, block_digest, is_workflow_path, workflow_jobs, workflow_paths, workflow_problem
 
 STATE_DIR = ".agent/ci-local"
 LAST_RUN = "last-run.json"
@@ -222,9 +222,10 @@ def _check_against_workflows(root: Path, plan: Plan) -> None:
         if text is None:
             continue
         workflows[relative] = workflow_jobs(text)
-        if unreadable_jobs(text):
-            plan.problems.append(f"{relative}: its jobs are not block-style under `jobs:`, so the local CI map "
-                                 "cannot see them; use one key per line (docs/local-ci.md)")
+        problem = workflow_problem(text)
+        if problem:
+            plan.problems.append(f"{relative}: {problem}; the local CI map cannot verify this workflow "
+                                 "(docs/local-ci.md)")
     declared = {job.key for job in plan.jobs} | {(item.workflow, item.name) for item in plan.not_local}
     for job in plan.jobs:
         if not is_workflow_path(job.workflow):
