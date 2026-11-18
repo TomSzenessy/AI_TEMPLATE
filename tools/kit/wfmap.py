@@ -85,8 +85,8 @@ def workflow_problem(text: str) -> str | None:
     Reads the conventional block form of GitHub's documented top-level keys.
     An explicit key (`? jobs`), a flow mapping, an unknown top-level key, a
     `jobs:` body with no readable job, or a workflow with no `jobs:` at all is a
-    named problem, never an empty job list. An empty `jobs:` mapping is not a
-    problem: there is nothing to miss.
+    named problem, never an empty job list. A workflow must define at least one
+    job, so an empty or anchored-null `jobs:` is a problem too.
     """
     lines = text.replace("\r\n", "\n").split("\n")
     jobs_index: int | None = None
@@ -115,7 +115,7 @@ def workflow_problem(text: str) -> str | None:
         body.append(line)
     meaningful = [line for line in body if line.strip() and not line.lstrip().startswith("#")]
     if not meaningful:
-        return None
+        return "it has no readable jobs"
     if meaningful[0].lstrip().startswith(("{", "[")):
         return "its jobs are a flow mapping, not a block"
     indent = len(meaningful[0]) - len(meaningful[0].lstrip())

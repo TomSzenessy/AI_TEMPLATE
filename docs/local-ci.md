@@ -117,10 +117,10 @@ parser. It reads the conventional block form: GitHub's documented top-level
 keys, any consistent job indentation, quoted keys, YAML key spacing, a document
 marker comment, and a block anchor or tag on `jobs:`. Anything it cannot read
 confidently — an explicit key (`? jobs`), a flow mapping, an unknown top-level
-key, a `jobs:` body with no readable job, or a workflow with no `jobs:` at all —
-is a named finding, never an empty job list. An empty `jobs:` mapping is not a
-finding. `BLESS` refuses to run while structural problems (an unmapped job, a
-missing reason) remain: a fresh digest must not bless an incomplete map.
+key, a `jobs:` body with no readable job (including an empty or anchored-null
+mapping), or a workflow with no `jobs:` at all — is a named finding, never an
+empty job list. `BLESS` refuses to run while structural problems (an unmapped
+job, a missing reason) remain: a fresh digest must not bless an incomplete map.
 
 ## Tools, skips, and the doctor
 

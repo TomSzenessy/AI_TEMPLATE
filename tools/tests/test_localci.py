@@ -104,6 +104,19 @@ jobs: &jobs
     runs-on: ubuntu-latest
 """
 
+ANCHORED_NULL = """\
+name: anchored-null
+on: push
+jobs: &jobs
+"""
+
+TAGGED_NULL = """\
+name: tagged-null
+on: push
+jobs: !!map
+permissions: {}
+"""
+
 EMPTY_JOBS_THEN_KEY = """\
 name: empty
 on: push
@@ -246,13 +259,15 @@ class WorkflowParsingTests(unittest.TestCase):
         self.assertIsNone(wfmap.workflow_problem(SPACED_KEYS))
         self.assertEqual(set(wfmap.workflow_jobs('"jobs" :\n  verify :\n    runs-on: x\n')), {"verify"})
 
-    def test_an_empty_jobs_mapping_followed_by_a_key_is_not_unreadable(self) -> None:
+    def test_an_empty_or_anchored_null_jobs_section_is_named(self) -> None:
         self.assertEqual(wfmap.workflow_jobs(EMPTY_JOBS_THEN_KEY), {})
-        self.assertIsNone(wfmap.workflow_problem(EMPTY_JOBS_THEN_KEY))
-        self.assertIsNone(wfmap.workflow_problem(EMPTY_JOBS_THEN_NESTED))
+        self.assertIn("no readable jobs", wfmap.workflow_problem(EMPTY_JOBS_THEN_KEY))
+        self.assertIn("no readable jobs", wfmap.workflow_problem(EMPTY_JOBS_THEN_NESTED))
+        self.assertIn("no readable jobs", wfmap.workflow_problem(ANCHORED_NULL))
+        self.assertIn("no readable jobs", wfmap.workflow_problem(TAGGED_NULL))
 
-    def test_a_block_workflow_with_no_jobs_is_not_unreadable(self) -> None:
-        self.assertIsNone(wfmap.workflow_problem("name: x\non: push\njobs:\n"))
+    def test_a_block_workflow_with_no_jobs_is_named(self) -> None:
+        self.assertIn("no readable jobs", wfmap.workflow_problem("name: x\non: push\njobs:\n"))
 
     def test_an_explicit_yaml_jobs_key_is_named_not_ignored(self) -> None:
         self.assertEqual(wfmap.workflow_jobs(EXPLICIT_JOBS_KEY), {})
@@ -306,7 +321,10 @@ class ManifestTests(LocalCIBase):
 
     def test_a_workflow_without_jobs_is_a_named_finding(self) -> None:
         self.write(".github/workflows/nojobs.yml", NO_JOBS)
-        self.assertIn("nojobs.yml: it has no 'jobs:' mapping", "\n".join(localci.findings(self.root)))
+        self.write(".github/workflows/empty.yml", EMPTY_JOBS_THEN_KEY)
+        problems = "\n".join(localci.findings(self.root))
+        self.assertIn("nojobs.yml: it has no 'jobs:' mapping", problems)
+        self.assertIn("empty.yml: it has no readable jobs", problems)
 
     def test_flow_style_jobs_are_a_named_finding_not_silence(self) -> None:
         self.write(".github/workflows/flow.yml", FLOW_JOBS)
